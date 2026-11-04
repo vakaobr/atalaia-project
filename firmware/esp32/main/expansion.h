@@ -40,9 +40,9 @@
  * timelines show. Reads at discovery (IDENT, CHANNEL) are tried EXP_DISCOVERY_TRIES times.
  *
  * Platform-free: the bus is a small interface (exp_bus_t; expansion_esp.c on the ESP32, the
- * host tests' C model of a module in test/expansion_model.c), the clock is the caller's, and
- * what the driver learns goes to callbacks. Nothing calls it yet: the game task, hits to the
- * script, node.modules and node.module_lost come with increment 8.
+ * host tests' simulated modules on the module core in test/module_sim.c), the clock is the
+ * caller's, and what the driver learns goes to callbacks. Nothing calls it yet: the game task,
+ * hits to the script, node.modules and node.module_lost come with increment 8.
  */
 #ifndef ATALAIA_EXPANSION_H
 #define ATALAIA_EXPANSION_H

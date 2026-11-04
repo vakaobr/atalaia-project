@@ -5,10 +5,10 @@
  * Tests for the expansion port's driver, the box's side (expansion.c; draft RFC "The expansion
  * port", increment 6): every case of protocol/vectors/expansion.json (the CRC-8 and every frame
  * through expansion_vectors.h; fields, reasons, modules and timelines through
- * expansion_cases.h), the C model of a module (expansion_model.c) against the same cases, and
- * the driver against the model on a fake bus: discovery, IDENT, polling, events, retries, loss,
- * output reconciliation and the lease. Four of the lease's timelines are replayed by the driver
- * itself, write for write.
+ * expansion_cases.h), the module core (firmware/module-core/, through module_sim.c) against the
+ * same cases, and the driver against simulated modules on that core on a fake bus: discovery,
+ * IDENT, polling, events, retries, loss, output reconciliation and the lease. Four of the lease's
+ * timelines are replayed by the driver itself, write for write.
  */
 #include <stdio.h>
 #include <string.h>
@@ -16,7 +16,7 @@
 #include "check.h"
 #include "expansion.h"
 #include "expansion_cases.h"
-#include "expansion_model.h"
+#include "module_sim.h"
 #include "expansion_vectors.h"
 
 static void named(bool ok, const char *what, const char *name)
@@ -57,13 +57,13 @@ static const exp_module_case_t *module_case(const char *name)
     return NULL;
 }
 
-static void model_of(exp_model_t *m, const char *name, int address)
+static void model_of(module_sim_t *m, const char *name, int address)
 {
     const exp_module_case_t *mc = module_case(name);
     CHECK(mc != NULL);
     if (mc == NULL) return;
-    exp_model_init(m, (uint8_t)(address >= 0 ? address : mc->address), mc->ident, mc->channel,
-                   mc->channels);
+    CHECK(module_sim_from_frames(m, (uint8_t)(address >= 0 ? address : mc->address), mc->ident,
+                                 mc->channel, mc->channels));
 }
 
 /* ---- The frames ------------------------------------------------------------------------- */
@@ -181,14 +181,14 @@ static void test_status_cases(void)
     CHECK(valid == 8 && refused == 5 && timed == 1);
 }
 
-/* The box writes exactly the file's bytes; the model takes the good ones and refuses the others
- * for the file's reason. */
+/* The box writes exactly the file's bytes; the module core takes the good ones and refuses the
+ * others for the file's reason. */
 static void test_command_cases(void)
 {
     int valid = 0, refused = 0;
     for (size_t i = 0; i < EXP_COMMAND_CASE_COUNT; i++) {
         const exp_command_case_t *v = &exp_command_cases[i];
-        exp_model_t m;
+        module_sim_t m;
         model_of(&m, v->module, v->address);
         if (v->reason == NULL) {
             valid++;
@@ -197,13 +197,13 @@ static void test_command_cases(void)
             size_t n = expansion_encode_command(&c, (uint8_t)v->address, buf, sizeof(buf));
             named(n == v->len && memcmp(buf, v->bytes, n) == 0, "command bytes", v->name);
             named(n >= 3 && n <= EXP_COMMAND_MAX, "command length", v->name);
-            named(exp_model_write(&m, 0, v->bytes, v->len) && m.refusal == NULL, "command taken",
+            named(module_sim_write(&m, 0, v->bytes, v->len) && m.refusal == NULL, "command taken",
                   v->name);
         } else {
             refused++;
-            bool taken = exp_model_write(&m, 0, v->bytes, v->len);
+            bool taken = module_sim_write(&m, 0, v->bytes, v->len);
             uint8_t outputs, flags;
-            exp_model_state(&m, 0, &outputs, &flags);
+            module_sim_state(&m, 0, &outputs, &flags);
             named(!taken && same(m.refusal, v->reason) && (flags & EXP_ST_CMD_ERROR),
                   "command refused", v->name);
         }
@@ -218,33 +218,33 @@ static void test_command_cases(void)
 }
 
 /* A refused write sets CMD_ERROR; the next good one clears it. */
-static void test_model_cmd_error(void)
+static void test_core_cmd_error(void)
 {
-    exp_model_t m;
+    module_sim_t m;
     model_of(&m, "out4", -1);
     const uint8_t too_long[] = {0x10, 0x04, 0x33, 0x47};
-    CHECK(!exp_model_write(&m, 0, too_long, sizeof(too_long)));
+    CHECK(!module_sim_write(&m, 0, too_long, sizeof(too_long)));
     uint8_t outputs, flags;
-    exp_model_state(&m, 0, &outputs, &flags);
+    module_sim_state(&m, 0, &outputs, &flags);
     CHECK(outputs == 0 && flags == (EXP_ST_FRESH | EXP_ST_CMD_ERROR));
     exp_command_t c = {0};
     c.op = EXP_OP_CLEAR_FRESH;
     uint8_t buf[EXP_COMMAND_MAX];
-    size_t n = expansion_encode_command(&c, m.addr, buf, sizeof(buf));
-    CHECK(exp_model_write(&m, 1, buf, n));
-    exp_model_state(&m, 1, &outputs, &flags);
+    size_t n = expansion_encode_command(&c, m.cfg.address, buf, sizeof(buf));
+    CHECK(module_sim_write(&m, 1, buf, n));
+    module_sim_state(&m, 1, &outputs, &flags);
     CHECK(outputs == 0 && flags == 0);
 }
 
 #define TIMELINE_FLAGS (EXP_ST_LEASE_EXPIRED | EXP_ST_FRESH | EXP_ST_CMD_ERROR)
 
-/* Every timeline, step by step, on the model (the box's encoder writes each step's bytes). */
-static void test_model_timelines(void)
+/* Every timeline, step by step, on the module core (the box's encoder writes each step's bytes). */
+static void test_core_timelines(void)
 {
     CHECK(EXP_TIMELINE_CASE_COUNT == 7);
     for (size_t i = 0; i < EXP_TIMELINE_CASE_COUNT; i++) {
         const exp_timeline_case_t *tl = &exp_timeline_cases[i];
-        exp_model_t m;
+        module_sim_t m;
         model_of(&m, tl->module, -1);
         for (size_t j = 0; j < tl->count; j++) {
             const exp_step_case_t *s = &tl->steps[j];
@@ -255,17 +255,17 @@ static void test_model_timelines(void)
             if (s->write) {
                 exp_command_t c = to_cmd(&s->fields);
                 uint8_t buf[EXP_COMMAND_MAX];
-                size_t n = expansion_encode_command(&c, m.addr, buf, sizeof(buf));
+                size_t n = expansion_encode_command(&c, m.cfg.address, buf, sizeof(buf));
                 named(n == s->len && memcmp(buf, s->bytes, n) == 0, "timeline bytes", where);
                 if (s->delivered) {
-                    named(exp_model_write(&m, t, s->bytes, s->len) == (s->accepted == 1),
+                    named(module_sim_write(&m, t, s->bytes, s->len) == (s->accepted == 1),
                           "timeline write", where);
                 }
             }
-            if (s->restart) exp_model_restart(&m, t);
+            if (s->restart) module_sim_restart(&m, t);
             if (s->expect) {
                 uint8_t outputs, flags;
-                exp_model_state(&m, t, &outputs, &flags);
+                module_sim_state(&m, t, &outputs, &flags);
                 named(outputs == s->outputs && (flags & TIMELINE_FLAGS) == s->flags,
                       "timeline state", where);
             }
@@ -285,7 +285,7 @@ typedef struct {
 } logged_t;
 
 typedef struct {
-    exp_model_t *at[EXP_ADDR_COUNT];
+    module_sim_t *at[EXP_ADDR_COUNT];
     bool unplugged[EXP_ADDR_COUNT];
     uint32_t now;
     /* faults */
@@ -307,7 +307,7 @@ typedef struct {
     int probes, reads;
 } fake_bus_t;
 
-static exp_model_t *model_at(fake_bus_t *b, uint8_t addr)
+static module_sim_t *model_at(fake_bus_t *b, uint8_t addr)
 {
     if (addr < EXP_ADDR_FIRST || addr > EXP_ADDR_LAST) return NULL;
     int i = addr - EXP_ADDR_FIRST;
@@ -341,7 +341,7 @@ static bool fake_probe(void *ctx, uint8_t addr)
 static int fake_write(void *ctx, uint8_t addr, const uint8_t *data, size_t len)
 {
     fake_bus_t *b = (fake_bus_t *)ctx;
-    exp_model_t *m = model_at(b, addr);
+    module_sim_t *m = model_at(b, addr);
     if (len > 0 && data[0] == EXP_REG_COMMAND && b->logged < LOG_MAX) {
         logged_t *l = &b->log[b->logged++];
         l->t = b->now;
@@ -361,7 +361,7 @@ static int fake_write(void *ctx, uint8_t addr, const uint8_t *data, size_t len)
         at_time(b->drop_write_at, b->drop_write_at_n, b->now)) {
         return EXP_BUS_OK;
     }
-    exp_model_write(m, b->now, data, len);
+    module_sim_write(m, b->now, data, len);
     return EXP_BUS_OK;
 }
 
@@ -375,15 +375,15 @@ static int fake_write_read(void *ctx, uint8_t addr, const uint8_t *out, size_t o
         b->suspended_reads--;
         return EXP_BUS_SUSPENDED;
     }
-    exp_model_t *m = model_at(b, addr);
+    module_sim_t *m = model_at(b, addr);
     if (m == NULL) return EXP_BUS_FAIL;
     if (b->fail_reads > 0) {
         b->fail_reads--;
         return EXP_BUS_FAIL;
     }
     if (at_time(b->fail_read_at, b->fail_read_at_n, b->now)) return EXP_BUS_FAIL;
-    exp_model_write(m, b->now, out, out_len);
-    exp_model_read(m, b->now, in, in_len);
+    module_sim_write(m, b->now, out, out_len);
+    module_sim_read(m, b->now, in, in_len);
     if (b->corrupt_reads > 0 && in_len > 0) {
         b->corrupt_reads--;
         in[in_len - 1] ^= 0x5A;
@@ -429,7 +429,7 @@ static int count_events(const sink_t *s, exp_event_type_t type)
 static fake_bus_t bus;
 static sink_t sink;
 static expansion_t exp_;
-static exp_model_t models[EXP_ADDR_COUNT];
+static module_sim_t models[EXP_ADDR_COUNT];
 
 static void setup(void)
 {
@@ -440,9 +440,9 @@ static void setup(void)
     expansion_init(&exp_, &b, &ops);
 }
 
-static exp_model_t *plug(const char *name, int address)
+static module_sim_t *plug(const char *name, int address)
 {
-    exp_model_t *m = &models[address - EXP_ADDR_FIRST];
+    module_sim_t *m = &models[address - EXP_ADDR_FIRST];
     model_of(m, name, address);
     bus.at[address - EXP_ADDR_FIRST] = m;
     bus.unplugged[address - EXP_ADDR_FIRST] = false;
@@ -490,7 +490,7 @@ typedef struct {
     uint32_t until_ms;           /* the desired on, set at 0 */
     uint32_t stop_from, stop_to; /* the box does not tick in between (a crash) */
     uint32_t all_off_at;         /* expansion_all_off then (0: never) */
-    uint32_t restart_at;         /* the model restarts then (0: never) */
+    uint32_t restart_at;         /* the module restarts then (0: never) */
     uint32_t fail_reads[2];      /* reads at these times fail (0: none) */
     uint32_t drop_at;            /* the write of drop_op then is lost (UINT32_MAX: none) */
     uint8_t drop_op;
@@ -503,7 +503,7 @@ static void replay(const replay_t *r)
     if (tl == NULL) return;
     setup();
     const exp_module_case_t *mc = module_case(tl->module);
-    exp_model_t *m = plug(tl->module, mc->address);
+    module_sim_t *m = plug(tl->module, mc->address);
     for (int i = 0; i < 2; i++) {
         if (r->fail_reads[i] != 0) bus.fail_read_at[bus.fail_read_at_n++] = r->fail_reads[i];
     }
@@ -515,7 +515,7 @@ static void replay(const replay_t *r)
     uint32_t end = (uint32_t)tl->steps[tl->count - 1].t_ms;
     size_t next = 0;
     for (uint32_t t = 0; t <= end; t++) {
-        if (r->restart_at != 0 && t == r->restart_at) exp_model_restart(m, t);
+        if (r->restart_at != 0 && t == r->restart_at) module_sim_restart(m, t);
         if (r->all_off_at != 0 && t == r->all_off_at) expansion_all_off(&exp_);
         bool stopped = t > r->stop_from && t < r->stop_to;
         if (t % 10 == 0 && !stopped) {
@@ -524,11 +524,11 @@ static void replay(const replay_t *r)
         }
         for (; next < tl->count && (uint32_t)tl->steps[next].t_ms == t; next++) {
             const exp_step_case_t *s = &tl->steps[next];
-            /* A state between two writes of one moment is the model's to check, not ours. */
+            /* A state between two writes of one moment is the module's to check, not ours. */
             bool later = next + 1 < tl->count && (uint32_t)tl->steps[next + 1].t_ms == t;
             if (!s->expect || later) continue;
             uint8_t outputs, flags;
-            exp_model_state(m, t, &outputs, &flags);
+            module_sim_state(m, t, &outputs, &flags);
             char where[80];
             snprintf(where, sizeof(where), "%s at %u ms", r->name, (unsigned)t);
             named(outputs == s->outputs && (flags & TIMELINE_FLAGS) == s->flags, "replay state",
@@ -578,7 +578,7 @@ static void test_driver_replays_timelines(void)
     replay(&missed);
 }
 
-/* ---- The driver against the model -------------------------------------------------------- */
+/* ---- The driver against simulated modules ----------------------------------------------- */
 
 static void test_discovery_at_boot(void)
 {
@@ -593,7 +593,9 @@ static void test_discovery_at_boot(void)
     CHECK(strchr(bus.trace, 'R') > strrchr(bus.trace, 'P'));
     CHECK(writes_of(0x58, EXP_OP_ALL_OFF, 0, 0) == 1 && writes_of(0x5C, EXP_OP_ALL_OFF, 0, 0) == 1);
     CHECK(writes_of(0x58, EXP_OP_CLEAR_FRESH, 0, 0) == 1);
-    CHECK(models[0].clear_freshes == 1 && (models[0].flags & EXP_ST_FRESH) == 0);
+    uint8_t fresh_flags = 0;
+    module_sim_state(&models[0], 0, NULL, &fresh_flags);
+    CHECK(models[0].clear_freshes == 1 && (fresh_flags & EXP_ST_FRESH) == 0);
     const exp_module_t *t = expansion_module(&exp_, 0x58);
     CHECK(t != NULL && t->inputs == 1 && t->outputs == 0 && strcmp(t->cap[0], "hit") == 0);
     const exp_module_t *o = expansion_module(&exp_, 0x5C);
@@ -640,10 +642,10 @@ static void test_hot_plug(void)
 static void test_refused_ident_and_channels(void)
 {
     setup();
-    exp_model_t *m = plug("target", 0x58);
+    module_sim_t *m = plug("target", 0x58);
     m->ident[0] = 0x42; /* bad magic, CRC fixed */
     m->ident[15] = expansion_crc8(m->ident, 15);
-    exp_model_t *mixed = plug("m8001", 0x5D);
+    module_sim_t *mixed = plug("m8001", 0x5D);
     mixed->channel[1][4] = 0; /* the light channel without a max on */
     mixed->channel[1][7] = expansion_crc8(mixed->channel[1], 7);
     start(0);
@@ -660,7 +662,7 @@ static void test_refused_ident_and_channels(void)
     CHECK(expansion_module(&exp_, 0x58) != NULL);
     /* A module with no usable channel is not added. */
     setup();
-    exp_model_t *t = plug("target", 0x58);
+    module_sim_t *t = plug("target", 0x58);
     t->channel[0][1] = EXP_KIND_CONTACT;
     t->channel[0][7] = expansion_crc8(t->channel[0], 7);
     start(0);
@@ -688,61 +690,63 @@ static void test_discovery_reads_are_retried(void)
 static void test_events(void)
 {
     setup();
-    exp_model_t *m = plug("target", 0x58);
+    module_sim_t *m = plug("target", 0x58);
     start(0);
     run(10, 20);
-    CHECK(m->armed == 0); /* the box arms nothing by itself */
+    CHECK(module_sim_armed(m) == 0); /* the box arms nothing by itself */
     CHECK(expansion_arm(&exp_, 0x58, 0xFF) == EXP_OK);
     CHECK(expansion_arm(&exp_, 0x5C, 1) == EXP_NO_SUCH);
     run(30, 40);
-    CHECK(m->armed == 1 && m->arms == 1);
+    CHECK(module_sim_armed(m) == 1 && m->arms == 1);
     /* A hit 15 ms before the next read: reported once, on the box's clock, and acknowledged. */
-    exp_model_hit(m, 45, 0, EXP_EV_HIT, 200);
+    module_sim_hit(m, 45, 0, EXP_EV_HIT, 200);
     run(50, 100);
     CHECK(count_events(&sink, EXP_EVT_INPUT) == 1);
     const exp_event_t *e = &sink.ev[sink.n - 1];
     CHECK(e->type == EXP_EVT_INPUT && e->address == 0x58 && e->channel == 0 &&
           e->kind == EXP_EV_HIT && e->value == 200 && e->t_ms == 45);
     CHECK(strcmp(sink.cap[sink.n - 1], "hit") == 0);
-    CHECK(m->count == 0 && m->acks == 1);
+    CHECK(module_sim_queued(m) == 0 && m->acks == 1);
     /* Three at once: all within one poll (MORE). */
-    exp_model_hit(m, 101, 0, EXP_EV_HIT, 1);
-    exp_model_hit(m, 102, 0, EXP_EV_HIT, 2);
-    exp_model_hit(m, 103, 0, EXP_EV_HIT, 3);
+    module_sim_hit(m, 101, 0, EXP_EV_HIT, 1);
+    module_sim_hit(m, 102, 0, EXP_EV_HIT, 2);
+    module_sim_hit(m, 103, 0, EXP_EV_HIT, 3);
     run(110, 120);
-    CHECK(count_events(&sink, EXP_EVT_INPUT) == 4 && m->count == 0);
+    CHECK(count_events(&sink, EXP_EVT_INPUT) == 4 && module_sim_queued(m) == 0);
     CHECK(sink.ev[sink.n - 3].value == 1 && sink.ev[sink.n - 1].value == 3);
     CHECK(sink.ev[sink.n - 1].t_ms == 103);
     /* Six at once: four reads in a poll, the rest at the next. */
-    for (int i = 0; i < 6; i++) exp_model_hit(m, 121, 0, EXP_EV_HIT, (uint8_t)(10 + i));
+    for (int i = 0; i < 6; i++) module_sim_hit(m, 121, 0, EXP_EV_HIT, (uint8_t)(10 + i));
     run(130, 140);
-    CHECK(count_events(&sink, EXP_EVT_INPUT) == 8 && m->count == 2);
+    CHECK(count_events(&sink, EXP_EVT_INPUT) == 8 && module_sim_queued(m) == 2);
     run(150, 160);
-    CHECK(count_events(&sink, EXP_EVT_INPUT) == 10 && m->count == 0);
+    CHECK(count_events(&sink, EXP_EVT_INPUT) == 10 && module_sim_queued(m) == 0);
 }
 
 static void test_lost_ack_is_not_reported_twice(void)
 {
     setup();
-    exp_model_t *m = plug("target", 0x58);
+    module_sim_t *m = plug("target", 0x58);
     start(0);
     expansion_arm(&exp_, 0x58, 1);
     run(10, 40);
-    exp_model_hit(m, 41, 0, EXP_EV_HIT, 77);
+    module_sim_hit(m, 41, 0, EXP_EV_HIT, 77);
     bus.drop_writes = 1;
     bus.drop_op = EXP_OP_ACK;
     run(50, 60);
-    CHECK(count_events(&sink, EXP_EVT_INPUT) == 1 && m->count == 1);
+    CHECK(count_events(&sink, EXP_EVT_INPUT) == 1 && module_sim_queued(m) == 1);
     run(70, 80);
     CHECK(count_events(&sink, EXP_EVT_INPUT) == 1);
-    CHECK(m->count == 0); /* acknowledged again at the next poll */
+    CHECK(module_sim_queued(m) == 0); /* acknowledged again at the next poll */
     const exp_module_t *x = expansion_module(&exp_, 0x58);
     CHECK(x->repeats == 1 && writes_of(0x58, EXP_OP_ACK, 50, 80) == 2);
     /* After a restart its numbers start again: seq 0 again is a new event. */
-    exp_model_restart(m, 100);
+    module_sim_restart(m, 100);
     run(90, 140);
-    CHECK(m->armed == 1 && (m->flags & EXP_ST_FRESH) == 0);
-    exp_model_hit(m, 141, 0, EXP_EV_HIT, 5);
+    uint8_t flags = 0;
+    module_sim_state(m, 140, NULL, &flags);
+    CHECK(module_sim_armed(m) == 1 && (flags & EXP_ST_FRESH) == 0);
+    module_sim_hit(m, 141, 0, EXP_EV_HIT, 5);
     run(150, 160);
     CHECK(count_events(&sink, EXP_EVT_INPUT) == 2 && sink.ev[sink.n - 1].value == 5);
 }
@@ -750,31 +754,32 @@ static void test_lost_ack_is_not_reported_twice(void)
 static void test_overflow_and_disarmed(void)
 {
     setup();
-    exp_model_t *m = plug("target", 0x58);
+    module_sim_t *m = plug("target", 0x58);
     start(0);
     expansion_arm(&exp_, 0x58, 1);
     run(10, 40);
-    for (int i = 0; i < 20; i++) exp_model_hit(m, 41, 0, EXP_EV_HIT, (uint8_t)i);
+    for (int i = 0; i < 20; i++) module_sim_hit(m, 41, 0, EXP_EV_HIT, (uint8_t)i);
     run(50, 200);
     CHECK(count_events(&sink, EXP_EVT_INPUT) == 16);
     CHECK(count_events(&sink, EXP_EVT_OVERFLOW) == 1);
     /* The module still holds an event of a channel the box disarmed: dropped, acknowledged. */
     expansion_arm(&exp_, 0x58, 0);
-    exp_model_hit(m, 201, 0, EXP_EV_HIT, 9); /* the model is still armed until the next poll */
+    module_sim_hit(m, 201, 0, EXP_EV_HIT, 9); /* the model is still armed until the next poll */
     run(210, 260);
-    CHECK(count_events(&sink, EXP_EVT_INPUT) == 16 && m->count == 0 && m->armed == 0);
+    CHECK(count_events(&sink, EXP_EVT_INPUT) == 16 && module_sim_queued(m) == 0 &&
+          module_sim_armed(m) == 0);
     CHECK(expansion_module(&exp_, 0x58)->dropped == 1);
 }
 
 static void test_refused_status_and_loss(void)
 {
     setup();
-    exp_model_t *m = plug("target", 0x58);
+    module_sim_t *m = plug("target", 0x58);
     start(0);
     expansion_arm(&exp_, 0x58, 1);
     run(10, 40);
     /* A bad CRC: read again at the next poll; the event is not lost. */
-    exp_model_hit(m, 41, 0, EXP_EV_HIT, 50);
+    module_sim_hit(m, 41, 0, EXP_EV_HIT, 50);
     bus.corrupt_reads = 1;
     run(50, 60);
     CHECK(count_events(&sink, EXP_EVT_INPUT) == 0);
@@ -801,16 +806,16 @@ static void test_refused_status_and_loss(void)
           strcmp(sink.text[sink.n - 1], "58:target/1.0.0:hit") == 0);
     /* Plugged back: found again at the next probe of its address, armed nothing. */
     bus.unplugged[0] = false;
-    exp_model_restart(m, t0 + 500);
+    module_sim_restart(m, t0 + 500);
     run(t0 + 500, t0 + 2500);
     CHECK(expansion_module_count(&exp_) == 1 && count_events(&sink, EXP_EVT_ADDED) == 2);
-    CHECK(m->armed == 0);
+    CHECK(module_sim_armed(m) == 0);
 }
 
 static void test_output_only_module_gone_after_6_s(void)
 {
     setup();
-    exp_model_t *m = plug("out4", 0x5C);
+    module_sim_t *m = plug("out4", 0x5C);
     start(0);
     exp_desired_t on = {EXP_MODE_ON, 0, 0, 0};
     CHECK(expansion_output(&exp_, 0x5C, 0, &on, 0) == EXP_OK);
@@ -822,24 +827,24 @@ static void test_output_only_module_gone_after_6_s(void)
     CHECK(expansion_module_count(&exp_) == 0);
     /* Back: added off; the old desired state is gone with the module. */
     bus.unplugged[4] = false;
-    exp_model_restart(m, 7300);
+    module_sim_restart(m, 7300);
     run(7300, 9300);
     CHECK(expansion_module_count(&exp_) == 1);
     run(9310, 30000);
     uint8_t outputs;
-    exp_model_state(m, 30000, &outputs, NULL);
+    module_sim_state(m, 30000, &outputs, NULL);
     CHECK(outputs == 0 && expansion_module(&exp_, 0x5C)->out[0].want.mode == EXP_MODE_OFF);
 }
 
 static void test_swapped_module(void)
 {
     setup();
-    exp_model_t *m = plug("target", 0x5D);
+    module_sim_t *m = plug("target", 0x5D);
     start(0);
     run(10, 100);
     /* Within the 0.5 s a different module comes up at the same address: FRESH, another IDENT. */
     model_of(m, "m8001", 0x5D);
-    exp_model_restart(m, 105);
+    module_sim_restart(m, 105);
     run(110, 140);
     CHECK(count_events(&sink, EXP_EVT_LOST) == 1);
     int lost = -1;
@@ -849,7 +854,7 @@ static void test_swapped_module(void)
     const exp_module_t *x = expansion_module(&exp_, 0x5D);
     CHECK(x != NULL && x->ident.model == 0x8001);
     /* The same module restarting is not lost. */
-    exp_model_restart(m, 200);
+    module_sim_restart(m, 200);
     run(150, 300);
     CHECK(count_events(&sink, EXP_EVT_LOST) == 1 && expansion_module(&exp_, 0x5D)->restarts == 1);
 }
@@ -857,7 +862,7 @@ static void test_swapped_module(void)
 static void test_outputs_and_lease(void)
 {
     setup();
-    exp_model_t *m = plug("out4", 0x5C);
+    module_sim_t *m = plug("out4", 0x5C);
     start(0);
     uint8_t outputs, flags;
     /* A 10 s siren: OUTPUT with 100 (10 s), refreshed while on, off by the module's timer. */
@@ -867,11 +872,11 @@ static void test_outputs_and_lease(void)
     CHECK(writes_of(0x5C, EXP_OP_OUTPUT, 1000, 1000) == 1);
     CHECK(bus.log[bus.logged - 1].bytes[4] == 100);
     run(1010, 10990);
-    exp_model_state(m, 10990, &outputs, &flags);
+    module_sim_state(m, 10990, &outputs, &flags);
     CHECK(outputs == 1 && flags == 0);
     CHECK(writes_of(0x5C, EXP_OP_LEASE, 1000, 10990) == 19);
     run(11000, 12000);
-    exp_model_state(m, 12000, &outputs, &flags);
+    module_sim_state(m, 12000, &outputs, &flags);
     CHECK(outputs == 0 && flags == 0);
     CHECK(writes_of(0x5C, EXP_OP_LEASE, 11000, 12000) == 0);
     CHECK(writes_of(0x5C, EXP_OP_OUTPUT, 1010, 12000) == 0); /* nothing to repair */
@@ -882,7 +887,7 @@ static void test_outputs_and_lease(void)
     exp_desired_t off = {EXP_MODE_OFF, 0, 0, 0};
     CHECK(expansion_output(&exp_, 0x5C, 1, &off, 13000) == EXP_OK);
     run(13010, 13010);
-    exp_model_state(m, 13010, &outputs, NULL);
+    module_sim_state(m, 13010, &outputs, NULL);
     CHECK(outputs == 0 && writes_of(0x5C, EXP_OP_OUTPUT, 13010, 13010) == 1);
     /* An output the box wants off but the module shows on is turned off at the next poll. */
     const uint8_t on_ch3[] = {0x10, 0x03, 0x03, 0x01, 0, 0, 0, 0, 0, 0, 0};
@@ -891,9 +896,9 @@ static void test_outputs_and_lease(void)
     uint8_t covered[EXP_COMMAND_MAX + 1] = {0x5C << 1};
     memcpy(covered + 1, frame, 10);
     frame[10] = expansion_crc8(covered, 11);
-    CHECK(exp_model_write(m, 13015, frame, 11));
+    CHECK(module_sim_write(m, 13015, frame, 11));
     run(13020, 13300);
-    exp_model_state(m, 13300, &outputs, NULL);
+    module_sim_state(m, 13300, &outputs, NULL);
     CHECK(outputs == 0);
     /* The box stops: the module turns everything off within 1.5 s of the last refresh. */
     want.until_ms = 0;
@@ -901,9 +906,9 @@ static void test_outputs_and_lease(void)
     run(14000, 15000);
     int last = bus.logged - 1;
     uint32_t last_write = bus.log[last].t;
-    exp_model_state(m, last_write + 1499, &outputs, NULL);
+    module_sim_state(m, last_write + 1499, &outputs, NULL);
     CHECK(outputs == 1);
-    exp_model_state(m, last_write + 1500, &outputs, &flags);
+    module_sim_state(m, last_write + 1500, &outputs, &flags);
     CHECK(outputs == 0 && (flags & EXP_ST_LEASE_EXPIRED));
     /* All off: ALL_OFF, and nothing comes back on. */
     setup();
@@ -915,7 +920,7 @@ static void test_outputs_and_lease(void)
     run(0, 600);
     expansion_all_off(&exp_);
     run(610, 2000);
-    exp_model_state(m, 2000, &outputs, NULL);
+    module_sim_state(m, 2000, &outputs, NULL);
     CHECK(outputs == 0 && writes_of(0x5C, EXP_OP_ALL_OFF, 610, 610) == 1);
     CHECK(writes_of(0x5C, EXP_OP_LEASE, 620, 2000) == 0 &&
           writes_of(0x5C, EXP_OP_OUTPUT, 620, 2000) == 0);
@@ -949,27 +954,27 @@ static void test_output_arguments(void)
 static void test_pattern_reconciled(void)
 {
     setup();
-    exp_model_t *m = plug("out4", 0x5C);
+    module_sim_t *m = plug("out4", 0x5C);
     start(0);
     exp_desired_t p = {EXP_MODE_PATTERN, 5000, 500, 500};
     CHECK(expansion_output(&exp_, 0x5C, 1, &p, 0) == EXP_OK);
     run(0, 4000);
     CHECK(writes_of(0x5C, EXP_OP_OUTPUT, 0, 4000) == 1);
     uint8_t outputs;
-    exp_model_state(m, 4100, &outputs, NULL);
+    module_sim_state(m, 4100, &outputs, NULL);
     CHECK(outputs == 2);
     run(4010, 6000);
-    exp_model_state(m, 6000, &outputs, NULL);
+    module_sim_state(m, 6000, &outputs, NULL);
     CHECK(outputs == 0 && writes_of(0x5C, EXP_OP_OUTPUT, 0, 6000) == 1);
     /* The module restarts in the middle of a pattern: sent again with what is left. */
     p.until_ms = 20000;
     expansion_output(&exp_, 0x5C, 1, &p, 6000);
     run(6010, 8000);
-    exp_model_restart(m, 8005);
+    module_sim_restart(m, 8005);
     run(8010, 8500);
     CHECK(writes_of(0x5C, EXP_OP_OUTPUT, 8010, 8500) == 1 && m->outputs_taken >= 1);
-    exp_model_state(m, 8600, &outputs, NULL);
-    CHECK((m->out[1].mode == EXP_MODE_PATTERN));
+    module_sim_state(m, 8600, &outputs, NULL);
+    CHECK(m->core.out[1].mode == MC_MODE_PATTERN);
 }
 
 /* The module's max on is the box's too: the box stops refreshing and does not fight the module;
@@ -977,16 +982,16 @@ static void test_pattern_reconciled(void)
 static void test_max_on_and_min_off(void)
 {
     setup();
-    exp_model_t *m = plug("out4", 0x5C);
+    module_sim_t *m = plug("out4", 0x5C);
     start(0);
     exp_desired_t on = {EXP_MODE_ON, 0, 0, 0};
     CHECK(expansion_output(&exp_, 0x5C, 2, &on, 0) == EXP_OK); /* smoke: 30 s, then 30 s off */
     run(0, 29990);
     uint8_t outputs, flags;
-    exp_model_state(m, 29990, &outputs, NULL);
+    module_sim_state(m, 29990, &outputs, NULL);
     CHECK(outputs == 4);
     run(30000, 40000);
-    exp_model_state(m, 40000, &outputs, &flags);
+    module_sim_state(m, 40000, &outputs, &flags);
     CHECK(outputs == 0 && (flags & EXP_ST_CMD_ERROR) == 0);
     CHECK(writes_of(0x5C, EXP_OP_OUTPUT, 30000, 40000) == 0 &&
           writes_of(0x5C, EXP_OP_LEASE, 30000, 40000) == 0);
@@ -995,10 +1000,10 @@ static void test_max_on_and_min_off(void)
     exp_desired_t pulse = {EXP_MODE_ON, 61000, 0, 0};
     CHECK(expansion_output(&exp_, 0x5C, 2, &pulse, 60000) == EXP_OK);
     run(60000, 60000);
-    exp_model_state(m, 60000, &outputs, &flags);
+    module_sim_state(m, 60000, &outputs, &flags);
     CHECK(outputs == 4 && (flags & EXP_ST_CMD_ERROR) == 0);
     run(60010, 61500);
-    exp_model_state(m, 61500, &outputs, NULL);
+    module_sim_state(m, 61500, &outputs, NULL);
     CHECK(outputs == 0);
 }
 
@@ -1006,7 +1011,7 @@ static void test_max_on_and_min_off(void)
 static void test_relay_100_ms(void)
 {
     setup();
-    exp_model_t *m = plug("out4", 0x5C);
+    module_sim_t *m = plug("out4", 0x5C);
     start(0);
     exp_desired_t on = {EXP_MODE_ON, 0, 0, 0}, off = {EXP_MODE_OFF, 0, 0, 0};
     expansion_output(&exp_, 0x5C, 0, &on, 0);
@@ -1018,7 +1023,7 @@ static void test_relay_100_ms(void)
     CHECK(writes_of(0x5C, EXP_OP_OUTPUT, 60, 140) == 0);
     run(150, 150);
     uint8_t outputs, flags;
-    exp_model_state(m, 150, &outputs, &flags);
+    module_sim_state(m, 150, &outputs, &flags);
     CHECK(writes_of(0x5C, EXP_OP_OUTPUT, 150, 150) == 1 && outputs == 1 &&
           (flags & EXP_ST_CMD_ERROR) == 0);
 }
@@ -1026,7 +1031,7 @@ static void test_relay_100_ms(void)
 static void test_backend_drive(void)
 {
     setup();
-    exp_model_t *m = plug("out4", 0x5C);
+    module_sim_t *m = plug("out4", 0x5C);
     start(0);
     exp_out_ref_t ref = {&exp_, 0x5C, 1};
     expansion_backend_drive(&ref, true, true, 0);
@@ -1034,11 +1039,11 @@ static void test_backend_drive(void)
     expansion_backend_drive(&ref, true, true, 10); /* the same level: nothing new */
     run(10, 1000);
     uint8_t outputs;
-    exp_model_state(m, 1000, &outputs, NULL);
+    module_sim_state(m, 1000, &outputs, NULL);
     CHECK(outputs == 2 && writes_of(0x5C, EXP_OP_OUTPUT, 0, 1000) == 1);
     expansion_backend_drive(&ref, false, false, 1000);
     run(1010, 1010);
-    exp_model_state(m, 1010, &outputs, NULL);
+    module_sim_state(m, 1010, &outputs, NULL);
     CHECK(outputs == 0 && writes_of(0x5C, EXP_OP_OUTPUT, 1010, 1010) == 1);
     exp_out_ref_t nobody = {&exp_, 0x5F, 0};
     expansion_backend_drive(&nobody, true, true, 1020); /* no module: nothing */
@@ -1063,7 +1068,7 @@ static void test_modules_text(void)
     CHECK(expansion_modules_text(&exp_, text, sizeof(text)) == 0 && strcmp(text, none) == 0);
     setup();
     plug("target", 0x58);
-    exp_model_t *b = plug("target", 0x59);
+    module_sim_t *b = plug("target", 0x59);
     b->ident[10] = 1; /* firmware 1.0.1 */
     b->ident[15] = expansion_crc8(b->ident, 15);
     start(0);
@@ -1094,8 +1099,8 @@ void run_expansion_tests(void)
     test_channel_cases();
     test_status_cases();
     test_command_cases();
-    test_model_cmd_error();
-    test_model_timelines();
+    test_core_cmd_error();
+    test_core_timelines();
     test_driver_replays_timelines();
     test_discovery_at_boot();
     test_hot_plug();
