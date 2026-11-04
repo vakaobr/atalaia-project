@@ -118,6 +118,16 @@ static bool settings_ok(const out_settings_t *s)
            s->max_on_s <= OUT_MAX_ON_MAX_S;
 }
 
+/* Where a channel is, for the log: "GPIO 46" or "module 5c channel 2". */
+static void where(const out_channel_t *c, char *out, size_t cap)
+{
+    if (c->module) {
+        snprintf(out, cap, "module %02x channel %u", c->addr, (unsigned)c->mch + 1u);
+    } else {
+        snprintf(out, cap, "GPIO %d", c->gpio);
+    }
+}
+
 /* Capability ids from the functions: a second channel with the same function is "<fn>.2". The
  * functions are short (outputs_function_ok), so "<fn>.<n>" always fits. */
 static void name_channels(outputs_t *o)
@@ -149,8 +159,11 @@ void outputs_init(outputs_t *o, const outputs_ops_t *ops)
 
 int outputs_add_simple(outputs_t *o, int gpio, const out_backend_t *be, const out_settings_t *saved)
 {
-    if (o->count >= OUTPUTS_MAX) return -1;
-    int i = o->count++;
+    if (o->simple >= OUTPUTS_MAX) return -1;
+    /* Simple outputs come first: a module's channels (added later) move up one. */
+    int i = o->simple++;
+    memmove(&o->ch[i + 1], &o->ch[i], (size_t)(o->count - i) * sizeof(o->ch[0]));
+    o->count++;
     out_channel_t *c = &o->ch[i];
     memset(c, 0, sizeof(*c));
     c->gpio = gpio;
@@ -167,7 +180,61 @@ int outputs_add_simple(outputs_t *o, int gpio, const out_backend_t *be, const ou
     return i;
 }
 
+int outputs_add_module(outputs_t *o, uint8_t addr, uint8_t mch, const char *function, bool relay,
+                       uint32_t module_max_s, const out_backend_t *be)
+{
+    if (o->count - o->simple >= OUT_MODULE_CHANNELS || o->count >= OUT_CHANNELS_MAX) return -1;
+    int i = o->count++;
+    out_channel_t *c = &o->ch[i];
+    memset(c, 0, sizeof(*c));
+    c->gpio = -1;
+    c->module = true;
+    c->addr = addr;
+    c->mch = mch;
+    c->relay = relay;
+    c->module_max_s = module_max_s >= 1 ? module_max_s : 1;
+    if (be != NULL) c->be = *be;
+    outputs_default_settings(i, &c->set);
+    if (function != NULL && outputs_function_ok(function)) {
+        snprintf(c->set.function, sizeof(c->set.function), "%s", function);
+    }
+    if (c->set.max_on_s > c->module_max_s) c->set.max_on_s = c->module_max_s;
+    name_channels(o);
+    say(o,
+        "output %d on module %02x channel %u: %s, disabled (the admin enables it at the box), "
+        "at most %lu s",
+        i + 1, addr, (unsigned)mch + 1u, c->id, (unsigned long)c->set.max_on_s);
+    return i;
+}
+
+int outputs_remove_module(outputs_t *o, uint8_t addr)
+{
+    int gone = 0;
+    for (int i = o->simple; i < o->count;) {
+        if (o->ch[i].module && o->ch[i].addr == addr) {
+            memmove(&o->ch[i], &o->ch[i + 1], (size_t)(o->count - i - 1) * sizeof(o->ch[0]));
+            o->count--;
+            gone++;
+        } else {
+            i++;
+        }
+    }
+    if (gone > 0) {
+        name_channels(o);
+        say(o, "module %02x gone: its %d output channel(s) left the box's outputs", addr, gone);
+    }
+    return gone;
+}
+
 /* ---- State ------------------------------------------------------------------------ */
+
+/* A module's channel: the desired state whole, when it changes (the module runs its timers). */
+static out_result_t push(const outputs_t *o, const out_channel_t *c)
+{
+    if (!c->module || c->be.set == NULL) return OUT_OK;
+    out_want_t w = {c->on, c->on && c->pattern, c->until_ms, c->on_ms, c->off_ms};
+    return c->be.set(c->be.ctx, &w, o->now);
+}
 
 static bool level_now(const out_channel_t *c, uint32_t now)
 {
@@ -194,6 +261,7 @@ static void turn_off(outputs_t *o, out_channel_t *c, out_source_t src, bool tell
     if (!c->on) return;
     c->on = false;
     update_level(c, o->now);
+    push(o, c);
     if (tell_it) {
         char data[96];
         snprintf(data, sizeof(data), "{\"capability\":\"%s\",\"ms\":0,\"source\":\"%s\"}", c->id,
@@ -223,15 +291,18 @@ out_result_t outputs_configure(outputs_t *o, int index, const out_settings_t *s)
         return OUT_BUSY;
     }
     out_channel_t *c = &o->ch[index];
+    if (c->module && s->max_on_s > c->module_max_s) return OUT_BAD_ARGS;
     c->set = *s;
     if (!c->set.enabled) turn_off(o, c, OUT_SRC_BOX_ADMIN, false);
     name_channels(o);
-    if (o->ops.save != NULL && !o->ops.save(o->ops.ctx, index, &c->set)) {
+    if (!c->module && o->ops.save != NULL && !o->ops.save(o->ops.ctx, index, &c->set)) {
         say(o, "output %d: the settings could not be stored (kept until the box restarts)",
             index + 1);
     }
-    say(o, "output %d on GPIO %d: %s, %s, at most %lu s (set at the box)", index + 1, c->gpio,
-        c->id, c->set.enabled ? "enabled" : "disabled", (unsigned long)c->set.max_on_s);
+    char at[32];
+    where(c, at, sizeof(at));
+    say(o, "output %d on %s: %s, %s, at most %lu s (set at the box)", index + 1, at, c->id,
+        c->set.enabled ? "enabled" : "disabled", (unsigned long)c->set.max_on_s);
     return OUT_OK;
 }
 
@@ -295,7 +366,10 @@ void outputs_tick(outputs_t *o, out_game_t game, uint32_t now_ms)
     }
     for (int i = 0; i < o->count; i++) {
         out_channel_t *c = &o->ch[i];
-        if (c->on && at_or_after(now_ms, c->until_ms)) c->on = false; /* its time is up */
+        if (c->on && at_or_after(now_ms, c->until_ms)) {
+            c->on = false; /* its time is up (a module's channel ended on the module's timer) */
+            push(o, c);
+        }
         update_level(c, now_ms);
         bool live = c->level || (o->game == OUT_GAME_RUNNING && c->set.enabled);
         if (c->be.drive != NULL) c->be.drive(c->be.ctx, c->level, live, now_ms);
@@ -324,7 +398,7 @@ static out_result_t start(outputs_t *o, out_channel_t *c, out_act_t act, uint32_
                           uint32_t on_ms, uint32_t off_ms, out_source_t src)
 {
     uint32_t now = o->now;
-    if (!c->set.enabled) return OUT_DISABLED;
+    if (!c->set.enabled || c->withheld) return OUT_DISABLED;
     if (!may_start(o, src)) return OUT_NOT_NOW;
     uint32_t max_ms = c->set.max_on_s * 1000u;
     if (act == OUT_ACT_ON) {
@@ -333,21 +407,29 @@ static out_result_t start(outputs_t *o, out_channel_t *c, out_act_t act, uint32_
         if (ms == 0 || ms > OUT_MS_MAX) return OUT_BAD_ARGS;
         if (ms > max_ms) ms = max_ms;
     }
+    /* A simple output's switch needs a few frames, and a relay should not chatter; a module's
+     * channel has its own floor (the module enforces it too) and its own timer. */
+    uint32_t floor_ms = !c->module ? OUT_SIMPLE_MIN_MS
+                        : c->relay ? OUT_RELAY_PATTERN_MIN_MS
+                                   : OUT_PATTERN_MIN_MS;
+    uint32_t least_ms = c->module ? OUT_MODULE_LEAST_MS : OUT_SIMPLE_MIN_MS;
     if (act == OUT_ACT_PATTERN) {
-        /* A simple output's switch needs a few frames, and a relay should not chatter. */
-        if (on_ms < OUT_SIMPLE_MIN_MS || off_ms < OUT_SIMPLE_MIN_MS || on_ms > OUT_PATTERN_MAX_MS ||
+        if (on_ms < floor_ms || off_ms < floor_ms || on_ms > OUT_PATTERN_MAX_MS ||
             off_ms > OUT_PATTERN_MAX_MS) {
             return OUT_BAD_ARGS;
         }
     }
-    if (ms < OUT_SIMPLE_MIN_MS) ms = OUT_SIMPLE_MIN_MS; /* the shortest a switch shows */
+    if (ms < least_ms) ms = least_ms; /* the shortest a switch shows */
     if (o->grace && src != OUT_SRC_BOX_ADMIN) {
         uint32_t left = o->grace_until - now;
-        if (left < OUT_SIMPLE_MIN_MS) return OUT_NOT_NOW;
+        if (left < least_ms) return OUT_NOT_NOW;
         if (ms > left) ms = left;
     }
-    /* Off to on: not within OUT_SIMPLE_MIN_MS of the last change (an off is never held back). */
-    if (!c->level && c->changed && now - c->change_ms < OUT_SIMPLE_MIN_MS) return OUT_TOO_SOON;
+    /* Off to on: not within OUT_SIMPLE_MIN_MS of the last change (an off is never held back); a
+     * module's relay channel waits its 100 ms on the module's side (expansion.c). */
+    if (!c->module && !c->level && c->changed && now - c->change_ms < OUT_SIMPLE_MIN_MS) {
+        return OUT_TOO_SOON;
+    }
     if (src == OUT_SRC_SCRIPT) {
         if (c->start_count >= OUT_SCRIPT_STARTS && now - c->starts[c->start_next] < 1000u) {
             if (!c->rate_told) {
@@ -364,6 +446,7 @@ static out_result_t start(outputs_t *o, out_channel_t *c, out_act_t act, uint32_
         c->start_next = (uint8_t)((c->start_next + 1) % OUT_SCRIPT_STARTS);
         if (c->start_count < OUT_SCRIPT_STARTS) c->start_count++;
     }
+    out_channel_t before = *c;
     c->on = true;
     c->pattern = act == OUT_ACT_PATTERN;
     c->on_ms = c->pattern ? on_ms : 0;
@@ -372,6 +455,12 @@ static out_result_t start(outputs_t *o, out_channel_t *c, out_act_t act, uint32_
     c->start_ms = now;
     c->until_ms = now + ms;
     c->src = src;
+    out_result_t refused = push(o, c);
+    if (refused != OUT_OK) {
+        /* The module's side refuses it now (its min off): as if it had not been asked. */
+        *c = before;
+        return refused;
+    }
     update_level(c, now);
     char data[112];
     snprintf(data, sizeof(data), "{\"capability\":\"%s\",\"ms\":%lu,\"source\":\"%s\"}", c->id,
@@ -511,9 +600,9 @@ size_t outputs_modules_text(const outputs_t *o, char *out, size_t cap)
     out[0] = '\0';
     size_t len = 0;
     size_t limit = cap - 1 < OUT_MODULES_MAX ? cap - 1 : OUT_MODULES_MAX;
-    for (int i = 0; i < o->count; i++) {
+    for (int i = 0; i < o->simple; i++) {
         const out_channel_t *c = &o->ch[i];
-        if (!c->set.enabled) continue;
+        if (!c->set.enabled || c->withheld) continue;
         char entry[48];
         int n = snprintf(entry, sizeof(entry), "%sg%d:servo:%s", len ? ";" : "", c->gpio, c->id);
         if (n < 0 || len + (size_t)n > limit) break;

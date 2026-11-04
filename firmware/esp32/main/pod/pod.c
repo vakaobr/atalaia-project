@@ -59,33 +59,71 @@ static void send_ack(pod_t *p, int link, uint16_t seq)
     send(p, link, ATALAIA_PROXY_ACK, buf, n);
 }
 
+/* One try at IDENT: the io's part at level and trim, the pod's own fields; the encoded length
+ * (0: it does not fit in 256 bytes). *listed: the outputs it lists. */
+static size_t ident_try(pod_t *p, atalaia_proxy_ident_t *id, uint8_t *buf, size_t cap,
+                        pod_ident_level_t level, int trim, int *listed)
+{
+    memset(id, 0, sizeof(*id));
+    snprintf(id->caps_json, sizeof(id->caps_json), "[]");
+    *listed = p->io.ident != NULL ? p->io.ident(p->io.ctx, id, level, trim) : 0;
+    if (level >= POD_IDENT_SHORT_FW) {
+        /* The release alone: up to the pre-release or the build metadata. */
+        size_t cut = strcspn(id->fw_version, "-+");
+        if (cut > 0) id->fw_version[cut] = '\0';
+    }
+    id->has_radio = p->radio.radio_present;
+    id->protocol_version = ATALAIA_PROXY_VERSION;
+    /* As the modem's JSON IDENT: measure with a radio and a measuring build; field and
+     * pair frames always relayed (without a radio, FIELD_TX is answered no_radio). */
+    id->measure = p->radio.radio_present && p->radio.io.measure_start != NULL ? ATALAIA_PROXY_YES
+                                                                              : ATALAIA_PROXY_NO;
+    id->field_frames = ATALAIA_PROXY_YES;
+    id->pair_frames = ATALAIA_PROXY_YES;
+    return atalaia_proxy_ident_encode(id, buf, cap);
+}
+
 void pod_send_ident(pod_t *p, pod_link_t link)
 {
     atalaia_proxy_ident_t id;
     uint8_t buf[ATALAIA_PROXY_PAYLOAD_MAX];
-    size_t n = 0;
-    for (int compact = 0; compact < 2 && n == 0; compact++) {
-        memset(&id, 0, sizeof(id));
-        snprintf(id.caps_json, sizeof(id.caps_json), "[]");
-        if (p->io.ident != NULL) p->io.ident(p->io.ctx, &id, compact != 0);
-        id.has_radio = p->radio.radio_present;
-        id.protocol_version = ATALAIA_PROXY_VERSION;
-        /* As the modem's JSON IDENT: measure with a radio and a measuring build; field and
-         * pair frames always relayed (without a radio, FIELD_TX is answered no_radio). */
-        id.measure = p->radio.radio_present && p->radio.io.measure_start != NULL ? ATALAIA_PROXY_YES
-                                                                                 : ATALAIA_PROXY_NO;
-        id.field_frames = ATALAIA_PROXY_YES;
-        id.pair_frames = ATALAIA_PROXY_YES;
-        n = atalaia_proxy_ident_encode(&id, buf, sizeof(buf));
+    /* Each level in turn; at POD_IDENT_TRIM one output fewer at a time, the last first, while
+     * there are outputs to leave out (decision EXPI9-27), then POD_IDENT_NO_PORT. */
+    pod_ident_level_t level = POD_IDENT_FULL;
+    int trim = 0, listed = 0;
+    size_t n = ident_try(p, &id, buf, sizeof(buf), level, trim, &listed);
+    while (n == 0 && level < POD_IDENT_NO_PORT) {
+        if (level < POD_IDENT_SHORT_FW) {
+            level = (pod_ident_level_t)(level + 1);
+        } else if (listed > 0) {
+            level = POD_IDENT_TRIM;
+            trim++;
+        } else {
+            level = POD_IDENT_NO_PORT;
+        }
+        n = ident_try(p, &id, buf, sizeof(buf), level, trim, &listed);
     }
     if (n == 0) {
         /* Too many capabilities for 256 bytes (pod_caps keeps within it): say
          * who we are without them rather than not at all. */
         say(p, "IDENT does not fit; sent without capabilities");
+        level = POD_IDENT_LEVELS;
         snprintf(id.caps_json, sizeof(id.caps_json), "[]");
         n = atalaia_proxy_ident_encode(&id, buf, sizeof(buf));
+    } else if (level == POD_IDENT_NO_PORT) {
+        say(p, "IDENT does not fit; sent without the outputs and the hit sensors");
+    } else if (level == POD_IDENT_TRIM) {
+        say(p, "IDENT does not fit; sent with %d output(s) left out", trim);
     }
+    if (p->io.ident_sent != NULL) p->io.ident_sent(p->io.ctx, level, trim);
     if (n > 0) send(p, (int)link, ATALAIA_PROXY_IDENT, buf, n);
+}
+
+void pod_send_ident_all(pod_t *p)
+{
+    for (int l = 0; l < POD_LINK_COUNT; l++) {
+        if (p->links[l].active) pod_send_ident(p, (pod_link_t)l);
+    }
 }
 
 /* ---- The radio: the modem's frames, 3 types up ------------------------------------- */
@@ -130,9 +168,7 @@ static bool radio_filter(void *ctx, const atalaia_header_t *hdr, const uint8_t *
     if (r == POD_CONFIG_APPLIED) {
         p->count.config_applied++;
         say(p, "pod settings rev %lu taken", (unsigned long)rev);
-        for (int l = 0; l < POD_LINK_COUNT; l++) {
-            if (p->links[l].active) pod_send_ident(p, (pod_link_t)l);
-        }
+        pod_send_ident_all(p);
     } else {
         p->count.config_repeats++;
     }
@@ -227,7 +263,8 @@ static void on_frame(void *ctx, uint8_t type, const uint8_t *pl, size_t len)
     pod_t *p = (pod_t *)ctx;
     int link = p->replying;
     if (!valid_link(link)) return;
-    /* Any valid frame says the phone is on this link. */
+    /* Any valid frame says the phone is on this link (and is still there: the outputs' lease). */
+    p->heard_ms = now(p);
     if (!p->links[link].active) pod_set_link_active(p, (pod_link_t)link);
     switch (type) {
     case ATALAIA_PROXY_CMD: handle_cmd(p, link, pl, len); break;
@@ -306,6 +343,16 @@ void pod_set_link_active(pod_t *p, pod_link_t link)
 bool pod_link_active(const pod_t *p, pod_link_t link)
 {
     return valid_link((int)link) && p->links[link].active;
+}
+
+bool pod_phone_on(const pod_t *p)
+{
+    return any_active(p);
+}
+
+uint32_t pod_heard_ms(const pod_t *p)
+{
+    return p->heard_ms;
 }
 
 /* ---- Events ------------------------------------------------------------------------ */

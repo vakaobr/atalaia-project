@@ -31,7 +31,7 @@ import threading
 from typing import TYPE_CHECKING, Any, Optional
 
 from atalaia_sim import codec
-from atalaia_sim.field_controller import CMD_OPCODES, CMD_PEER_EPOCH, STATE_NAMES
+from atalaia_sim.field_controller import BROADCAST, CMD_OPCODES, CMD_PEER_EPOCH, STATE_NAMES
 from atalaia_sim.packet import Header, cmd_decode, hello_encode, state_encode, time_decode, vf_make
 from atalaia_sim.protocol import MESSAGE_TYPES
 
@@ -108,7 +108,11 @@ class PropLinks:
     # --- controller -> props -------------------------------------------------------
 
     def forward(self, msg_type: int, payload: bytes) -> bool:
-        """A packet the controller sends: TIME and CMD also go to the linked props. True if one got it."""
+        """A packet the controller sends: TIME and CMD also go to the linked props. True if one got it.
+
+        A CMD goes to the prop its ``dest`` names; with no ``dest``, or ``dest`` 65535 (every node:
+        CMD 12's every-output off, a GM message to all; decision EXPI9-20), to every linked prop,
+        which is told ``dest`` null, the prop link's "every node"."""
         with self._lock:
             links = list(self._links.values())
         if not links:
@@ -130,6 +134,8 @@ class PropLinks:
             msg = {"type": "cmd", "cmd": OPCODE_NAMES.get(c.get("cmd"), str(c.get("cmd"))),
                    "opcode": c.get("cmd"), "params": c.get("params") or {}}
             dest = c.get("dest")
+            if dest == BROADCAST:
+                dest = None
             sent = False
             for link in links:
                 if dest is None or dest == link.node_id:

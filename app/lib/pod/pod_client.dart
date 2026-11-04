@@ -285,10 +285,18 @@ class PodInputs {
       return ('keypad.key', {'key': key});
     }
     // A hit sensor's hit (a target addon lent through the proxy, decision
-    // P4R4): hit.hit with its strength, 0-255.
+    // P4R4): hit.hit with its strength, 0-255, and, on a pod with two hit
+    // sensors, its channel (draft RFC 0000 Amendment 5).
     if (type == 'hit' && msg.name == 'hit') {
       final strength = msg.data['strength'];
-      return ('hit.hit', {'strength': strength is int ? strength : 0});
+      final channel = msg.data['channel'];
+      return (
+        'hit.hit',
+        {
+          'strength': strength is int ? strength : 0,
+          if (channel is int) 'channel': channel,
+        },
+      );
     }
     return null;
   }

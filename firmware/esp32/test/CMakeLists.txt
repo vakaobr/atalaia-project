@@ -12,6 +12,8 @@ set(CMAKE_C_EXTENSIONS OFF)
 # works from the repo root without extra -D flags, as CI does.
 set(CORE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../core" CACHE PATH "Path to core/")
 set(MODES_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../modes" CACHE PATH "Path to modes/")
+# The module core (firmware/module-core/): the simulated modules of the port driver's tests.
+set(MODULE_CORE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../module-core")
 
 # ---- Lua 5.4 (vendored, MIT) ------------------------------------------------
 # Built as a separate static library without -Wpedantic because Lua uses
@@ -191,6 +193,8 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/status_hold.c
     ${SHELL_DIR}/tft_splash.c
     ${SHELL_DIR}/expansion.c
+    ${SHELL_DIR}/expansion_box.c
+    ${MODULE_CORE_DIR}/src/module_core.c
     ${SHELL_DIR}/sound.c
     ${SHELL_DIR}/outputs.c
     ${SHELL_DIR}/outputs_admin.c
@@ -203,6 +207,8 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/pod/pod_json.c
     ${SHELL_DIR}/pod/pod_settings.c
     ${SHELL_DIR}/pod/pod_ble.c
+    ${SHELL_DIR}/pod/pod_outputs.c
+    ${SHELL_DIR}/pod/pod_port.c
 )
 
 # ---- HAL stub ----------------------------------------------------------------
@@ -263,7 +269,8 @@ set(TEST_SOURCES
     test_status_hold.c
     test_tft_splash.c
     test_expansion.c
-    expansion_model.c
+    test_expansion_box.c
+    module_sim.c
     test_sound.c
     test_outputs.c
     test_simple_out.c
@@ -284,6 +291,7 @@ target_include_directories(firmware_test PRIVATE
     ${SHELL_DIR}/radio
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CORE_DIR}/tests # proxy_vectors.h
+    ${MODULE_CORE_DIR}/include
 )
 
 target_link_libraries(firmware_test PRIVATE atalaia_core_fw atalaia_lua_fw atalaia_screens_fw

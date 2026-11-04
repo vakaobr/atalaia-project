@@ -261,7 +261,7 @@ Every built-in mode is listed in **Mode or preset**. Their English and Portugues
 | Hacking Terminal | Hackeia o terminal | Works without the controller. Puzzle: code, wires or sequence. |
 | VIP / Payload | VIP / Carga | The VIP shares a position from the app. |
 | Money Factory | Fábrica de Dinheiro | Needs tags. |
-| Target Windows | Janelas de Alvo | Needs the target addon, which is not built yet. |
+| Target Windows | Janelas de Alvo | Needs a target on the box's expansion port ([Targets](#targets)). Not yet tried on hardware; not yet a preset on the Field Box. |
 | Codes (modifier) | Códigos (modificador) | Keypad codes alongside any mode. |
 | Medic Kit (role) | Ligaduras | A kit box next to any mode. |
 | Objectives (role) | Objetivos | The boxes of a custom scenario. |
@@ -397,7 +397,20 @@ A standby controller cannot start a game. It says **This controller is not in ch
 
 The boxes also turn their outputs off on their own when the game is paused or ends. A GM on the site server's **Remote GM** page can only turn every output off, never one on.
 
+**A phone prop's outputs and modules.** A phone prop with an I/O pod built with a simple output, or with a module on the pod's expansion port (a target, an output module), uses them as a box does: the mode on the phone fires the outputs and arms the target, and scenario triggers, field scripts and you switch the outputs. The pod tells the phone what it has, and the phone tells the controller, so the prop gets its chips and its lines in **Outputs** like a box (a simple output marked **not checked**), and a module that stops answering during a game raises the same alert. **All outputs off** reaches it over the pod's radio and over the field's Wi-Fi. The start check does not count a prop's outputs (it does not check phones). The pod turns them off by itself when the phone's link drops. Not yet tried on hardware.
+
 **Modes that switch outputs.** *Bomb / Rush* fires the bomb box's **smoke** and **siren** when it explodes, for the seconds you give in **Smoke when it explodes** and **Siren when it explodes** (at most 10: the explosion ends the game, and a box keeps an output on for at most 10 seconds after the end). *Master and Satellites* sounds the master box's **siren** when one team holds every satellite, for the seconds in **Siren on the master when one team holds every satellite** (the box's own longest time still wins), and again only after that team lost one. Left empty (the default), nothing is switched, and the game is as before. When you pick such a mode, the form says which outputs it would use (**Bomb / Rush would switch these outputs on a box that has them: smoke, siren**). For it to work, the box's admin must have enabled the output at the box with the admin PIN and given it that use (**smoke**, **siren**; see the [Field Box manual](field-box.md#outputs-a-siren-a-strobe-a-smoke-machine)). A box without it plays the game the same, with nothing fired; if it has outputs but none of those, the start check says so (**box-4 (bomb) has none of the outputs the mode would switch (smoke, siren): it plays without them.**).
+
+### Targets
+
+A box can carry a **target** on its expansion port: a plate with a sensor that feels each hit ([Field Box manual](field-box.md#a-target-on-the-expansion-port)). *Target Windows* is the mode for it (role **target**).
+
+- **Before the game**, plug the target into the box, then let the box join. The **Boxes** tab shows it as a chip under the box: **target 1.0.0: hit**. A box whose role needs a hit sensor and has none makes the start check say so (**A box lacks what its role needs: box-4 (target): hit**); look at the cable before you **Start anyway**.
+- **During the game** each hit reaches the mode: in *Target Windows*, a hit while the box shows a team's colour scores **Points for a hit in the window** for that team, and the **Log** says **A target was hit**. Hits count only while the game runs (not while it is paused). **Weakest hit that counts** (0-255) ignores light taps; the right value depends on the plate, set it at a test game.
+- **If a target goes** (a cable pulled, a broken connector), the **Log** says **box-4 lost a module: 58:target/1.0.0:hit (it stopped answering)** and its chip goes. Plugged in again, it counts at once.
+- A box with two targets names them **hit** and **hit.2**.
+
+Not yet tried on hardware: the target and its firmware are built and tested on a computer only.
 
 ### The Boxes tab
 
