@@ -247,7 +247,7 @@ size_t expansion_box_disabled_text(const expansion_box_t *xb, char *out, size_t 
         bool any = false;
         for (int i = o->simple; i < o->count && n > 0 && (size_t)n < sizeof(entry); i++) {
             const out_channel_t *c = &o->ch[i];
-            if (!c->module || c->addr != m->addr || c->set.enabled) continue;
+            if (!c->module || c->addr != m->addr || (c->set.enabled && !c->withheld)) continue;
             n += snprintf(entry + n, sizeof(entry) - (size_t)n, "%s%s", any ? "," : "", c->id);
             any = true;
         }

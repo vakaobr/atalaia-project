@@ -12,7 +12,8 @@
  *   hit.2 ...          two hit channels)
  *   <use>     output   -                                     on {"ms"}, off, pulse {"ms"},
  *                                                            pattern {"on_ms","off_ms","ms"}
- *   pod       -        modules {"modules", "max_on_s"},      -
+ *   pod       -        modules {"modules", "max_on_s",       -
+ *                      "withheld"},
  *                      module_lost {"modules", "reason"}
  *
  * A module's hit channels are lent as `hit`, `hit.2` (EXPI6-15): their hits go to the phone as
@@ -32,7 +33,10 @@
  * box would send (protocol/expansion-port.md, section 7: its enabled simple outputs
  * "g33:servo:siren", then its modules "58:target/1.0.0:hit") and each lent output's longest on in
  * seconds ({"siren": 30}); the phone passes the text on to the controller as node.modules and
- * takes the longest ons for its own model. A module that stops answering while a phone is on a
+ * takes the longest ons for its own model. A pod with an output fitted adds "withheld", the
+ * outputs fitted that it does not lend (pod_port_withheld_text; "" when it lends every one), which
+ * the phone tells the controller as node.outputs_disabled, so the console shows them as a box's
+ * outputs fitted but not enabled (decision PROPC-6). A module that stops answering while a phone is on a
  * link is the EVT "pod" "module_lost" ({"modules": its entry, "reason"}), which the phone tells
  * the controller as node.module_lost during a game. A change of the lent capabilities sends IDENT
  * again first (ops.ident_changed). An older phone drops these EVTs: they name no capability of
@@ -88,6 +92,8 @@ typedef struct {
     bool trimmed; /* the last IDENT sent left outputs out: a channel found since waits for one */
     char told_text[POD_PORT_TEXT_MAX + 1];
     char told_max[96];
+    bool told_has_withheld; /* the last modules EVT carried "withheld" */
+    char told_withheld[POD_PORT_TEXT_MAX + 1];
     uint32_t hits, module_lost; /* sent to the phone */
 } pod_port_t;
 
@@ -135,6 +141,14 @@ void pod_port_ident_sent(pod_port_t *pp, pod_ident_level_t level);
  * whole entries only, at most POD_PORT_TEXT_MAX bytes; a withheld output is left out (a module
  * whose channels are all withheld too). Its length. */
 size_t pod_port_modules_text(const pod_port_t *pp, char *out, size_t cap);
+
+/* node.outputs_disabled's text as a box makes it (decisions EXPL-20, PROPC-6, PROPC-7): the
+ * simple outputs not lent, then per module its output channels not lent, in its node.modules form
+ * with only those ids ("g33:servo:siren;5c:out4/1.0.0:strobe,out.4"): withheld from IDENT for want
+ * of room (pod_port_ident_sent), or a module's channel on a pod not built to lend them. Whole
+ * entries only, at most POD_PORT_TEXT_MAX bytes; its length, 0 when every output fitted is lent
+ * (or the pod has none). */
+size_t pod_port_withheld_text(const pod_port_t *pp, char *out, size_t cap);
 
 /* The lent outputs' longest on, {"siren":30,"strobe.2":10} ("{}" for none; a withheld output is
  * not lent). Its length, 0 when it does not fit. */

@@ -82,8 +82,8 @@ bool expansion_box_has_hit(const expansion_box_t *xb);
 size_t expansion_box_modules_text(const expansion_box_t *xb, char *out, size_t cap);
 
 /* node.outputs_disabled's entries for the modules (decision EXPL-20): per module, in address
- * order, its output channels that their admin has not enabled (EXPI8-7: every one until then),
- * in its node.modules form with only those ids ("5c:out4/1.0.0:siren,strobe"); whole entries
+ * order, its output channels that their admin has not enabled (EXPI8-7: every one until then)
+ * and, on an I/O pod, those withheld from IDENT (decision PROPC-7), in its node.modules form with only those ids ("5c:out4/1.0.0:siren,strobe"); whole entries
  * only, at most EXP_MODULES_TEXT_MAX bytes; its length, 0 when every module channel is enabled
  * (or the box has none, or no output layer). */
 size_t expansion_box_disabled_text(const expansion_box_t *xb, char *out, size_t cap);
