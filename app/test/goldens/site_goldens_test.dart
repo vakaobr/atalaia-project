@@ -4,7 +4,7 @@
 // Online registration's screens (lib/site/, decision S16-13) in every
 // language on a 360x780 phone: the login at a site, the field's games, the
 // registration form with replicas, the kept ticket; the player's chrono
-// records with the consent per field (APPS-*).
+// records with the consent per field, and the club pages (APPS-*).
 
 @Tags(['golden'])
 library;
@@ -13,6 +13,7 @@ import 'package:atalaia_app/checkin/my_replicas.dart';
 import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/site/account_screen.dart';
 import 'package:atalaia_app/site/chrono_screens.dart';
+import 'package:atalaia_app/site/club_screens.dart';
 import 'package:atalaia_app/site/hub_share.dart';
 import 'package:atalaia_app/site/privacy_notice.dart';
 import 'package:atalaia_app/site/privacy_screens.dart';
@@ -192,6 +193,28 @@ void main() {
       );
       await tester.pumpAndSettle();
       await snap(tester, 'my_chrono_field', lang);
+    });
+
+    testWidgets('the clubs (${lang.code})', (tester) async {
+      final site = FakeSite();
+      final h = await start(tester, site);
+      final session = h.services.sites.of(link.site);
+      await tester.pumpWidget(h.app(home: ClubsScreen(session: session)));
+      await tester.pumpAndSettle();
+      await snap(tester, 'clubs', lang);
+    });
+
+    testWidgets('a club, as its admin (${lang.code})', (tester) async {
+      final site = FakeSite();
+      final h = await start(tester, site);
+      final session = h.services.sites.of(link.site);
+      await tester.pumpWidget(
+        h.app(
+          home: ClubScreen(session: session, clubId: 'club-a'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await snap(tester, 'club', lang);
     });
 
     testWidgets('registering (${lang.code})', (tester) async {

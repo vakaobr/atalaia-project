@@ -29,6 +29,7 @@ import '../ui/qr_painter.dart';
 import '../ui/widgets.dart';
 import 'account_screen.dart';
 import 'chrono_screens.dart';
+import 'club_screens.dart';
 import 'history_screens.dart';
 import 'hub_share.dart';
 import 'privacy_notice.dart';
@@ -880,6 +881,18 @@ class _SiteScreenState extends State<SiteScreen> {
           context,
           MaterialPageRoute<void>(
             builder: (_) => MyChronoScreen(session: _session!, field: fg.field),
+          ),
+        ),
+      ),
+      const SizedBox(height: 8),
+      OutlinedButton.icon(
+        key: const Key('site-clubs'),
+        icon: const Icon(Icons.groups_outlined),
+        label: Text(s.t('club.open')),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => ClubsScreen(session: _session!),
           ),
         ),
       ),

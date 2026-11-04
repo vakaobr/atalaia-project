@@ -743,7 +743,11 @@ checking it again; a team the site drops leaves the controller), the
 migration's data test, and the controller's `test_sync_branding.py` against an
 in-memory site server; the shared vectors gain 2 valid and 9 invalid field
 answers. Not yet: a real deployment, the console's "from the site server"
-label. Decisions S18-1 to S18-12, all open.
+label. Decisions S18-1 to S18-12, all open. The club pages in the app (S18-11)
+were built on 2026-11-04 (`app/lib/site/clubs.dart`, `club_screens.dart`: the
+account's clubs, a club's page with its fields and members, memberships and
+invitations, making, changing and deleting a club, inviting, roles, leaving;
+images and moderation stay on the staff pages; decisions APPS-9 to APPS-16).
 
 ### Follow-up: the field's settings and branding changes on the stream (BR24, S18-11; 2026-10-27, in software)
 
