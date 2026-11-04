@@ -40,7 +40,7 @@ cor de uma equipa pontua para essa equipa.
 | Sem linha de interrupção | A caixa **interroga** o módulo por I2C a cada 20 ms; um impacto chega ao jogo em cerca de 21 ms ([secção 4](#4-como-a-caixa-lê-os-impactos-sem-linha-de-interrupção)). Não é preciso nenhum GPIO, por isso o mapa de pinos da Field Box não muda | P5J-18 |
 | Cabo | I2C a 100 kHz em, no máximo, **2 m** de cabo M12 de 5 condutores; um alvo mais afastado usa antes um Satélite ou um nó fino pelo rádio | Especificação de conceção, secção 6; P5J-17 |
 | O que os scripts de jogo da caixa veem | A capacidade `hit`: um evento `hit` com uma `strength` de 0 a 255 (os scripts recebem `hit.hit`), e os comandos `arm` e `disarm` (só comunica impactos enquanto armado) | Especificação de conceção, secção 7; rascunho do RFC 0000, Aditamento 1; decisão P4R4 |
-| Como um impacto atravessa o fio (rascunho) | Um relatório de 5 bytes que a caixa lê (sinalizadores, o número de sequência do impacto, a sua força, a sua idade, um CRC-8) e três comandos que escreve (confirmar um impacto, armar, desarmar). O módulo guarda cada impacto até a caixa o confirmar, por isso nenhum se perde por o barramento estar ocupado | [`firmware/esp32/main/target_addon.h`](../../firmware/esp32/main/target_addon.h); P5J-19 |
+| Como um impacto atravessa o fio | O protocolo v1 da porta de expansão: a caixa lê o `STATUS` de 9 bytes do módulo (sinalizadores, o número de sequência do impacto, o canal e o tipo, a sua força, a sua idade, as saídas, os canais armados, um CRC-8) e escreve comandos (confirmar, armar, ...), cada um com um CRC-8 que cobre também o byte de endereço. O módulo guarda cada impacto até a caixa o confirmar, por isso nenhum se perde por o barramento estar ocupado. Substituiu o relatório de 5 bytes em rascunho de P5J-19, contra o qual nenhum módulo foi construído | [`protocol/expansion-port.md`](../../protocol/expansion-port.md); [`firmware/esp32/main/expansion.h`](../../firmware/esp32/main/expansion.h); RFC em rascunho "The expansion port" |
 | Num módulo de E/S de um telemóvel | A mesma capacidade `hit` no protocolo de proxy de capacidades (`{"id": "hit", "type": "hit"}`), com vetores de teste partilhados `target_addon`, `target_hit` e `target_arm`, para que um módulo de E/S pudesse emprestar uma a um telemóvel. Nenhum módulo de E/S montado até agora tem uma | [protocol/capability-proxy.md](../../protocol/capability-proxy.md), "A hit sensor" |
 | O modo de jogo | *Janelas de Alvo* (`modes/target_windows/`): o papel `target` precisa de `hit` e `led`. O alvo fica escuro durante `interval_s`, depois acende a cor de uma equipa ao acaso durante `window_s`; um impacto de pelo menos `min_strength` na janela dá `hit_points` a essa equipa. Construído e testado no simulador; não é uma predefinição da Field Box enquanto o módulo não existir | [Plano da fase 4](../../docs/phase-4-site-server/PLAN.md), fase 2 do plano; decisões M2-1 a M2-5 |
 | O que vem a seguir | O processador do módulo e o seu firmware, o controlador de consulta chamado a partir do ciclo de jogo da caixa, a capacidade `hit` no firmware da Field Box, o limiar e o debounce do sensor afinados em placas de aço e de policarbonato; depois *Janelas de Alvo* passa a ser uma predefinição integrada | Plano da fase 4, HW2 |
@@ -74,9 +74,10 @@ barramento I2C e os trilhos da caixa, por isso segue a
 | SCL | GPIO 18 | `ATALAIA_NFC_SCL_PIN` | 3,3 V |
 | GND | o trilho GND do hub | -- | 0 V |
 
-Verificado contra o firmware em 2026-10-28: o controlador de consulta
-(`firmware/esp32/main/target_addon.c`) ainda não é chamado pela caixa e não tem
-endereço I2C, por isso uma Field Box ainda não consegue falar com um módulo.
+Verificado contra o firmware em 2026-11-04: o controlador da porta
+(`firmware/esp32/main/expansion.c`, RFC em rascunho "The expansion port",
+incremento 6) encontra módulos em 0x58-0x5F mas ainda não é chamado pela caixa,
+por isso uma Field Box ainda não consegue falar com um módulo.
 **Ainda não testado numa placa real**: a porta, o fusível e o cabo.
 
 SDA e SCL estão nos pinos 2 e 4, em lados opostos do conector e não lado a lado
@@ -165,17 +166,20 @@ não precisa dele (decisão P5J-18):
   som ou do botão 3, o que custaria uma funcionalidade a todas as caixas por 10
   ms.
 
-O controlador (`firmware/esp32/main/target_addon.c`, testes no computador em
-`firmware/esp32/test/test_target_addon.c`) consulta, recebe cada impacto uma só
-vez (uma confirmação perdida não conta um impacto duas vezes), volta a enviar
-`arm` e `disarm` até o relatório do módulo concordar, recusa relatórios com um
-CRC errado, e dá o módulo por desaparecido após 25 leituras falhadas seguidas
-(0,5 s). **Ainda por fazer**, para quando o endereço do módulo estiver decidido:
-as leituras e escritas I2C nesse endereço (`hal_esp_i2c`), encontrar o módulo no
-arranque e juntar `hit` às capacidades da caixa, chamar o controlador a partir
-do ciclo de jogo e passar cada impacto ao script como `hit.hit` com a sua
-`strength`, enviar-lhe os `cap("hit"):arm()` e `:disarm()` do script
-(`command_dispatch.c`), e fazer de *Janelas de Alvo* uma predefinição (P4R23).
+O controlador (`firmware/esp32/main/expansion.c`, o protocolo v1 da porta de
+expansão; testes no computador em `firmware/esp32/test/test_expansion.c` contra
+os vetores partilhados e um modelo em C de um módulo; o seu I2C através de
+`hal_esp_i2c` em `expansion_esp.c`) encontra módulos em 0x58-0x5F (o módulo de
+alvo usa 0x58 por omissão), consulta um módulo com entradas a cada 20 ms,
+recebe cada impacto uma só vez com a sua hora no relógio da caixa (uma
+confirmação perdida não conta um impacto duas vezes), volta a enviar `ARM` até
+o `STATUS` do módulo concordar, recusa leituras com um CRC errado, e dá o módulo
+por desaparecido após 25 leituras falhadas seguidas (0,5 s). **Ainda por
+fazer** (o incremento 8 do RFC em rascunho): chamar o controlador a partir do
+ciclo de jogo, juntar `hit` às capacidades da caixa, passar cada impacto ao
+script como `hit.hit` com a sua `strength`, enviar-lhe os `cap("hit"):arm()` e
+`:disarm()` do script (`command_dispatch.c`), e fazer de *Janelas de Alvo* uma
+predefinição (P4R23).
 
 ## 5. O que não está decidido
 

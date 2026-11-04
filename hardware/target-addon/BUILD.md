@@ -39,7 +39,7 @@ team's colour scores for that team.
 | No interrupt line | The box **polls** the addon over I2C every 20 ms; a hit reaches the game within about 21 ms ([section 4](#4-how-the-box-reads-hits-no-interrupt-line)). No GPIO is needed, so the Field Box's pin map does not change | P5J-18 |
 | Cable | I2C at 100 kHz over at most **2 m** of 5-core M12 cable; a target further away uses a Satellite or a thin node over the radio instead | Design specification, section 6; P5J-17 |
 | What the box's game scripts see | The `hit` capability: an event `hit` with a `strength` from 0 to 255 (scripts get `hit.hit`), and the commands `arm` and `disarm` (it reports hits only while armed) | Design specification, section 7; draft RFC 0000 Amendment 1; decision P4R4 |
-| How a hit crosses the wire (draft) | A 5-byte report the box reads (flags, the hit's sequence number, its strength, its age, a CRC-8) and three commands it writes (acknowledge a hit, arm, disarm). The addon holds each hit until the box acknowledges it, so none is lost to a busy bus | [`firmware/esp32/main/target_addon.h`](../../firmware/esp32/main/target_addon.h); P5J-19 |
+| How a hit crosses the wire | The expansion port's protocol v1: the box reads the module's 9-byte `STATUS` (flags, the hit's sequence number, channel and kind, its strength, its age, the outputs, the armed channels, a CRC-8) and writes commands (acknowledge, arm, ...), each with a CRC-8 over the address byte too. The module holds each hit until the box acknowledges it, so none is lost to a busy bus. It replaced P5J-19's draft 5-byte report, which no addon was built against | [`protocol/expansion-port.md`](../../protocol/expansion-port.md); [`firmware/esp32/main/expansion.h`](../../firmware/esp32/main/expansion.h); draft RFC "The expansion port" |
 | On a phone's I/O pod | The same `hit` capability in the capability proxy protocol (`{"id": "hit", "type": "hit"}`), with shared test vectors `target_addon`, `target_hit` and `target_arm`, so a pod could lend one to a phone. No pod built so far has one | [protocol/capability-proxy.md](../../protocol/capability-proxy.md), "A hit sensor" |
 | The game mode | *Target Windows* (`modes/target_windows/`): the role `target` needs `hit` and `led`. The target is dark for `interval_s`, then lights a random team's colour for `window_s`; a hit of at least `min_strength` in the window scores `hit_points` for that team. Built and tested in the simulator; not a Field Box preset until the addon exists | [Phase 4 plan](../../docs/phase-4-site-server/PLAN.md), plan phase 2; decisions M2-1 to M2-5 |
 | What comes next | The addon's processor and its firmware, the polling driver called from the box's game loop, the `hit` capability in the Field Box's firmware, the sensor's threshold and debounce tuned on steel and on polycarbonate plates; then *Target Windows* becomes a built-in preset | Phase 4 plan, HW2 |
@@ -73,9 +73,10 @@ box's I2C bus and rails, so it follows the
 | SCL | GPIO 18 | `ATALAIA_NFC_SCL_PIN` | 3.3 V |
 | GND | the hub's GND rail | -- | 0 V |
 
-Checked against the firmware on 2026-10-28: the polling driver
-(`firmware/esp32/main/target_addon.c`) is still not called by the box and has
-no I2C address, so a Field Box cannot talk to an addon yet. **Not yet tested
+Checked against the firmware on 2026-11-04: the port driver
+(`firmware/esp32/main/expansion.c`, draft RFC "The expansion port", increment
+6) finds modules at 0x58-0x5F but is not yet called by the box, so a Field Box
+cannot talk to an addon yet. **Not yet tested
 on a real board**: the port, the fuse and the cable.
 
 SDA and SCL are on pins 2 and 4, across the connector from each other rather
@@ -161,17 +162,19 @@ one (decision P5J-18):
   eight of the expander's pins are in use), or freeing a GPIO by giving up the
   sound or button 3, which would cost every box a feature for 10 ms.
 
-The driver (`firmware/esp32/main/target_addon.c`, host tests in
-`firmware/esp32/test/test_target_addon.c`) polls, takes each hit once (a lost
-acknowledge does not count a hit twice), sends `arm` and `disarm` again until
-the addon's report agrees, refuses reports with a bad CRC, and counts the addon
-as gone after 25 failed reads in a row (0.5 s). **Not done yet**, for when the
-addon's address is decided: the I2C reads and writes at that address
-(`hal_esp_i2c`), finding the addon at start and adding `hit` to the box's
-capabilities, calling the driver from the game loop and passing each hit to the
-script as `hit.hit` with its `strength`, sending the script's
-`cap("hit"):arm()` and `:disarm()` to it (`command_dispatch.c`), and making
-*Target Windows* a preset (P4R23).
+The driver (`firmware/esp32/main/expansion.c`, the expansion port's protocol
+v1; host tests in `firmware/esp32/test/test_expansion.c` against the shared
+vectors and a C model of a module; its I2C through `hal_esp_i2c` in
+`expansion_esp.c`) finds modules at 0x58-0x5F (the target module defaults to
+0x58), polls a module with inputs every 20 ms, takes each hit once with its
+time on the box's clock (a lost acknowledge does not count a hit twice), sends
+`ARM` again until the module's `STATUS` agrees, refuses reads with a bad CRC,
+and counts the module as gone after 25 failed reads in a row (0.5 s). **Not
+done yet** (the draft RFC's increment 8): calling the driver from the game
+loop, adding `hit` to the box's capabilities, passing each hit to the script as
+`hit.hit` with its `strength`, sending the script's `cap("hit"):arm()` and
+`:disarm()` to it (`command_dispatch.c`), and making *Target Windows* a preset
+(P4R23).
 
 ## 5. What is not decided
 
