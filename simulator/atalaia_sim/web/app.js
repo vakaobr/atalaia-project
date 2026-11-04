@@ -101,7 +101,8 @@ async function poll(once = false) {
   }
   polling = true;
   try {
-    const res = await fetch(`/api/state?since=${since}`, { cache: "no-store" });
+    const lang = encodeURIComponent($("box-lang").value);
+    const res = await fetch(`/api/state?since=${since}&lang=${lang}`, { cache: "no-store" });
     if (res.ok) render(await res.json());
   } catch (err) {
     $("game-state").textContent = "disconnected";
@@ -311,6 +312,138 @@ function makeExtras(box, node) {
   }
 }
 
+// ---- a box's screen ----
+//
+// The server draws nothing itself: for a screen with a template it sends the render model
+// (atalaia_sim/screens.py render_screen), every text, colour, visible: and bar value already
+// worked out by the core, as on the box. Here it is laid out as the Field Box's LVGL renderer
+// lays it out (firmware/esp32/main/screen_template.c): 320x240, the widgets in a column centred
+// both ways 4 px apart, rows 6 px apart, children centred, "fill" growing along the parent's
+// direction and taking all of it across. Texts go in with textContent; colours are "#rrggbb".
+
+const ICONS = {
+  ok: "✓", close: "✕", warning: "⚠", pause: "❚❚", play: "▶", stop: "■", bell: "🔔︎",
+  home: "⌂", refresh: "↻", gps: "⌖", wifi: "📶︎", battery: "▮▮▮", power: "⏻", bluetooth: "ᛒ",
+  settings: "⚙", eye: "👁︎", plus: "+", minus: "−", left: "◀", right: "▶", up: "▲", down: "▼",
+  audio: "♪", mute: "🔇︎", bars: "☰", loop: "⟲", charge: "⚡︎",
+};
+const SCREEN_W = 320;
+const SCREEN_H = 240;
+
+function px(v) {
+  return `${v}px`;
+}
+
+// The widget's size: pixels, "fill" or null (its content). `row`: its parent is a row.
+function applySize(box, w, row) {
+  if (w.width === "fill") {
+    if (row) { box.style.flex = "1 1 0"; box.style.minWidth = "0"; } else box.style.alignSelf = "stretch";
+  } else if (w.width != null) {
+    box.style.width = px(w.width);
+    box.style.flexShrink = "0";
+  }
+  if (w.height === "fill") {
+    if (row) box.style.alignSelf = "stretch"; else { box.style.flex = "1 1 0"; box.style.minHeight = "0"; }
+  } else if (w.height != null) {
+    box.style.height = px(w.height);
+    box.style.flexShrink = "0";
+  }
+}
+
+function drawWidget(w, row) {
+  let box;
+  switch (w.type) {
+    case "label":
+    case "qr_code":
+    case "icon":
+      box = el("div", { class: `w-${w.type}`,
+                        textContent: w.type === "icon" ? (ICONS[w.icon] || "?") : w.text });
+      box.style.fontSize = px(w.font);
+      box.style.color = w.color;
+      box.style.textAlign = w.align;
+      // An LVGL label of a set width wraps its text; one that fits its content does not.
+      box.style.whiteSpace = w.width == null ? "pre" : "pre-wrap";
+      break;
+    case "progress_bar": {
+      box = el("div", { class: "w-bar", role: "progressbar", "aria-valuenow": String(w.value),
+                        "aria-valuemin": "0", "aria-valuemax": "100" });
+      const h = typeof w.height === "number" && w.height > 0 ? w.height : 12;
+      box.style.background = w.track;
+      box.style.borderRadius = px(Math.floor(h / 2));
+      const fill = el("div", { class: "w-fill" });
+      fill.style.width = `${w.value}%`;
+      fill.style.background = w.color;
+      fill.style.borderRadius = px(Math.floor(h / 2));
+      box.append(fill);
+      break;
+    }
+    case "spacer":
+      box = el("div", { class: "w-spacer" });
+      break;
+    default: // row, column
+      box = el("div", { class: w.type === "row" ? "w-row" : "w-column" },
+        ...w.children.map((c) => drawWidget(c, w.type === "row")));
+  }
+  applySize(box, w, row);
+  if (w.background) box.style.background = w.background;
+  box.style.padding = w.padding.map(px).join(" ");
+  if (!w.visible) box.hidden = true;
+  if (w.id) box.dataset.id = w.id;
+  return box;
+}
+
+function drawScreen(model) {
+  const lcd = el("div", { class: "lcd" }, ...model.widgets.map((w) => drawWidget(w, false)));
+  lcd.style.background = model.background;
+  lcd.dataset.template = model.template;
+  return lcd;
+}
+
+// The drawn screen is 320x240, as on the box, scaled down to a narrower card.
+const fitScreens = new ResizeObserver((entries) => {
+  for (const e of entries) {
+    e.target.style.setProperty("--lcd-scale", String(Math.min(1, e.contentRect.width / SCREEN_W)));
+  }
+});
+
+function renderScreen(card, node) {
+  const frame = card.querySelector(".lcd-frame");
+  const template = card.querySelector(".template");
+  const dl = card.querySelector(".screen-data");
+  const drawn = node.drawn;
+  if (!frame.dataset.observed) {
+    fitScreens.observe(frame);
+    frame.dataset.observed = "1";
+  }
+  frame.hidden = !(drawn && !drawn.error);
+  card.querySelector(".screen").classList.toggle("drawn", !frame.hidden);
+  if (!frame.hidden) {
+    const key = JSON.stringify(drawn);
+    if (frame.dataset.key !== key) {
+      frame.replaceChildren(drawScreen(drawn));
+      frame.dataset.key = key;
+    }
+  } else {
+    frame.dataset.key = "";
+  }
+  if (node.screen) {
+    const [name, data] = node.screen.args;
+    template.textContent = drawn && drawn.error ? `${name}: ${drawn.error}` : name;
+    template.className = "template";
+    template.title = drawn ? "" : "No template of this name: a box draws its built-in screen";
+    const rows = [];
+    for (const [k, v] of Object.entries(data || {})) {
+      rows.push(el("dt", { textContent: k }), el("dd", { textContent: typeof v === "string" ? v : compact(v) }));
+    }
+    dl.replaceChildren(...rows);
+  } else {
+    template.textContent = "no screen shown yet";
+    template.className = "template empty";
+    template.title = "";
+    dl.replaceChildren();
+  }
+}
+
 function renderNode(node) {
   const card = cards.get(node.name) || makeCard(node);
   const { game } = state;
@@ -321,22 +454,7 @@ function renderNode(node) {
   status.className = "status chip " + (node.status === "running" ? "on" : node.status === "halted" ? "bad" : "");
   status.title = node.error || "";
 
-  const template = card.querySelector(".template");
-  const dl = card.querySelector(".screen-data");
-  if (node.screen) {
-    const [name, data] = node.screen.args;
-    template.textContent = name;
-    template.className = "template";
-    const rows = [];
-    for (const [k, v] of Object.entries(data || {})) {
-      rows.push(el("dt", { textContent: k }), el("dd", { textContent: typeof v === "string" ? v : compact(v) }));
-    }
-    dl.replaceChildren(...rows);
-  } else {
-    template.textContent = "no screen shown yet";
-    template.className = "template empty";
-    dl.replaceChildren();
-  }
+  renderScreen(card, node);
 
   card.querySelector(".outputs").replaceChildren(...node.outputs.map((o) => {
     const team = o.args.find((a) => typeof a === "string" && state.teams.includes(a));
@@ -431,6 +549,7 @@ for (const b of document.querySelectorAll("[data-step]")) {
 $("start").addEventListener("click", () => act("start"));
 $("pause").addEventListener("click", () => act(state.game.paused ? "resume" : "pause"));
 $("end").addEventListener("click", () => act("end"));
+$("box-lang").addEventListener("change", () => poll(true));
 $("reset").addEventListener("click", () => {
   if (!state.game.started || confirm("Start over? The current game and its log are lost.")) act("reset");
 });
