@@ -143,11 +143,14 @@ class _Handler(BaseHTTPRequestHandler):
         if url.path.startswith("/editor/"):
             return self._editor_file(url.path[len("/editor/"):] or "index.html")
         if url.path == "/api/state":
+            query = parse_qs(url.query)
             try:
-                since = int(parse_qs(url.query).get("since", ["0"])[0])
+                since = int(query.get("since", ["0"])[0])
             except ValueError:
                 since = 0
-            return self._json(HTTPStatus.OK, self.server.game.snapshot(since))
+            # The box language the screens are drawn in (the page's choice; none by default).
+            lang = query.get("lang", [""])[0]
+            return self._json(HTTPStatus.OK, self.server.game.snapshot(since, lang))
         if url.path in ("/api/log.json", "/api/log.csv"):
             return self._download(url.path.rsplit(".", 1)[1])
         self._error(HTTPStatus.NOT_FOUND, "not found")
