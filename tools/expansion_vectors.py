@@ -13,9 +13,9 @@ each step, written out by hand here from the rules of protocol/expansion-port.md
 node.modules' compact text. The bytes are assembled here from the tables alone, with nothing of the
 simulator's code, so the implementations that check the file are each compared with an independent
 assembly: the Python reference model (simulator/atalaia_sim/expansion.py, simulator/tests/test_expansion.py),
-the box's C (firmware/esp32/test/test_target_addon.c, through tools/protogen.py's
-firmware/esp32/test/expansion_vectors.h; the port driver of a later increment), and the module core's C
-(a later increment).
+the box's port driver (firmware/esp32/main/expansion.c: firmware/esp32/test/test_expansion.c, every case,
+through tools/protogen.py's firmware/esp32/test/expansion_vectors.h and expansion_cases.h, with a C model of
+a module in the test tree), and the module core's C (a later increment, which replaces that model).
 """
 from __future__ import annotations
 
@@ -517,7 +517,8 @@ def build() -> dict:
                        "reason, the reference modules they belong to, the lease's timelines, and node.modules' "
                        "compact text. Made by tools/expansion_vectors.py; checked by "
                        "simulator/tests/test_expansion.py (the Python reference model) and "
-                       "firmware/esp32/test/test_target_addon.c (the box's CRC-8, every frame).",
+                       "firmware/esp32/test/test_expansion.c (the box's port driver and a C model of a module, "
+                       "every case).",
         "protocol_version": VERSION,
         "magic": MAGIC.decode(),
         "addresses": {"first": 0x58, "last": 0x5F, "input_default": 0x58, "output_default": 0x5C,

@@ -446,6 +446,7 @@ What it lends (only what is fitted is in IDENT; decision PF6):
 | `audio` (MAX98357A and/or the piezo buzzer) | | `tone` {"freq","ms"}, `play` (the mode's clips as tones, `sound.c`'s patterns), `stop`, `set_volume` |
 | `nfc` (PN532) | `tag` {"uid", "tag"}: a player tag's record; join cards are not forwarded | |
 | `case` (tamper) | `opened`, `closed` | |
+| `<use>` (output: a simple output, optional) | | `on` {"ms"}, `off`, `pulse` {"ms"}, `pattern` {"on_ms","off_ms","ms"} |
 
 Button N stands for the game's N-th team, as on a Field Box; a colour set
 in Kconfig goes into its descriptor. The enclosure switch (GPIO 47 by
@@ -453,6 +454,43 @@ default, to GND, closed while the lid is shut) is armed once it has read
 closed, so a pod without one never alarms; the phone reports an opening as
 `node.tamper` (reason `pod_opened`). The battery gauge's level is in IDENT
 and in Pod Status.
+
+**Simple outputs** (optional, `CONFIG_ATALAIA_SIMPLE_OUT`; draft RFC "The expansion port",
+increment 9, EXP-26; `main/pod/pod_outputs.c`): the Field Box's output layer (`outputs.c`) and RMT
+bursts (`simple_out.c`, `simple_out_esp.c`) on **GPIO 33** (a second on **GPIO 1**,
+`ATALAIA_SIMPLE_OUT2`, with or without the buzzer), lent as `{"id":"siren","type":"output",
+"feedback":false}` after the other parts. A pod has no admin PIN (PODC-2), so building the output in
+enables it (EXP-28), with its use and longest on from the build (`ATALAIA_POD_OUT1_FUNCTION`,
+`ATALAIA_POD_OUT1_MAX_ON_S`, and `_OUT2_` for the second; `out.1` and 30 s by default). The phone
+runs the game's rules (`app/lib/prop/prop_outputs.dart`); the pod keeps the output layer's own
+limits (ms 1-600000, the build's longest on, a change at most every 500 ms; a refused CMD is still
+acknowledged), switches only while a phone is on a link, and turns every output off **at once when
+its last link goes** and **after 1.5 s without a frame from the phone while one is on** (the phone
+sends RADIO_CMD PING twice a second then; `POD_OUT_QUIET_MS`). The bursts are renewed by the pod's
+loop, so a hung pod stops them within 0.5 s. IDENT still fits in 256 bytes: with every part, the
+longest version and an output, the pod leaves out the buttons' colours and the `feedback` flags,
+then the version's build metadata, then the outputs (`pod_ident_level_t`). Size (ESP-IDF 5.3.2,
+2026-11-04): the pod image was 689,888 bytes before; 694,704 with the option off (the output layer is
+always built in), 697,808 with one output, 704,336 with two and the buzzer (17 % of the 4 MB slot);
+0 warnings.
+
+**The expansion port** (`CONFIG_ATALAIA_POD_PORT`, on by default; the port half of increment 9,
+decisions EXPI9-18 to EXPI9-26; `main/pod/pod_port.c`): the box's port driver (`expansion.c`) and its
+game glue (`expansion_box.c`) on the pod's I2C bus (`expansion_esp.c` over `hal_esp_i2c`, GPIO 17/18,
+the bus of the keypad's expander, the NFC reader and the gauge), ticked by the pod's loop after the
+outputs, with a phone on a link in the game's place. A module's hit channels are lent as `hit`
+(`hit.2`, each with its `channel`), armed by the phone's CMD `arm`/`disarm` and only while a phone is
+linked (the arming forgotten when the last link goes); a hit is the EVT `hit` `{"strength"}`. An output
+module's channels join the output layer after the simple outputs and are lent as `output` without the
+`feedback` flag, only with `CONFIG_ATALAIA_POD_MODULE_OUTPUTS` (off by default; `docker_fw.py pod
+--module-outputs=on`), each at most `CONFIG_ATALAIA_POD_MODULE_MAX_ON_S` (30 s) and the module's own;
+the driver holds the module's lease, and the output layer's link and silence rules turn them off.
+After every IDENT and change the pod sends the EVT `pod.modules` (a box's `node.modules` text and each
+lent output's longest on, `max_on_s`), and `pod.module_lost` for a module that goes while a phone is
+linked; a change of what IDENT lends sends IDENT again. IDENT's compaction gains a level: from
+`POD_IDENT_COMPACT` the hit sensors' `channel` goes too, and `POD_IDENT_NO_PORT` leaves them out after
+the outputs. Size (ESP-IDF 5.3.2, 2026-11-04): 710,096 bytes with one simple output and the module
+outputs on (17 % of the slot); 0 warnings.
 
 The radio is the USB modem's own code (`main/modem/modem.c`, frames
 shifted by 3): the phone sends plaintext packets with RADIO_TX, the pod
@@ -498,6 +536,11 @@ lists the checks that need the board and a phone. Code:
   too), Pod Status (plain C);
 - `main/pod/pod_caps.c` -- the capabilities on the HAL ops (plain C);
 - `main/pod/pod_settings.c` -- the settings pushed over the radio: parse, merge, stored form, apply (plain C);
+- `main/pod/pod_outputs.c` -- the simple outputs lent to the phone: descriptors, CMDs, the link and
+  lease rules, on the box's output layer (plain C);
+- `main/pod/pod_port.c` -- the expansion port lent to the phone: the box's port driver, hits and
+  arming, a module's outputs, the EVTs `pod.modules` and `pod.module_lost`, IDENT's capabilities
+  (plain C);
 - `main/pod/pod_ble.c` -- the GATT service's logic, UUIDs and advertising
   data (plain C); `pod_ble_nimble.c` puts it on NimBLE;
 - `main/pod/pod_task.c`, `pod_main.c` -- the ESP-IDF task, USB, audio queue,
@@ -506,10 +549,20 @@ lists the checks that need the board and a phone. Code:
 Tests: `test/test_pod.c` (the proxy and the capabilities, against the
 shared vectors; a box's update offer through the pod, opened with the game key, its duty-cycle refusal, the box's `node.update_failed` coming back; CMD pod over the radio: taken and not passed on, a repeat, a stale rev, another node, another key), `test/test_pod_settings.c` (the shared vectors `protocol/vectors/pod_config.json` through the core's CMD decoder, the strict parser's limits, the stored form read back, what the settings do to the capabilities), `test/test_ble_gatt_stub.c` (`ctest -R ble_gatt_stub`: the
 GATT service with the Bluetooth stack stubbed), `test/test_proxy_codec.c`
-(the frames). `test/pod_host/` builds the pod's code with real AES-CCM into
+(the frames); the simple outputs in `test/test_pod.c` too (`test_outputs_*`: the IDENT vector
+`pod_simple_output`, IDENT's room with every part, the CMDs and their limits against a fake RMT, the
+boot's end of signal, a live off while linked, off when USB goes, after 1.5 s of silence and not
+while the phone pings); the port in `test/test_pod.c` too (`test_port_*`, on the module core behind a
+fake bus: the IDENT vector `pod_port_modules`, the EVT `pod_modules`, arming, hits with their
+channel, a module plugged in and unplugged, a module's relay switched and turned off when the link
+goes or the phone falls silent, the module outputs not lent by default, IDENT's room). `test/pod_host/` builds the pod's code with real AES-CCM into
 a Linux program (USB and Bluetooth links as TCP sockets, the radio as UDP,
-the hardware on stdin) that the app's Dart tests
-(`app/test/pod/pod_host_test.dart`, `app/test/radio/pod_radio_link_test.dart`)
+the hardware on stdin; `--simple-out siren[@GPIO]`, twice at most, prints `OUTPUT siren on|off`
+and `PIN g33 low`, and `status` adds `outputs`; `--module target|out4[@ADDR]`, `--module-outputs`,
+`--module-max-on S` put simulated modules on the real module core on its port, with `hit`, `plug`,
+`unplug` and `@modules` on stdin and `MODULE 5c outputs=0x01` on stdout) that the app's Dart tests
+(`app/test/pod/pod_host_test.dart`, `app/test/radio/pod_radio_link_test.dart`,
+`app/test/prop/prop_pod_outputs_test.dart`, `app/test/prop/prop_pod_port_test.dart`)
 and the controller's end-to-end test (`controller/tests/test_pod_e2e.py`)
 drive.
 
@@ -568,17 +621,21 @@ I/O pod options (under "I/O pod"): `ATALAIA_POD_BTN1_TEAM` ..
 the game's N-th team), `ATALAIA_POD_TAMPER_PIN` (the enclosure switch,
 default 47, -1 = none) and `ATALAIA_POD_TAMPER_OPEN_HIGH`,
 `ATALAIA_POD_BLE` (the Bluetooth link, default on) and
-`ATALAIA_POD_BLE_ENCRYPTED` (frames only on an encrypted link, default on).
+`ATALAIA_POD_BLE_ENCRYPTED` (frames only on an encrypted link, default on). Under "Expansion port (I/O
+pod)": `ATALAIA_POD_PORT` (default on), `ATALAIA_POD_MODULE_OUTPUTS` (default off) and
+`ATALAIA_POD_MODULE_MAX_ON_S` (default 30).
 
 Piezo buzzer options (under "Piezo buzzer", the Field Box and the pod; decisions BZR-1 to BZR-8):
 `ATALAIA_BUZZER` (default **off**: a passive piezo is fitted) and `ATALAIA_BUZZER_PIN` (default 45).
 See "Sound: the speaker and the piezo buzzer" below.
 
-Simple output options (under "Simple output (RC relay switch)", the Field Box; draft RFC "The expansion port",
-EXP-31 to EXP-37): `ATALAIA_SIMPLE_OUT` (default **off**), `ATALAIA_SIMPLE_OUT_PIN` (46 on a V4.3, 5 on a V4.2,
-following `ATALAIA_BOARD_REV`), `ATALAIA_SIMPLE_OUT2` (a second one, offered only without the buzzer) and
-`ATALAIA_SIMPLE_OUT2_PIN` (45). `python3 tools/docker_fw.py build|bench --simple-out=on|on2|<GPIO>` and
-`--buzzer=on` set them for that build folder. See "Outputs: the simple output" below.
+Simple output options (under "Simple output (RC relay switch)", the Field Box and the pod; draft RFC "The
+expansion port", EXP-31 to EXP-37): `ATALAIA_SIMPLE_OUT` (default **off**), `ATALAIA_SIMPLE_OUT_PIN` (46 on a
+V4.3, 5 on a V4.2, following `ATALAIA_BOARD_REV`; 33 on a pod), `ATALAIA_SIMPLE_OUT2` (a second one, offered
+only without the buzzer, except on a pod) and `ATALAIA_SIMPLE_OUT2_PIN` (45; 1 on a pod); on a pod also
+`ATALAIA_POD_OUT1_FUNCTION`, `ATALAIA_POD_OUT1_MAX_ON_S` (and `_OUT2_`). `python3 tools/docker_fw.py
+build|bench|pod --simple-out=on|on2|<GPIO>` and `--buzzer=on` set them for that build folder. See "Outputs: the
+simple output" below and "The I/O pod" above.
 
 GNSS options (under "GNSS"): `ATALAIA_GNSS_PWR_PIN` (34, VGNSS_Ctrl,
 active low; driven high, module off, at boot), `ATALAIA_GNSS_POWER_ON`
@@ -714,7 +771,8 @@ per burst and `PIN g46 low t=<ms>` when the last one has gone out; `status` adds
 **Not in this increment** (the RFC's later ones): the controllers sending CMD 12, their output API,
 `modules` in the node list and the capability start check, the console's outputs panel (3); modes
 using outputs (4); scenario triggers (5); the I2C port and its modules (6-8, 11); the I/O pod's
-simple outputs (9). **Not yet tried on hardware.**
+simple outputs and port (9: built on 2026-11-04, "The I/O pod" above). **Not yet
+tried on hardware.**
 
 **Size** (ESP-IDF 5.3.2, 2026-11-03, against the commit before this change): the Field Box image grew from
 2,163,296 to 2,174,736 bytes with the simple output off (+11,440: the output layer, its admin screen and
@@ -724,6 +782,53 @@ Static internal RAM left for the heap (`check_fw_ram.py`): 192,757 bytes before,
 191,333 with the buzzer (the 120 KiB floor holds). The bench image: 2,150,000 off, 2,152,752 on, 2,159,280
 with the buzzer. Every build 0 warnings; a bench build with `--simple-out=15` (the amplifier's LRCLK) stops
 at the compile-time check, as it should.
+
+## The expansion port's driver (draft RFC "The expansion port", increment 6)
+
+Modules plugged into the box's M12 port (a target plate's hits now; an output module later) answer the
+expansion port's protocol v1 (`protocol/expansion-port.md`) at 0x58-0x5F on the board's I2C bus. The box's
+driver is `main/expansion.c` (platform-free, host tests in `test/test_expansion.c`); on the ESP32 its bus is
+`main/expansion_esp.c`, over `hal/esp/hal_esp_i2c.c`, so a module gets the same 10 ms timeouts, health
+records and back-off as the keypad and the NFC reader (a suspended module's skipped poll counts as a failed
+read). Since increment 8 the game task runs it through `main/expansion_box.c` (below).
+
+| What | The driver |
+| --- | --- |
+| Finding modules | `expansion_start` at boot: every address probed, `ALL_OFF` to each module that answers before anything else, then its IDENT and every CHANNEL read (3 tries each) and `CLEAR_FRESH`. Then `expansion_tick` probes each empty address every 2 s, one every 250 ms in turn; a module found is read, sent `ALL_OFF` and `CLEAR_FRESH`, and added. At most 4. A refused IDENT keeps a module out until its address's next probe; a refused channel is not used |
+| Polling | STATUS every 20 ms for a module with inputs, every 250 ms for an output-only one, up to 4 reads while MORE. An event is reported once (`EXP_EVT_INPUT`, with `t_ms = t_read - age` on the box's clock and its capability id) and acknowledged; a sequence number seen again is a lost ACK, acknowledged again and not reported; an event of a channel the box has not armed (`expansion_arm`) is acknowledged and dropped. OVERFLOW (`EXP_EVT_OVERFLOW`), CMD_ERROR and LEASE_EXPIRED are counted and logged |
+| Restart and loss | FRESH: the IDENT read again; a different module there is the old one lost (`bad_ident`) and the new one added; the same one gets `CLEAR_FRESH` and its state again. A refused STATUS, a failed read and a skipped poll count as failed reads; 25 in a row (0.5 s, or 6 s for an output-only module) and the module is gone (`EXP_EVT_LOST`, `no_answer`): its outputs count as off and its desired state is dropped |
+| Outputs | `expansion_output` sets a channel's desired state (off, on until a time or until off, a pattern), sent at the next tick; each STATUS is compared with it and a difference sent again with what is left, rounded up to 100 ms. While an output should be on, `OUTPUT` or `LEASE 15` reaches the module at least every 500 ms, so it turns its outputs off within 1.5 s of the box stopping. The module's max on ends a desired on on the box's side too, a start during its min off is `EXP_TOO_SOON`, a relay's on waits 100 ms after its off, a pattern under the channel's floor (100 ms on a relay) is refused. `expansion_all_off` sends `ALL_OFF`. `expansion_backend_drive` is an `out_backend_t` drive for the output layer |
+| Capability ids and `node.modules` | `hit`, `hit.2`; an output's hint (`siren`, ...) or `out.<channel + 1>`, then `.2`; `expansion_modules_text` gives the modules' entries (`58:target/1.0.0:hit;5c:out4/1.0.0:siren,strobe,smoke,out.4`), whole entries within 100 bytes |
+
+The host tests run every case of `protocol/vectors/expansion.json` (`test/expansion_vectors.h` and
+`test/expansion_cases.h`, generated by `tools/protogen.py`), the **module core**
+(`firmware/module-core/`, through `test/module_sim.c`, a simulated module on that core behind a fake
+bus; it replaced increment 6's C model of a module) against every COMMAND case and the seven lease
+timelines, and the driver against simulated modules on a fake bus, four of the timelines written by the
+driver byte for byte. **Not yet tried on hardware.**
+
+### In the game (increment 8)
+
+`main/expansion_box.c` (platform-free; host tests in `test/test_expansion_box.c`) joins the driver to the
+box (decisions EXPI8-2 to EXPI8-7 and EXPI8-16 to EXPI8-18):
+
+| What | How |
+| --- | --- |
+| Start and tick | `shell.c` starts it at boot right after the outputs (every module `ALL_OFF` first, then read and added) and ticks it every 10 ms in the game task, after `outputs_tick`. A board whose I2C bus cannot be installed logs it and runs without modules |
+| Hits | Each hit of a module's hit channel reaches the mode's script as `hit.hit` with `{"strength": 0-255}` (plus `"channel": n`, the number of `hit.n`, on a box with more than one hit channel: draft RFC 0000 Amendment 5), only while a game runs; at any other moment it is acknowledged and dropped |
+| Arming | `cap("hit"):arm()` and `:disarm()` (and `hit.2`, ...) go to `expansion_box_command` from the node runner; they are kept by capability id, so a target plugged in mid-game is armed at once. The plates are armed only while a game runs (paused: disarmed, so a hit then never counts); a game's end forgets what was armed |
+| HELLO and `node.modules` | HELLO lists `hit` (type 10) while a module has a hit channel when the box joins. `node.modules` is one text: the enabled simple outputs, then the modules in address order, whole entries within 100 bytes (`g46:servo:siren;58:target/1.0.0:hit`); `box_game.c` sends it after the HELLO is acknowledged and again whenever it changes, to nothing too |
+| `node.module_lost` | Critical, `{"modules": "<its entry>", "reason": "no_answer"\|"bad_ident"}`, when a module goes during a running or paused game |
+| A module's outputs | Each output channel joins the output layer (`outputs_add_module`) after the simple outputs, **disabled** until its admin enables it at the box (EXP-28; kept in RAM: a restart or a re-plug starts it disabled again), at most the module's max on, with the module's hint as its function; the output layer names them beside the simple outputs (a module's `siren` beside a simple output's is `siren.2`) and the driver's entry follows. Their back-end is `expansion_box_backend_set`: the desired state passes whole (on until a time, a pattern) to `expansion_output`, so the module runs its own timers; a module's relay takes patterns down to 100 ms (a simple output: 500 ms). A lost module's channels leave the layer |
+| The console and the log | `@modules` lists the modules (`[{"address":"58","model":"target","fw":"1.0.0","caps":["hit"],"armed":1,"events":3,"polls":...}]`); the log says `expansion: 0x58 added: ...`, `lost (no_answer)`, `hit hit, strength n`. `@outputs` and the picker's **Outputs** name a module's channel `module 5c channel 2` (`I2C 5c/2` on the screen) |
+
+The **host box** takes `--module target|out4[@ADDR]` (up to four): modules simulated on the real module core
+(`firmware/module-core/`, through `test/module_sim.c`) behind a fake I2C bus, `hit <addr> <strength>`,
+`unplug <addr>` and `plug <addr>` on stdin, and a `"modules"` array in its status line;
+`controller/tests/test_box_e2e.py` plays *Target Windows* on it with a target module (HELLO's `hit`, the
+node list's module, hits scoring, `node.module_lost`, the module back and armed). The Field Box image with
+the port in the game task: 2,187,200 bytes, 48 % of its 4 MB slot free, 0 warnings. The target module's
+own firmware is [`firmware/target-module/`](../target-module/README.md).
 
 ## Partition Table
 

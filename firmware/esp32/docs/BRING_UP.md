@@ -328,6 +328,39 @@ reads 10 kohm to GND.
 6. **Record** the switch models, their signal-loss times and the scope captures (photos) in
    `docs/review/decisions-to-review.md` under EXP-37.
 
+## Step 8c: Expansion port (a target module)
+
+Every Field Box build runs the port driver (draft RFC "The expansion port", increments 6 and 8;
+`main/expansion.c`, `main/expansion_box.c`; not yet tried on hardware). It needs the box's port
+board ([hardware/expansion-port/BUILD.md](../../../hardware/expansion-port/BUILD.md)) and a target
+module flashed with `atalaia_target_module.uf2` ([hardware/target-addon/BUILD.md](../../../hardware/target-addon/BUILD.md),
+section 7; `python3 tools/docker_module.py build`). On a bare board on the desk the module's SDA
+and SCL may go straight to the board's GPIO 17 and 18 with the Heltec's own pull-ups, its 3V3 and
+GND to the board's (never with the module's USB cable in).
+
+1. **At boot.** Before the first game the log says `expansion: 0x58 added: 58:target/1.0.0:hit`
+   (the box sent the module `ALL_OFF` first, then read it). With nothing plugged in it says
+   nothing. `@modules` on the console lists what was found:
+   `modules: [{"address":"58","model":"target","fw":"1.0.0","caps":["hit"],"armed":0,"events":0,"polls":...}]`;
+   `polls` rises by 50 a second.
+2. **Hot-plug.** Unplug the module: within about 0.5 s `expansion: 0x58 lost (no_answer)`. Plug
+   it in again: within 2 s `added` again. The keypad, the NFC reader and the gauge keep working
+   throughout (the RFC's bench test 3 is 100 such cycles in a running game).
+3. **In a game.** Join a field controller's game as role `target` with *Target Windows* (step
+   10b; the mode put on the box as a field's preset, since it is not a built-in preset until the
+   target is bench-tested), or start any game: HELLO lists capability 10 (`hit`), the controller's
+   node list shows the module (`58`, `target`, `1.0.0`, `hit`). With *Target Windows* running,
+   `@modules` shows `"armed":1`; a tap on the plate logs `expansion: hit hit, strength <n>` and
+   the mode's `target.hit`. A mode that does not arm `hit` (every built-in one) leaves it at
+   `"armed":0`, and taps are dropped on the module.
+4. **Lost in a game.** Pull the cable during the game: the controller's log gets a critical
+   `node.module_lost` (`{"modules":"58:target/1.0.0:hit","reason":"no_answer"}`), then
+   `node.modules` without it; plugged in again, it is armed at once.
+5. **Current and voltage** (RFC bench test 4): a meter in series with the port's pin 1, the module
+   sampling: under 25 mA; about 3.0 V at the module's 3V3 pin.
+6. **Record** the current, the voltage, and the strength of a few hits at the field's joule limit
+   (bench test 8) in `docs/review/decisions-to-review.md` under EXPI8.
+
 ## Step 9: Battery
 
 1. The firmware reads the battery from the MAX17048 gauge (I2C, address
@@ -822,3 +855,14 @@ the app (`python tools/docker_app.py apk`). None of them has been run yet.
 10. **Hours.** A 2-hour game with the pod on battery and Bluetooth: no
     watchdog reset in the UART0 log, no lost link, the battery estimate on
     a 3000 mAh cell.
+11. **The expansion port** (draft RFC "The expansion port", increment 9;
+    [I/O pod build guide, section 8.2](../../../hardware/io-pod/BUILD.md#82-expansion-port-optional)).
+    With a target module on the socket, the boot log says
+    `expansion: 0x58 added: 58:target/1.0.0:hit` and the `I/O pod ...` line
+    lists `{"id":"hit","type":"hit"}`; link the phone and run Target Windows:
+    a strike on the plate shows on the phone, and the GM console shows the
+    target's chip under the phone. Unplug the module during the game: the
+    console raises the module's loss. With an output module and a build with
+    `--module-outputs=on`, switch a relay from the GM console, then pull the
+    USB cable: the relay opens within about a second; power the pod off with
+    a relay on: the module opens it within 1.5 s (its lease).

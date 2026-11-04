@@ -126,15 +126,19 @@ class PropLinks {
       } on RfException {
         return false;
       }
+      // No dest, or dest 65535 (every node: CMD 12's every-output off, a GM
+      // message to all; decision EXPI9-20): every linked prop, told dest
+      // null, the prop link's "every node".
+      final dest = c.dest == broadcastNode ? null : c.dest;
       var sent = false;
       for (final l in _links.values) {
-        if (c.dest == null || c.dest == l.nodeId) {
+        if (dest == null || dest == l.nodeId) {
           l.put({
             'type': 'cmd',
             'cmd': _opcodeNames[c.cmd] ?? '${c.cmd}',
             'opcode': c.cmd,
             'params': c.params ?? const <String, Object?>{},
-            'dest': c.dest,
+            'dest': dest,
           });
           sent = true;
         }

@@ -175,6 +175,17 @@ O que a caixa faz:
 
 **Segurança.** Só aparelhos de baixa tensão com bateria própria (no máximo 24 V). **Nunca** a rede elétrica. Uma máquina de fumo só pela sua entrada de comando de baixa tensão; nunca pirotecnia. Proteção auditiva perto de sirenes e buzinas. Fumo nunca numa sala fechada sem autorização do recinto. Antes do primeiro jogo, quem monta verifica cada interruptor: tem de desligar quando se tira o cabo ([manual de montagem, secção 9.10](../../../hardware/field-box/BUILD.pt.md#910-saída-simples-opcional)).
 
+### Um alvo na porta de expansão
+
+Uma caixa montada com uma **porta de expansão** (uma tomada M12, [guia da porta](../../../hardware/expansion-port/BUILD.pt.md)) aceita um **alvo**: uma placa para onde os jogadores disparam, com um sensor e uma pequena placa própria atrás, num cabo de até 2 m ([guia do alvo](../../../hardware/target-addon/BUILD.pt.md)). O jogo *Janelas de Alvo* usa-o: a caixa acende-se na cor de uma equipa durante uns segundos, e um impacto na placa de alvo nesse tempo pontua para essa equipa. Ainda não testado em hardware.
+
+1. **Liga o alvo antes de a caixa entrar no jogo** (com a caixa ligada ou desligada). A caixa encontra-o em 2 segundos; ligado mais tarde, a caixa encontra-o na mesma, e o jogo usa-o logo.
+2. A consola de GM mostra-o como uma etiqueta debaixo da caixa: **target 1.0.0: hit**.
+3. Em *Janelas de Alvo* o alvo só conta impactos enquanto o jogo decorre: nem antes de começar, nem em pausa, nem depois de acabar.
+4. Se o cabo sair durante o jogo, o registo de GM diz **box-4 perdeu um módulo: 58:target/1.0.0:hit (deixou de responder)**. Volta a ligá-lo: continua logo.
+
+**Segurança.** Proteção dos olhos e da cara para toda a gente ao alcance do alvo, a placa de alvo inclinada para baixo para as BB irem para o chão, e nunca disparar para a caixa, o cabo ou o invólucro do alvo: só para a placa. Os limites de potência do campo valem para os alvos como para os jogadores.
+
 As *Ligaduras* e o *Hackeia o terminal* não seguem a língua da caixa. Cada um usa a língua do ecrã da sua própria definição **Língua** no jogo; se estiver vazia, é a língua do jogo. O *VIP / Carga* segue a língua da caixa, como os outros modos (a sua antiga definição **Língua** já não é usada).
 
 ## 7. O que te dizem as luzes e os ecrãs
@@ -230,6 +241,10 @@ Mais: a [página do rádio](https://atalaia-project.link/radio/), o [guia do tes
 
 Um telemóvel Android também pode ser uma caixa. Na app escolhe **Dispositivo de jogo**, depois **Entrar num jogo** e lê o **código QR de entrada** que a organização mostra, ou encosta um cartão de entrada. O telemóvel mostra o ecrã do modo com os botões das equipas no ecrã. Um **módulo de E/S** opcional junta um rádio e botões grandes. Define a **Chave de entrada do campo** e o **PIN da organização** nas **Definições**. Nas **Definições**, o **Modo quiosque** prende o telemóvel à app e **Bateria e segundo plano** diz-te como impedir que o Android adormeça a app. Se o jogo usa um modo que a app não tem, e a organização o permitir, o telemóvel obtém o modo do controlador do campo, pelo Wi-Fi do campo, antes de começares: só aceita um pacote **assinado** por uma chave de modo em que confias. Acrescenta a chave do projeto (ou do teu clube) em **Definições › Chaves dos modos obtidos** e pede-a à organização. Um pacote sem assinatura, assinado por outra chave ou danificado é recusado com uma mensagem e nunca é executado. Ainda não testado num campo. Vê o [guia da app](../../../app/README.md) (em inglês).
 
+**Saídas através do módulo.** Um módulo compilado com uma **saída simples** (uma sirene, um estroboscópio, uma luz ou o comando de uma máquina de fumo num interruptor de relé RC; [guia de montagem do módulo de E/S, secção 8.1](../../../hardware/io-pod/BUILD.pt.md#81-saídas-simples-opcionais)) empresta-a ao telemóvel: o jogo no telemóvel liga-a como uma caixa liga a sua ([Saídas](#saídas-uma-sirene-um-estroboscópio-uma-máquina-de-fumo)), e a organização também, na consola. As mesmas regras: só durante o jogo (e uma buzina de fim de jogo até 10 segundos), desligada quando o jogo começa, fica em pausa ou acaba, nunca mais tempo do que o seu máximo, no máximo uma mudança a cada meio segundo. Não há nada a ativar no telemóvel nem no módulo: quem montou o módulo definiu o uso da saída (**siren**, **smoke**...) ao compilá-lo. **Se o telemóvel se vai, a saída desliga-se**: o módulo desliga-a quando o cabo USB sai, a ligação Bluetooth cai ou a app deixa de lhe falar durante 1,5 segundos; mantém a app em primeiro plano (**Bateria e segundo plano** nas **Definições**). Ainda não experimentado em hardware.
+
+**Um alvo ou um módulo de saídas no módulo de E/S.** Um módulo de E/S com porta de expansão aceita os mesmos módulos de uma caixa ([guia de montagem do módulo de E/S, secção 8.2](../../../hardware/io-pod/BUILD.pt.md#82-porta-de-expansão-opcional)): liga um alvo e o jogo no telemóvel conta os impactos enquanto o jogo decorre, como numa caixa; os relés de um módulo de saídas funcionam como as saídas simples do módulo de E/S, se este foi compilado para os emprestar. Liga os módulos antes do jogo, como numa caixa. O GM vê-os debaixo do telemóvel na consola. Ainda não experimentado em hardware.
+
 ## Resolução de problemas
 
 | Problema | O que fazer |
@@ -249,5 +264,7 @@ Um telemóvel Android também pode ser uma caixa. Na app escolhe **Dispositivo d
 | O ecrã pequeno está apagado | Fala com quem montou a caixa. O ecrã grande pode continuar a funcionar. |
 | A sirene (ou o estroboscópio, o fumo) nunca liga | Ativa a saída na caixa (PIN de administração, **Saídas**) e dá-lhe o uso que o jogo pede. Só funciona durante um jogo, ou com o teste de 1 segundo entre jogos. Verifica a bateria do próprio interruptor. |
 | Um interruptor fica ligado com a caixa desligada | Deixa de usar esse interruptor: tem de desligar quando perde o sinal. Fala com quem montou a caixa. |
+| A sirene do módulo nunca liga | O módulo foi compilado sem a saída, ou com um uso diferente do que o jogo pede (fala com quem o montou); o módulo não está ligado; nenhum jogo a decorrer. |
+| A saída do módulo desliga-se sozinha | O telemóvel deixou de falar com o módulo (a app foi para segundo plano ou foi fechada) ou a ligação caiu. Liga de novo; mantém a app em primeiro plano. |
 
 Para avarias de montagem e de bancada, vê [a tabela de resolução de problemas do manual de montagem](../../../hardware/field-box/BUILD.pt.md#13-resolução-de-problemas).

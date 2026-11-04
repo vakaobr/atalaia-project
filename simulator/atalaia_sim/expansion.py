@@ -223,6 +223,16 @@ class _Output:
             return (t - self.start) % (self.on_ms + self.off_ms) < self.on_ms
         return False
 
+    def ms_since_off(self, t: int) -> Optional[int]:
+        """How long the load has been off at t: since it was turned off, or since a pattern's last on time
+        ended; None when it is on or has not been off. A relay is not turned on again within 100 ms of either
+        (decision EXPI7-11, as the module core; aligned in increment 8, EXPI8-15)."""
+        if self.mode == "pattern" and not self.level(t):
+            return (t - self.start) % (self.on_ms + self.off_ms) - self.on_ms
+        if self.mode == "off" and self.last_off is not None:
+            return t - self.last_off
+        return None
+
     def off(self, t: int) -> None:
         if self.mode != "off":
             self.last_off = t
@@ -316,8 +326,8 @@ class ModuleModel:
             else:
                 if t < o.min_off_until:
                     raise ExpansionError("min_off")
-                if (o.spec["relay"] and o.mode == "off" and o.last_off is not None
-                        and t - o.last_off < RELAY_LEAST_CHANGE_MS):
+                since = o.ms_since_off(t)
+                if o.spec["relay"] and since is not None and since < RELAY_LEAST_CHANGE_MS:
                     raise ExpansionError("relay_change")
                 if o.mode == "off":
                     o.on_since = t

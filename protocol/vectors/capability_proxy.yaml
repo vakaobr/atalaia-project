@@ -62,6 +62,19 @@ evt:
     fields: {"cap_id": "hit.2", "event": "hit", "data": {"channel": 2, "strength": 90}, "seq": 13}
     payload: "a401656869742e32026368697403a2676368616e6e656c0268737472656e677468185a040d"
     frame: "a5020025a401656869742e32026368697403a2676368616e6e656c0268737472656e677468185a040d8f57"
+  # The pod's expansion port (draft RFC "The expansion port", increment 9, the port half; draft RFC 0000
+  # Amendment 7): the pod tells the phone what a box would tell the field as node.modules, and each lent
+  # output's longest on, after every IDENT and change; a module that stops answering while a phone is on a
+  # link. The pseudo-capability "pod", as the settings' EVT "config". The pod firmware writes these data
+  # (firmware/esp32/test/test_pod.c). Bytes written with the Python reference codec.
+  - name: pod_modules
+    fields: {"cap_id": "pod", "event": "modules", "data": {"modules": "g33:servo:siren;58:target/1.0.0:hit;5c:out4/1.0.0:siren.2,strobe,smoke,out.4", "max_on_s": {"siren": 30, "siren.2": 20, "strobe": 20, "smoke": 20, "out.4": 20}}, "seq": 3}
+    payload: "a40163706f6402676d6f64756c657303a2676d6f64756c6573784c6733333a736572766f3a736972656e3b35383a7461726765742f312e302e303a6869743b35633a6f7574342f312e302e303a736972656e2e322c7374726f62652c736d6f6b652c6f75742e34686d61785f6f6e5f73a565736972656e181e67736972656e2e3214667374726f62651465736d6f6b6514656f75742e34140403"
+    frame: "a502009aa40163706f6402676d6f64756c657303a2676d6f64756c6573784c6733333a736572766f3a736972656e3b35383a7461726765742f312e302e303a6869743b35633a6f7574342f312e302e303a736972656e2e322c7374726f62652c736d6f6b652c6f75742e34686d61785f6f6e5f73a565736972656e181e67736972656e2e3214667374726f62651465736d6f6b6514656f75742e341404039469"
+  - name: pod_module_lost
+    fields: {"cap_id": "pod", "event": "module_lost", "data": {"modules": "59:target/1.0.0:hit.2", "reason": "no_answer"}, "seq": 4}
+    payload: "a40163706f64026b6d6f64756c655f6c6f737403a2676d6f64756c65737535393a7461726765742f312e302e303a6869742e3266726561736f6e696e6f5f616e737765720404"
+    frame: "a5020046a40163706f64026b6d6f64756c655f6c6f737403a2676d6f64756c65737535393a7461726765742f312e302e303a6869742e3266726561736f6e696e6f5f616e737765720404ad2c"
 
 cmd:
   - name: ring_fill
@@ -138,6 +151,13 @@ radio:
     fields: {"opcode": 7}
     payload: "07"
     frame: "a50800010742d5"
+  # The modem's PING (opcode 1, no token): what a phone sends a pod at least every 500 ms while one
+  # of the pod's outputs is on, when it has nothing else to say (the outputs' lease; increment 9).
+  - name: cmd_ping
+    type: 8
+    fields: {"opcode": 1}
+    payload: "01"
+    frame: "a5080001012213"
   - name: status
     type: 9
     fields: {"json": "{\"cmd\":4,\"configured\":true,\"radio\":\"sx1262\"}"}
@@ -219,6 +239,21 @@ pod_relay:
       fields: {"fw_version": "0.3.0", "capabilities": [], "has_radio": false, "protocol_version": 1, "field_frames": true, "pair_frames": true, "measure": false}
       payload: "a70165302e332e30028004f4050106f507f508f4"
       frame: "a5010014a70165302e332e30028004f4050106f507f508f4d95a"
+    # A pod built with a simple output (draft RFC "The expansion port", increment 9, EXP-26): its
+    # descriptor last, "feedback": false, as the pod firmware writes it (firmware/esp32/test/test_pod.c
+    # checks the pod's IDENT against these bytes). Written with the Python reference codec.
+    - name: pod_simple_output
+      fields: {"fw_version": "0.8.0", "capabilities": [{"id": "btn.1", "type": "button"}, {"id": "btn.2", "type": "button"}, {"id": "ring", "type": "led", "count": 24}, {"id": "case", "type": "tamper"}, {"id": "siren", "type": "output", "feedback": false}], "battery_pct": 87, "has_radio": true, "protocol_version": 1, "field_frames": true, "pair_frames": true, "measure": true}
+      payload: "a80165302e382e300285a26269646562746e2e31647479706566627574746f6ea26269646562746e2e32647479706566627574746f6ea36269646472696e676474797065636c656465636f756e741818a2626964646361736564747970656674616d706572a362696465736972656e6474797065666f757470757468666565646261636bf403185704f5050106f507f508f5"
+      frame: "a5010092a80165302e382e300285a26269646562746e2e31647479706566627574746f6ea26269646562746e2e32647479706566627574746f6ea36269646472696e676474797065636c656465636f756e741818a2626964646361736564747970656674616d706572a362696465736972656e6474797065666f757470757468666565646261636bf403185704f5050106f507f508f52317"
+    # A pod with a simple output and an expansion port (the port half of increment 9): a target module's hit
+    # sensor after the parts, then the outputs, the simple one with "feedback": false and an out4 module's
+    # four channels without it (its siren is siren.2), as the pod firmware writes it (test_pod.c checks
+    # these bytes). Written with the Python reference codec.
+    - name: pod_port_modules
+      fields: {"fw_version": "0.8.0", "capabilities": [{"id": "btn.1", "type": "button"}, {"id": "hit", "type": "hit"}, {"id": "siren", "type": "output", "feedback": false}, {"id": "siren.2", "type": "output"}, {"id": "strobe", "type": "output"}, {"id": "smoke", "type": "output"}, {"id": "out.4", "type": "output"}], "battery_pct": 87, "has_radio": true, "protocol_version": 1, "field_frames": true, "pair_frames": true, "measure": true}
+      payload: "a80165302e382e300287a26269646562746e2e31647479706566627574746f6ea262696463686974647479706563686974a362696465736972656e6474797065666f757470757468666565646261636bf4a262696467736972656e2e326474797065666f7574707574a2626964667374726f62656474797065666f7574707574a262696465736d6f6b656474797065666f7574707574a2626964656f75742e346474797065666f757470757403185704f5050106f507f508f5"
+      frame: "a50100b9a80165302e382e300287a26269646562746e2e31647479706566627574746f6ea262696463686974647479706563686974a362696465736972656e6474797065666f757470757468666565646261636bf4a262696467736972656e2e326474797065666f7574707574a2626964667374726f62656474797065666f7574707574a262696465736d6f6b656474797065666f7574707574a2626964656f75742e346474797065666f757470757403185704f5050106f507f508f5b78b"
   radio:
     - name: field_tx
       type: 12
