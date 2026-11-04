@@ -12,8 +12,9 @@ CONTRIBUTING.md, "Pull request titles and commit messages"); optional hand-writt
 `## [Unreleased]` and move into the next release's section as "Details". The sections up to 0.5.0
 were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.8.0](https://github.com/vakaobr/atalaia-project/compare/v0.7.0...v0.8.0) (2026-11-04)
+## [Unreleased]
 
+## [0.8.0](https://github.com/vakaobr/atalaia-project/compare/v0.7.0...v0.8.0) (2026-11-04)
 
 ### ⚠ BREAKING CHANGES
 
@@ -62,7 +63,7 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 * **site:** the build page shows the expansion port, the target addon and the simple output (increment 10) ([382cf91](https://github.com/vakaobr/atalaia-project/commit/382cf918ef5441610676021c1a0601e47b6961a4))
 * **site:** the target and output modules on the build page (increments 8 and 11) ([#66](https://github.com/vakaobr/atalaia-project/issues/66)) ([b8819c6](https://github.com/vakaobr/atalaia-project/commit/b8819c6f3df4cbac9eb41bd0b4097353dd85d2c1))
 
-## [Unreleased]
+### Details
 
 - **`check_wiring.py` checks the I/O pod's pins on the project page's build page** (decisions WIRE-1 to WIRE-4, answering SITE9-2; `tools/check_wiring.py`, `site/src/build.html`, the generated build pages, `site/README.md`, `tools/README.md`): the cells of the page's pod section (`<section id="io-pod">`) are checked against the pod build's defaults, Kconfig with `firmware/esp32/sdkconfig.defaults` and `sdkconfig.pod` over it, as the pod guide's table already was (which now reads the same files instead of naming `ATALAIA_POD_MODE`); every other cell keeps the Field Box's. The pod's two simple outputs, GPIO 33 and 1, become marked cells (`data-kconfig`), and the section must keep a marked cell for each of its pins, so a wrong number or a dropped mark fails the check with the section named. The build page's target section no longer says the pod will lend a target "later": the pod already lends a target addon's hits to a phone's game (increment 9), tested on a computer only (pt, en, de and zh-TW; SITE9-4). The decisions file gains the rows the release key rotation's entries cite (KRT-1 to KRT-12, reconstructed from the sources; KRT-0 was already there).
 
@@ -114,6 +115,7 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 - **The simulator's web view draws each box's screen from its template** (`simulator/atalaia_sim/screens.py` `render_screen`, `web/app.js`, decisions SIMS-1 to SIMS-8): a node's card showed only the screen's name and data; it now draws the mode's `assets/screens/<name>.yaml` at the Field Box's 320x240, laid out with the numbers of the box's LVGL renderer (a centred column 4 px apart, rows 6 px apart, `fill`, the 14/20/28/48 fonts, a 200x12 bar), with every text, `visible:`, bar value and colour worked out by the core's own parser and evaluator through ctypes, and the data a box adds (`lang`, and `held`/`age`/`live` from `since`). *Box language* in the top bar shows the templates in English, Portuguese, German or Chinese. Screens with no template (`code_entry`, a built-in `final_score`) still show as their name and data; the outputs of increment 4 are drawn beside the screen as before. New tests draw every built-in mode's screens with the data its own tests send, in every language, without a failed expression (`test_screen_render.py`), and check the page in Chromium (`editor_tests/test_web_view.py`).
 
 - **"Not built" lines the code has since built are corrected** (decisions SD-4 to SD-16 in `docs/review/decisions-to-review.md`; `docs/phase-1-single-box/SRE.md`, `docs/phase-2-field-network/STATUS.md`, `docs/phase-3-android-players/{ADR,PLAN,STATUS}.md`, `docs/phase-4-site-server/{PLAN,STATUS}.md`, `docs/phase-5-community/ADR.md`, `modes/README.md`, `site/README.md`, `site/i18n/*.yaml`): each line was checked against the code, and what is built is struck through or annotated with its date and commit, never deleted; among them the GM console's remote GM log (built 2026-10-26), the I/O pod's settings over the radio (PF15, built 2026-10-28), the editor's *Test in the simulator* (2026-10-22), phase 1's SRE defects B-1 to B-4 (fixed in the firmware's first commit) and hosted mode now waiting for its go-live checklist rather than the legal review. The project page in four languages no longer calls the site server, the phone controller and sending a box a new mode "still to come".
+
 ## [0.7.0](https://github.com/vakaobr/atalaia-project/compare/v0.6.1...v0.7.0) (2026-11-03)
 
 ### Features
