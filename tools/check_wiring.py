@@ -38,7 +38,10 @@ with --resolve before drawing. The check fails when:
   pod's BUILD.md, GUIDES below) or of the project page's build page
   (site/src/build.html, its cells marked data-kconfig) gives a GPIO that is
   not its Kconfig default, a pin no part may use, or leaves out a pin it must
-  list (phase 5 plan phase 12);
+  list (phase 5 plan phase 12); the pod's guide and the page's pod section
+  (<section id="io-pod">, its simple outputs on GPIO 33 and 1 included) are
+  read with the pod build's defaults, Kconfig with sdkconfig.defaults and
+  sdkconfig.pod over it (GUIDE_SDKCONFIG, SITE_SECTION_SDKCONFIG below);
 - the expansion port's pin table (hardware/expansion-port/BUILD.md and its
   Portuguese BUILD.pt.md, the table after the marker PORT_MARKER) does not give
   the M12 pin-out of decision EXP-1 (pin, wire colour and signal; SDA and SCL on
@@ -127,13 +130,26 @@ EXPANSION_ADDRESSES = range(0x58, 0x60)
 BOX_ADDRESSES = {0x24: "the PN532", 0x36: "the battery gauge", 0x3C: "the board's OLED"}
 KEYPAD_SEARCH = (range(0x20, 0x28), range(0x38, 0x40))
 # A guide whose pins are those of another firmware variant: its table is checked against that
-# build's Kconfig defaults (the I/O pod's simple outputs: GPIO 33 and 1, not the Field Box's 46).
-GUIDE_CHOICE: dict[Path, frozenset[str]] = {
-    REPO / "hardware" / "io-pod" / "BUILD.md": frozenset({"ATALAIA_POD_MODE"}),
+# build's Kconfig defaults, Kconfig.projbuild read with the variant's sdkconfig files laid over it in
+# the order tools/docker_fw.py gives them (POD_DEFAULTS there): the I/O pod's simple outputs are
+# GPIO 33 and 1, not the Field Box's 46 and 45.
+ESP32 = REPO / "firmware" / "esp32"
+POD_SDKCONFIG = (ESP32 / "sdkconfig.defaults", ESP32 / "sdkconfig.pod")
+GUIDE_SDKCONFIG: dict[Path, tuple[Path, ...]] = {
+    REPO / "hardware" / "io-pod" / "BUILD.md": POD_SDKCONFIG,
 }
 GUIDE_SYMBOL = re.compile(r"`(ATALAIA_\w+)`")
 # The project page's build page: <td data-kconfig="ATALAIA_BTN1_PIN">4</td>.
 SITE_CELL = re.compile(r'data-kconfig="(ATALAIA_\w+)"[^>]*>([^<]*)<')
+SITE_SECTION = re.compile(r'<section id="([\w-]+)"(.*?)</section>', re.DOTALL)
+# A section of the build page whose pins are another variant's, as GUIDE_SDKCONFIG (decision
+# WIRE-1): the pod's section is read with the pod build's defaults, and must mark the cells named
+# here (its guide's pins and its two simple outputs, WIRE-2); every other cell, with the Field Box's.
+SITE_SECTION_SDKCONFIG: dict[str, tuple[Path, ...]] = {"io-pod": POD_SDKCONFIG}
+SITE_SECTION_REQUIRED: dict[str, tuple[str, ...]] = {
+    "io-pod": GUIDES[REPO / "hardware" / "io-pod" / "BUILD.md"] + (
+        "ATALAIA_SIMPLE_OUT_PIN", "ATALAIA_SIMPLE_OUT2_PIN"),
+}
 
 BOARD = "BOARD"
 HASH_MARK = "atalaia-wiring-source-sha256:"
@@ -273,13 +289,42 @@ def _truth(expr: str, bools: dict[str, bool]) -> bool:
     return any(all(term(t) for t in part.split("&&")) for part in expr.split("||"))
 
 
-def read_kconfig_defaults(text: str, choose: frozenset[str] = frozenset()) -> dict[str, int]:
+def read_sdkconfig(paths: tuple[Path, ...]) -> dict[str, str]:
+    """The values an sdkconfig defaults file sets, later files over earlier ones:
+    `CONFIG_SYM=y` -> {"SYM": "y"}, `# CONFIG_SYM is not set` -> "n"."""
+    values: dict[str, str] = {}
+    for path in paths:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            m = re.fullmatch(r"CONFIG_(\w+)=(.*)", line)
+            if m:
+                values[m.group(1)] = m.group(2).strip().strip('"')
+                continue
+            m = re.fullmatch(r"#\s*CONFIG_(\w+) is not set", line)
+            if m:
+                values[m.group(1)] = "n"
+    return values
+
+
+def variant_defaults(kconfig_text: str, sdkconfig: tuple[Path, ...]) -> dict[str, int]:
+    """A firmware variant's pin defaults: Kconfig with the variant's sdkconfig files over it (its
+    `=y` choice members chosen, its bools and numbers set)."""
+    values = read_sdkconfig(sdkconfig)
+    chosen = frozenset(name for name, value in values.items() if value == "y")
+    return read_kconfig_defaults(kconfig_text, chosen, values)
+
+
+def read_kconfig_defaults(text: str, choose: frozenset[str] = frozenset(),
+                          fixed: dict[str, str] | None = None) -> dict[str, int]:
     """Returns the default of every numeric `config` symbol.
 
     Handles conditional defaults (`default 6 if SYM`, the first true one wins)
     and choices (`default SYM` selects that choice member; a member in `choose`
-    is selected instead, as a build that picks it).
+    is selected instead, as a build that picks it). `fixed` holds the values an
+    sdkconfig file sets (read_sdkconfig): a bool or a number there wins over its
+    Kconfig default.
     """
+    fixed = fixed or {}
     numeric: dict[str, list[tuple[str, str | None]]] = {}
     bool_defaults: dict[str, list[tuple[str, str | None]]] = {}
     choice_members: list[list[str]] = []
@@ -334,13 +379,22 @@ def read_kconfig_defaults(text: str, choose: frozenset[str] = frozenset()) -> di
             chosen = picked[0]
         for member in members:
             bools[member] = member == chosen
+    for name, value in fixed.items():
+        if value in ("y", "n") and name not in bools:
+            bools[name] = value == "y"
     for name, options in bool_defaults.items():
+        if fixed.get(name) in ("y", "n"):
+            bools[name] = fixed[name] == "y"
+            continue
         for value, cond in options:
             if cond is None or _truth(cond, bools):
                 bools[name] = value == "y"
                 break
     defaults: dict[str, int] = {}
     for name, options in numeric.items():
+        if re.fullmatch(r"-?\d+|0x[0-9a-fA-F]+", fixed.get(name, "")):
+            defaults[name] = int(fixed[name], 0)
+            continue
         for value, cond in options:
             if cond is None or _truth(cond, bools):
                 defaults[name] = int(value, 0)
@@ -567,7 +621,7 @@ def check_pin(where: str, symbol: str, cell: str, defaults: dict[str, int],
     if gpio in STRAP_TOLERANT and symbol in STRAP_TOLERANT[gpio][0]:
         return []
     if POD_SIMPLE_OUT.get(symbol) == gpio:
-        return []  # the I/O pod's guide, read with its build's defaults (GUIDE_CHOICE)
+        return []  # the I/O pod's guide or page section, read with its build's defaults
     if symbol in REVISION_FREE:
         # A guide's tables are for the default revision (a V4.3); its cell names both.
         if gpio == REVISION_FREE[symbol][DEFAULT_REVISION]:
@@ -682,11 +736,29 @@ def check_port_addresses(defaults: dict[str, int]) -> list[str]:
 
 
 def check_site_build(text: str, required: set[str], defaults: dict[str, int],
-                     internal: set[int]) -> list[str]:
-    """The project page's build page: each cell marked data-kconfig holds that pin's GPIO."""
+                     internal: set[int],
+                     section_defaults: dict[str, dict[str, int]] | None = None) -> list[str]:
+    """The project page's build page: each cell marked data-kconfig holds that pin's GPIO, the
+    Field Box's default, or in a section of section_defaults (the I/O pod's) that build's."""
+    section_defaults = section_defaults or {}
     errors: list[str] = []
     seen: set[str] = set()
-    for symbol, cell in SITE_CELL.findall(text):
+    sections = {m.group(1): m.group(2) for m in SITE_SECTION.finditer(text)}
+    for name in sorted(set(section_defaults) | set(SITE_SECTION_REQUIRED)):
+        if name not in sections:
+            errors.append(f"{SITE_BUILD.name}: no <section id=\"{name}\">")
+    for name, body in sections.items():
+        where = f"{SITE_BUILD.name} (#{name})"
+        section_seen: set[str] = set()
+        for symbol, cell in SITE_CELL.findall(body):
+            section_seen.add(symbol)
+            errors += check_pin(where, symbol, cell.strip(), section_defaults.get(name, defaults),
+                                internal)
+        seen |= section_seen
+        errors += [f"{where}: no data-kconfig cell for {s}"
+                   for s in SITE_SECTION_REQUIRED.get(name, ()) if s not in section_seen]
+    outside = SITE_SECTION.sub("", text)
+    for symbol, cell in SITE_CELL.findall(outside):
         seen.add(symbol)
         errors += check_pin(SITE_BUILD.name, symbol, cell.strip(), defaults, internal)
     errors += [f"{SITE_BUILD.name}: no data-kconfig cell for {s}" for s in sorted(required)
@@ -772,8 +844,8 @@ def check_guides(kconfig_path: Path) -> list[str]:
     errors: list[str] = []
     for path, required in GUIDES.items():
         name = path.relative_to(REPO).as_posix()
-        choice = GUIDE_CHOICE.get(path)
-        guide_defaults = read_kconfig_defaults(kconfig_text, choice) if choice else defaults
+        sdkconfig = GUIDE_SDKCONFIG.get(path)
+        guide_defaults = variant_defaults(kconfig_text, sdkconfig) if sdkconfig else defaults
         errors += check_guide(name, path.read_text(encoding="utf-8"), required, guide_defaults,
                               internal)
     for path in PORT_GUIDES:
@@ -786,8 +858,10 @@ def check_guides(kconfig_path: Path) -> list[str]:
         errors += check_output_table(path.relative_to(REPO).as_posix(),
                                      path.read_text(encoding="utf-8"), output_pins)
     required_all = {s for symbols in GUIDES.values() for s in symbols}
+    section_defaults = {name: variant_defaults(kconfig_text, sdkconfig)
+                        for name, sdkconfig in SITE_SECTION_SDKCONFIG.items()}
     errors += check_site_build(SITE_BUILD.read_text(encoding="utf-8"), required_all, defaults,
-                               internal)
+                               internal, section_defaults)
     return errors
 
 

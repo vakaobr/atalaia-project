@@ -26,7 +26,9 @@ by tools/build_site.py (WIRING there), with --check; their labels stay in Englis
 The pin tables are the same in every language, so their GPIO numbers live here,
 not in the language files: each GPIO cell names its Kconfig symbol in
 data-kconfig, and tools/check_wiring.py (in tools/check.sh) fails if a number
-is not that symbol's default in firmware/esp32/main/Kconfig.projbuild. The
+is not that symbol's default in firmware/esp32/main/Kconfig.projbuild (in the
+I/O pod's section, the pod build's default: sdkconfig.pod over Kconfig, so its
+simple outputs are GPIO 33 and 1; decisions WIRE-1 to WIRE-4). The
 photo placeholders (class "photo") of the Satellite, the pod, the port and the target stay until
 their first builds' photos (plan phase HW2); never a mock-up or generated photo. The
 Field Box already has its first real photos and clip (the bench build of 2026-10-31
@@ -258,8 +260,8 @@ and 2026-11-01, #field-box-first-build). See site/README.md.
                 <tr><td>{{ build.pin.lrclk }}</td><td data-kconfig="ATALAIA_AUDIO_LRCLK_PIN">15</td></tr>
                 <tr><td>{{ build.pin.dout }}</td><td data-kconfig="ATALAIA_AUDIO_DOUT_PIN">16</td></tr>
                 <tr><td>{{ build.pin.tamper }}</td><td data-kconfig="ATALAIA_POD_TAMPER_PIN">47</td></tr>
-                <tr><td>{{ build.pin.pod_out1 }}</td><td>33</td></tr>
-                <tr><td>{{ build.pin.pod_out2 }}</td><td>1</td></tr>
+                <tr><td>{{ build.pin.pod_out1 }}</td><td data-kconfig="ATALAIA_SIMPLE_OUT_PIN">33</td></tr>
+                <tr><td>{{ build.pin.pod_out2 }}</td><td data-kconfig="ATALAIA_SIMPLE_OUT2_PIN">1</td></tr>
                 <tr><td>{{ build.pin.log }}</td><td>43</td></tr>
               </tbody>
             </table>
