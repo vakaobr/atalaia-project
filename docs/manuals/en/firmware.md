@@ -325,11 +325,11 @@ The modem is the only image whose USB port carries data frames, so its log is on
 An I/O pod lends its buttons, keypad, ring, sound, NFC reader and radio to an Android phone. Its parts are in the [I/O pod build guide](../../../hardware/io-pod/BUILD.md).
 
 - Build: `python tools/docker_fw.py pod` (`--region` as above). Flash from `firmware/esp32/build-pod`. Edit `build-pod/sdkconfig` for a V4.2.
-- A pod has no setup page, no Wi-Fi and no admin PIN. It has the 2.4 GHz antenna for **Bluetooth** (`atalaia-pod-XXXX`), which is paired and encrypted.
+- A pod has no setup page, no Wi-Fi and no admin PIN. It has the 2.4 GHz antenna for **Bluetooth** (`atalaia-pod-XXXX`), which is paired and encrypted. The phone pairs with a **6-digit code** that the board's small screen shows while it pairs; Android's dialog asks for it. Hold the board's **PRG** button 5 seconds to make the pod forget every phone ([I/O pod build guide, section 10](../../../hardware/io-pod/BUILD.md#10-linking-it-to-a-phone)).
 - Its USB port carries the frames to the phone, so the log is on **GPIO 43** (UART0 transmit), read with a 3.3 V USB-serial adapter at 115200 baud. It is not on the USB port.
-- Build options for the pod, in `build-pod/sdkconfig`: a colour for each button (`CONFIG_ATALAIA_POD_BTN1_TEAM="red"` and so on), the enclosure switch pin (`CONFIG_ATALAIA_POD_TAMPER_PIN`), Bluetooth on or off. Leave `CONFIG_ATALAIA_POD_BLE_ENCRYPTED` on.
+- Build options for the pod, in `build-pod/sdkconfig`: a colour for each button (`CONFIG_ATALAIA_POD_BTN1_TEAM="red"` and so on), the enclosure switch pin (`CONFIG_ATALAIA_POD_TAMPER_PIN`), Bluetooth on or off. Leave `CONFIG_ATALAIA_POD_BLE_ENCRYPTED` and `CONFIG_ATALAIA_POD_BLE_PASSKEY` on.
 - The buttons' colours, the ring's brightness, the volume and the enclosure switch can also be set **over the radio** from the GM console, with no cable ([I/O pod build guide, "Settings over the radio"](../../../hardware/io-pod/BUILD.md#settings-over-the-radio)); they are kept in the pod's flash. The LED count, the pins and the radio stay in `build-pod/sdkconfig`.
-- It does not use the board's small screen.
+- The board's small screen stays dark, except while a phone pairs: the code, then **PAIRED**, **FAILED**, **TOO SLOW** or **PAIR AGAIN** (in English: the pod has no language). Pairing with the code is not yet tried on a real board.
 
 Not yet tested on a real board: all of it. The pod firmware has run on a computer, against the app and the controller. The Satellite is not a variant: it is the Field Box image with fewer parts fitted ([Satellite build guide](../../../hardware/satellite/BUILD.md)). The target addon cannot be built yet ([its page](../../../hardware/target-addon/BUILD.md)).
 

@@ -286,7 +286,7 @@ menu "Atalaia Field Box Configuration"
 
     # ---- On-board OLED --------------------------------------------------------
     menu "On-board OLED"
-        depends on ATALAIA_NODE_MODE || ATALAIA_MODEM_MODE
+        depends on ATALAIA_NODE_MODE || ATALAIA_MODEM_MODE || ATALAIA_POD_MODE
 
         config ATALAIA_OLED_STATUS
             bool "Show a compact status on the board's own OLED"
@@ -300,8 +300,11 @@ menu "Atalaia Field Box Configuration"
                 staff. The TFT keeps the full game screen. On the USB radio
                 modem it shows the link to the controller, the game, the
                 channel, the packet counts, the duty-cycle budget and any
-                radio fault. Without an OLED at the address the firmware logs
-                a warning and runs without it.
+                radio fault. On the I/O pod it stays dark except while a
+                phone pairs over Bluetooth: the 6-digit passkey to type on
+                the phone, then the outcome (decision PODPK-2). Without an
+                OLED at the address the firmware logs a warning and runs
+                without it.
 
         config ATALAIA_OLED_ADDR
             hex "OLED I2C address"
@@ -968,11 +971,37 @@ menu "Atalaia Field Box Configuration"
             default y
             depends on ATALAIA_POD_BLE
             help
-                The pod asks the phone to pair (LE Secure Connections, Just
-                Works: the pod has no display; bonded) and takes Pod RX writes
-                and sends frames only once the link is encrypted, so the game
-                key in RADIO_CMD CONFIGURE never crosses the air in the clear.
-                Off only for bench tests with tools that cannot pair.
+                The pod asks the phone to pair (LE Secure Connections,
+                bonded) and takes Pod RX writes and sends frames only once
+                the link is encrypted, so the game key in RADIO_CMD CONFIGURE
+                never crosses the air in the clear. Off only for bench tests
+                with tools that cannot pair.
+
+        config ATALAIA_POD_BLE_PASSKEY
+            bool "Pair with a passkey shown on the OLED (MITM protection)"
+            default y
+            depends on ATALAIA_POD_BLE_ENCRYPTED
+            help
+                Passkey entry (decisions PODPK-1 to PODPK-11): the pod is
+                DisplayOnly, shows a 6-digit passkey on its OLED (and in its
+                log) and the phone asks for it, so nobody can sit between
+                the phone and the pod while they pair. Only a link encrypted
+                with a key made so carries frames; a bond made without it
+                (Just Works, a pod firmware before 0.8) is refused and the
+                phone is asked to pair again, once. Off: Just Works, which
+                stops listening but not a man in the middle; only for a pod
+                whose OLED is broken.
+
+        config ATALAIA_POD_BOND_CLEAR_PIN
+            int "Button that clears the Bluetooth bonds (GPIO, -1 = none)"
+            default 0
+            depends on ATALAIA_POD_BLE_ENCRYPTED
+            help
+                Held for 5 seconds while the pod runs, every phone the pod
+                has paired with is forgotten (decision PODPK-6); the OLED
+                shows the hold and the outcome. GPIO 0 is the Heltec V4's
+                PRG button, inside the enclosure: clearing the bonds needs
+                the lid open. Pressed reads low (the pin's pull-up is on).
     endmenu
 
     # ---- Boot splash (decision LOGO-6) ----------------------------------------

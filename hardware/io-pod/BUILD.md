@@ -89,6 +89,11 @@ Decided (in the firmware and the design documents):
 - **Two links to the phone at once**: USB (the board's USB-C port, which the
   phone sees as a serial device) and Bluetooth LE (`atalaia-pod-XXXX`, one
   phone at a time, paired and encrypted; decisions PF3, PF4).
+- **Pairing with a passkey**: the board's own 0.96" OLED stays dark, except
+  while a phone pairs over Bluetooth: it shows a 6-digit code, and the phone
+  asks for it, so nobody can sit between the phone and the pod while they pair
+  (decisions PODPK-1 to PODPK-11; [section 10](#10-linking-it-to-a-phone)). The
+  board's **PRG** button, held 5 seconds, makes the pod forget every phone.
 - **The log** goes to UART0's transmit pin, GPIO 43, not to the USB-C port,
   which carries the pod's frames.
 
@@ -344,11 +349,16 @@ the Kconfig menu "I/O pod", listed in firmware/esp32/README.md):
 | No enclosure switch | `CONFIG_ATALAIA_POD_TAMPER_PIN=-1` (optional: an unwired switch never reports) |
 | Switch open while the lid is shut | `# CONFIG_ATALAIA_POD_TAMPER_OPEN_HIGH is not set` |
 | USB only, no Bluetooth | `# CONFIG_ATALAIA_POD_BLE is not set` |
+| The OLED is broken: pair without a code (Just Works) | `# CONFIG_ATALAIA_POD_BLE_PASSKEY is not set` |
+| No button to forget the phones | `CONFIG_ATALAIA_POD_BOND_CLEAR_PIN=-1` (default 0: the PRG button) |
 | 12- or 16-LED ring | `CONFIG_ATALAIA_LED_COUNT=12` (or 16) |
 | Antenna with more than 2 dBi | `CONFIG_ATALAIA_RADIO_ANTENNA_GAIN_DBI=` its gain, rounded up |
 
-Leave `CONFIG_ATALAIA_POD_BLE_ENCRYPTED` on: it keeps the game key off an
-unencrypted Bluetooth link.
+Leave `CONFIG_ATALAIA_POD_BLE_ENCRYPTED` and `CONFIG_ATALAIA_POD_BLE_PASSKEY`
+on: the first keeps the game key off an unencrypted Bluetooth link, the second
+makes sure the phone that pairs is the one you hold (a code on the pod's OLED).
+Without the passkey, the pod's log on GPIO 43 still shows `pairing passkey
+123456` when the OLED is missing.
 
 ### Settings over the radio
 
@@ -394,8 +404,26 @@ with the board steps of BRING_UP.md that apply first (revision, antenna,
 
 1. **USB.** A USB-C OTG cable from the phone to the pod. In the app:
    *Prop > I/O pod > Find pods*, open it, allow USB access: "Pod linked over USB".
-2. **Bluetooth.** Unplugged: *Find pods* lists `atalaia-pod-XXXX`; open it and
-   confirm Android's pairing question once: "Pod linked over BLE".
+2. **Bluetooth.** Unplugged: *Find pods* lists `atalaia-pod-XXXX`; open it.
+   The pod's OLED shows **PAIR**, the seconds left and a 6-digit code (`123
+   456`), with the pod's name below; Android's pairing dialog asks for it: type
+   the 6 digits within 30 seconds. The OLED shows **PAIRED** and the app "Pod
+   linked over BLE". Only once: the phone and the pod keep the pairing.
+   - **A wrong code** (or *Cancel*): the OLED shows **FAILED**, the app says the
+     code did not match. Open the pod again: a new code.
+   - **Too slow**: **TOO SLOW** on the OLED, and a message in the app. A phone
+     that connects and never pairs is let go after 60 seconds.
+   - **"This pod needs pairing again"**: the phone was paired with this pod
+     before it had the code (a pod firmware before 0.8), or the pod forgot its
+     phones. The OLED shows **PAIR AGAIN**; the app forgets its old pairing
+     and opens the pod again by itself, once: type the new code. If Android
+     does not let the app forget it, the app says so: forget
+     `atalaia-pod-XXXX` in Android's Bluetooth settings, then link it again.
+   - **Forget every phone**: open the lid and hold the board's **PRG** button
+     for 5 seconds. The OLED shows **FORGET ALL** with a bar, then
+     **CLEARED**; a phone that is linked is dropped. Every phone pairs again
+     with a code. (Opening the lid reports a tamper if the enclosure switch is
+     on: do it between games.)
 3. **A game.** A prop game on the phone with the pod linked: its buttons are the
    game's teams by number, its ring shows the team, its reader checks player
    tags, and the phone's radio link to the field controller goes through the
@@ -413,6 +441,8 @@ amplifier and the power. For a pod in particular:
 | The phone does not find the pod over USB | A charge-only cable or panel extension; the phone has no USB host (OTG) |
 | Opening the USB port resets the pod | The app sets DTR and RTS together; another serial app may not: use the Atalaia app |
 | `atalaia-pod-XXXX` not listed | The 2.4 GHz antenna missing or on the wrong connector; another phone is linked (one at a time); Bluetooth turned off in the build |
+| Android asks for a code but the OLED stays dark | The OLED was not found at boot (the log says `SSD1306 OLED not found`): the code is in the log on GPIO 43 (`pairing passkey 123456`); check the board's OLED, or build without the passkey (section 9) |
+| "This pod needs pairing again" every time | Android did not forget its pairing: forget `atalaia-pod-XXXX` in the Bluetooth settings, then link it again |
 | The phone never shows "Someone opened the I/O pod" | No switch on GPIO 47, or it never read closed (the lid does not press it); a switch wired the other way round needs `POD_TAMPER_OPEN_HIGH` off |
 | The pod reports an opening by itself | The switch lets go when the box is knocked: mount it firmer, or use a lever switch |
 | Button 4 never registers | It is on the PCF8574's P7: the expander must be fitted and found at boot |
