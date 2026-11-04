@@ -6,7 +6,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 # RFC 0000: The expansion port, the simple output, and their first modules
 
 - **Author(s):** The Atalaia contributors (design requested by the maintainer on 2026-11-03)
-- **Status:** Draft (2026-11-03): a design for the maintainer to approve; its open questions were approved on 2026-11-03, and increments 1 to 6 of section 8's plan are built (each in `docs/phase-5-community/STATUS.md`; the port driver of 6 is not yet called by the game task). Decisions are numbered **EXP-1** to **EXP-38** in this file. Updated the same day with the maintainer's decision EXP-31: two output paths, the single-GPIO simple output preferred
+- **Status:** Draft (2026-11-03): a design for the maintainer to approve; its open questions were approved on 2026-11-03, and increments 1 to 8 and 10 of section 8's plan are built (each in `docs/phase-5-community/STATUS.md`; nothing tried on hardware yet, and *Target Windows* waits for the bench to become a Field Box preset). Decisions are numbered **EXP-1** to **EXP-38** in this file. Updated the same day with the maintainer's decision EXP-31: two output paths, the single-GPIO simple output preferred
 - **Discussion:** the pull request that adds this file
 - **Replaces, once accepted:** the target addon's open items (P5J-9, P5J-21) and the draft report format of P5J-19; revisits P5J-7 (no outputs on the pod)
 
@@ -318,10 +318,12 @@ timer, so the output ends on time even between polls.
   output-only one) is **gone**: its capabilities leave the box's list, the
   controller is told (section 5), and its outputs count as off (its lease has
   long run out by then).
-- **Hot-plug:** the buffer connects a module only when the bus is idle. Every
-  2 s the box probes one empty address of 0x58-0x5F with a one-byte address
-  write; a module that answers is read (`IDENT`, `CHANNEL`s), sent `ALL_OFF`
-  and `CLEAR_FRESH`, and added. A module plugged in during a game is usable at
+- **Hot-plug:** the buffer connects a module only when the bus is idle. The
+  box probes each empty address of 0x58-0x5F every 2 s with a one-byte address
+  write, one address every 250 ms in turn (an address with a module is
+  skipped), so a module plugged in is found within 2 s (bench test 3; the
+  maintainer's answer to EXPI6-4, 2026-11-04); a module that answers is read
+  (`IDENT`, `CHANNEL`s), sent `ALL_OFF` and `CLEAR_FRESH`, and added. A module plugged in during a game is usable at
   once by a mode that already calls its capability (calls before that were
   ignored).
 - The box sends `ALL_OFF` to every module it finds at boot, before anything
@@ -670,7 +672,8 @@ an "outputs disabled on this box" note when the box says so.
 pods", Amendment 6):* the note travels as a **fourth event**,
 `node.outputs_disabled` (60, normal, data `modules`: the outputs fitted that the
 box's admin has not enabled, in the same compact text, the empty text when
-every one is), sent with `node.modules` by a box that has an output fitted. Not
+every one is; a module's channels not enabled as its entry with only those
+ids, EXPL-20), sent with `node.modules` by a box that has an output fitted. Not
 a key of `node.modules`: the decoders refuse an unknown data key, so an older
 controller would lose the whole `node.modules`; it refuses an unknown event
 alone. The controllers give it as the node list's `outputs_disabled`, and the
@@ -1032,7 +1035,7 @@ where a recommendation changes, it says so.
 | EXP-11 | Every output leased: 1.5 s, refreshed every 500 ms, at most 5 s |
 | EXP-12 | Desired state on the box, reconciled with each `STATUS` |
 | EXP-13 | Hard limits in the module, the box and the call; the lowest wins |
-| EXP-14 | Errors, gone after 25 failed reads, hot-plug by probing one empty address every 2 s, `ALL_OFF` at discovery and boot |
+| EXP-14 | Errors, gone after 25 failed reads, hot-plug by probing each empty address every 2 s (one every 250 ms in turn), `ALL_OFF` at discovery and boot |
 | EXP-15 | RP2040 reference processor, portable protocol core; bare PCF8574/MCP23017 relay boards not supported |
 | EXP-16 | I2C output module (later, optional since EXP-31): I2C isolator, own supply, RP2040, off-the-shelf opto-isolated relay board |
 | EXP-17 | SELV loads only; mains out of scope; smoke machines only through documented low-voltage inputs; no pyrotechnics |

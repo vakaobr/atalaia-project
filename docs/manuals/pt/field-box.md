@@ -176,6 +176,17 @@ O que a caixa faz:
 
 **Segurança.** Só aparelhos de baixa tensão com bateria própria (no máximo 24 V). **Nunca** a rede elétrica. Uma máquina de fumo só pela sua entrada de comando de baixa tensão; nunca pirotecnia. Proteção auditiva perto de sirenes e buzinas. Fumo nunca numa sala fechada sem autorização do recinto. Antes do primeiro jogo, quem monta verifica cada interruptor: tem de desligar quando se tira o cabo ([manual de montagem, secção 9.10](../../../hardware/field-box/BUILD.pt.md#910-saída-simples-opcional)).
 
+### Um alvo na porta de expansão
+
+Uma caixa montada com uma **porta de expansão** (uma tomada M12, [guia da porta](../../../hardware/expansion-port/BUILD.pt.md)) aceita um **alvo**: uma placa para onde os jogadores disparam, com um sensor e uma pequena placa própria atrás, num cabo de até 2 m ([guia do alvo](../../../hardware/target-addon/BUILD.pt.md)). O jogo *Janelas de Alvo* usa-o: a caixa acende-se na cor de uma equipa durante uns segundos, e um impacto na placa de alvo nesse tempo pontua para essa equipa. Ainda não testado em hardware.
+
+1. **Liga o alvo antes de a caixa entrar no jogo** (com a caixa ligada ou desligada). A caixa encontra-o em 2 segundos; ligado mais tarde, a caixa encontra-o na mesma, e o jogo usa-o logo.
+2. A consola de GM mostra-o como uma etiqueta debaixo da caixa: **target 1.0.0: hit**.
+3. Em *Janelas de Alvo* o alvo só conta impactos enquanto o jogo decorre: nem antes de começar, nem em pausa, nem depois de acabar.
+4. Se o cabo sair durante o jogo, o registo de GM diz **box-4 perdeu um módulo: 58:target/1.0.0:hit (deixou de responder)**. Volta a ligá-lo: continua logo.
+
+**Segurança.** Proteção dos olhos e da cara para toda a gente ao alcance do alvo, a placa de alvo inclinada para baixo para as BB irem para o chão, e nunca disparar para a caixa, o cabo ou o invólucro do alvo: só para a placa. Os limites de potência do campo valem para os alvos como para os jogadores.
+
 As *Ligaduras* e o *Hackeia o terminal* não seguem a língua da caixa. Cada um usa a língua do ecrã da sua própria definição **Língua** no jogo; se estiver vazia, é a língua do jogo. O *VIP / Carga* segue a língua da caixa, como os outros modos (a sua antiga definição **Língua** já não é usada).
 
 ## 7. O que te dizem as luzes e os ecrãs

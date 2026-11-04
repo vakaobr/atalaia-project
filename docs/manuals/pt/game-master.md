@@ -261,7 +261,7 @@ Todos os modos incluídos aparecem em **Modo ou predefinição**. Os nomes em in
 | Hacking Terminal | Hackeia o terminal | Funciona sem o controlador. Enigma: código, fios ou sequência. |
 | VIP / Payload | VIP / Carga | O VIP partilha a posição a partir da app. |
 | Money Factory | Fábrica de Dinheiro | Precisa de etiquetas. |
-| Target Windows | Janelas de Alvo | Precisa do módulo de alvo, que ainda não está feito. |
+| Target Windows | Janelas de Alvo | Precisa de um alvo na porta de expansão da caixa ([Alvos](#alvos)). Ainda não testado em hardware; ainda não é uma predefinição da Field Box. |
 | Codes (modificador) | Códigos (modificador) | Códigos no teclado ao lado de qualquer modo. |
 | Medic Kit (função) | Ligaduras | Uma caixa de kit ao lado de qualquer modo. |
 | Objectives (função) | Objetivos | As caixas de um cenário à medida. |
@@ -400,6 +400,17 @@ Um controlador de reserva não pode começar um jogo. Diz **Este controlador nã
 As caixas também desligam as saídas sozinhas quando o jogo é posto em pausa ou acaba. Quem está na página **GM remoto** do servidor do site só pode desligar todas as saídas (**Desligar todas as saídas**, em qualquer estado do jogo em curso até ter terminado), nunca ligar uma.
 
 **Modos que acionam saídas.** A *Bomba / Rush* aciona o **fumo** (smoke) e a **sirene** (siren) da caixa da bomba quando explode, durante os segundos escritos em **Fumo quando explode** e **Sirene quando explode** (até 10: a explosão termina o jogo, e uma caixa mantém uma saída ligada no máximo 10 segundos depois do fim). O *Mestre e Satélites* toca a **sirene** da caixa mestre quando uma equipa tem todos os satélites, durante os segundos em **Sirene na mestre quando uma equipa tem todos os satélites** (o tempo máximo da própria caixa continua a valer), e volta a tocá-la só depois de essa equipa perder um. Vazios (por omissão), nada é acionado e o jogo é como antes. Ao escolher um destes modos, o formulário diz que saídas usaria (**Bomba / Rush acionaria estas saídas numa caixa que as tenha: smoke, siren**). Para funcionar, a saída tem de estar ativada na própria caixa, com o PIN de administração, e ter esse uso (**smoke**, **siren**; vê o [manual da Field Box](field-box.md#saídas-uma-sirene-um-estroboscópio-uma-máquina-de-fumo)). Uma caixa sem ela joga o jogo da mesma maneira, sem acionar nada; se tiver saídas mas nenhuma destas, a verificação antes de começar diz isso (**box-4 (bomb) não tem nenhuma das saídas que o modo acionaria (smoke, siren): joga-se sem elas.**). Um cenário cujos gatilhos acionam saídas aparece da mesma maneira, caixa a caixa (**Foxhound acionaria estas saídas numa caixa que as tenha: siren, strobe (master); horn (gate)**), e a verificação antes de começar olha para cada caixa a que deste nome no separador **Juntar** como olharia para o papel de um modo.
+
+### Alvos
+
+Uma caixa pode levar um **alvo** na sua porta de expansão: uma placa com um sensor que sente cada impacto ([manual da Field Box](field-box.md#um-alvo-na-porta-de-expansão)). *Janelas de Alvo* é o modo para ele (papel **target**).
+
+- **Antes do jogo**, liga o alvo à caixa e depois deixa a caixa entrar. O separador **Caixas** mostra-o como uma etiqueta debaixo da caixa: **target 1.0.0: hit**. Uma caixa cujo papel precisa de um sensor de impacto e não o tem faz a verificação de arranque dizê-lo (**Falta a uma caixa o que o seu papel precisa: box-4 (target): hit**); vê o cabo antes de **Começar mesmo assim**.
+- **Durante o jogo** cada impacto chega ao modo: em *Janelas de Alvo*, um impacto enquanto a caixa mostra a cor de uma equipa dá a essa equipa os **Pontos por um tiro na janela**, e o **Registo** diz **Um alvo foi atingido**. Os impactos só contam enquanto o jogo decorre (não em pausa). **Impacto mais fraco que conta** (0-255) ignora toques leves; o valor certo depende da placa de alvo, acerta-o num jogo de teste.
+- **Se um alvo desaparecer** (um cabo puxado, um conector partido), o **Registo** diz **box-4 perdeu um módulo: 58:target/1.0.0:hit (deixou de responder)** e a sua etiqueta desaparece. Ligado outra vez, conta logo.
+- Uma caixa com dois alvos chama-lhes **hit** e **hit.2**.
+
+Ainda não testado em hardware: o alvo e o seu firmware estão feitos e testados só num computador.
 
 ### O separador Caixas
 

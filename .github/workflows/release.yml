@@ -1,6 +1,6 @@
 name: Release
 
-# A release tag v* builds the firmware images, signs them with a CI release key and publishes a
+# A release tag v* builds the firmware images (and the target module's UF2 files), signs them with a CI release key and publishes a
 # GitHub pre-release with them (docs/manuals/en/firmware.md, firmware/esp32/docs/RELEASE_SIGNING.md).
 # What decides is the ref the run is on, not the event: a tag v* is a real release, whether
 # release-please.yml named it (`gh workflow run release.yml --ref vX.Y.Z` after merging the release
@@ -170,9 +170,43 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  build-module:
+    # The target module's UF2 files (firmware/target-module/; draft RFC "The expansion port",
+    # increment 8), built in tools/docker_module.py's image (Ubuntu pinned by digest, pico-sdk and
+    # picotool pinned by commit). Extra release assets covered by SHA256SUMS; not signed: a module is
+    # flashed over USB by hand, never updated over the air.
+    name: Build the target module
+    needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      FW_VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Host tests, then the UF2 files
+        run: |
+          python3 tools/docker_module.py test
+          python3 tools/docker_module.py build
+      - name: Name them for the release
+        run: |
+          set -eu
+          mkdir -p dist
+          cp firmware/target-module/build/atalaia_target_module.uf2 "dist/atalaia-target-module-$FW_VERSION.uf2"
+          cp firmware/target-module/build/atalaia_target_module_2.uf2 "dist/atalaia-target-module-2-$FW_VERSION.uf2"
+          ls -l dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: firmware-target-module
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
   publish:
     name: Sign and publish
-    needs: [version, build]
+    needs: [version, build, build-module]
     runs-on: ubuntu-latest
     # The protected environment "release" (required reviewers, set in the repository settings): the
     # signing secrets belong to it, so only a run a maintainer approved can read them (SC-1, SC-2).
@@ -271,8 +305,9 @@ jobs:
           set -eu
           sha256sum atalaia-* > SHA256SUMS
           cat SHA256SUMS
-          # usb.zip and merged.bin of three images, the Field Box's .bin and .release.json, the sums.
-          test "$(find . -type f | wc -l)" -eq 9
+          # usb.zip and merged.bin of three images, the Field Box's .bin and .release.json, the
+          # target module's two .uf2 files, the sums.
+          test "$(find . -type f | wc -l)" -eq 11
       - name: On a dry run, keep the files as a workflow artifact
         if: github.ref_type != 'tag'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

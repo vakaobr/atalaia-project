@@ -6,9 +6,10 @@ each hit (its strength 0-255) and answers the box at I2C address 0x58. It plugs 
 *Target Windows* lights the box's own LED ring, so the module needs no LEDs. The hardware of the Target Windows mode
 (built in software).
 
-[BUILD.md](BUILD.md) ([pt](BUILD.pt.md)): parts, the module's supply entry, sensor front end and connector, checks,
-the plate, and what waits for the firmware. The hardware is decided (draft RFC "The expansion port", EXP-1 to EXP-15)
-and can be built; the module's firmware (UF2), the box's port driver in its game loop and Target Windows as a box
-preset come with increment 8 of the RFC's plan.
+[BUILD.md](BUILD.md) ([pt](BUILD.pt.md)): parts, the module's pins, supply entry, sensor front end and connector,
+flashing, checks, the plate, and what waits for the bench. The hardware is decided (draft RFC "The expansion port",
+EXP-1 to EXP-15); the module's firmware ([firmware/target-module/](../../firmware/target-module/README.md), a UF2
+file) and the box's port driver in its game loop came with increment 8. Target Windows becomes a box preset once
+bench-tested.
 
-Status: buildable hardware, firmware pending (increment 8).
+Status: buildable hardware and firmware, tested on a computer only; not yet built.

@@ -162,6 +162,7 @@ else()
         "reset_reason_esp.c"
         "expansion.c"
         "expansion_esp.c"
+        "expansion_box.c"
         "sound.c"
         "sound_esp.c"
         "outputs.c"

@@ -176,6 +176,17 @@ What the box does:
 
 **Safety.** Only low-voltage devices on their own battery (at most 24 V). **Never** mains. A smoke machine only through its low-voltage remote input; never pyrotechnics. Hearing protection near sirens and horns. Smoke never in a closed room without the venue's approval. Before its first game, the builder checks each switch: it must turn off when its cable is pulled ([build manual, section 9.10](../../../hardware/field-box/BUILD.md#910-simple-output-optional)).
 
+### A target on the expansion port
+
+A box built with an **expansion port** (an M12 socket, [port guide](../../../hardware/expansion-port/BUILD.md)) takes a **target**: a plate that players shoot at, with a sensor and a small board of its own behind it, on a cable of up to 2 m ([target guide](../../../hardware/target-addon/BUILD.md)). The game *Target Windows* uses it: the box lights up in a team's colour for a few seconds, and a hit on the plate then scores for that team. Not yet tried on hardware.
+
+1. **Plug the target in before the box joins the game** (with the box on or off). The box finds it within 2 seconds; plugged in later, the box still finds it, and the game uses it at once.
+2. The GM's console shows it as a chip under the box: **target 1.0.0: hit**.
+3. During *Target Windows* the target counts hits only while the game runs: not before it starts, not while it is paused, not after it ends.
+4. If the cable comes out during the game, the GM's log says **box-4 lost a module: 58:target/1.0.0:hit (it stopped answering)**. Plug it back in: it carries on at once.
+
+**Safety.** Eye and face protection for everyone within range of the target, the plate angled down so BBs go to the ground, and never shoot at the box, the cable or the target's enclosure: only at the plate. The field's power limits apply to targets as to players.
+
 *Medic Kit* and *Hacking Terminal* do not follow the box language. Each takes its screen language from its own **Language** setting in the game; left empty, it is the game's language. *VIP / Payload* follows the box language, like the other modes (its old **Language** setting is no longer used).
 
 ## 7. What the lights and screens tell you
