@@ -36,6 +36,18 @@ SPDX-License-Identifier: GPL-3.0-or-later
       <button id="end" type="button">End</button>
       <button id="reset" type="button" title="Start over with a new game">Reset</button>
     </div>
+
+    <div class="group">
+      <label class="speed" title="The language a box hands its screens as data lang">Box language
+        <select id="box-lang">
+          <option value="">not set</option>
+          <option value="en">English</option>
+          <option value="pt">Português</option>
+          <option value="de">Deutsch</option>
+          <option value="zh-tw">繁體中文</option>
+        </select>
+      </label>
+    </div>
   </header>
 
   <div id="notice" class="notice" role="status" hidden></div>
@@ -86,6 +98,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
         <span class="status chip"></span>
       </header>
       <div class="screen" aria-label="Screen">
+        <div class="lcd-frame" hidden></div>
         <div class="template"></div>
         <dl class="screen-data"></dl>
       </div>

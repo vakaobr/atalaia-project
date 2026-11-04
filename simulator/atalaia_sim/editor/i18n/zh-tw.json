@@ -176,6 +176,13 @@
     "sound_tip": "播放盒子的音效，例如 captured、armed 或 explosion。",
     "team_display": "讓隊伍燈號顯示 %1",
     "team_display_tip": "在盒子的燈上顯示某隊的顏色（none 會關燈）。",
+    "output": "輸出 %1 %2 持續 %3 毫秒",
+    "output_tip": "切換盒子的一個輸出（警報器、煙霧機…）：脈衝持續該時間、開啟（最多該時間；空白：該輸出自己的最長時間）或關閉。只在遊戲進行中有效，沒有該輸出的盒子會忽略。請在「模式」分頁中把功能列入角色的輸出。",
+    "output_pattern": "閃爍輸出 %1：開 %2 毫秒、關 %3 毫秒，持續 %4 毫秒",
+    "output_pattern_tip": "讓盒子的一個輸出輪流開關（各 0.5-10 秒）持續該時間，例如頻閃燈。",
+    "act_pulse": "脈衝",
+    "act_on": "開啟",
+    "act_off": "關閉",
     "param": "設定 %1",
     "param_tip": "模式某個設定的值，即 GM 為這場遊戲選的值。",
     "param_declare": "設定 %1 是 %2",
@@ -241,6 +248,10 @@
     "on_command_tip": "GM 按下這個指令，或控制器腳本送出它時，執行裡面的積木。",
     "field_send_mode": "把模式指令 %1 送到盒子 %2",
     "field_send_mode_tip": "把模式自己的指令送到某個盒子，盒子在「當收到模式指令 …」中接收。",
+    "field_output": "盒子 %2 的輸出 %1 %3 持續 %4 毫秒",
+    "field_output_tip": "從控制器切換某個盒子的輸出（field.send … \"output\"）：脈衝或開啟持續該時間，或關閉；* 搭配關閉：盒子的所有輸出。控制器每 2 秒最多送一個開啟給同一個盒子。",
+    "field_output_pattern": "閃爍盒子 %2 的輸出 %1：開 %3 毫秒、關 %4 毫秒，持續 %5 毫秒",
+    "field_output_pattern_tip": "從控制器讓某個盒子的輸出輪流開關（各 0.5-10 秒）持續該時間。",
     "problem_screen_unknown": "畫面「{name}」既不是盒子的畫面，也不是模式的畫面檔（「模式」分頁）。",
     "problem_polygon_points": "區域需要 3 到 {name} 個角點。",
     "problem_no_role": "模式至少需要一個角色。",
@@ -251,6 +262,9 @@
     "problem_role_no_input": "角色「{name}」不需要盒子腳本會回應的任何輸入。",
     "problem_role_unknown": "「{name}」不是這個模式的角色（「模式」分頁）。",
     "problem_command_twice": "GM 指令「{name}」宣告了兩次。",
-    "problem_command_unhandled": "GM 指令「{name}」沒有「當收到模式指令 …」積木。"
+    "problem_command_unhandled": "GM 指令「{name}」沒有「當收到模式指令 …」積木。",
+    "problem_output_ms": "這個輸出積木需要以毫秒表示的時間。",
+    "problem_output_all": "*（所有輸出）只能關閉。",
+    "problem_output_unlisted": "輸出「{name}」不在任何角色的輸出中（「模式」分頁）：請在那裡列出，讓主控台與開始檢查知道模式會用到它。"
   }
 }

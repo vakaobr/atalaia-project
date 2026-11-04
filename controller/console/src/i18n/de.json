@@ -505,7 +505,7 @@
     "off_note": "Der Kartenabruf ist für dieses Spielfeld ausgeschaltet (Einstellungen).",
     "login": "Melde dich zuerst mit dem GM-Code an der Konsole an und öffne diese Seite dann aus dem Tab Feld.",
     "intro": "Such das Feld auf der Karte und markiere die Ecken seines Umrisses: Dieser Browser zeichnet das Feldbild aus offenen Karten. Das Bild, seine Lage auf der Karte (ATAK) und die Feldgrenze werden dann auf dem Feld-Controller gespeichert, der dafür kein Internet braucht.",
-    "sources": "Nur während du das Spiel einrichtest: Dieser Browser lädt die Karte und das Gebiet einmal von OpenStreetMap (© OpenStreetMap-Mitwirkende) und, wo es sie gibt, die offenen Luftbilder des Landes oder der Region (das DGT-Orthofoto auf dem portugiesischen Festland, das PNOA des IGN in Spanien, die Orthofotos des IGN in Frankreich und die von PDOK in den Niederlanden sowie die der öffentlichen Dienste Belgiens, Luxemburgs, der Schweiz, von elf deutschen Ländern, Polens und Tschechiens, jeweils mit ihrem Nachweis). Ist der Datendienst von OpenStreetMap ausgelastet, geht dieselbe Anfrage (nur das Gebiet des Feldes) an einen anderen öffentlichen Server mit denselben Daten (overpass.private.coffee). Sonst wird nichts heruntergeladen, und der Rest der Konsole funktioniert weiter ohne Internet.",
+    "sources": "Nur während du das Spiel einrichtest: Dieser Browser lädt die Karte und das Gebiet einmal von OpenStreetMap (© OpenStreetMap-Mitwirkende) und, wo es sie gibt, die offenen Luftbilder des Landes oder der Region (das DGT-Orthofoto auf dem portugiesischen Festland, das PNOA des IGN in Spanien, die Orthofotos des IGN in Frankreich und die von PDOK in den Niederlanden sowie die der öffentlichen Dienste Belgiens, Luxemburgs, der Schweiz, von elf deutschen Ländern, Polens, Tschechiens und Österreichs (basemap.at), jeweils mit ihrem Nachweis). Ist der Datendienst von OpenStreetMap ausgelastet, geht dieselbe Anfrage (nur das Gebiet des Feldes) an einen anderen öffentlichen Server mit denselben Daten (overpass.private.coffee). Sonst wird nichts heruntergeladen, und der Rest der Konsole funktioniert weiter ohne Internet.",
     "offline": "Diese Seite braucht Internet, und dieses Gerät hat gerade keins. Der Rest der Konsole funktioniert ohne.",
     "go": "Einen Ort suchen oder zu „Breite, Länge“ gehen",
     "go_button": "Suchen",
@@ -542,7 +542,7 @@
     "layer": "Ebene:",
     "layer_map": "Karte",
     "layer_ortho": "Orthofoto ({name})",
-    "layer_none": "Hier gibt es nur die OpenStreetMap-Karte: Offene, hochaufgelöste Luftbilder, die verwendet werden dürfen, gibt es nur auf dem portugiesischen Festland, in Spanien, in Frankreich (mit Korsika und den Überseegebieten), in den Niederlanden, Belgien, Luxemburg, der Schweiz und Liechtenstein, in Polen, Tschechien und in Deutschland außer Baden-Württemberg, Niedersachsen, Hamburg, Sachsen-Anhalt und Schleswig-Holstein.",
+    "layer_none": "Hier gibt es nur die OpenStreetMap-Karte: Offene, hochaufgelöste Luftbilder, die verwendet werden dürfen, gibt es nur auf dem portugiesischen Festland, in Spanien, in Frankreich (mit Korsika und den Überseegebieten), in den Niederlanden, Belgien, Luxemburg, der Schweiz und Liechtenstein, in Polen, Tschechien, Österreich und in Deutschland außer Baden-Württemberg, Niedersachsen, Hamburg, Sachsen-Anhalt und Schleswig-Holstein.",
     "outline": "Der Umriss des Felds",
     "corners": "{n} von höchstens {max} Ecken (mindestens 3).",
     "corners_max": "Höchstens {n} Ecken.",
@@ -588,6 +588,7 @@
     "no_ortho": "Das Orthofoto ({name}) hat kein Bild dieses Gebiets: Das Bild wird nur aus OpenStreetMap gezeichnet.",
     "osm_from": "Die OpenStreetMap-Daten kamen von {host} (der Hauptserver war ausgelastet); die Daten dieses Servers können ein paar Monate alt sein.",
     "ortho_failed": "Das Orthofoto ({name}) konnte nicht geladen werden ({detail}): Das Bild wird nur aus OpenStreetMap gezeichnet.",
+    "ortho_partial": "Das Orthofoto ({name}) hat für einen Teil dieses Gebiets kein Bild ({missing} von {tiles} Kacheln): Dieser Teil bleibt weiß.",
     "errors": {
       "too_big": "Der Umriss ist zu groß ({detail} breit; höchstens 4 km): Zeichne einen kleineren.",
       "offline": "Kein Internet: Diese Seite braucht es, um die Karte zu laden.",
@@ -595,6 +596,7 @@
       "too_much": "Zu viele Kartendaten in diesem Gebiet: Zeichne einen kleineren Umriss.",
       "osm_failed": "Die OpenStreetMap-Daten konnten nicht geladen werden ({detail}).",
       "ortho_failed": "Das Orthofoto konnte nicht geladen werden ({detail}).",
+      "ortho_tiles": "{detail} Kacheln des Orthofotos sind nicht angekommen",
       "too_big_image": "Das Bild ist auch verkleinert noch über 4 MB: Zeichne einen kleineren Umriss.",
       "unreachable": "Die Datenserver von OpenStreetMap waren nicht erreichbar ({detail}): Sie sind ausgelastet oder nicht erreichbar. Prüf die Internetverbindung oder versuch es in ein paar Minuten noch einmal."
     }

@@ -2577,6 +2577,37 @@
       ]
     },
     {
+      "name": "EXPL a scenario's triggers in the start check and the modes list: the output functions they switch on a box count as its role's outputs: (draft RFC 'The expansion port', increment 5 leftover: EXP-22, EXP-25)",
+      "join_key": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/scenarios", "token": "gm", "body": {"manifest": "id: org.club.sirens\nversion: 0.1.0\nname: Sirens\nlang: en\nteams: [red, blue]\nnodes:\n  alpha: { role: objective }\n  bravo: { role: objective }\n  charlie: { role: objective }\nobjectives:\n  - { id: hill, name: Hill, type: capture_and_hold, target: alpha }\n  - { id: cache, name: Cache, type: capture_and_hold, target: charlie }\ntriggers:\n  - when: { completed: [hill] }\n    output: { node: alpha, capability: siren, act: pulse, seconds: 10 }\n  - when: { game: start }\n    output: { node: alpha, capability: horn, act: \"on\", seconds: 2 }\n  - when: { failed: hill }\n    output: { node: alpha, capability: \"*\", act: \"off\" }\n  - when: { game: end }\n    output: { node: bravo, capability: horn, act: pulse, seconds: 5 }\n"}}, "status": 201},
+        {"request": {"method": "GET", "path": "/api/v1/modes", "token": "gm"}, "status": 200, "json": {"$contains": [{"id": "org.club.sirens", "kind": "scenario", "outputs": {"alpha": ["siren", "horn"], "bravo": ["horn"]}}]}},
+        {"request": {"method": "GET", "path": "/api/v1/modes", "token": "gm"}, "status": 200, "json": {"$contains": [{"id": "org.atalaia.domination", "outputs": "$absent"}]}},
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sirens", "mode_id": "org.club.sirens+org.atalaia.objectives"}}, "status": 201, "save": {"gid": "id"}},
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {"name": "alpha", "node_id": 4}}, "status": 200, "json": {"node_id": 4, "role": "objective", "name": "alpha"}},
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {"name": "bravo", "node_id": 5}}, "status": 200, "json": {"node_id": 5, "role": "objective", "name": "bravo"}},
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {"name": "charlie", "node_id": 6}}, "status": 200, "json": {"node_id": 6, "role": "objective", "name": "charlie"}},
+        {"rx": {"source": 4, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-4", "platform": 1, "fw_version": "0.7.0", "core_version": "0.7.0", "tier": 0, "capabilities": [1, 2, 3, 4, 5, 6, 11], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"rx": {"source": 5, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-5", "platform": 1, "fw_version": "0.7.0", "core_version": "0.7.0", "tier": 0, "capabilities": [1, 2, 3, 4, 5, 6], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"rx": {"source": 6, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-6", "platform": 1, "fw_version": "0.7.0", "core_version": "0.7.0", "tier": 0, "capabilities": [1, 2, 3, 4, 5, 6], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/start-check", "token": "read"}, "status": 200,
+         "json": {"missing": [], "missing_caps": [],
+                  "warnings": [{"code": "optional_caps", "node": 5, "name": "box-5", "role": "objective", "capabilities": ["output"], "text": "$any"}],
+                  "not_checked": [], "ok": true}},
+        {"rx": {"source": 4, "seq": 1, "epoch": 1, "type": "EVENT", "event": {"node": 4, "seq": 1, "t": 0, "type": "node.modules", "data": {"modules": "g46:servo:strobe"}}}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/start-check", "token": "read"}, "status": 200,
+         "json": {"missing_caps": [],
+                  "warnings": [{"code": "outputs", "node": 4, "name": "box-4", "role": "objective", "capabilities": ["siren", "horn"], "text": "$any"},
+                               {"code": "optional_caps", "node": 5, "name": "box-5", "role": "objective", "capabilities": ["output"], "text": "$any"}],
+                  "not_checked": [{"node": 4, "name": "box-4", "role": "objective", "capability": "strobe", "text": "$any"}], "ok": true}},
+        {"rx": {"source": 4, "seq": 2, "epoch": 1, "type": "EVENT", "event": {"node": 4, "seq": 2, "t": 0, "type": "node.modules", "data": {"modules": "g46:servo:horn"}}}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/start-check", "token": "read"}, "status": 200,
+         "json": {"warnings": [{"code": "optional_caps", "node": 5}],
+                  "not_checked": [{"node": 4, "capability": "horn"}], "ok": true}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200}
+      ]
+    },
+    {
       "name": "EXP outputs: a box's modules in the node list, the capability start check, the GM's outputs and their limits (draft RFC 'The expansion port', increment 3: EXP-21, EXP-23, EXP-27, EXP-30, EXP-36)",
       "steps": [
         {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sirens", "mode_id": "org.atalaia.domination", "assignments": {"4": "zone", "5": "zone", "6": "zone"}}}, "status": 201,

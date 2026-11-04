@@ -25,7 +25,8 @@
                                                         id a phone already has at that field; the field's
                                                         controller confirms it (202, pending)
 
-Registering needs only an account (F14); the field's staff roles count only in a TOTP session. The
+Registering needs only an account (F14); the field's staff roles count only in a TOTP session. Registering and a new
+ticket count against 20 an hour per account (WREG-5), the same from the app and from the web registration page. The
 rules are in ``services/registration.py``. Changes are in the audit log without names or numbers.
 """
 
@@ -110,6 +111,13 @@ def _error(exc: svc.RegistrationError) -> HTTPException:
     return HTTPException(exc.status, exc.code)
 
 
+def _limited(request: Request, principal: Principal) -> None:
+    """20 registrations and new tickets an hour per account, from the app or the web page alike (WREG-5)."""
+    wait = request.app.state.limits.game_registrations.hit(str(principal.user.id))
+    if wait:
+        raise HTTPException(429, "too_many_requests", headers={"Retry-After": str(wait)})
+
+
 async def _field(db: AsyncSession, field_id: uuid.UUID) -> Field:
     field = await db.get(Field, field_id)
     if field is None:
@@ -140,6 +148,7 @@ async def register(field_id: uuid.UUID, game_id: uuid.UUID, body: RegistrationIn
                    principal: Principal = Depends(current_principal),
                    db: AsyncSession = Depends(get_session)) -> JSONResponse:
     """Registers the account; the answer holds the ticket (``ticket``, ``ticket_text``), shown this once."""
+    _limited(request, principal)
     field = await _field(db, field_id)
     game = await _game(db, field_id, game_id)
     try:
@@ -426,6 +435,7 @@ async def cancel_mine(reg_id: uuid.UUID, request: Request, principal: Principal 
 @router.post("/me/registrations/{reg_id}/ticket")
 async def new_ticket(reg_id: uuid.UUID, request: Request, principal: Principal = Depends(current_principal),
                      db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    _limited(request, principal)
     field, game, reg = await _mine(db, principal, reg_id)
     try:
         secret = svc.renew_ticket(game, reg, svc.now_utc())

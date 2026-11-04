@@ -216,8 +216,29 @@ List<String> _names(Object? value) => [
       if (v is String) v,
 ];
 
+/// A role's manifest entry with the output functions a scenario's triggers
+/// switch on one box added to its `outputs:` (each once, the role's first),
+/// and `output` optional unless the role already lists it; the entry as it is
+/// without any (outputs.py `with_outputs`).
+Object? withOutputs(Object? spec, Object? extra) {
+  final fns = _names(extra);
+  if (fns.isEmpty) return spec;
+  final base = spec is Map ? spec.cast<String, Object?>() : <String, Object?>{};
+  final outputs = _names(base['outputs']);
+  for (final f in fns) {
+    if (!outputs.contains(f)) outputs.add(f);
+  }
+  final optional = _names(base['optional']);
+  if (!optional.contains('output') &&
+      !_names(base['requires']).contains('output')) {
+    optional.add('output');
+  }
+  return {...base, 'optional': optional, 'outputs': outputs};
+}
+
 /// The capability part of the start check for the joined nodes, each
-/// `{node, name, role, capabilities, modules}` (outputs.py `check_nodes`).
+/// `{node, name, role, capabilities, modules}` and, for a scenario's box, the
+/// `outputs` its triggers switch (outputs.py `check_nodes`).
 Map<String, List<Map<String, Object?>>> checkNodes(
   Iterable<Map<String, Object?>> nodes,
   Object? Function(String role) roleSpec,
@@ -235,7 +256,7 @@ Map<String, List<Map<String, Object?>>> checkNodes(
       });
     }
     final types = typesOf(n['capabilities']);
-    final spec = roleSpec('${n['role']}');
+    final spec = withOutputs(roleSpec('${n['role']}'), n['outputs']);
     if (types.isEmpty || spec is! Map) continue;
     for (final name in _names(spec['requires'])) {
       if (hasCapability(types, name) == false) {
