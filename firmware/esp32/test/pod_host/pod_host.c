@@ -26,7 +26,12 @@
  *   pod_host [--usb-port N] [--ble-port N] [--ble-mtu N] [--air-port N]
  *            [--air-peer N] [--no-radio] [--buttons N] [--colour N=NAME]...
  *            [--no-keypad] [--no-nfc] [--no-leds] [--no-audio] [--no-case]
- *            [--led-count N]
+ *            [--led-count N] [--simple-out FUNCTION[@GPIO]]...
+ *
+ * --simple-out (up to twice; draft RFC "The expansion port", increment 9): a simple output (an
+ * RC relay switch, main/pod/pod_outputs.c with the firmware's output layer and burst scheduler)
+ * with that use (siren, strobe, smoke, light, horn, out.1-out.9), enabled as a pod build enables
+ * it, on GPIO 33 (the second: GPIO 1) or the GPIO given; its longest on is 30 s.
  *
  * stdin, one command per line:
  *   press <1-4> | release <1-4>    a team button goes down or up
@@ -45,6 +50,8 @@
  *   TONE <hz> <ms> | AUDIO stop | AUDIO volume <pct>
  *   TX <hex>        a packet the pod's radio put on air
  *   POD settings <json>  new settings taken from a CMD pod (opcode 10; main/pod/pod_settings.h)
+ *   OUTPUT <id> on|off t=<ms>  what a simple output shows changed (2.0 ms pulses or not)
+ *   PIN g<gpio> low t=<ms>     a simple output's last burst has gone out: no signal at all
  *   LOG <text>      the pod's log
  *   STATUS {...}
  * Port 0 picks a free port. It serves one client per link and runs until
@@ -70,7 +77,9 @@
 #include "pod/pod.h"
 #include "pod/pod_ble.h"
 #include "pod/pod_caps.h"
+#include "pod/pod_outputs.h"
 #include "pod/pod_settings.h"
+#include "simple_out.h"
 #include "radio/noise_stats.h"
 #include "radio/radio_limits.h"
 
@@ -282,18 +291,121 @@ static uint32_t now(void *ctx)
     return mono_ms();
 }
 
+/* ---- Simple outputs (--simple-out): the RMT a fake that remembers when its bursts end ---- */
+
+static pod_outputs_t outs;
+static simple_out_t simple[OUTPUTS_MAX];
+static uint32_t pin_low_at[OUTPUTS_MAX]; /* when the last burst ends; 0: told already */
+static bool shown[OUTPUTS_MAX];          /* what OUTPUT said last */
+static uint32_t host_now;
+/* The simple outputs added (their own count: outputs_t's may one day hold module channels too). */
+static int simple_count;
+static int channel_of[OUTPUTS_MAX]; /* simple output i's index in the output layer */
+
+static bool fake_rmt_send(void *ctx, uint16_t width_us, uint16_t frames, bool flush)
+{
+    simple_out_t *so = (simple_out_t *)ctx;
+    int i = (int)(so - simple);
+    (void)width_us;
+    uint32_t start = flush || !simple_out_pulsing(so, host_now) ? host_now : so->horizon_ms;
+    pin_low_at[i] = start + (uint32_t)frames * SO_FRAME_MS;
+    if (pin_low_at[i] == 0) pin_low_at[i] = 1;
+    return true;
+}
+
+static void outputs_log(void *ctx, const char *line)
+{
+    (void)ctx;
+    out("LOG output: %s", line);
+}
+
+/* "FUNCTION[@GPIO]": false for a bad use or GPIO. */
+static bool add_simple_out(const char *arg)
+{
+    int i = simple_count;
+    if (i >= OUTPUTS_MAX) return false;
+    char fn[OUT_ID_MAX + 1];
+    int gpio = i == 0 ? 33 : 1;
+    const char *at = strchr(arg, '@');
+    size_t n = at ? (size_t)(at - arg) : strlen(arg);
+    if (n == 0 || n > OUT_ID_MAX) return false;
+    memcpy(fn, arg, n);
+    fn[n] = '\0';
+    if (at != NULL) gpio = atoi(at + 1);
+    if (!outputs_function_ok(fn) || simple_out_pin_problem(gpio, SO_BOARD_V4_3, -1, NULL, 0)) {
+        return false;
+    }
+    for (int j = 0; j < i; j++) {
+        if (simple[j].gpio == gpio) return false;
+    }
+    out_settings_t s;
+    outputs_default_settings(i, &s);
+    s.enabled = true; /* as a pod build with the output enables it */
+    snprintf(s.function, sizeof(s.function), "%s", fn);
+    simple_out_rmt_t rmt = {.ctx = &simple[i], .send = fake_rmt_send};
+    simple_out_init(&simple[i], gpio, &rmt);
+    out_backend_t be = {.ctx = &simple[i], .drive = simple_out_backend_drive};
+    int ch = outputs_add_simple(&outs.out, gpio, &be, &s);
+    if (ch < 0) return false;
+    channel_of[i] = ch;
+    simple_count++;
+    return true;
+}
+
+/* The outputs' tick, and what changed as OUTPUT and PIN lines. */
+static void outputs_turn(uint32_t t)
+{
+    host_now = t;
+    pod_outputs_tick(&outs, pod_phone_on(&pod), pod_heard_ms(&pod), t);
+    for (int i = 0; i < simple_count; i++) {
+        bool level = outputs_level(&outs.out, channel_of[i]);
+        if (level != shown[i]) {
+            shown[i] = level;
+            out("OUTPUT %s %s t=%lu", outs.out.ch[channel_of[i]].id, level ? "on" : "off",
+                (unsigned long)t);
+        }
+        if (pin_low_at[i] != 0 && (int32_t)(t - pin_low_at[i]) >= 0 &&
+            !simple_out_pulsing(&simple[i], t)) {
+            out("PIN g%d low t=%lu", simple[i].gpio, (unsigned long)pin_low_at[i]);
+            pin_low_at[i] = 0;
+        }
+    }
+}
+
+static void print_outputs(char *buf, size_t cap)
+{
+    size_t len = (size_t)snprintf(buf, cap, "[");
+    for (int i = 0; i < simple_count && len + 2 < cap; i++) {
+        const out_channel_t *c = &outs.out.ch[channel_of[i]];
+        len += (size_t)snprintf(buf + len, cap - len,
+                                "%s{\"id\":\"%s\",\"gpio\":%d,\"on\":%s,\"pulsing\":%s,"
+                                "\"bursts\":%lu}",
+                                i ? "," : "", c->id, c->gpio, c->level ? "true" : "false",
+                                simple_out_pulsing(&simple[i], host_now) ? "true" : "false",
+                                (unsigned long)simple[i].bursts);
+    }
+    if (len + 2 <= cap) snprintf(buf + len, cap - len, "]");
+}
+
 static bool command(void *ctx, const atalaia_proxy_msg_t *m)
 {
     (void)ctx;
+    if (pod_outputs_owns(&outs, m->cap_id)) return pod_outputs_command(&outs, m);
     return pod_caps_command(&caps, m);
 }
 
-static void ident(void *ctx, atalaia_proxy_ident_t *id, bool compact)
+static void ident(void *ctx, atalaia_proxy_ident_t *id, pod_ident_level_t level)
 {
     (void)ctx;
     snprintf(id->fw_version, sizeof(id->fw_version), "host-pod");
-    if (pod_caps_descriptors(&caps, id->caps_json, sizeof(id->caps_json), !compact) == 0) {
+    size_t n =
+        pod_caps_descriptors(&caps, id->caps_json, sizeof(id->caps_json), level == POD_IDENT_FULL);
+    if (n == 0) {
         snprintf(id->caps_json, sizeof(id->caps_json), "[]");
+        n = 2;
+    }
+    if (level < POD_IDENT_NO_OUTPUTS) {
+        pod_outputs_append(&outs, id->caps_json, n, sizeof(id->caps_json), level == POD_IDENT_FULL);
     }
     id->has_battery = battery >= 0;
     id->battery_pct = battery >= 0 ? (uint8_t)battery : 0;
@@ -420,10 +532,13 @@ static void put_card(const char *uid_hex, const uint8_t *mem, size_t mem_len)
 
 static void print_status(void)
 {
+    char outputs[512];
+    print_outputs(outputs, sizeof(outputs));
     out("STATUS {\"usb\":%s,\"ble\":%s,\"radio_configured\":%s,\"radio_owner\":%d,\"pending\":%u,"
         "\"evt_sent\":%lu,\"evt_acked\":%lu,\"evt_lost\":%lu,\"cmds\":%lu,\"cmd_repeats\":%lu,"
         "\"cmd_unknown\":%lu,\"bad_payloads\":%lu,\"ignored\":%lu,\"links_broken\":%lu,"
-        "\"field_tx\":%lu,\"field_rx\":%lu}",
+        "\"field_tx\":%lu,\"field_rx\":%lu,\"outputs\":%s,\"output_quiet_offs\":%lu,"
+        "\"output_link_offs\":%lu,\"output_refused\":%lu}",
         pod_link_active(&pod, POD_LINK_USB) ? "true" : "false",
         pod_link_active(&pod, POD_LINK_BLE) ? "true" : "false",
         pod.radio.configured ? "true" : "false", pod.radio_owner, (unsigned)pod_pending(&pod),
@@ -432,7 +547,8 @@ static void print_status(void)
         (unsigned long)pod.count.cmd_repeats, (unsigned long)pod.count.cmd_unknown,
         (unsigned long)pod.count.bad_payloads, (unsigned long)pod.count.ignored,
         (unsigned long)pod.count.links_broken, (unsigned long)pod.radio.count.field_tx,
-        (unsigned long)pod.radio.count.field_rx);
+        (unsigned long)pod.radio.count.field_rx, outputs, (unsigned long)outs.quiet_offs,
+        (unsigned long)outs.link_offs, (unsigned long)outs.refused);
 }
 
 /* Returns false on "quit". */
@@ -535,6 +651,8 @@ int main(int argc, char **argv)
     static char colours[POD_BUTTONS][24];
     int nbuttons = POD_BUTTONS;
     cfg.keypad = cfg.nfc = cfg.leds = cfg.audio = cfg.tamper = true;
+    outputs_ops_t out_ops = {.log = outputs_log};
+    pod_outputs_init(&outs, &out_ops);
     radio_limits_init(&limits, 14, 2);
     radio_limits_set_channel(&limits, radio_region_default_channel_hz(RADIO_REGION));
     for (int i = 1; i < argc; i++) {
@@ -573,6 +691,14 @@ int main(int argc, char **argv)
             cfg.audio = false;
         } else if (strcmp(argv[i], "--no-case") == 0) {
             cfg.tamper = false;
+        } else if (strcmp(argv[i], "--simple-out") == 0 && i + 1 < argc) {
+            if (!add_simple_out(argv[++i])) {
+                fprintf(stderr,
+                        "pod_host: --simple-out %s: FUNCTION[@GPIO] (siren, strobe, smoke, light, "
+                        "horn, out.1-out.9; at most %d, each on its own free GPIO)\n",
+                        argv[i], OUTPUTS_MAX);
+                return 2;
+            }
         } else {
             fprintf(stderr, "pod_host: unknown option %s\n", argv[i]);
             return 2;
@@ -710,6 +836,7 @@ int main(int argc, char **argv)
         if (measure_pending && (int32_t)(t - measure_done_at) >= 0) finish_measure();
         pod_tick(&pod);
         pod_ble_flush(&ble);
+        outputs_turn(t);
     }
     return 0;
 }

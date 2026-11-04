@@ -230,6 +230,8 @@ More: the [radio page](https://atalaia-project.link/en/radio/), the [radio field
 
 An Android phone can be a box too. In the app choose **Game prop**, then **Join a game** and scan the **join QR code** the organisers show, or hold a join card. The phone shows the mode's screen with team buttons on the screen. An optional **I/O pod** adds a radio and big buttons. Set the **Field join key** and the **Admin PIN** in **Settings**. In **Settings**, **Kiosk mode** pins the phone to the app and **Battery and background** tells you how to stop Android from sleeping the app. If the game uses a mode the app does not carry, and the organisers allow it, the phone gets the mode from the field controller over the field's Wi-Fi before you start: it takes only a package **signed** by a mode key you trust. Add the project's (or your club's) key in **Settings › Mode keys for fetched modes**, and ask the organisers for it. A package that is unsigned, signed by another key or damaged is refused with a message and never runs. Not yet tested on a field. See the [app guide](../../../app/README.md).
 
+**Outputs through the pod.** A pod built with a **simple output** (a siren, a strobe, a light or a smoke machine's remote on an RC relay switch; [I/O pod build guide, section 8.1](../../../hardware/io-pod/BUILD.md#81-simple-outputs-optional)) lends it to the phone: the game on the phone switches it as a box switches its own ([Outputs](#outputs-a-siren-a-strobe-a-smoke-machine)), and so does the GM from the console. The same rules: only during the game (and an end-of-game horn for up to 10 seconds), off when the game starts, is paused or ends, never longer than its longest time, at most one change every half second. There is nothing to enable on the phone or the pod: the builder set the output's use (**siren**, **smoke**...) when building the pod. **If the phone goes, the output goes off**: the pod turns it off when the USB cable is pulled, the Bluetooth link drops, or the app stops talking to it for 1.5 seconds; keep the app in the foreground (**Battery and background** in **Settings**). Not yet tried on hardware.
+
 ## Troubleshooting
 
 | Problem | What to do |
@@ -249,5 +251,7 @@ An Android phone can be a box too. In the app choose **Game prop**, then **Join 
 | The small screen is dark | Ask the builder. The big screen can still work. |
 | The siren (or strobe, smoke) never comes on | Enable the output at the box (admin PIN, **Outputs**) and give it the use the game asks for. It works only during a game, or with the 1-second test between games. Check the switch's own battery. |
 | A switch stays on when the box is off | Stop using that switch: it must turn off when it loses its signal. Ask the builder. |
+| The pod's siren never comes on | The pod was built without the output, or with another use than the game asks for (ask the builder); the pod is not linked; no game running. |
+| The pod's output goes off by itself | The phone stopped talking to the pod (the app was sent to the background or closed) or the link dropped. Link again; keep the app in the foreground. |
 
 For building and bench faults see [the build manual's troubleshooting table](../../../hardware/field-box/BUILD.md#13-troubleshooting).
