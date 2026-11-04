@@ -6,7 +6,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 # RFC 0000: The expansion port, the simple output, and their first modules
 
 - **Author(s):** The Atalaia contributors (design requested by the maintainer on 2026-11-03)
-- **Status:** Draft (2026-11-03): a design for the maintainer to approve; its open questions were approved on 2026-11-03, and increments 1 to 8 and 10 of section 8's plan are built (each in `docs/phase-5-community/STATUS.md`; nothing tried on hardware yet, and *Target Windows* waits for the bench to become a Field Box preset). Decisions are numbered **EXP-1** to **EXP-38** in this file. Updated the same day with the maintainer's decision EXP-31: two output paths, the single-GPIO simple output preferred
+- **Status:** Draft (2026-11-03): a design for the maintainer to approve; its open questions were approved on 2026-11-03, and increments 1 to 10 of section 8's plan are built (each in `docs/phase-5-community/STATUS.md`; nothing tried on hardware yet, and *Target Windows* waits for the bench to become a Field Box preset). Decisions are numbered **EXP-1** to **EXP-38** in this file. Updated the same day with the maintainer's decision EXP-31: two output paths, the single-GPIO simple output preferred
 - **Discussion:** the pull request that adds this file
 - **Replaces, once accepted:** the target addon's open items (P5J-9, P5J-21) and the draft report format of P5J-19; revisits P5J-7 (no outputs on the pod)
 
@@ -751,6 +751,14 @@ gains a target or outputs through its pod:
   within 2 s, and at the game's end, as a box does;
 - the app's prop shell passes the mode's `cap("siren")` calls to the pod, and
   handles CMD 12 from the controller like a box.
+
+Built in increment 9 (2026-11-04, decisions EXPI9-1 to EXPI9-26): the pod's
+simple outputs, then its port (`firmware/esp32/main/pod/pod_port.c`): a
+module's `hit` armed by the phone, an output module's channels lent on a pod
+built to lend them, the module's lease held by the pod; and the pod tells the
+phone a box's `node.modules` text and each output's longest on (the EVT
+`pod.modules`, draft RFC 0000 Amendment 7), which the phone sends to the
+controller, so a prop's outputs show in the console.
 
 The phone as field controller (Android) serves the same output API and CMD 12
 as the Pi (contract vectors). An iPhone is not a prop or a controller (those roles

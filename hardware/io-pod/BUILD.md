@@ -76,6 +76,7 @@ What the pod lends, from the pod firmware
 | LoRa radio | the field's radio: the phone talks to the field controller through it, encrypted by the pod with the game key |
 | Battery gauge (MAX17048) | the pod's battery level |
 | Simple outputs (optional, one or two RC relay switches) | a siren, a strobe, a light or a smoke machine's remote, switched by the mode and the field; off when the phone's link goes ([section 8.1](#81-simple-outputs-optional)) |
+| Expansion port (optional, the M12 socket) | a target module's hits; an output module's relays with the build option; both shown in the GM console ([section 8.2](#82-expansion-port-optional)) |
 
 ## 2. What is decided and what is not
 
@@ -100,11 +101,20 @@ Decided (in the firmware and the design documents):
   goes or the phone stops talking ([section 8.1](#81-simple-outputs-optional)).
   In the firmware and tested on a computer only: no pod has switched a real
   relay yet.
+- **The expansion port** (optional, since 2026-11-04; increment 9, EXP-26): the
+  Field Box's M12 socket and port board on the pod's I2C bus (GPIO 17 and 18,
+  no GPIO of its own), with the box's port driver. A target module's plate
+  hits reach the phone's game; an output module's relays are lent to it in a
+  build that says so; the pod holds the module's lease and turns its outputs
+  off when the phone goes ([section 8.2](#82-expansion-port-optional)). In the
+  firmware and tested on a computer only.
 
 Not decided, or not supported yet:
 
-- **The expansion port** (a target plate's hits, the I2C output module) on a
-  pod: after the Field Box's port driver (the RFC's increments 6 to 8).
+- **A pod with every part and an output module**: the pod's description of
+  itself to the phone (256 bytes) then has room for the module's hit sensor
+  but not its outputs; a pod built for an output module leaves out the parts
+  it does not use (decision EXPI9-23).
 - **Power from the phone.** On USB, the phone powers the board; with the pod's
   main switch on, the board's charger may then charge the pod's cell from the
   phone, as a Field Box charges from any USB charger. Whether a pod should do
@@ -331,6 +341,40 @@ What differs on a pod:
    Then, with a phone linked and a game running, pull the USB cable with the
    output on: the relay opens within about a second.
 
+### 8.2 Expansion port (optional)
+
+**Not yet built on hardware.** The same port as a Field Box's: the M12 socket
+and the port board (hot-swap buffer, TVS, fuse, diode) on the board's I2C bus,
+[expansion port build guide](../expansion-port/BUILD.md). On a pod the bus is
+the keypad expander's, the NFC reader's and the gauge's (GPIO 17 SDA, 18 SCL):
+nothing else changes in the wiring. One module per socket: a
+[target addon](../target-addon/BUILD.md) (address 0x58) or an output module
+(0x5C).
+
+1. **The firmware** looks for modules in every pod build
+   (`CONFIG_ATALAIA_POD_PORT`): at boot, and within 2 s of one being plugged
+   in. The log says `expansion: 0x58 added: 58:target/1.0.0:hit`. An output
+   module's relays are lent to the phone only in a build made with
+   `python tools/docker_fw.py pod --module-outputs=on`
+   (`CONFIG_ATALAIA_POD_MODULE_OUTPUTS`): a pod has no admin PIN, so building
+   it in is what enables them, as for the simple outputs. Their longest on is
+   `CONFIG_ATALAIA_POD_MODULE_MAX_ON_S` (30 s by default), never more than the
+   module's own. The log says `module 5c channel 1 lent to the phone as siren,
+   at most 30 s`.
+2. **A target:** the plate's hits reach the game on the phone while the game
+   runs and the game has armed the plate (Target Windows, Bomb's plate...).
+3. **An output module:** its relays are switched as the simple outputs are (the
+   mode, the field, the GM; the same rules). **When the phone goes, the pod
+   turns them off**, at once for a lost link and after 1.5 s for a silent
+   phone; if the pod itself stops, the module turns them off within 1.5 s (its
+   lease).
+4. **The GM console** shows the pod's outputs and modules under the phone
+   prop, from the pod (the phone passes them on), and **All outputs off**
+   reaches them, over the pod's radio and over the field's Wi-Fi.
+5. **Checks:** the [port guide's section 8](../expansion-port/BUILD.md#8-checks-and-tests); then, with a phone linked and a
+   game running, strike the plate (a hit on the phone's screen), and pull the
+   USB cable with a relay on: it opens within about a second.
+
 ## 9. First flash
 
 The pod firmware is flashed from your computer, like the Field Box's
@@ -392,7 +436,9 @@ the Kconfig menu "I/O pod", listed in firmware/esp32/README.md):
 | 12- or 16-LED ring | `CONFIG_ATALAIA_LED_COUNT=12` (or 16) |
 | Antenna with more than 2 dBi | `CONFIG_ATALAIA_RADIO_ANTENNA_GAIN_DBI=` its gain, rounded up |
 | A simple output's use ([8.1](#81-simple-outputs-optional)) | `CONFIG_ATALAIA_POD_OUT1_FUNCTION="siren"` (`strobe`, `smoke`, `light`, `horn`, `out.1`; output 2: `POD_OUT2_FUNCTION`) |
-| Its longest on | `CONFIG_ATALAIA_POD_OUT1_MAX_ON_S=10` (1-600 s, 30 by default; the app stops at 30 s for now) |
+| Its longest on | `CONFIG_ATALAIA_POD_OUT1_MAX_ON_S=10` (1-600 s, 30 by default; the pod tells the app) |
+| No expansion port ([8.2](#82-expansion-port-optional)) | `# CONFIG_ATALAIA_POD_PORT is not set` (optional: with no module plugged in it costs one probe every 250 ms) |
+| An output module's relays lent to the phone | `docker_fw.py pod --module-outputs=on`, or `CONFIG_ATALAIA_POD_MODULE_OUTPUTS=y`; their longest on `CONFIG_ATALAIA_POD_MODULE_MAX_ON_S=60` (1-600 s, 30 by default) |
 
 Leave `CONFIG_ATALAIA_POD_BLE_ENCRYPTED` on: it keeps the game key off an
 unencrypted Bluetooth link.
@@ -464,6 +510,9 @@ amplifier and the power. For a pod in particular:
 | The pod reports an opening by itself | The switch lets go when the box is knocked: mount it firmer, or use a lever switch |
 | Button 4 never registers | It is on the PCF8574's P7: the expander must be fitted and found at boot |
 | The siren (or strobe, smoke) never comes on | A build without `--simple-out`; its use in `build-pod\sdkconfig` is not the one the game asks for (the boot log lists it); no game running; the switch's own battery |
+| A module is not found (no `expansion: ... added` in the log) | As on a Field Box ([port guide, section 9](../expansion-port/BUILD.md#9-troubleshooting)): its address, its cable, its supply, its firmware |
+| The target's hits never reach the game | The game has not armed the plate, or is not running; the phone's app older than the pod (it ignores the plate) |
+| An output module's relays are not offered to the game | A build without `--module-outputs=on`; a pod with every part (no room: [section 2](#2-what-is-decided-and-what-is-not)) |
 | The output goes off by itself after a second or two | The phone stopped talking to the pod (the app in the background or killed: see the app's battery settings) or the link dropped: the pod turns it off on purpose |
 | Anything hot, a smell, smoke | Unplug the phone, switch off, take the fuse out, take the cells out into a fire-safe bag |
 

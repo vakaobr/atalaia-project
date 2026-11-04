@@ -31,7 +31,11 @@
  *     the RC switch opens on the lost signal (EXP-32, EXP-37).
  * Off within 2 s of the link going, in every case.
  *
- * Plain C: host-tested with a fake RMT (test/test_pod_outputs.c) and run by the host pod.
+ * A module's output channels on the pod's expansion port (pod_port.h, the port half of increment
+ * 9) join the same output layer after the simple outputs, and these rules hold for them too; the
+ * module's own lease, refreshed by the port driver, ends them within 1.5 s if the pod stops.
+ *
+ * Plain C: host-tested with a fake RMT (test/test_pod.c) and run by the host pod.
  */
 #ifndef ATALAIA_POD_OUTPUTS_H
 #define ATALAIA_POD_OUTPUTS_H
