@@ -177,6 +177,13 @@
     "sound_tip": "Spielt einen der Töne der Box, z. B. captured, armed oder explosion.",
     "team_display": "Teamanzeige leuchtet für %1",
     "team_display_tip": "Zeigt die Farbe eines Teams an den Lichtern der Box (none schaltet sie aus).",
+    "output": "Ausgang %1 %2 für %3 ms",
+    "output_tip": "Schaltet einen Ausgang der Box (eine Sirene, eine Nebelmaschine...): Impuls für diese Zeit, ein (höchstens so lange; leer: die längste Zeit des Ausgangs) oder aus. Nur während das Spiel läuft; eine Box ohne diesen Ausgang ignoriert es. Trage die Funktion im Reiter Modus bei den Ausgängen der Rolle ein.",
+    "output_pattern": "Ausgang %1 blinken: ein %2 ms, aus %3 ms, für %4 ms",
+    "output_pattern_tip": "Schaltet einen Ausgang der Box abwechselnd ein und aus (je 0,5-10 s) für diese Zeit, z. B. ein Stroboskop.",
+    "act_pulse": "Impuls",
+    "act_on": "ein",
+    "act_off": "aus",
     "param": "Einstellung %1",
     "param_tip": "Der Wert einer Einstellung des Modus, wie die Spielleitung ihn für dieses Spiel gewählt hat.",
     "param_declare": "Einstellung %1 hat den Typ %2",
@@ -242,6 +249,10 @@
     "on_command_tip": "Führt die Blöcke darin aus, wenn die Spielleitung diesen Befehl drückt oder das Controller-Skript ihn sendet.",
     "field_send_mode": "sende den Modus-Befehl %1 an Box %2",
     "field_send_mode_tip": "Sendet einen der eigenen Befehle des Modus an eine Box, die ihn in „wenn der Modus-Befehl … eintrifft“ bekommt.",
+    "field_output": "Ausgang %1 der Box %2 %3 für %4 ms",
+    "field_output_tip": "Schaltet einen Ausgang einer Box vom Controller aus (field.send … \"output\"): Impuls oder ein für diese Zeit, oder aus; * mit aus: jeder Ausgang der Box. Der Controller schickt einer Box höchstens alle 2 s einen Start.",
+    "field_output_pattern": "Ausgang %1 der Box %2 blinken: ein %3 ms, aus %4 ms, für %5 ms",
+    "field_output_pattern_tip": "Schaltet einen Ausgang einer Box vom Controller aus abwechselnd ein und aus (je 0,5-10 s) für diese Zeit.",
     "problem_screen_unknown": "Der Bildschirm „{name}“ ist weder einer der Box noch eine Bildschirmdatei des Modus (Reiter Modus).",
     "problem_polygon_points": "Eine Fläche braucht 3 bis {name} Ecken.",
     "problem_no_role": "Der Modus braucht mindestens eine Rolle.",
@@ -252,6 +263,9 @@
     "problem_role_no_input": "Die Rolle „{name}“ braucht keine der Eingaben, auf die das Box-Skript reagiert.",
     "problem_role_unknown": "„{name}“ ist keine der Rollen des Modus (Reiter Modus).",
     "problem_command_twice": "Der GM-Befehl „{name}“ ist zweimal festgelegt.",
-    "problem_command_unhandled": "Der GM-Befehl „{name}“ hat keinen Block „wenn der Modus-Befehl … eintrifft“."
+    "problem_command_unhandled": "Der GM-Befehl „{name}“ hat keinen Block „wenn der Modus-Befehl … eintrifft“.",
+    "problem_output_ms": "Dieser Ausgangsblock braucht seine Zeit in ms.",
+    "problem_output_all": "* (jeder Ausgang) kann nur ausgeschaltet werden.",
+    "problem_output_unlisted": "Der Ausgang „{name}“ steht bei keiner Rolle unter Ausgänge (Reiter Modus): trage ihn dort ein, damit die Konsole und die Startprüfung wissen, dass der Modus ihn nutzt."
   }
 }

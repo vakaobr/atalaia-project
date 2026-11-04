@@ -1300,6 +1300,43 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("start-warnings")).to_contain_text(
             "box-7 (bomb) não tem nenhuma das saídas que o modo acionaria (smoke, siren)")
 
+    def test_a_scenarios_outputs_in_the_form_and_the_start_check(self):
+        """Increment 5's leftover: a scenario's triggers name output functions on its boxes; the game form
+        says which, box by box, in four languages, and a box named in the Join tab with an output but none
+        of those gets the start check's "outputs" note, as a role's outputs: would."""
+        text = ("id: org.club.sirens\nversion: 0.1.0\nname: Sirens\nlang: en\nnodes:\n"
+                "  master: { role: objective }\n  gate: { role: objective }\nobjectives:\n"
+                "  - { id: hill, name: Hill, type: capture_and_hold, target: master }\n"
+                "triggers:\n"
+                "  - { when: { completed: [hill] }, output: { node: master, capability: siren, act: pulse, seconds: 10 } }\n"
+                "  - { when: { completed: [hill] }, output: { node: master, capability: strobe, act: pulse, seconds: 5 } }\n"
+                "  - { when: { game: end }, output: { node: gate, capability: horn, act: pulse, seconds: 5 } }\n")
+        self.assertEqual(self.field.http.post("/api/v1/scenarios", json={"manifest": text}).status_code, 201)
+        page = self.console()
+        page.get_by_test_id("lang").select_option("en")
+        page.get_by_test_id("game-source").select_option("mode:org.club.sirens")
+        uses = page.get_by_test_id("game-mode-outputs")
+        expect(uses).to_contain_text(
+            "Sirens would switch these outputs on a box that has them: siren, strobe (master); horn (gate).")
+        for lang, words in (("pt", "acionaria estas saídas numa caixa que as tenha: siren, strobe (master); horn (gate)"),
+                            ("de", "würde diese Ausgänge an einer Box schalten, die sie hat: siren, strobe (master)"),
+                            ("zh-tw", "會在有這些輸出的盒子上啟動它們：siren, strobe (master); horn (gate)")):
+            page.get_by_test_id("lang").first.select_option(lang)
+            expect(uses).to_contain_text(words)
+
+        r = self.field.http.post("/api/v1/games", json={"name": "Sirens", "teams": ["red", "blue"],
+                                                        "mode_id": "org.club.sirens+org.atalaia.objectives"})
+        self.assertEqual(r.status_code, 201, r.text)
+        self.assertEqual(self.field.http.post("/api/v1/join", json={"name": "master", "node_id": BOX}).status_code, 200)
+        self.field.box_hello(caps=[1, 2, 3, 4, 5, 11])
+        ev = codec.encode_event({"node": BOX, "seq": 1, "t": 0, "type": "node.modules",
+                                 "data": {"modules": "g46:servo:horn"}})
+        self.field.box("EVENT", ev, ack=True)
+        page = self.console()
+        page.get_by_test_id("lang").select_option("en")
+        expect(page.get_by_test_id("start-warnings")).to_contain_text(
+            "box-7 (objective) has none of the outputs the mode would switch (siren, strobe): it plays without them.")
+
     def test_hacking_terminal_game_and_its_event(self):
         """A Hacking Terminal game from the form (its parameters in Portuguese); the terminal's
         join; a solved terminal reads as words in the feed, with the code it revealed for the GM,
