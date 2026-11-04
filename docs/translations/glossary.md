@@ -122,6 +122,9 @@ process.
 | Satellite (the box) | caixa satélite, satélite | Satellit, Satelliten-Box | 衛星盒 | |
 | I/O pod | módulo de E/S | I/O-Pod | I/O 模組 | |
 | target addon | módulo de alvo | Ziel-Addon | 標靶擴充模組 | *(check)*; zh-tw: *(check)* |
+| expansion port | porta de expansão | Erweiterungsanschluss | 擴充埠 | the M12 socket modules plug into (draft RFC "The expansion port"); its port board: placa da porta / Anschlussplatine / 擴充埠板 *(check)* |
+| simple output | saída simples | einfacher Ausgang | 簡易輸出 | the box's RC relay switch output for a siren, strobe or smoke remote (EXP-31) *(check)* |
+| RC relay switch | interruptor de relé RC | RC-Relaisschalter | RC 繼電器開關 | *(check)* |
 | enclosure switch (tamper) | interruptor da caixa | Gehäuseschalter | 外殼開關 | the alert: "violação" / "Manipulationsalarm" *(check)*; zh-tw: 警報：「防拆警報」 |
 | Li-ion cell | célula (de iões de lítio) | Zelle, Akku | 鋰電池芯、電芯 | "pilha" is a disposable battery |
 | resettable fuse (PTC) | fusível rearmável | rückstellbare Sicherung | 可自恢復保險絲 | the target addon's port (P5J-16) *(check)* |
