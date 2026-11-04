@@ -16,7 +16,10 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -34,9 +37,21 @@ import java.util.UUID
  * Pod TX (the pod's frames, handed to Dart as bytes) and writes without
  * response to Pod RX (the phone's frames, cut to the MTU and sent one after
  * the other). The run-time permissions are asked from Dart first. The pod
- * firmware (firmware/esp32/main/pod/) asks to pair on connection (Android
- * shows its question) and sends its frames once the link is encrypted. Not
- * run against a real pod yet (plan phase G).
+ * firmware (firmware/esp32/main/pod/) asks to pair on connection and sends
+ * its frames once the link is encrypted with a passkey's key: the pod shows
+ * a 6-digit passkey on its OLED and Android's own pairing dialog asks for it
+ * (decisions PODPK-1 to PODPK-11).
+ *
+ * How a pairing ended is kept for Dart ("last_error"): "pair_failed" when
+ * Android's bond went from bonding to none (a wrong passkey, Cancel),
+ * "pair_timeout" when it ended so for the time running out, "repair" when
+ * the pod dropped the link with HCI reason 0x05, Authentication Failure: it
+ * does not trust this phone's bond (made without a passkey by an older pod
+ * firmware, or cleared on the pod), and has forgotten its side. "forget"
+ * then removes the phone's side (BluetoothDevice.removeBond, a hidden API
+ * reached by reflection; false when Android refuses it, and the person
+ * forgets the pod in the Bluetooth settings), and the next open pairs anew.
+ * Not run against a real pod yet (plan phase G).
  */
 @SuppressLint("MissingPermission")
 class BlePodPlugin(private val activity: Activity, messenger: BinaryMessenger) :
@@ -52,6 +67,10 @@ class BlePodPlugin(private val activity: Activity, messenger: BinaryMessenger) :
     private val queue = ArrayDeque<ByteArray>()
     private var writing = false
     private var opening: MethodChannel.Result? = null
+    private var openingAddress: String? = null
+    private var bondingSince = 0L
+    private var lastError: String? = null
+    private var bondWatch: BroadcastReceiver? = null
 
     init {
         channel.setMethodCallHandler(this)
@@ -79,6 +98,8 @@ class BlePodPlugin(private val activity: Activity, messenger: BinaryMessenger) :
                     close()
                     result.success(null)
                 }
+                "last_error" -> result.success(lastError)
+                "forget" -> result.success(forget(call.argument<String>("id") ?: ""))
                 else -> result.notImplemented()
             }
         } catch (e: SecurityException) {
@@ -131,7 +152,75 @@ class BlePodPlugin(private val activity: Activity, messenger: BinaryMessenger) :
             return
         }
         opening = result
+        openingAddress = address
+        lastError = null
+        watchBond()
         gatt = device.connectGatt(activity, false, callback, BluetoothDevice.TRANSPORT_LE)
+    }
+
+    /** Android's bond with the pod while a link opens: a pairing that failed or ran out. */
+    private fun watchBond() {
+        if (bondWatch != null) return
+        val r = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                @Suppress("DEPRECATION")
+                val d = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                if (d?.address != openingAddress) return
+                val state = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, -1)
+                val before = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, -1)
+                if (state == BluetoothDevice.BOND_BONDING) {
+                    bondingSince = System.currentTimeMillis()
+                } else if (state == BluetoothDevice.BOND_NONE &&
+                    before == BluetoothDevice.BOND_BONDING
+                ) {
+                    // EXTRA_REASON is hidden; 6 is UNBOND_REASON_AUTH_TIMEOUT. The Security
+                    // Manager's 30 s also count as running out.
+                    val reason = intent.getIntExtra(EXTRA_REASON, 0)
+                    val took = System.currentTimeMillis() - bondingSince
+                    lastError = if (reason == UNBOND_REASON_AUTH_TIMEOUT || took >= SMP_TIMEOUT_MS) {
+                        "pair_timeout"
+                    } else {
+                        "pair_failed"
+                    }
+                }
+            }
+        }
+        val filter = IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+        // A system broadcast: it reaches a receiver that is not exported.
+        if (Build.VERSION.SDK_INT >= 33) {
+            activity.registerReceiver(r, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            activity.registerReceiver(r, filter)
+        }
+        bondWatch = r
+    }
+
+    private fun unwatchBond() {
+        bondWatch?.let {
+            try {
+                activity.unregisterReceiver(it)
+            } catch (e: IllegalArgumentException) {
+                // Not registered.
+            }
+        }
+        bondWatch = null
+    }
+
+    /** Removes Android's bond with the pod at [address]; false when Android refuses. */
+    private fun forget(address: String): Boolean {
+        val device = try {
+            manager?.adapter?.getRemoteDevice(address)
+        } catch (e: IllegalArgumentException) {
+            null
+        } ?: return false
+        if (device.bondState == BluetoothDevice.BOND_NONE) return true
+        return try {
+            device.javaClass.getMethod("removeBond").invoke(device) as? Boolean ?: false
+        } catch (e: ReflectiveOperationException) {
+            false
+        } catch (e: SecurityException) {
+            false
+        }
     }
 
     private fun opened(ok: Boolean) {
@@ -146,6 +235,8 @@ class BlePodPlugin(private val activity: Activity, messenger: BinaryMessenger) :
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 g.requestMtu(247)
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                // The pod's own reason (the HCI code): 0x05, it does not trust this bond.
+                if (status == HCI_AUTH_FAILURE && lastError == null) lastError = "repair"
                 opened(false)
                 main.post { sink?.endOfStream() }
             }
@@ -261,6 +352,7 @@ class BlePodPlugin(private val activity: Activity, messenger: BinaryMessenger) :
     }
 
     fun close() {
+        unwatchBond()
         queue.clear()
         writing = false
         rx = null
@@ -280,5 +372,15 @@ class BlePodPlugin(private val activity: Activity, messenger: BinaryMessenger) :
         val POD_TX: UUID = UUID.fromString("4174616c-6169-6100-0000-000000000001")
         val POD_RX: UUID = UUID.fromString("4174616c-6169-6100-0000-000000000002")
         val CCCD: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+
+        /** HCI Authentication Failure: the pod's reason for dropping a bond it does not trust. */
+        const val HCI_AUTH_FAILURE = 0x05
+
+        /** BluetoothDevice's hidden EXTRA_REASON and UNBOND_REASON_AUTH_TIMEOUT. */
+        const val EXTRA_REASON = "android.bluetooth.device.extra.REASON"
+        const val UNBOND_REASON_AUTH_TIMEOUT = 6
+
+        /** The Security Manager's timeout (Bluetooth Core, Vol 3 Part H 3.4), less a margin. */
+        const val SMP_TIMEOUT_MS = 29000L
     }
 }
