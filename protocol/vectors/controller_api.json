@@ -2683,6 +2683,38 @@
         {"prop": "p", "messages": [{"type": "ack", "seq": 2, "event_type": "node.module_lost"}]},
         {"request": {"method": "GET", "path": "/api/v1/nodes", "token": "read"}, "status": 200, "json": [{"node_id": 7, "modules": [{"address": "g33"}, {"address": "58", "lost": true}, {"address": "5c"}]}]}
       ]
+    },
+    {
+      "name": "PROPC a phone prop's HELLO lists its capability types: Bomb's optional output and its outputs: warn about a prop as about a box, and the HELLO it sends again when its pod lends a siren counts (PROPC-1 to PROPC-4)",
+      "join_key": "6465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f80818283",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Smoke", "mode_id": "org.atalaia.bomb", "assignments": {"7": "bomb"}}}, "status": 201, "save": {"gid": "id"}},
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {"node_id": 7}}, "status": 200, "save": {"text": "text"}},
+        {"join_decode": "${text}", "json": {"node_id": 7}, "save": {"key": "game_key"}},
+        {"prop_connect": "p", "node_id": 7, "key": "${key}", "welcome": {"type": "welcome", "node_id": 7}},
+        {"prop_send": "p", "json": {"type": "hello", "node_name": "telemovel-7", "fw_version": "app-0.8.0", "core_version": "0.8.0", "tier": 0, "capabilities": [1, 2, 3, 4, 5], "battery_pct": 81}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/start-check", "token": "read"}, "status": 200, "json": {"missing": [], "missing_caps": [], "warnings": [{"code": "optional_caps", "node": 7, "name": "telemovel-7", "role": "bomb", "capabilities": ["output"], "text": "$any"}], "not_checked": [], "ok": true}},
+        {"prop_send": "p", "json": {"type": "hello", "node_name": "telemovel-7", "fw_version": "app-0.8.0", "core_version": "0.8.0", "tier": 0, "capabilities": [1, 2, 3, 4, 5, 11], "battery_pct": 81}},
+        {"prop_send": "p", "json": {"type": "event", "event": {"seq": 1, "t": 0, "type": "node.modules", "data": {"modules": "g33:servo:horn"}}}},
+        {"prop": "p", "messages": [{"type": "ack", "seq": 1, "event_type": "node.modules"}]},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/start-check", "token": "read"}, "status": 200, "json": {"missing_caps": [], "warnings": [{"code": "outputs", "node": 7, "name": "telemovel-7", "role": "bomb", "capabilities": ["smoke", "siren"], "text": "$any"}], "not_checked": [{"node": 7, "name": "telemovel-7", "role": "bomb", "capability": "horn", "text": "$any"}], "ok": true}}
+      ]
+    },
+    {
+      "name": "PROPC a phone prop without its pod's target: Target Windows' required hit blocks Start as for a box, until the prop's HELLO lists the hit its pod lends (PROPC-1 to PROPC-4)",
+      "join_key": "6465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f80818283",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Plates", "mode_id": "org.atalaia.target_windows", "assignments": {"7": "target"}}}, "status": 201, "save": {"gid": "id"}},
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {"node_id": 7}}, "status": 200, "save": {"text": "text"}},
+        {"join_decode": "${text}", "json": {"node_id": 7}, "save": {"key": "game_key"}},
+        {"prop_connect": "p", "node_id": 7, "key": "${key}", "welcome": {"type": "welcome", "node_id": 7}},
+        {"prop_send": "p", "json": {"type": "hello", "node_name": "telemovel-7", "fw_version": "app-0.8.0", "core_version": "0.8.0", "tier": 0, "capabilities": [1, 2, 3, 4, 5], "battery_pct": 81}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/start-check", "token": "read"}, "status": 200, "json": {"missing": [], "missing_caps": [{"node": 7, "name": "telemovel-7", "role": "target", "capability": "hit"}], "warnings": [], "not_checked": [], "ok": false}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm"}, "status": 409, "json": {"detail": "$any", "start_check": {"missing_caps": [{"node": 7, "capability": "hit"}], "ok": false}}},
+        {"prop_send": "p", "json": {"type": "hello", "node_name": "telemovel-7", "fw_version": "app-0.8.0", "core_version": "0.8.0", "tier": 0, "capabilities": [1, 2, 3, 4, 5, 10], "battery_pct": 81}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/start-check", "token": "read"}, "status": 200, "json": {"missing_caps": [], "warnings": [], "ok": true}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm"}, "status": 200, "json": {"state": "running"}}
+      ]
     }
   ],
   "s7": {

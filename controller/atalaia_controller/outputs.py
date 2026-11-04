@@ -13,8 +13,10 @@
   are not types (``team_input``, ``team_display``) are met by the types
   ``protocol/schema/capabilities.yaml`` lists under ``role_names``; a name neither a type nor
   there is never checked. Only nodes whose HELLO lists a capability type this controller knows are
-  checked (a box from before the RFC, a phone: never). An enabled simple output counts as present,
-  and the check names each one as "not checked", so the GM looks. A role's ``outputs:`` (EXP-22,
+  checked (a box from before the RFC, a phone prop before 0.8.0: never; a prop since lists its
+  phone's parts and what its pod lends, decisions PROPC-1 to PROPC-4, and is checked as a box is).
+  An enabled simple output counts as present, and the check names each one as "not checked", so
+  the GM looks. A role's ``outputs:`` (EXP-22,
   increment 4: Bomb's ``[smoke, siren]``) names the functions its mode switches: a box of that role
   that has outputs (its HELLO lists ``output`` and its ``node.modules`` came) but none of those
   functions is a warning, ``outputs`` (the mode would switch nothing on it). A box with no output
@@ -111,7 +113,7 @@ def check_nodes(nodes: Iterable[dict[str, Any]], role_spec: Any) -> dict[str, li
         types = types_of(n.get("capabilities"))
         spec = role_spec(n["role"])
         if not types or not isinstance(spec, dict):
-            continue  # it reports no capability (older firmware, a phone): not checked
+            continue  # it reports no capability (older firmware, an older phone prop): not checked
         for name in _names(spec.get("requires")):
             if has(types, name) is False:
                 missing.append({**who, "capability": name})
