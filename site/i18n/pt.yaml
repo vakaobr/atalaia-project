@@ -1015,8 +1015,8 @@ roadmap:
       - "<strong>O servidor do site</strong>: contas com códigos de dois fatores, direitos sobre os
         dados pessoais, sincronização, registo de cronógrafo, histórico dos jogos e biblioteca de
         cenários."
-      - "<strong>Marcação de jogos e inscrições</strong>, com páginas públicas por campo, feeds de
-        calendário e perfis de clube."
+      - "<strong>Marcação de jogos e inscrições</strong>, na app ou nas páginas web do campo sem a
+        app, com páginas públicas por campo, feeds de calendário e perfis de clube."
       - "<strong>Modo alojado</strong>: vários campos num só servidor, cada um separado dos outros,
         com a sua instalação."
     g_modes:
