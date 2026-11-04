@@ -64,7 +64,7 @@ int main(void)
     run_box_pair_tests();
     run_status_hold_tests();
     run_tft_splash_tests();
-    run_target_addon_tests();
+    run_expansion_tests();
     run_sound_tests();
     run_outputs_tests();
     run_simple_out_tests();
