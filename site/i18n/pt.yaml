@@ -2010,8 +2010,9 @@ build:
         ruído ao lado de uma sirene, na lista da <a href="#expansion-port">porta de expansão</a>.
       preset: >-
         <strong>As Janelas de Alvo como predefinição da Field Box</strong>, depois de o alvo ser testado
-        na bancada; até lá, um campo põe o modo numa caixa como qualquer outro. Mais tarde, com o
-        incremento 9, o módulo de E/S a emprestar um alvo a um telemóvel.
+        na bancada; até lá, um campo põe o modo numa caixa como qualquer outro. O módulo de E/S já
+        empresta os impactos de um módulo de alvo a um jogo num telemóvel (incremento 9), testado só
+        num computador: vê o <a href="#io-pod">módulo de E/S</a>.
     open:
       plate: >-
         <strong>A placa de alvo</strong>: o tipo de material, o tamanho, a espessura, o suporte e o

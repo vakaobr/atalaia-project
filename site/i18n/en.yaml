@@ -1932,8 +1932,9 @@ build:
         siren, in the <a href="#expansion-port">expansion port</a>'s list.
       preset: >-
         <strong>Target Windows as a built-in Field Box preset</strong>, once the target is
-        bench-tested; until then a field puts the mode on a box like any other mode. Later, with
-        increment 9, the I/O pod lending a target to a phone.
+        bench-tested; until then a field puts the mode on a box like any other mode. The I/O pod
+        already lends a target addon's hits to a game on a phone (increment 9), tested on a computer
+        only: see <a href="#io-pod">the I/O pod</a>.
     open:
       plate: >-
         <strong>The plate</strong>: its material grade, size, thickness, stand and angle, from the
