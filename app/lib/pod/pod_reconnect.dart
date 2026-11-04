@@ -171,6 +171,7 @@ class PodReconnector extends ChangeNotifier {
     attempt = 0;
     _repaired = false;
     repairing = false;
+    _now = false;
     notifyListeners();
     unawaited(_loop());
   }
