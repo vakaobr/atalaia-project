@@ -240,6 +240,11 @@ const Map<String, String> deStrings = {
   'pod.linked_one': 'Pod über {kind} verbunden: Firmware {fw}, {n} Funktion.',
   'pod.open_failed': 'Die Verbindung zum Pod ließ sich nicht öffnen.',
   'pod.no_ident': 'Der Pod hat nicht geantwortet.',
+  'pod.pair_hint': 'Koppeln: Der Pod zeigt auf seinem Display einen 6-stelligen Code. Gib ihn ein, wenn Android danach fragt.',
+  'pod.wrong_passkey': 'Koppeln fehlgeschlagen: Der Code stimmte nicht, oder das Koppeln wurde abgebrochen. Verbinde den Pod erneut und gib die 6 Ziffern von seinem Display ein.',
+  'pod.pair_timeout': 'Das Koppeln hat zu lange gedauert. Verbinde den Pod erneut und gib den Code innerhalb von 30 Sekunden ein.',
+  'pod.repair': 'Dieser Pod muss neu gekoppelt werden (er wurde ohne Code gekoppelt, oder seine Kopplungen wurden gelöscht). Die App hat die alte Kopplung vergessen: Gib den neuen Code von seinem Display ein.',
+  'pod.repair_manual': 'Dieser Pod muss neu gekoppelt werden. Entferne ihn in den Bluetooth-Einstellungen von Android, verbinde ihn dann erneut und gib den Code von seinem Display ein.',
   'pod.reconnecting':
       'Die Verbindung zum Pod ist abgebrochen. Verbinde neu (Versuch {n}) …',
   'pod.refused':
