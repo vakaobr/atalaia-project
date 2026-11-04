@@ -58,7 +58,7 @@ from .remote_gm import RemoteHub
 from .security_headers import SecurityHeadersMiddleware
 from .tokens import Keys, UsedTokens
 from .totp import SeedBox
-from .web import club_pages, field_pages, preview, privacy_pages, scoreboard, staff_pages
+from .web import club_pages, field_pages, player_pages, preview, privacy_pages, scoreboard, staff_pages
 
 log = logging.getLogger("atalaia.server")
 
@@ -187,6 +187,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(remote_gm.router)
     app.include_router(atak.router)  # the remote ATAK relay's enrolment (Phase 4 follow-up FU5)
     app.include_router(field_pages.router)
+    app.include_router(player_pages.router)  # registering on the field's pages in a browser (WREG-*)
     app.include_router(club_pages.router)
     app.include_router(privacy_pages.router)  # /privacy: the same notice as a page (CONS-1)
     app.include_router(history.router)  # plan phase 20: game history, the scenario library, the scoreboard
