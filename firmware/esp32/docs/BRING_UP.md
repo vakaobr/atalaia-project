@@ -785,11 +785,12 @@ the app (`python tools/docker_app.py apk`). None of them has been run yet.
    UART0 log must not show a new boot).
 3. **Bluetooth link.** Unplug USB. Find pods again: `atalaia-pod-XXXX`
    (the last 4 hex digits of its Bluetooth address) is listed. Open it:
-   Android asks to pair (Just Works: confirm); within 30 s the app shows
-   "Pod linked over BLE". The UART0 log shows the connection, the MTU (247)
-   and the encryption. Open it again later: no second pairing question (the
-   bond is kept). With a second phone, the pod is not listed while the
-   first is connected (one phone at a time) and is again once it leaves.
+   the pod's OLED shows a 6-digit passkey and Android asks for it (step 11);
+   within 30 s the app shows "Pod linked over BLE". The UART0 log shows the
+   connection, the MTU (247), `pairing passkey NNNNNN` and the encryption.
+   Open it again later: no second pairing question (the bond is kept). With
+   a second phone, the pod is not listed while the first is connected (one
+   phone at a time) and is again once it leaves.
 4. **Inputs.** Start a prop game on the phone (any mode with team buttons),
    with the pod linked: each button is the game's team by number (button 1
    = first team), holding one captures as on a Field Box; keypad keys reach
@@ -822,3 +823,41 @@ the app (`python tools/docker_app.py apk`). None of them has been run yet.
 10. **Hours.** A 2-hour game with the pod on battery and Bluetooth: no
     watchdog reset in the UART0 log, no lost link, the battery estimate on
     a 3000 mAh cell.
+11. **Pairing with the passkey (decisions PODPK-1 to PODPK-11). Not tried
+    on hardware yet.** One pod, one Android phone with the app, UART0's log
+    open. Tick each:
+    - [ ] *Boot*: the log shows `SSD1306 OLED at 0x3C`, `OLED ready for
+      pairing` and `N phone(s) paired; pairing with a passkey on the OLED`;
+      the OLED is dark.
+    - [ ] *Fresh pairing*: forget the pod in Android's Bluetooth settings if
+      it is there, then Find pods and open it. The OLED shows **PAIR**,
+      `0:30` counting down, the passkey and `atalaia-pod-XXXX`, the same
+      passkey as the log; Android's dialog asks for a code (not a yes/no
+      question: that would be Just Works). Type it: **PAIRED** for 5 s, then
+      dark; "Pod linked over BLE"; the log shows the encryption.
+    - [ ] *Bond kept*: close and open again, and restart the pod: no dialog,
+      the OLED stays dark, linked.
+    - [ ] *Wrong passkey*: forget the pod on the phone, open it, type a wrong
+      code: **FAILED** on the OLED, the link dropped at once, the app shows
+      the wrong-code message (in pt, en, de and zh-TW with the app's
+      language). Open again: a new passkey.
+    - [ ] *Timeout*: open it and leave the dialog for 30 s: **TOO SLOW** and
+      the app's message. With nRF Connect, connect without pairing: the pod
+      drops it after 60 s (`pairing failed, or none within 60 s`).
+    - [ ] *An old Just Works bond*: flash a pod firmware from before PODPK
+      (v0.7.0), pair the phone (Just Works), flash this one. Open the pod:
+      either Android pairs again by itself with a passkey (the pod asks for
+      MITM protection), or the OLED shows **PAIR AGAIN**, the log `a bond
+      without a passkey (or unknown): forgotten`, and the app forgets its
+      bond and opens the pod again with a passkey, once. Note which one this
+      phone does.
+    - [ ] *Forget every phone*: hold PRG (GPIO 0) 5 s with the phone linked:
+      **FORGET ALL** with a filling bar, then **CLEARED**; the phone is
+      dropped; the log shows `Bluetooth bonds cleared`. Open it on the
+      phone: **PAIR AGAIN**, the app forgets its bond and pairs anew. A
+      short press does nothing.
+    - [ ] *Android refuses to forget*: if `removeBond` is refused on this
+      Android version, the app asks to forget the pod in the settings.
+      Note the Android version.
+    - [ ] *Without the OLED*: build with `CONFIG_ATALAIA_OLED_STATUS` off:
+      pairing still works with the passkey read from the log.
