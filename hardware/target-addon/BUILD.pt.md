@@ -3,101 +3,192 @@ SPDX-FileCopyrightText: 2026 The Atalaia contributors
 SPDX-License-Identifier: CC-BY-SA-4.0
 -->
 
-# Guia de montagem do módulo de alvo (ainda não se pode montar)
+# Guia de montagem do módulo de alvo
 
 Em inglês: [Target addon build guide](BUILD.md).
 
-O módulo de alvo é uma placa a que se dispara, com um sensor que sente cada
-impacto, e que se liga a uma caixa e a transforma num alvo com pontuação: o
-hardware do modo *Janelas de Alvo*, em que um impacto enquanto o alvo mostra a
-cor de uma equipa pontua para essa equipa.
+O módulo de alvo é uma placa a que se dispara, com um sensor piezo que sente
+cada impacto e uma pequena placa RP2040 própria, que se liga à
+[porta de expansão](../expansion-port/BUILD.pt.md) de uma caixa e a transforma
+num alvo com pontuação: o hardware do modo *Janelas de Alvo*, em que um
+impacto enquanto o alvo mostra a cor de uma equipa pontua para essa equipa.
+Escrito para alguém do clube que saiba soldar pinos e fios e usar um
+multímetro.
 
-> **Estado: o lado da caixa está decidido; o módulo não.** Desde 2026-10-23 a
-> porta da caixa está especificada (só 3,3 V, quatro fios, sem linha de
-> interrupção: a caixa interroga o módulo; decisões P5J-15 a P5J-21), e o
-> firmware da Field Box tem um controlador de consulta testado para ela (um
-> esqueleto, ainda não chamado). O módulo em si **ainda não se pode montar**: o
-> seu processador não está escolhido, não existe firmware para ele, o seu
-> endereço I2C e a sua resposta "identify" não estão decididos, e o sensor e a
-> placa não estão desenhados (fase 4, fase HW2 do plano;
-> [secção 5](#5-o-que-não-está-decidido)). Este guia diz o que está decidido,
-> com a origem de cada decisão, e lista exatamente o que não está, para que
-> ninguém monte algo que o firmware não vai suportar. **Não ligues uma placa a
-> uma Field Box a partir desta página.** Quando o módulo for desenhado, esta
-> página passa a ser o seu guia de montagem, com fotografias (fase HW2 do
-> plano); este guia nunca usa fotografias de maquetas nem geradas.
+> **Estado: o hardware está decidido e pode ser montado; ainda não pode ser
+> usado.** O rascunho do RFC «The expansion port»
+> ([`docs/rfcs/0000-expansion-port.md`](../../docs/rfcs/0000-expansion-port.md),
+> aprovado por quem mantém o projeto em 2026-11-03) decidiu o que este guia
+> listava como em aberto: o processador (uma placa RP2040, EXP-15), o
+> endereço (0x58, EXP-7), a resposta «identify» e o relatório de impactos (o
+> protocolo de expansão v1,
+> [`protocol/expansion-port.md`](../../protocol/expansion-port.md), EXP-9), o
+> circuito do sensor em linhas gerais e a proteção da porta (EXP-4). **O que
+> ainda falta é o firmware**: o firmware do próprio módulo (em pico-sdk, com o
+> seu ficheiro UF2), o controlador da porta da caixa chamado pela sua tarefa
+> de jogo e *Janelas de Alvo* como predefinição da caixa chegam todos com o
+> **incremento 8** do plano do RFC. Por isso já se pode fazer a placa de alvo,
+> o circuito de entrada do sensor, o invólucro e o cabo do módulo, e a porta
+> da caixa, e verificá-los com um multímetro; até lá o módulo não pode ser
+> gravado e nenhuma caixa o lê. Cada passo que depende do incremento 8 di-lo
+> (**depois do incremento 8**), e a
+> [secção 10](#10-o-que-espera-pelo-incremento-8) lista-os. **Ainda não se
+> montou nenhum alvo a partir deste guia.** Os passos marcados **Verifica na
+> primeira montagem** são questões em aberto; conta o que encontrares numa
+> issue. As fotografias serão juntadas depois da primeira montagem (fase HW2
+> do plano); este guia nunca usa fotografias de maquetas nem geradas.
 
-## 1. O que está decidido
+## Índice
+
+1. [O que estás a montar](#1-o-que-estás-a-montar)
+2. [O que está decidido e o que não está](#2-o-que-está-decidido-e-o-que-não-está)
+3. [Peças](#3-peças)
+4. [Ferramentas e segurança](#4-ferramentas-e-segurança)
+5. [O lado da caixa: a porta de expansão](#5-o-lado-da-caixa-a-porta-de-expansão)
+6. [O módulo, passo a passo](#6-o-módulo-passo-a-passo)
+7. [Verificações na montagem](#7-verificações-na-montagem)
+8. [Placa de alvo, suporte e invólucro](#8-placa-de-alvo-suporte-e-invólucro)
+9. [Como a caixa lê os impactos](#9-como-a-caixa-lê-os-impactos)
+10. [O que espera pelo incremento 8](#10-o-que-espera-pelo-incremento-8)
+11. [Fotografias](#11-fotografias)
+12. [Ajudar](#12-ajudar)
+
+## 1. O que estás a montar
+
+```
+placa ── almofada de borracha ── disco piezo ── entrada ── placa RP2040 ── M12 (macho) ═══ cabo de 2 m ═══ M12 (fêmea) ── placa da porta ── caixa
+         (aço ou policarbonato)                 (divisor,    (ADC, alvo I2C   pino 1 3,3 V, 2 SDA,                    (buffer, TVS,
+                                                 dreno,       em 0x58)        3 GND, 4 SCL, 5 n.l.                     fusível, díodo)
+                                                 limitadores)
+```
+
+- O **disco piezo**, colado através de uma almofada de borracha às costas da
+  placa de alvo, transforma cada impacto num pico de tensão curto.
+- O **circuito de entrada** (um divisor de resistências, um dreno de 1 Mohm,
+  dois díodos Schottky limitadores) ajusta o pico à gama do ADC do RP2040 e
+  mantém-no entre o GND e os 3,3 V.
+- A **placa RP2040** amostra o piezo continuamente, encontra o pico de cada
+  impacto (a sua força, 0-255) com um tempo de espera contra a vibração da
+  placa, guarda-o com a sua idade até a caixa o recolher, e responde às
+  leituras I2C da caixa no endereço **0x58** (EXP-10, EXP-15).
+- A **caixa** lê o `STATUS` do módulo a cada 20 ms pela sua porta de
+  expansão, e passa cada impacto ao script do modo como `hit.hit` com a sua
+  `strength` (**depois do incremento 8**).
+
+*Janelas de Alvo* acende o **anel de luzes da própria caixa**, por isso o
+módulo não precisa de luzes (P5J-16). Custo aproximado: 10-15 € para o módulo
+sem a placa de alvo nem o cabo (RFC, secção 3), mais a placa de alvo, o cabo e
+a porta da caixa ([guia da porta](../expansion-port/BUILD.pt.md), 6-14 €);
+preços do mercado de amadores, não é um orçamento.
+
+## 2. O que está decidido e o que não está
 
 | O quê | Decidido | Onde |
 | --- | --- | --- |
-| Finalidade | Um alvo com pontuação de impactos para qualquer caixa | [Especificação de conceção](../../docs/design-spec.md), secção 6 |
-| Peças, em resumo | Uma placa de aço ou de policarbonato, um sensor piezo, um processador pequeno (da classe RP2040 ou ATtiny) para detetar impactos. LED próprios só com uma alimentação própria ([secção 2](#2-a-porta-da-caixa)) | Especificação de conceção, secção 6; P5J-16 |
-| Custo aproximado | 20-30 € em peças, a preços do mercado de amadores (não é um orçamento) | Especificação de conceção, secção 6 |
-| Como se liga | Um conector **M12 de 5 pinos**, estanque, na caixa, com **só 3,3 V**: o trilho 3V3 da placa, GND, e o barramento I2C da caixa (SDA, SCL) a 3,3 V. **Sem 5 V na porta.** O quinto pino não está ligado. O módulo leva o seu próprio processador pequeno, que responde a um pedido "identify" com um descritor de capacidades, por isso a caixa não precisa de um controlador novo para cada módulo | Especificação de conceção, secção 6, "Expansion port and simple output" (corrigida em 2026-10-23; com novo nome em 2026-11-03); P5J-15, a seguir a M3 |
-| Energia vinda da caixa | No máximo **25 mA** dos 3,3 V da porta, para o processador e o circuito do sensor, através de um fusível rearmável na caixa | P5J-16 |
-| As luzes da janela | *Janelas de Alvo* acende o **anel de luzes da própria caixa** (`cap("ring")` em `modes/target_windows/node.lua`), por isso um módulo não precisa de LED. Um módulo com luzes próprias alimenta-as a partir da sua própria célula, nunca da porta | P5J-16 |
-| Sem linha de interrupção | A caixa **interroga** o módulo por I2C a cada 20 ms; um impacto chega ao jogo em cerca de 21 ms ([secção 4](#4-como-a-caixa-lê-os-impactos-sem-linha-de-interrupção)). Não é preciso nenhum GPIO, por isso o mapa de pinos da Field Box não muda | P5J-18 |
-| Cabo | I2C a 100 kHz em, no máximo, **2 m** de cabo M12 de 5 condutores; um alvo mais afastado usa antes um Satélite ou um nó fino pelo rádio | Especificação de conceção, secção 6; P5J-17 |
-| O que os scripts de jogo da caixa veem | A capacidade `hit`: um evento `hit` com uma `strength` de 0 a 255 (os scripts recebem `hit.hit`), e os comandos `arm` e `disarm` (só comunica impactos enquanto armado) | Especificação de conceção, secção 7; rascunho do RFC 0000, Aditamento 1; decisão P4R4 |
-| Como um impacto atravessa o fio | O protocolo v1 da porta de expansão: a caixa lê o `STATUS` de 9 bytes do módulo (sinalizadores, o número de sequência do impacto, o canal e o tipo, a sua força, a sua idade, as saídas, os canais armados, um CRC-8) e escreve comandos (confirmar, armar, ...), cada um com um CRC-8 que cobre também o byte de endereço. O módulo guarda cada impacto até a caixa o confirmar, por isso nenhum se perde por o barramento estar ocupado. Substituiu o relatório de 5 bytes em rascunho de P5J-19, contra o qual nenhum módulo foi construído | [`protocol/expansion-port.md`](../../protocol/expansion-port.md); [`firmware/esp32/main/expansion.h`](../../firmware/esp32/main/expansion.h); RFC em rascunho "The expansion port" |
-| Num módulo de E/S de um telemóvel | A mesma capacidade `hit` no protocolo de proxy de capacidades (`{"id": "hit", "type": "hit"}`), com vetores de teste partilhados `target_addon`, `target_hit` e `target_arm`, para que um módulo de E/S pudesse emprestar uma a um telemóvel. Nenhum módulo de E/S montado até agora tem uma | [protocol/capability-proxy.md](../../protocol/capability-proxy.md), "A hit sensor" |
-| O modo de jogo | *Janelas de Alvo* (`modes/target_windows/`): o papel `target` precisa de `hit` e `led`. O alvo fica escuro durante `interval_s`, depois acende a cor de uma equipa ao acaso durante `window_s`; um impacto de pelo menos `min_strength` na janela dá `hit_points` a essa equipa. Construído e testado no simulador; não é uma predefinição da Field Box enquanto o módulo não existir | [Plano da fase 4](../../docs/phase-4-site-server/PLAN.md), fase 2 do plano; decisões M2-1 a M2-5 |
-| O que vem a seguir | O processador do módulo e o seu firmware, o controlador de consulta chamado a partir do ciclo de jogo da caixa, a capacidade `hit` no firmware da Field Box, o limiar e o debounce do sensor afinados em placas de aço e de policarbonato; depois *Janelas de Alvo* passa a ser uma predefinição integrada | Plano da fase 4, HW2 |
+| Finalidade | Um alvo com pontuação de impactos para qualquer caixa (Field Box, Satélite, módulo de E/S) | [Especificação de conceção](../../docs/design-spec.md), secção 6; EXP-2 |
+| Como se liga | A **porta de expansão** da caixa: uma tomada M12 de codificação A, 5 pinos, só 3,3 V (1 castanho 3,3 V, 2 branco SDA, 3 azul GND, 4 preto SCL, 5 cinzento não ligado), atrás da placa da porta da caixa | EXP-1, EXP-4; [guia da porta](../expansion-port/BUILD.pt.md) |
+| Processador | Uma **placa RP2040** (da classe RP2040-Zero, ou um Pico), a um relógio reduzido (48 MHz) para ficar dentro da corrente da porta | EXP-15; RFC, secção 3 (a) |
+| Energia vinda da caixa | No máximo **25 mA** dos 3,3 V da porta (cerca de 3,0 V no módulo), para o processador e o circuito de entrada do sensor; **medidos** na primeira montagem | EXP-3; P5J-16 |
+| Pull-ups | **Nenhum** no módulo: a placa da porta da caixa tem-nos | EXP-4; P5J-17 |
+| Polaridade invertida | O módulo protege-se de um cabo feito à mão e mal ligado: um MOSFET de canal P na sua alimentação ([secção 6.1](#61-entrada-da-alimentação)) | RFC, secção 1 («Plugging in reversed»); este guia (EXPI10-8) |
+| Endereço | **0x58**; dois jumpers de solda somam 1-3 (0x59-0x5B) para um segundo alvo na mesma caixa | EXP-7 |
+| «Identify» e o relatório de impactos | O protocolo de expansão v1: `IDENT` (modelo 0x0001 `target`, um canal), `CHANNEL` (tipo hit), `STATUS` (o impacto mais antigo com a sua sequência, força e idade), `COMMAND` (`ACK`, `ARM`, `CONFIG` para o limiar, o tempo de espera e o debounce, `LOCATE`). Substitui o rascunho de 5 bytes da P5J-19, para o qual nada foi montado | EXP-9, EXP-10; [protocol/expansion-port.md](../../protocol/expansion-port.md) |
+| Sensor | Um disco piezo de 27-35 mm, colado às costas da placa de alvo através de uma almofada de borracha; um divisor de resistências e um dreno de 1 Mohm para acertar o nível, díodos Schottky limitadores para os 3,3 V e o GND, para um pino do ADC | RFC, secção 3 (a) |
+| Deteção de impactos | No módulo: um pico acima do limiar, escalado para 0-255, um tempo de espera (50 ms por omissão) contra a vibração; pelo menos 16 impactos em fila, cada um com a sua idade | EXP-10 |
+| Placa de alvo | Aço ou policarbonato, inclinada para baixo, com a eletrónica atrás | RFC, secção 3 (a); [secção 8](#8-placa-de-alvo-suporte-e-invólucro) |
+| O que os scripts de jogo da caixa veem | A capacidade `hit`: um evento `hit` com uma `strength` de 0 a 255 (os scripts recebem `hit.hit`), e os comandos `arm` e `disarm` | Especificação de conceção, secção 7; rascunho do RFC 0000, Aditamento 1; EXP-18 |
+| O modo de jogo | *Janelas de Alvo* (`modes/target_windows/`): o papel `target` precisa de `hit` e `led`. O alvo fica escuro durante `interval_s`, depois acende a cor de uma equipa ao acaso durante `window_s`; um impacto de pelo menos `min_strength` na janela dá `hit_points` a essa equipa. Construído e testado no simulador; predefinição da Field Box quando o alvo estiver testado em bancada | [Plano da fase 4](../../docs/phase-4-site-server/PLAN.md), fase 2 do plano; M2-1 a M2-5; incremento 8 do RFC |
 
-## 2. A porta da caixa
+Não decidido, ou ainda não feito:
 
-A porta é o barramento I2C da caixa levado para fora por um conector, por isso
-segue as regras que todos os módulos I2C da Field Box já seguem: alimentada a
-partir do 3V3 da placa, nunca a partir de 5 V, e nada puxa SDA ou SCL acima de
-3,3 V (decisão M3, confirmada por quem mantém o projeto em 2026-10-21; o
-[manual de montagem da Field Box, secção 9.2](../field-box/BUILD.pt.md); o "powered from 3V3, never 5V" do
-expansor do teclado na
-[lista de peças](../field-box/README.md#bill-of-materials-per-box)).
+1. **O firmware do módulo** (pico-sdk, sobre o núcleo portátil de módulo do
+   incremento 7) e o seu ficheiro UF2 vindo da CI e das versões publicadas:
+   **depois do incremento 8**. Com ele vêm a tabela de pinos do módulo (que
+   pinos do RP2040 levam o alvo I2C, a entrada do ADC e os jumpers de
+   endereço), como o LED da placa mostra o `LOCATE`, e como a placa recebe
+   3,3 V no seu pino 3V3.
+2. **A escala de força, o limiar e o tempo de espera** em placas reais de aço
+   e de policarbonato (teste de bancada 8, HW2), e com eles as duas
+   resistências do divisor do circuito de entrada.
+3. **O tamanho e a espessura da placa de alvo, o seu suporte e a sua
+   inclinação** (HW2).
+4. **Uma placa de circuito impresso** para o módulo: mais tarde; placa
+   perfurada até lá.
 
-| Pino M12 (codificação A, 5 pinos) | Cor habitual do fio | Sinal | Na caixa |
-| --- | --- | --- | --- |
-| 1 | castanho | 3,3 V | O trilho 3V3 da placa de interligação, através de um fusível rearmável (PTC, cerca de 50 mA de retenção) |
-| 2 | branco | SDA | O trilho SDA (GPIO 17 da placa) |
-| 3 | azul | GND | O trilho GND |
-| 4 | preto | SCL | O trilho SCL (GPIO 18 da placa) |
-| 5 | cinzento | não ligado | Livre nas duas pontas, e nunca 5 V. Uma caixa futura com um GPIO de sobra poderia fazer dele uma linha de interrupção |
+## 3. Peças
 
-**Referência de pinos da porta.** A porta não usa nenhum GPIO próprio. É o
-barramento I2C e os trilhos da caixa, por isso segue a
-[referência de pinos da Field Box](../field-box/BUILD.pt.md#15-referência-de-pinos) (secção 15):
+Um alvo. A porta da caixa é um conjunto de peças à parte
+([guia da porta, secção 3](../expansion-port/BUILD.pt.md#3-peças-e-contra-o-que-protege-cada-uma)).
 
-| Sinal da porta | Pino da placa | Opção do firmware | Nível |
-| --- | --- | --- | --- |
-| 3,3 V | o pino 3V3 da placa, através do hub e de um fusível rearmável | -- | 3,3 V |
-| SDA | GPIO 17 | `ATALAIA_NFC_SDA_PIN` | 3,3 V, 100 kHz |
-| SCL | GPIO 18 | `ATALAIA_NFC_SCL_PIN` | 3,3 V |
-| GND | o trilho GND do hub | -- | 0 V |
+| # | Peça | Qtd | Para que serve | O que verificar |
+| --- | --- | --- | --- | --- |
+| 1 | Placa RP2040: da classe **RP2040-Zero** (ou um Raspberry Pi Pico) | 1 | Amostra o piezo, encontra os impactos, responde à caixa em 0x58 | Um RP2040 genuíno com a sua USB-C (ou micro-USB) para gravar por UF2 |
+| 2 | Disco piezo, **27-35 mm**, com fios | 1 (2 de reserva) | Sente cada impacto através da placa de alvo | Disco de latão com o centro cerâmico; compra de reserva, partem |
+| 3 | Almofada de borracha (2-3 mm, neopreno ou EPDM) e cola de contacto | 1 | Cola o piezo à placa de alvo e espalha o choque, para um impacto direto não o partir | Cobre o disco todo |
+| 4 | Resistência de 1 Mohm, 1/4 W | 1 | O **dreno** aos terminais do piezo: escoa a sua carga, para o ADC ver um pico e não um nível a derivar devagar | |
+| 5 | Duas resistências para o divisor (valores escolhidos em placas reais) e uma barra de 2 contactos para cada uma | 2 | Ajustam o pico à gama do ADC | Monta-as em suportes, para se poderem trocar no teste de bancada 8 |
+| 6 | Díodos Schottky pequenos, da classe **BAT85** | 2 | **Limitadores**: mantêm o pino do ADC entre o GND e os 3,3 V, faça a placa de alvo o que fizer | Tensão direta baixa |
+| 7 | MOSFET de canal P para uma tensão de porta baixa, da classe **AO3401** ou SI2301 (SOT-23), num adaptador SOT-23; uma resistência de 10 kohm | 1 de cada | **Proteção contra polaridade invertida** da alimentação do módulo, quase sem queda de tensão (um díodo tiraria mais 0,3 V, e o nível alto do barramento ficaria acima da alimentação do módulo) | Para uma tensão de porta de -2,5 V ou menos |
+| 8 | Jumpers de solda ou um interruptor DIP de 2 posições | 1 | O endereço: aberto-aberto é 0x58; os outros 0x59-0x5B | A que pinos do RP2040 vão: **depois do incremento 8** |
+| 9 | Conector de painel M12 de codificação A, 5 pinos, **macho**, IP67 | 1 | A ponta do cabo do lado do módulo | Codificação A, 5 pinos |
+| 10 | Cabo de extensão de sensor M12 de codificação A, 5 polos, macho-fêmea, 1-2 m | 1 | Da caixa ao módulo, no máximo 2 m | Confirma as cores com um multímetro |
+| 11 | Invólucro IP65 pequeno, bucim ou o conector M12 na parede, placa perfurada, fio de 0,25 mm², manga termorretrátil | 1 conjunto | Guarda a placa RP2040 e o circuito de entrada atrás da placa de alvo | De preferência não metálico; fora da linha de fogo |
+| 12 | Placa de aço ou folha de policarbonato, e um suporte | 1 | Aquilo para onde os jogadores disparam | Tamanho, espessura e suporte: HW2 ([secção 8](#8-placa-de-alvo-suporte-e-invólucro)) |
 
-Verificado contra o firmware em 2026-11-04: o controlador da porta
-(`firmware/esp32/main/expansion.c`, RFC em rascunho "The expansion port",
-incremento 6) encontra módulos em 0x58-0x5F mas ainda não é chamado pela caixa,
-por isso uma Field Box ainda não consegue falar com um módulo.
-**Ainda não testado numa placa real**: a porta, o fusível e o cabo.
+## 4. Ferramentas e segurança
 
-SDA e SCL estão nos pinos 2 e 4, em lados opostos do conector e não lado a lado
-(decisão P5J-20). A porta espera pelo primeiro módulo: uma Field Box montada
-hoje não precisa dela.
+As ferramentas são as da Field Box ([manual, secção 3](../field-box/BUILD.pt.md#3-ferramentas-e-consumíveis)).
+Na bancada:
 
-O lado do módulo, segundo as mesmas decisões:
+1. **Nunca ligues ao mesmo tempo o cabo USB do módulo e o cabo da porta.**
+   Grava o módulo (depois do incremento 8) com a porta desligada.
+2. **Só 3,3 V** em todos os pinos do conector do módulo; **o pino 5 sem
+   ligação**; **sem pull-ups** no módulo; **no máximo 25 mA** (P5J-16,
+   P5J-17).
+3. **Nada de luzes na alimentação da porta.** Um módulo com luzes próprias
+   precisa de uma célula própria, com o seu fusível e a sua carga, o seu GND
+   unido ao da porta, e a sua alimentação nunca chega à porta.
+4. **Estática**: toca no GND da caixa antes de ligares um módulo.
 
-- **Nada acima de 3,3 V em nenhum pino.** O processador do módulo funciona com
-  os 3,3 V da porta; uma peça do seu lado que precise de mais produz isso a
-  partir da sua própria alimentação, que nunca se liga à porta.
-- **Sem resistências de pull-up em SDA nem SCL no módulo**: o barramento da
-  caixa já as tem (P5J-17).
-- **No máximo 25 mA** do pino 1 (P5J-16). Um processador da classe ATtiny e o
-  circuito do piezo consomem alguns miliamperes; um RP2040 à velocidade máxima
-  aproxima-se do limite, por isso tem de ser medido, ou funcionar mais devagar.
-- **As suas luzes, se tiver, a partir da sua própria célula**: uma célula 1S
-  protegida com o seu próprio fusível e conversor elevador, como no caminho da
-  energia do Satélite, com o seu GND unido ao GND da porta; a sua alimentação
-  nunca chega à porta (P5J-16).
+Sempre que alguém dispara para o alvo, também na bancada:
+
+- **Proteção dos olhos e da cara** para todas as pessoas ao alcance do alvo,
+  incluindo enquanto o sensor é afinado.
+- **Ricochetes.** As BB ressaltam numa placa dura, e algumas voltam para
+  trás. Inclina uma placa de aço de modo a mandá-las para o chão, nunca de
+  frente para quem dispara. Nunca dispares para a caixa, o cabo, o conector
+  ou o invólucro do módulo, só para a placa de alvo.
+- **Protege a eletrónica.** O módulo, as suas ligações e o cabo ficam atrás
+  da placa de alvo ou no seu próprio invólucro, fora da linha de fogo.
+- **Os limites de potência do campo** (o cronógrafo, o limite em joules)
+  aplicam-se a disparar para alvos como a disparar para jogadores; o alvo não
+  é razão para os subir.
+- **Um adereço de jogo**: cores vivas e uma etiqueta «GAME PROP», como todos
+  os dispositivos Atalaia; a caixa onde se liga segue as regras de bateria do
+  seu próprio guia de montagem
+  ([Field Box](../field-box/BUILD.pt.md#4-regras-de-segurança),
+  [Satélite](../satellite/BUILD.pt.md#4-ferramentas-e-segurança)).
+
+## 5. O lado da caixa: a porta de expansão
+
+A caixa precisa de uma porta de expansão: a tomada M12 e a sua placa da porta
+(o buffer de ligação a quente, a matriz TVS, as resistências de 100 ohm, o
+fusível de 50 mA e o díodo contra a alimentação inversa). Monta-a e verifica-a
+pelo [guia de montagem da porta de expansão](../expansion-port/BUILD.pt.md); é
+a mesma na Field Box, no Satélite e no módulo de E/S, e não usa nenhum GPIO. A
+sua tabela de pinos é verificada contra o firmware pelo
+`tools/check_wiring.py`
+([guia da porta, secção 5](../expansion-port/BUILD.pt.md#5-os-pinos-da-porta)).
+
+As regras que o módulo segue, das mesmas decisões:
+
+- **Nada acima de 3,3 V em nenhum pino.** O módulo funciona com os 3,3 V da
+  porta (cerca de 3,0 V depois do díodo da caixa); uma peça que precise de
+  mais tira-a de uma alimentação própria, que nunca se liga à porta.
+- **Nenhuma resistência de pull-up em SDA ou SCL** no módulo (P5J-17). Se a
+  placa RP2040 que usas tiver alguma nos pinos que escolheres, tira-a.
+- **No máximo 25 mA** do pino 1 (P5J-16). Espera-se que um RP2040 a 48 MHz e
+  o circuito de entrada fiquem abaixo disso; **a medir** (teste de bancada 4).
 
 ### Porquê 25 mA
 
@@ -106,143 +197,182 @@ de 80-150 mA, com picos de 400-500 mA enquanto o Wi-Fi ou o rádio transmitem), 
 TFT com a sua retroiluminação (40-100 mA), o PN532 (50-150 mA com o campo
 ligado), e o expansor do teclado e o medidor (menos de 1 mA): cerca de 170-400
 mA num jogo, com picos perto de 750 mA
-([orçamento de energia da Field Box](../field-box/BUILD.pt.md), estimativas, não
-medições). O anel de luzes, o amplificador e os LED dos botões estão no
-conversor elevador de 5 V, não nos 3,3 V. O limite do próprio regulador não está
-documentado aqui, e saber se aguenta o TFT e o leitor NFC continua a ser um item
-**Verifica na primeira montagem** da Field Box. Por isso a porta promete só uma
-parte pequena e fixa: 25 mA são cerca de 3 % desses picos, e o fusível impede que
-um curto-circuito no cabo ou no conector deixe a caixa sem energia. Um só LED
-WS2812 consome até 60 mA, por isso luzes na porta estão fora de questão.
+([orçamento de energia da Field Box](../field-box/BUILD.pt.md#orçamento-de-energia-estimativas-não-medições),
+estimativas, não medições). A porta promete só uma parte pequena e fixa: 25 mA
+são cerca de 3 % desses picos, e o fusível impede que um curto-circuito no cabo
+ou no conector deixe a caixa sem energia. Um só LED WS2812 consome até 60 mA,
+por isso luzes na porta estão fora de questão.
 
-## 3. Verificações na primeira montagem (a verificar)
+## 6. O módulo, passo a passo
 
-- **Pull-ups e cabo.** A 100 kHz o barramento tem de subir em 1 µs. Com cerca de
-  100 pF por metro de cabo, 2 m de cabo e os módulos da própria caixa somam
-  cerca de 300 pF, o que exige as pull-ups do barramento da caixa, todas em
-  paralelo, entre cerca de **1 kΩ e 3,9 kΩ** (1 kΩ mantém a corrente que um
-  dispositivo tem de absorver abaixo de 3 mA). Mede-o com a caixa desligada e
-  todos os módulos montados: SDA a 3V3 e SCL a 3V3, na escala de resistência do
-  multímetro. Acima de 3,9 kΩ, monta um par de 2,2 kΩ de SDA e SCL ao trilho
-  3V3 na placa de interligação. Depois verifica que o teclado, o leitor NFC e o
-  medidor continuam a funcionar com o cabo e um módulo ligados.
-- **O fusível.** Um curto-circuito entre os pinos 1 e 3 da porta não pode
-  reiniciar a caixa.
-- **Proteger o barramento num conector exterior** (estática de uma mão, água no
-  conector): são prováveis pequenas resistências em série e díodos de proteção
-  na porta; os seus valores não estão escolhidos.
-- **A corrente do módulo**, contra os 25 mA.
+Dispõe o módulo numa pequena placa perfurada: a placa RP2040 em pinos, o
+circuito de entrada junto ao seu pino do ADC, o MOSFET junto ao seu pino 3V3,
+e os fios do conector M12 num bordo.
 
-## 4. Como a caixa lê os impactos (sem linha de interrupção)
+### 6.1 Entrada da alimentação
 
-A Field Box usa todos os oito GPIO da placa que estão livres de qualquer peça da
-placa (3, 4, 6, 15, 16, 33, 47, 48;
-[tabela de pinos](../field-box/README.md#peripheral-pins)), e o conector GNSS
-guarda o 34 e o 38-42, por isso não há pino para uma linha de interrupção. Também
-não precisa dele (decisão P5J-18):
+1. **Pino 1** do M12 (castanho) ao **dreno** do MOSFET; a sua **fonte** ao
+   pino **3V3** da placa RP2040; a sua **porta** ao GND através de 10 kohm.
+   Com a polaridade certa o MOSFET liga-se por completo; com os pinos 1 e 3
+   trocados num cabo feito à mão fica desligado.
+2. **Pino 3** do M12 (azul) ao **GND** da placa.
+3. **Nunca** ao pino 5V / VBUS / VSYS da placa: esse é o lado da USB.
+4. **Pino 5** do M12 (cinzento): cortado curto e isolado, sem ligação.
+5. **Verifica na primeira montagem:** como a placa escolhida recebe 3,3 V no
+   seu pino 3V3 com o seu próprio regulador sem alimentação, e a tensão no
+   pino 3V3 com o módulo a funcionar (espera-se cerca de 3,0 V); a
+   documentação do firmware do módulo fixa isto com o incremento 8.
 
-- Todo o tráfego I2C da caixa, o do teclado incluído, já corre no seu ciclo de
-  jogo, a cada 10 ms. Uma interrupção só seria notada no tique seguinte, por
-  isso o melhor que daria seria um impacto em 10 ms; consultar a cada 20 ms dá-o
-  em 20 ms, mais 0,56 ms para ler o relatório.
-- **Tempo de barramento.** A 100 kHz um byte com a sua confirmação demora 90 µs.
-  Uma consulta (o endereço e 5 bytes) demora cerca de **0,56 ms**: a cada 20 ms,
-  cerca de **3 %** do barramento. Receber um impacto acrescenta uma confirmação
-  de 2 bytes (0,28 ms). A leitura do teclado, a cada 10 ms, já usa cerca de
-  18 %; o medidor (a cada 10 s) quase nada; o OLED da placa uns milissegundos
-  quando a imagem muda.
-- **Latência.** Um impacto chega ao script cerca de 10 ms depois de o módulo o
-  sentir, em média, e em cerca de 21 ms no máximo, contra um objetivo de 50 ms:
-  a luz e o som de um impacto parecem imediatos, e uma janela está aberta pelo
-  menos 1 s (5 s por omissão), por isso 20 ms são no máximo 2 % dela; um BB
-  demora 0,2-0,3 s a atravessar 20-30 m, de qualquer modo. Momentos mais lentos:
-  uma consulta NFC (a cada 300 ms num jogo) pode prender o ciclo até cerca de
-  200 ms quando o leitor demora a responder, e ler a etiqueta de quem joga
-  durante mais tempo. Nessas alturas os impactos não se perdem: o módulo guarda-os,
-  com a sua idade, até a caixa os recolher.
-- As opções postas de lado: partilhar a linha INT do expansor do teclado (não
-  está ligada, `ATALAIA_KP_INT_PIN` é -1, ligá-la também levaria um GPIO, e os
-  oito pinos do expansor estão todos em uso), ou libertar um GPIO abdicando do
-  som ou do botão 3, o que custaria uma funcionalidade a todas as caixas por 10
-  ms.
+### 6.2 O piezo e o seu circuito de entrada
 
-O controlador (`firmware/esp32/main/expansion.c`, o protocolo v1 da porta de
-expansão; testes no computador em `firmware/esp32/test/test_expansion.c` contra
-os vetores partilhados e um modelo em C de um módulo; o seu I2C através de
-`hal_esp_i2c` em `expansion_esp.c`) encontra módulos em 0x58-0x5F (o módulo de
-alvo usa 0x58 por omissão), consulta um módulo com entradas a cada 20 ms,
-recebe cada impacto uma só vez com a sua hora no relógio da caixa (uma
-confirmação perdida não conta um impacto duas vezes), volta a enviar `ARM` até
-o `STATUS` do módulo concordar, recusa leituras com um CRC errado, e dá o módulo
-por desaparecido após 25 leituras falhadas seguidas (0,5 s). **Ainda por
-fazer** (o incremento 8 do RFC em rascunho): chamar o controlador a partir do
-ciclo de jogo, juntar `hit` às capacidades da caixa, passar cada impacto ao
-script como `hit.hit` com a sua `strength`, enviar-lhe os `cap("hit"):arm()` e
-`:disarm()` do script (`command_dispatch.c`), e fazer de *Janelas de Alvo* uma
-predefinição (P4R23).
+```
+piezo + ──┬── R1 ──┬──────────────── pino do ADC
+          │        ├── R2 ── GND
+        1 Mohm     ├── BAT85 (cátodo ao 3V3)
+          │        └── BAT85 (ânodo ao GND, cátodo ao nó do ADC)
+piezo − ──┴── GND
+```
 
-## 5. O que não está decidido
+1. Cola o disco piezo à almofada de borracha e a almofada às costas da placa
+   de alvo, ao centro, com o lado de latão virado para a almofada. Deixa a
+   cola curar como o fabricante diz.
+2. O dreno de **1 Mohm** aos terminais do piezo, no módulo.
+3. **R1** do terminal + do piezo ao nó do ADC; **R2** do nó do ADC ao GND
+   (as duas em suportes: os valores vêm do teste de bancada 8).
+4. Os dois limitadores **BAT85** no nó do ADC: um com o cátodo (a risca) ao
+   3V3 e o ânodo ao nó; o outro com o cátodo ao nó e o ânodo ao GND.
+5. O nó do ADC a um dos pinos de ADC do RP2040 (GPIO 26-28); qual: a tabela
+   de pinos do firmware do módulo, **depois do incremento 8**.
+6. Passa os fios do piezo entrançados, presos, atrás da placa de alvo.
 
-Cada um destes pontos precisa de uma decisão antes de alguém montar um módulo:
+### 6.3 Barramento e endereço
 
-1. **O processador**: RP2040 ou ATtiny (a especificação nomeia os dois), dentro
-   dos 25 mA, e o firmware que corre.
-2. **O endereço I2C do módulo e a sua resposta "identify"** (o descritor de
-   capacidades). O endereço tem de ficar longe dos dispositivos da caixa:
-   0x20-0x27 e 0x38-0x3F (onde a caixa procura o expansor do teclado), 0x24
-   (NFC), 0x36 (medidor) e 0x3C (OLED). O relatório do impacto e os comandos têm
-   um **rascunho** ([secção 1](#1-o-que-está-decidido)) contra o qual os dois
-   firmwares podem ser escritos; passa a definitivo com o primeiro módulo.
-3. **As peças do conector e o fabricante do cabo**, e a proteção na porta
-   ([secção 3](#3-verificações-na-primeira-montagem-a-verificar)).
-4. **O circuito do sensor**: o elemento piezo, como é montado na placa (e
-   isolado dela), a sua proteção e o andar de entrada analógico; o limiar e o
-   debounce hão de ser afinados em placas a sério (HW2).
-5. **A placa**: material e espessura, tamanho, o seu suporte e o ângulo a que é
-   posta, e a caixa que protege o processador e o cabo.
-6. **Luzes no próprio módulo**: não são precisas para *Janelas de Alvo*; se um
-   desenho futuro as quiser, a sua própria célula, carregamento e caixa.
+1. **Pino 2** do M12 (branco, SDA) e **pino 4** (preto, SCL) aos pinos de
+   alvo I2C do RP2040: quais, **depois do incremento 8**. Fios curtos; sem
+   pull-ups.
+2. Os dois jumpers de endereço entre os pinos do RP2040 que o firmware indicar
+   e o GND: os dois abertos é **0x58**, o endereço que todas as caixas
+   procuram primeiro. Deixa-os abertos, a não ser que a caixa leve um segundo
+   alvo.
 
-## 6. Segurança, quando houver algo para montar
+### 6.4 O conector e o invólucro
 
-Isto vale para qualquer alvo usado com airsoft ou paintball, seja qual for o
-desenho:
+O conector M12 macho na parede do invólucro, com o O-ring do lado de fora, e
+o invólucro atrás da placa de alvo com o conector virado para longe de quem
+dispara ([secção 8](#8-placa-de-alvo-suporte-e-invólucro)). Manga
+termorretrátil em todos os copos de solda.
 
-- **Proteção dos olhos e da cara** para todas as pessoas ao alcance do alvo
-  enquanto alguém lhe dispara, incluindo na bancada enquanto o sensor é afinado.
-- **Ricochetes.** Os BB ressaltam numa placa dura, e alguns voltam para trás. Põe
-  uma placa de aço num ângulo que os mande para o chão, nunca plana na direção
-  de quem dispara. Nunca dispares contra a caixa, o cabo ou o
-  conector, só contra a placa.
-- **Protege a eletrónica.** O processador, as suas ligações e o cabo ficam atrás
-  da placa ou na sua própria caixa, fora da linha de tiro.
-- **Os limites de potência do campo** (o cronógrafo, o limite em joules)
-  aplicam-se a disparar contra alvos como a disparar contra pessoas; o alvo não
-  é motivo para os subir.
-- **Um dispositivo de jogo**: cores vivas e uma etiqueta "GAME PROP", como todos
-  os dispositivos da Atalaia; e a caixa a que se liga segue as regras de bateria
-  do seu próprio guia de montagem
-  ([Field Box](../field-box/BUILD.pt.md), secção 4,
-  [Satélite](../satellite/BUILD.pt.md#4-ferramentas-e-segurança)), tal como a
-  célula própria de um módulo, se a tiver.
+## 7. Verificações na montagem
 
-## 7. Fotografias
+Com um multímetro, o módulo sem alimentação:
+
+- [ ] Pino 1 ao pino 3 do M12: sem curto-circuito.
+- [ ] Pino 5 do M12: aberto a todos os outros pinos.
+- [ ] Pinos 2 e 4 do M12 ao pino 1: **sem pull-up** (aberto, ou acima de
+      100 kohm).
+- [ ] O nó do ADC ao GND: R2 em paralelo com o resto; ao 3V3 e ao GND, os
+      limitadores medem como díodos (cerca de 0,2-0,4 V num sentido, aberto no
+      outro).
+- [ ] Os terminais do piezo: cerca de 1 Mohm (o dreno).
+
+**Depois do incremento 8** (o firmware do módulo e o controlador da porta da
+caixa):
+
+1. **Gravar o módulo**: carrega no botão BOOT da placa enquanto ligas o cabo
+   USB a um computador, e arrasta o ficheiro UF2 do módulo de alvo para a
+   unidade que aparece (com a porta desligada). Os ficheiros UF2 vêm da CI e
+   das versões publicadas com o incremento 8.
+2. **Corrente** (teste de bancada 4): um multímetro em série com o pino 1, o
+   módulo a amostrar: **abaixo de 25 mA**.
+3. **Encontrado pela caixa**: liga o módulo à porta de uma caixa; a caixa
+   encontra-o em 2 s (o registo e a lista de módulos da caixa, com o
+   incremento 8).
+4. **Afinação** (teste de bancada 8): limiar, tempo de espera e escala de
+   força em placas de aço e de policarbonato, ao limite em joules do campo,
+   com proteção dos olhos; troca R1 e R2 até um impacto à distância ficar bem
+   acima do limiar e um impacto mesmo por cima do piezo não chegar aos
+   limitadores (saturaria).
+
+## 8. Placa de alvo, suporte e invólucro
+
+Decidido: uma placa de **aço ou policarbonato**, **inclinada para baixo** para
+as BB irem para o chão, com a **eletrónica atrás da placa** ou no seu próprio
+invólucro, fora da linha de fogo (RFC, secção 3 (a)). Ainda não decidido
+(HW2): o tipo de material, a espessura e o tamanho da placa, o suporte e a
+inclinação exata; as primeiras montagens decidem-nos e esta secção ganha-os,
+com fotografias. Até lá:
+
+- o piezo colado através da almofada às costas da placa de alvo, e o
+  invólucro do módulo preso ao suporte, não à placa (para o choque da placa
+  não abanar a eletrónica);
+- o cabo sai do invólucro para baixo e passa pelo chão, atrás da placa de
+  alvo, até à caixa, que fica fora da linha de fogo.
+
+## 9. Como a caixa lê os impactos
+
+A Field Box usa os oito GPIO da placa que não têm nenhuma peça da placa, e o
+conector GNSS fica com os 34 e 38-42, por isso não há pino para uma linha de
+interrupção. Não precisa de uma (P5J-18, EXP-8):
+
+- Todo o tráfego I2C da caixa, incluindo o do teclado, corre no seu ciclo de
+  jogo a cada 10 ms; uma interrupção só seria vista no tique seguinte. A
+  caixa lê o `STATUS` de 9 bytes do módulo a cada **20 ms**: uma escrita do
+  ponteiro, um novo início e 9 bytes, cerca de 12 bytes no fio (1,1 ms), cerca
+  de **5 %** do barramento. A leitura do teclado já usa cerca de 18 %.
+- **Latência.** Um impacto chega ao script em cerca de 21 ms depois de o
+  módulo o sentir, contra um objetivo de 50 ms: uma janela fica aberta pelo
+  menos 1 s (5 s por omissão), e uma BB leva 0,2-0,3 s a atravessar 20-30 m de
+  qualquer forma. Quando o ciclo de jogo está lento (uma leitura NFC pode
+  segurá-lo 200 ms), os impactos não se perdem: o módulo guarda pelo menos 16,
+  com a sua idade, e a caixa data cada um no seu próprio relógio
+  (`t_event = t_read - age`).
+- A caixa confirma cada impacto pelo seu número de sequência, por isso uma
+  confirmação perdida nunca conta um impacto duas vezes; arma e desarma o
+  módulo como o modo pede; um módulo que falhe 25 leituras seguidas (0,5 s)
+  desaparece, e o controlador é avisado (`node.module_lost` durante um jogo).
+
+O controlador da porta da caixa (`firmware/esp32/main/expansion.c`, que
+substitui o esqueleto `target_addon.c`) está escrito (incremento 6, 2026-11-04),
+com testes no anfitrião contra os vetores partilhados do protocolo; é chamado pela
+tarefa de jogo, e os impactos chegam ao script, **depois do incremento 8**.
+
+## 10. O que espera pelo incremento 8
+
+Escrito a partir do que o RFC fixa; o resto vem com o firmware:
+
+- o firmware do módulo (pico-sdk, ADC com DMA a cerca de 20 kamostras/s,
+  deteção de picos, o núcleo de protocolo do incremento 7), compilado em
+  Docker (`tools/docker_module.py`), e o seu **ficheiro UF2** vindo da CI e
+  das versões publicadas;
+- a tabela de pinos do módulo: os pinos do alvo I2C, o pino do ADC, os
+  jumpers de endereço, o LED da placa para o `LOCATE`;
+- como a placa RP2040 escolhida recebe 3,3 V no seu pino 3V3;
+- a caixa a chamar o seu controlador da porta, a juntar `hit` às suas
+  capacidades e ao `node.modules` (`58:target/<versão>:hit`), e a passar os
+  impactos ao script;
+- as linhas do registo da caixa e a vista na consola para o módulo, e o passo
+  da porta no BRING_UP (`firmware/esp32/docs/BRING_UP.md`);
+- *Janelas de Alvo* como predefinição da Field Box, depois de testado em
+  bancada (P4R23);
+- o módulo de E/S a emprestar `hit` a um telemóvel (incremento 9, sobre o
+  controlador da porta do 8).
+
+## 11. Fotografias
 
 <!-- PHOTO: target-addon-plate.jpg | the finished target: plate and sensor mounting, front and back -->
-> **Fotografia a juntar depois da primeira montagem:** o alvo acabado, a placa e
-> a montagem do sensor, frente e verso.
+> **Fotografia a juntar depois da primeira montagem:** o alvo acabado, a placa
+> e a montagem do sensor, de frente e de trás.
 
-<!-- PHOTO: target-addon-port.jpg | the M12 addon port on a box, and the addon's cable plugged in -->
-> **Fotografia a juntar depois da primeira montagem:** a porta M12 do módulo
+<!-- PHOTO: target-addon-port.jpg | the M12 expansion port on a box, and the module's cable plugged in -->
+> **Fotografia a juntar depois da primeira montagem:** a porta de expansão M12
 > numa caixa, com o cabo do módulo ligado.
 
-## 8. Ajudar
+## 12. Ajudar
 
-Se quiseres desenhar o módulo, abre primeiro uma issue ou uma discussão: as
-decisões acima vêm antes de qualquer ligação, e o resto do lado do firmware
-(chamar o controlador da porta, e a capacidade `hit` numa caixa) tem de ser
-escrito com ele. Os projetos são CERN-OHL-S-2.0, como o resto do hardware
-([LICENSING.md](../../LICENSING.md)).
+Monta um e conta numa issue o que mediste (a corrente, a tensão no módulo, o
+tempo de subida, a afinação nas tuas placas); os itens **Verifica na primeira
+montagem** e as dimensões da placa de alvo vêm desses relatos. Os desenhos são
+CERN-OHL-S-2.0, como o resto do hardware ([LICENSING.md](../../LICENSING.md)).
 
 ---
 
