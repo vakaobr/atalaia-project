@@ -167,6 +167,52 @@ main {
 .screen dt { opacity: 0.7; }
 .screen dd { margin: 0; font-size: 20px; line-height: 1.2; }
 
+/* A screen drawn from its template, as the Field Box draws it (app.js drawScreen): 320x240, the
+   widgets in a column centred both ways 4 px apart, rows 6 px apart, scaled down in a narrow card. */
+.screen.drawn { padding: 0; background: transparent; min-height: 0; }
+.screen.drawn .template { margin-top: 4px; font-size: 11px; color: var(--muted); }
+.screen.drawn dl { font-size: 11px; color: var(--muted); }
+.screen.drawn dd { font-size: 12px; }
+.lcd-frame {
+  --lcd-scale: 1;
+  width: 100%;
+  max-width: 320px;
+  height: calc(240px * var(--lcd-scale));
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 6px;
+  position: relative; /* the screen inside takes no room of its own: a narrow card scales it */
+}
+.lcd {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 320px;
+  height: 240px;
+  transform: scale(var(--lcd-scale));
+  transform-origin: top left;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  overflow: hidden;
+  color: #fff;
+  font-family: Montserrat, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", "PingFang TC", sans-serif;
+  line-height: 1.15;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.lcd .w-row, .lcd .w-column { display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+.lcd .w-row { flex-direction: row; gap: 6px; }
+.lcd .w-column { flex-direction: column; gap: 4px; }
+.lcd .w-label, .lcd .w-icon, .lcd .w-qr_code { box-sizing: border-box; overflow: hidden; max-width: 100%; }
+.lcd .w-qr_code { overflow-wrap: anywhere; }
+.lcd .w-bar { position: relative; overflow: hidden; box-sizing: border-box; flex-shrink: 0; }
+.lcd .w-fill { height: 100%; }
+.lcd .w-spacer { flex-shrink: 0; }
+.lcd [hidden] { display: none !important; }
+
 .outputs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .outputs li { display: flex; align-items: center; gap: 8px; font: 12px var(--mono); }
 .switched { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }

@@ -164,7 +164,10 @@ todas. As que mais importam aqui:
 5. **Só sinais de 3,3 V** para a placa: o anel é comandado através do conversor
    de nível, e o medidor tem de puxar SDA e SCL para 3,3 V, nunca para 5 V.
 6. **Nunca ligues o GPIO 5 ou 46** (o módulo frontal do rádio), **nem o GPIO 34
-   ou 38-42** (o conector GNSS da placa).
+   ou 38-42** (o conector GNSS da placa). A única exceção é o circuito da
+   própria saída simples (46 numa V4.3, 5 numa V4.2), através do 74AHCT125
+   com a sua resistência de 10 kohm ao GND, e só numa versão com
+   `CONFIG_ATALAIA_SIMPLE_OUT=y` (linha 16 da lista de peças).
 7. **Nenhum jogo antes da verificação da potência de emissão** (BRING_UP.md,
    passo 10): o firmware limita a potência com um ganho de amplificador
    assumido que ainda não foi medido.

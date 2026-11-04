@@ -8,8 +8,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 **Current phase:** Implementation (plan phases 1 to 22 built in software, 2026-10-21; sync over 4G: HW1; a real ATAK device: HW3; a real deployment with a real domain, and a real hosted deployment: HW1)
 **Phase status:** Software done (every software plan phase built; the gate waits for hardware and real deployments)
 **Risk level:** High
-**Last verified:** 2026-10-21 (follow-up: the remote ATAK relay; full clean check, the site server's tests, migrations, deploy, deploy-hosted and browser tests)
-**Next step:** the hardware phases HW1-HW4 (the boards); hosted mode waits for the legal review (P4-6) before going live
+**Last verified:** 2026-11-04 (the "not built" and "not yet" lines checked against the code, SD-4 to SD-16; before that 2026-10-21: the remote ATAK relay, full clean check, the site server's tests, migrations, deploy, deploy-hosted and browser tests)
+**Next step:** the hardware phases HW1-HW4 (the boards); hosted mode waits for its go-live checklist (`server/docs/DEPLOY.md`) before going live; the lawyer approved the legal positions (P4-6) on 2026-10-30
 
 ## Completed
 
@@ -39,7 +39,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 | # | Plan phase | Software now / hardware | Depends on | Status |
 |---|------------|-------------------------|------------|--------|
-| 1 | Master and Satellites | Software, now | -- | Done in software (2026-10-19; not on radio hardware) |
+| 1 | Master and Satellites | Software, now | -- | Done in software (2026-10-19); test-played on four bench boxes 2026-11-01 (phase 2 STATUS), not yet in a field |
 | 2 | Target Windows (logic), `game.teams()`, `hit` input | Software, now | -- | Done in software (2026-10-19; the addon: HW2) |
 | 3 | Geo utilities in the core | Software, now | -- | Done in software (2026-10-20) |
 | 4 | Hacking Terminal | Software, now | -- | Done in software (2026-10-20; on a phone in the field: HW3) |
@@ -59,7 +59,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | 18 | Club profiles and branding sync | Software, now | 13 | **Done in software** (2026-10-20; not yet on a real deployment) |
 | 19 | Device health, firmware catalogue, remote GM | Software, now | 13 | **Done in software** (2026-10-20; not yet on a real deployment or over 4G) |
 | 20 | Game history and the scenario library | Software, now | 13, 7 | **Done in software** (2026-10-20; not yet on a real deployment) |
-| 21 | Hosted multi-tenant mode | Software, now | 10-20 | **Done in software** (2026-10-20; tested against PostgreSQL in Docker, not yet on a real hosted deployment; not live before P4-6) |
+| 21 | Hosted multi-tenant mode | Software, now | 10-20 | **Done in software** (2026-10-20; tested against PostgreSQL in Docker, not yet on a real hosted deployment; not live before the go-live checklist in `server/docs/DEPLOY.md`, the legal positions (P4-6) approved 2026-10-30) |
 | 22 | Deployment (Caddy, setup, backup, restore) | Software, now | 10 | **Done in software** (2026-10-20; tested in Docker with Caddy's own CA, not yet on a real server with a real domain and certificate) |
 | HW1 | Sync over a real 4G link | Hardware and a deployment | 13, phase 2 F | Waiting for boards |
 | HW2 | Target addon | Hardware | 2 | Waiting for the addon |
@@ -394,7 +394,9 @@ the models, the roles seed; settings, UUIDv7 with RFC 9562's example, the
 shared modules importing without the web stack, every built-in mode loading
 in the image's core). 19 of them (no database) also run in tools/check.sh.
 Not yet: accounts and anything with personal data (plan phases 11, 12), the
-controller sync (13), deployment with HTTPS and backups (22). Not run here:
+controller sync (13), deployment with HTTPS and backups (22). *(All four built
+since, in software: 11 and 12 on 2026-10-19, 13 and 22 on 2026-10-20; see their
+sections below.)* Not run here:
 the CI job itself (its commands were run by hand against a container started
 the same way). Decisions S10-1 to S10-12, all open.
 
@@ -417,7 +419,8 @@ TOTP with the RFC 6238 and RFC 4226 vectors, tokens, rate limits, accounts
 and sessions, roles, `create-admin` run as a command, 0002 with data); 21
 (no database, no server dependencies) also run in tools/check.sh. Not yet:
 per-game roles (with `games`, plan phase 13), personal data rights (12),
-deployment behind Caddy with the client address from the proxy (22).
+deployment behind Caddy with the client address from the proxy (22). *(All
+built since, in software: 12 on 2026-10-19, 13 and 22 on 2026-10-20.)*
 Decisions S11-1 to S11-15, all open; S11-4 (the breached list's licence)
 and S11-12 (lockouts per address behind a field's shared 4G address) want
 the maintainer's eye.
@@ -449,7 +452,10 @@ administrator, the purge's periods, its command and its daily task, 0003
 with data, the new lockouts); 22 (no database, no server dependencies) also
 run in tools/check.sh. Not yet: the tables of later plan phases (games,
 chrono, registrations), each added to `personal_data.py` with its plan
-phase; the legal review of the templates. Decisions S12-1 to S12-8, all open.
+phase; the legal review of the templates. *(Since: the later tables are in
+`server/atalaia_server/personal_data.py` (plan phases 13 to 20, 2026-10-20);
+the lawyer approved the positions on 2026-10-30, see "The security and privacy
+review of 30 October" below.)* Decisions S12-1 to S12-8, all open.
 
 **The templates, first full draft (2026-10-28, decisions PRIV-1 to PRIV-8).**
 `docs/templates/privacy-notice-pt.md` and `-en.md` were rewritten to cover
@@ -459,7 +465,10 @@ the opt-in remote paths, NFC tags and stickers, game history, hosted mode,
 the app's storage, third parties), with a short in-app notice for account
 creation (S17-16) and a short check-in poster notice; `dpa-template.md` was
 brought up to date. All three are marked as drafts not yet reviewed by a
-lawyer; the review (P4-6) is still open and still blocks hosted mode.
+lawyer; the review (P4-6) is still open and still blocks hosted mode. *(2026-10-30:
+the lawyer approved the positions; the templates were rewritten to them (LEG-60
+onwards) and hosted mode now waits for the go-live checklist in
+`server/docs/DEPLOY.md`.)*
 
 **The notice is published, and consent is asked again (2026-10-28, decisions
 CONS-1 to CONS-6).** `ATALAIA_PRIVACY_NOTICE_DIR` holds the operator's
@@ -506,12 +515,17 @@ controller catching up); 258 controller tests in tools/check.sh (30 new:
 the client against a small in-process site server, privacy checked field by
 field over a game with check-ins, positions and tokens, TLS with a pinned
 CA, redirects refused, backoff; the shared checker against the vectors).
-Not yet: over a real 4G link with a VPS (HW1); the controller's stream
-client and the remote GM (plan phase 19); the other sync endpoints with
-their plan phases (chrono 14, check-ins and roster 16, field and branding
-18, presets 20); the history views (20). Decisions S13-1 to S13-12, all
-open; S13-8 (no controller stream client yet) and S13-12 (the request limit
-shared with sync) want the maintainer's eye.
+Not yet: over a real 4G link with a VPS (HW1); ~~the controller's stream
+client and the remote GM (plan phase 19)~~ (built 2026-10-20, a5fe1f07:
+`controller/atalaia_controller/ws_client.py` and `remote_gm.py`); ~~the other
+sync endpoints with their plan phases (chrono 14, check-ins and roster 16,
+field and branding 18, presets 20)~~ (built 2026-10-20: `/api/v1/sync/chrono`,
+`marshals`, `schedule`, `roster`, `claims`, `field`, `images`, `presets` and
+`scenarios` in `server/atalaia_server/api/sync.py`); ~~the history views
+(20)~~ (built 2026-10-20, 4d9a95c2: `GET /api/v1/fields/{id}/history`; the
+staff page since 2026-10-21, 22490ba8). Decisions S13-1 to S13-12, all
+open; S13-8 (no controller stream client yet; built since in plan phase 19)
+and S13-12 (the request limit shared with sync) want the maintainer's eye.
 
 ## Plan phase 14: chrono registry (built 2026-10-20, in software)
 
@@ -552,11 +566,14 @@ rotation against the site server under uvicorn); 37 of the server's tests
 run in tools/check.sh with no database; 270 controller tests (12 new: the
 registry's sync against the in-process site server, privacy with signed
 readings, the new shared vectors). Not yet: a real chronograph and phones
-(HW4); the account's adoption of a phone's player id (plan phase 16), so the
-own history and sharing have no real links yet; ~~the controller pulling other
+(HW4); ~~the account's adoption of a phone's player id (plan phase 16), so the
+own history and sharing have no real links yet~~ (built 2026-10-20, d8adebd3:
+`GET|POST /api/v1/me/player-ids` in `server/atalaia_server/api/registrations.py`); ~~the controller pulling other
 fields' records (`GET /api/v1/sync/chrono`, with plan phase 16's roster)~~ (built
 2026-10-27, see "Other fields' chrono records on the controllers" below); a
-controller's erasure reaching the site server by itself (S14-10). Decisions
+~~controller's erasure reaching the site server by itself (S14-10)~~ (built
+2026-10-28, 1b94443d: `POST /api/v1/sync/erasures`, the controller's
+`sync_client.py` `_push_erasures`, RET-4). Decisions
 S14-1 to S14-12, all open; S14-5 (sharing consent per field) and S14-10
 (erasure propagation) want the maintainer's eye.
 
@@ -592,7 +609,9 @@ and the JSON feed against its schema; 0006 with data; a setting); 57 of the
 server's tests (20 new) run in tools/check.sh with no database. Not yet:
 online registration, the roster and the check-in sync (plan phase 16), so the
 feed's `registration.open` stays false; the registration import (17); a
-deployment with its public address (22). Decisions S15-1 to S15-15, all
+deployment with its public address (22). *(Plan phases 16, 17 and 22 built
+since, in software, 2026-10-20; a real deployment with a public address is
+still not done.)* Decisions S15-1 to S15-15, all
 open; S15-10 (the public address) and S15-11 (the limit for calendar
 services) want the maintainer's eye.
 
@@ -638,12 +657,17 @@ a chrono pass, the outcomes); 296 controller tests (18 new:
 the console's browser tests (1 new: a game from the schedule, expected players,
 *Arrived*, a scanned ticket, the counts); the Dart ticket tests against the
 same vectors. Built since: the app's screens for logging in and the account
-(`app/lib/site/site_auth.dart`, `account_screen.dart`, `site_screens.dart`).
-Not yet: a real game day (HW1); `[sync] push_walkins`; the
+(`app/lib/site/site_auth.dart`, `account_screen.dart`, `site_screens.dart`);
+`[sync] push_walkins` (2026-11-04, decisions PWI-1 to PWI-10: the walk-ins as
+guest registrations, opt-in on both controllers, deleted 30 days after the
+game; tested with the shared `checkin_outcomes` vectors, both controllers'
+sync tests and the site server's `WalkinGuestTests`).
+Not yet: a real game day (HW1); the
 registration import (17). Decisions S16-1 to S16-14, all open; S16-4 (claims
 confirmed by the controller), S16-6 (the field's limit template set on both
 sides) and S16-9 (no registration form on the public pages) want the
-maintainer's eye.
+maintainer's eye. S16-9's "later also on the web pages" is built since
+2026-11-04 (WREG-*, below).
 
 ## Other fields' chrono records on the controllers (S14-5, built 2026-10-27, in software)
 
@@ -679,10 +703,13 @@ controller's `test_sync_schedule.py` (7 new) and the answer vectors, 2,078 Dart
 tests (5 new in `controller_sync_test.dart`, the vectors in
 `controller_sync_format_test.dart`); `tools/check.sh` green.
 
-Not yet: a real field pair (HW1); the app's own screens for the person's
-consent per field (the endpoints exist, `PUT /api/v1/me/consents/chrono-sharing/{field}`);
-the player's own view of other fields' records in the app; a browser test of the
-console's new list.
+Not yet: a real field pair (HW1); the player's own view of other fields'
+records in the app; a browser test of the console's new list. The app's
+screens for the person's consent per field and their own chrono history were
+built on 2026-11-04 (`app/lib/site/chrono_screens.dart`: *My chrono checks and
+sharing*, a switch per field, off until turned on and confirmed, withdrawn
+after a confirmation; `GET /api/v1/me/chrono`, `PUT`/`DELETE
+/api/v1/me/consents/chrono-sharing/{field}`; decisions APPS-1 to APPS-8).
 
 ## Plan phase 17: registration import and platform adapters, and the app's registration screens (built 2026-10-20, in software)
 
@@ -740,7 +767,11 @@ checking it again; a team the site drops leaves the controller), the
 migration's data test, and the controller's `test_sync_branding.py` against an
 in-memory site server; the shared vectors gain 2 valid and 9 invalid field
 answers. Not yet: a real deployment, the console's "from the site server"
-label. Decisions S18-1 to S18-12, all open.
+label. Decisions S18-1 to S18-12, all open. The club pages in the app (S18-11)
+were built on 2026-11-04 (`app/lib/site/clubs.dart`, `club_screens.dart`: the
+account's clubs, a club's page with its fields and members, memberships and
+invitations, making, changing and deleting a club, inviting, roles, leaving;
+images and moderation stay on the staff pages; decisions APPS-9 to APPS-16).
 
 ### Follow-up: the field's settings and branding changes on the stream (BR24, S18-11; 2026-10-27, in software)
 
@@ -772,7 +803,9 @@ firmware and core versions, tier, last seen; and the `node.online`,
 game, `GET /api/v1/games/{game}/devices` one game's nodes, for the field's admin
 and gm, with battery-low, offline, silent, tampered and outdated-firmware flags.
 A **firmware catalogue** (`/api/v1/firmware`, migration `0010_firmware`): a list
-only, no image stored or sent (OTA is not built); a server administrator adds a
+only, no image stored or sent (OTA was not built then; since 2026-10-21 the
+field controller serves the images to its boxes itself, see "Follow-up:
+over-the-air firmware updates" below; the site server still stores none); a server administrator adds a
 release only when a key in `ATALAIA_FIRMWARE_KEYS` signed it with Ed25519 (no key:
 no entries), every listing checks the signatures again, a withdrawn release stays
 marked, a pre-release is never the latest. The **remote GM**: a controller with
@@ -800,8 +833,10 @@ under uvicorn), the migration's data test, and the controller's
 `test_remote_gm.py` (its checks, its log, the live view, the stream against a
 raw-socket server, RFC 6455's own examples). Built later: the remote ATAK relay that
 M9-10 had deferred here (FU5, `atak_relay.py`), positions in the remote view
-(PKD-5) and a GM page on the site server (FU9, S19-11). Not built: the console's
-screen for the log.
+(PKD-5) and a GM page on the site server (FU9, S19-11). ~~Not built: the console's
+screen for the log.~~ Built 2026-10-26 (be9321a8): the GM console's remote GM log in
+the Controller tab, `controller/console/src/components/remote-gm-log.js`, from
+`GET /api/v1/remote-gm` (decision S19-11; SD-2 had missed it, SD-4).
 Not yet: a real deployment, over 4G (HW1). Decisions S19-1 to S19-11, all open.
 
 ## Follow-up: device health events (2026-10-21, in software)
@@ -1116,6 +1151,14 @@ The maintainer's lawyer approved the position (decisions LEG-*; ADR-P4-8's amend
 - **A disposable stack for an authorised security test (`tools/pentest_stack.py`)**: a hosted hub with two fields, a fake OpenID provider, throwaway accounts and a linked field controller, on 127.0.0.1 only; its field container's health check is the controller's own `/healthz` (PT-H). The runbook is `docs/runbooks/pentest-stack.md`. No outside penetration test has been done.
 - **Phase state lines** that called built work next or not built were corrected (SD-1 to SD-3): site login on iOS was the one item still not built. It is built since 2026-10-30 (IOSL-1 to IOSL-9, `app/ios/Runner/BrowserPlugin.swift` and `PasskeyPlugin.swift`): compiled by CI's `ios-build`, not run on an iPhone; passkeys are opt-in at build time (`ATALAIA_ENTITLEMENTS`, `ATALAIA_SITE_HOST`, the paid Apple program, `ATALAIA_APP_IOS_APP_IDS` on the server).
 
+## Game history shared across a hub's fields, by opt-in (HUBH-*, 2026-11-04, in software)
+
+Answers S20-8's "a field-wide history across fields" with the maintainer's decision of 2026-11-04 ("fields can choose to share their games or not, should be an opt-in"). In a hosted hub a field's admin turns on `fields.history_sharing_enabled` (migration `0031_hub_history`, off by default) on `/staff/fields/<field>/hub-history`; the field's ended games, as game-level results only (mode, start and end, team scores, winner, field name; never a player), are then shown to the staff of the other fields that share theirs (reciprocity), through two hub tables under the chrono sharing's row-level security and two `SECURITY DEFINER` functions; off withdraws everything at once; nothing outlives the field's own 365-day results. The hub's operator reads it with `hosted shared-history`. Tested in Docker against a three-field hub (isolation of a field that never opted in, as the field's database role and as the server's login role; withdrawal; suspension; the purge; `hosted check`; `hosted delete`) and in headless Chromium; not on a real hosted deployment. The privacy notice templates' new paragraph waits for the lawyer (HUBH-9).
+
 ## The hub link code page (2026-10-31)
 
 `/staff/account/hub-share` (decisions HLC-*): the staff-style page for SVX-2's link code that the app's screen (APF-4) already had. In a hosted hub a signed-in person makes a link code at one field, enters it at another, sees the other fields they are linked at, gives or withdraws this field's `chrono_sharing` consent, and unlinks; every refusal in words in four languages; linked from `/staff/account` only when `GET /me/hub-share` answers. The API grew `field`, `consent` and `others` in the `GET` answer and one more `SECURITY DEFINER` function, `atalaia_share_peers(uuid)` (`hosted migrate` makes it; `hosted check` and `drop_sql` know it). Tests: `tests/test_hub_share_page.py`, `tests/test_hub_share.py`, `tests/test_tenants.py`, `tests_browser/test_hubshare_browser.py` (the hub's four calls faked in the browser, as the browser tests run a single field).
+
+## Registering on the web pages (WREG, 2026-11-04, in software)
+
+What S16-9 left for later, now that social login and passkeys exist (LG-*): `/f/<slug>/games/<id>/register/web` (`server/atalaia_server/web/player_pages.py`, `player_i18n.py`, `static/player/register.js`), linked from the game's *Register* page next to the app's way. A player logs in with Google, Microsoft or Apple, a passkey, or the password (with its TOTP code) when the server takes passwords; a new account comes only from a social login with the privacy notice opened and ticked, the 16-or-older box and the notice's version, checked by the server as for the app (LEG-*, CONS-4). Then the app's form (name, team, the federation number or the field's membership rule, the pre-declared replicas), the same API (`POST .../registrations`, `/api/v1/me/registrations`), so the same checks and records (`source` `site`, the audit entries), and the ticket as a QR code drawn in the page (the console's vendored generator, copied) and as text, shown once, printable. Back on the page later: the registration, change, cancel, a new ticket, the way into the app, and a passkey for next time. The page is of the staff pages' kind: no data in the HTML, `no-store`, `noindex`, the CSP unchanged (no inline script), no cookie authorises a change (CSRF), every value as text. New: a social login may return to that page (`PLAYER_RETURN_TO`, only `?lang=`), and 20 registrations and new tickets an hour per account (WREG-5), app and web alike. Four languages. Tests: `server/tests/test_web_registration.py`, `server/tests_browser/test_register_browser.py` (Chromium). Not yet on a real deployment or an iPhone. Decisions WREG-1 to WREG-12, all open; WREG-11 asks the maintainer's lawyer about the privacy notice templates.

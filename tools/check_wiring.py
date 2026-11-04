@@ -39,6 +39,18 @@ with --resolve before drawing. The check fails when:
   (site/src/build.html, its cells marked data-kconfig) gives a GPIO that is
   not its Kconfig default, a pin no part may use, or leaves out a pin it must
   list (phase 5 plan phase 12);
+- the expansion port's pin table (hardware/expansion-port/BUILD.md and its
+  Portuguese BUILD.pt.md, the table after the marker PORT_MARKER) does not give
+  the M12 pin-out of decision EXP-1 (pin, wire colour and signal; SDA and SCL on
+  the box's I2C bus GPIOs and Kconfig options, nothing on pins 1, 3 and 5's GPIO
+  and option cells, pin 5 not connected), or the keypad expander's Kconfig
+  address falls in the expansion modules' range 0x58-0x5F (EXP-7: PORT_PINOUT,
+  EXPANSION_ADDRESSES below);
+- the I2C output module's pin table (hardware/output-module/BUILD.md and
+  BUILD.pt.md, the table after the marker OUTPUT_MARKER) does not give each pin
+  of firmware/output-module/src/board.h exactly once, on its GP number; or
+  board.h itself puts two pins on one GPIO, a pin outside GP0-GP29, SDA and SCL
+  off an i2c0 pair, or the supply sense off an ADC pin (OUTPUT_BOARD below);
 - a rendered SVG or PNG is missing, or an SVG was not rendered from the
   current source and Kconfig defaults (the render writes the SHA-256 of the
   resolved source into it).
@@ -87,6 +99,38 @@ GUIDES: dict[Path, tuple[str, ...]] = {
 GUIDE_CHOICE: dict[Path, frozenset[str]] = {
     REPO / "hardware" / "io-pod" / "BUILD.md": frozenset({"ATALAIA_POD_MODE"}),
 }
+# The expansion port's build guide (draft RFC "The expansion port", increment 10): the port uses no
+# GPIO of its own, so its only pins are the I2C bus's, behind the port board's buffer. Both languages
+# are checked: the table is the same in each, and only the colour and signal words differ.
+PORT_GUIDES = [REPO / "hardware" / "expansion-port" / "BUILD.md",
+               REPO / "hardware" / "expansion-port" / "BUILD.pt.md"]
+for _port_guide in PORT_GUIDES:
+    GUIDES[_port_guide] = ("ATALAIA_NFC_SDA_PIN", "ATALAIA_NFC_SCL_PIN")
+PORT_MARKER = "<!-- check_wiring: expansion-port-pins -->"
+# M12 pin -> (its wire colour in English and Portuguese, the signal cell's accepted words (None: not
+# connected), the Kconfig pin of its bus GPIO or None). Decision EXP-1 (P5J-20): 1 brown 3.3 V,
+# 2 white SDA, 3 blue GND, 4 black SCL, 5 grey reserved, not connected.
+PORT_PINOUT: dict[int, tuple[tuple[str, ...], tuple[str, ...] | None, str | None]] = {
+    1: (("brown", "castanho"), ("3.3 V", "3,3 V"), None),
+    2: (("white", "branco"), ("SDA",), "ATALAIA_NFC_SDA_PIN"),
+    3: (("blue", "azul"), ("GND",), None),
+    4: (("black", "preto"), ("SCL",), "ATALAIA_NFC_SCL_PIN"),
+    5: (("grey", "cinzento"), None, None),
+}
+# The I2C output module's build guide (draft RFC "The expansion port", increment 11): its RP2040 pins
+# are the firmware's own (board.h's OUT_PIN_* defines), not the box's Kconfig; each language's table
+# names each define in backticks next to its GP number ("| GP6 | `OUT_PIN_CH0` | ...").
+OUTPUT_BOARD = REPO / "firmware" / "output-module" / "src" / "board.h"
+OUTPUT_GUIDES = [REPO / "hardware" / "output-module" / "BUILD.md",
+                 REPO / "hardware" / "output-module" / "BUILD.pt.md"]
+OUTPUT_MARKER = "<!-- check_wiring: output-module-pins -->"
+OUTPUT_DEFINE = re.compile(r"^#define\s+(OUT_PIN_\w+)\s+(\d+)\b", re.MULTILINE)
+OUTPUT_SYMBOL = re.compile(r"`(OUT_PIN_\w+)`")
+RP2040_ADC_PINS = range(26, 30)
+# Expansion modules answer at 0x58-0x5F (EXP-7); the box's own parts and the keypad search stay out.
+EXPANSION_ADDRESSES = range(0x58, 0x60)
+BOX_ADDRESSES = {0x24: "the PN532", 0x36: "the battery gauge", 0x3C: "the board's OLED"}
+KEYPAD_SEARCH = (range(0x20, 0x28), range(0x38, 0x40))
 GUIDE_SYMBOL = re.compile(r"`(ATALAIA_\w+)`")
 # The project page's build page: <td data-kconfig="ATALAIA_BTN1_PIN">4</td>.
 SITE_CELL = re.compile(r'data-kconfig="(ATALAIA_\w+)"[^>]*>([^<]*)<')
@@ -564,6 +608,79 @@ def check_guide(name: str, text: str, required: tuple[str, ...], defaults: dict[
     return errors
 
 
+def check_port_table(name: str, text: str, defaults: dict[str, int]) -> list[str]:
+    """The expansion port's pin table: the M12 pin-out of EXP-1, the bus's GPIOs and options on SDA
+    and SCL, and nothing in the GPIO and option cells of pins 1, 3 and 5 (the GPIO cells themselves
+    are checked against Kconfig by check_guide, as every guide's are)."""
+    if PORT_MARKER not in text:
+        return [f"{name}: no pin table after the marker {PORT_MARKER!r}"]
+    errors: list[str] = []
+    seen: dict[int, int] = {}
+    in_table = False
+    for line in text.split(PORT_MARKER, 1)[1].splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            if in_table:
+                break
+            continue
+        in_table = True
+        cells = [c.strip() for c in stripped.strip("|").split("|")]
+        if not re.fullmatch(r"\d+", cells[0]):
+            continue  # the header and its rule
+        pin = int(cells[0])
+        if pin not in PORT_PINOUT:
+            errors.append(f"{name}: the port table has an M12 pin {pin}; the socket has pins 1-5")
+            continue
+        seen[pin] = seen.get(pin, 0) + 1
+        if len(cells) < 5:
+            errors.append(f"{name}: M12 pin {pin}'s row has fewer than 5 cells (pin, colour, signal, "
+                          "GPIO, firmware option)")
+            continue
+        colours, signals, symbol = PORT_PINOUT[pin]
+        colour, signal, gpio_cell, option = cells[1].lower(), cells[2], cells[3], cells[4]
+        if colour not in colours:
+            errors.append(f"{name}: M12 pin {pin} is {cells[1]!r}, EXP-1 gives {colours[0]}")
+        if signals is None:
+            if re.search(r"\d\s*V\b|SDA|SCL|GND", signal):
+                errors.append(f"{name}: M12 pin 5 is reserved and not connected (EXP-1), the table "
+                              f"says {signal!r}")
+        elif not any(word in signal for word in signals):
+            errors.append(f"{name}: M12 pin {pin}'s signal is {signal!r}, EXP-1 gives {signals[0]}")
+        found = GUIDE_SYMBOL.fullmatch(option)
+        if symbol is None:
+            if re.search(r"\d", gpio_cell) or GUIDE_SYMBOL.search(option):
+                errors.append(f"{name}: M12 pin {pin} is not a GPIO signal: its GPIO and firmware "
+                              f"option cells must be '--', not {gpio_cell!r} and {option!r}")
+        elif found is None or found.group(1) != symbol:
+            errors.append(f"{name}: M12 pin {pin} ({signals[0] if signals else ''}) is the box's I2C "
+                          f"bus: its firmware option must be `{symbol}`, not {option!r}")
+    for pin in PORT_PINOUT:
+        if pin not in seen:
+            errors.append(f"{name}: the port table has no row for M12 pin {pin}")
+        elif seen[pin] > 1:
+            errors.append(f"{name}: the port table has {seen[pin]} rows for M12 pin {pin}")
+    if defaults.get("ATALAIA_NFC_SDA_PIN") == defaults.get("ATALAIA_NFC_SCL_PIN"):
+        errors.append(f"{name}: SDA and SCL default to the same GPIO")
+    return errors
+
+
+def check_port_addresses(defaults: dict[str, int]) -> list[str]:
+    """The expansion modules' addresses (EXP-7) are clear of the box's parts and its keypad search."""
+    errors: list[str] = []
+    for address in EXPANSION_ADDRESSES:
+        if address in BOX_ADDRESSES:
+            errors.append(f"expansion modules' address 0x{address:02x} is {BOX_ADDRESSES[address]}'s")
+        if any(address in search for search in KEYPAD_SEARCH):
+            errors.append(f"expansion modules' address 0x{address:02x} is in the keypad search")
+        if address < 0x08 or address > 0x77:
+            errors.append(f"expansion modules' address 0x{address:02x} is an I2C reserved address")
+    keypad = defaults.get("ATALAIA_KP_I2C_ADDR")
+    if keypad is not None and keypad in EXPANSION_ADDRESSES:
+        errors.append(f"Kconfig: ATALAIA_KP_I2C_ADDR = 0x{keypad:02x}, in the expansion modules' range "
+                      "0x58-0x5F (EXP-7)")
+    return errors
+
+
 def check_site_build(text: str, required: set[str], defaults: dict[str, int],
                      internal: set[int]) -> list[str]:
     """The project page's build page: each cell marked data-kconfig holds that pin's GPIO."""
@@ -574,6 +691,76 @@ def check_site_build(text: str, required: set[str], defaults: dict[str, int],
         errors += check_pin(SITE_BUILD.name, symbol, cell.strip(), defaults, internal)
     errors += [f"{SITE_BUILD.name}: no data-kconfig cell for {s}" for s in sorted(required)
                if s not in seen]
+    return errors
+
+
+def read_output_board(text: str) -> dict[str, int]:
+    """board.h's OUT_PIN_* defines: symbol -> GP number."""
+    return {name: int(gp) for name, gp in OUTPUT_DEFINE.findall(text)}
+
+
+def check_output_board(pins: dict[str, int]) -> list[str]:
+    """The output module's pins themselves: one GPIO each, on the RP2040, the bus on an i2c0 pair,
+    the supply sense on an ADC pin."""
+    name = OUTPUT_BOARD.relative_to(REPO).as_posix()
+    errors: list[str] = []
+    if not pins:
+        return [f"{name}: no OUT_PIN_* define"]
+    for symbol in ("OUT_PIN_SDA", "OUT_PIN_SCL", "OUT_PIN_SUPPLY_SENSE", "OUT_PIN_LED",
+                   "OUT_PIN_JUMPER_A0", "OUT_PIN_JUMPER_A1", "OUT_PIN_CH0"):
+        if symbol not in pins:
+            errors.append(f"{name}: no {symbol}")
+    by_gp: dict[int, list[str]] = {}
+    for symbol, gp in pins.items():
+        by_gp.setdefault(gp, []).append(symbol)
+        if gp > 29:
+            errors.append(f"{name}: {symbol} is GP{gp}; the RP2040 has GP0-GP29")
+    for gp, symbols in sorted(by_gp.items()):
+        if len(symbols) > 1:
+            errors.append(f"{name}: {' and '.join(sorted(symbols))} are both GP{gp}")
+    sda, scl = pins.get("OUT_PIN_SDA"), pins.get("OUT_PIN_SCL")
+    if sda is not None and scl is not None and (sda % 4 != 0 or scl != sda + 1):
+        errors.append(f"{name}: SDA GP{sda} and SCL GP{scl} are not an i2c0 pair (GP0/1, GP4/5, ...)")
+    sense = pins.get("OUT_PIN_SUPPLY_SENSE")
+    if sense is not None and sense not in RP2040_ADC_PINS:
+        errors.append(f"{name}: OUT_PIN_SUPPLY_SENSE is GP{sense}, not an ADC pin (GP26-GP29)")
+    return errors
+
+
+def check_output_table(name: str, text: str, pins: dict[str, int]) -> list[str]:
+    """The output module's pin table: each board.h pin exactly once, its GP number in the cell
+    before its backticked name."""
+    if OUTPUT_MARKER not in text:
+        return [f"{name}: no pin table after the marker {OUTPUT_MARKER!r}"]
+    errors: list[str] = []
+    seen: dict[str, int] = {}
+    in_table = False
+    for line in text.split(OUTPUT_MARKER, 1)[1].splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            if in_table:
+                break
+            continue
+        in_table = True
+        cells = [c.strip() for c in stripped.strip("|").split("|")]
+        for i, cell in enumerate(cells):
+            m = OUTPUT_SYMBOL.fullmatch(cell)
+            if not m:
+                continue
+            symbol = m.group(1)
+            seen[symbol] = seen.get(symbol, 0) + 1
+            if symbol not in pins:
+                errors.append(f"{name}: the pin table names {symbol}, which board.h does not have")
+                continue
+            gp = re.fullmatch(r"GP(\d+)", cells[i - 1]) if i > 0 else None
+            if gp is None or int(gp.group(1)) != pins[symbol]:
+                errors.append(f"{name}: {symbol} is GP{pins[symbol]} in board.h, the table says "
+                              f"{cells[i - 1] if i > 0 else 'nothing'!r}")
+    for symbol in pins:
+        if symbol not in seen:
+            errors.append(f"{name}: the pin table has no row for {symbol}")
+        elif seen[symbol] > 1:
+            errors.append(f"{name}: the pin table has {seen[symbol]} rows for {symbol}")
     return errors
 
 
@@ -589,6 +776,15 @@ def check_guides(kconfig_path: Path) -> list[str]:
         guide_defaults = read_kconfig_defaults(kconfig_text, choice) if choice else defaults
         errors += check_guide(name, path.read_text(encoding="utf-8"), required, guide_defaults,
                               internal)
+    for path in PORT_GUIDES:
+        errors += check_port_table(path.relative_to(REPO).as_posix(),
+                                   path.read_text(encoding="utf-8"), defaults)
+    errors += check_port_addresses(defaults)
+    output_pins = read_output_board(OUTPUT_BOARD.read_text(encoding="utf-8"))
+    errors += check_output_board(output_pins)
+    for path in OUTPUT_GUIDES:
+        errors += check_output_table(path.relative_to(REPO).as_posix(),
+                                     path.read_text(encoding="utf-8"), output_pins)
     required_all = {s for symbols in GUIDES.values() for s in symbols}
     errors += check_site_build(SITE_BUILD.read_text(encoding="utf-8"), required_all, defaults,
                                internal)
@@ -787,8 +983,8 @@ def main(argv: list[str]) -> int:
     if errors:
         print(f"check_wiring: {len(errors)} problem(s)", file=sys.stderr)
         return 1
-    print("check_wiring: the wiring diagrams, the pin tables (Field Box, build guides, project "
-          "page) and the Kconfig defaults agree")
+    print("check_wiring: the wiring diagrams, the pin tables (Field Box, build guides, the "
+          "expansion port, the output module, project page) and the Kconfig defaults agree")
     return 0
 
 

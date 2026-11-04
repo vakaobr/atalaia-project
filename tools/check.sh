@@ -50,6 +50,14 @@ fi
 cmake -S core -B "$BUILD" -DCMAKE_BUILD_TYPE=Debug -DATALAIA_SHARED=ON -DATALAIA_STUB=ON
 cmake --build "$BUILD"
 ctest --test-dir "$BUILD" --output-on-failure
+# The expansion port's module core (firmware/module-core/): its vectors and state machine.
+cmake -S firmware/module-core -B "$BUILD/module-core" -DCMAKE_BUILD_TYPE=Debug
+cmake --build "$BUILD/module-core"
+ctest --test-dir "$BUILD/module-core" --output-on-failure
+# The I2C output module's portable firmware (firmware/output-module/), on the module core.
+cmake -S firmware/output-module -B "$BUILD/output-module" -DOUTPUT_MODULE_HOST_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
+cmake --build "$BUILD/output-module"
+ctest --test-dir "$BUILD/output-module" --output-on-failure
 export ATALAIA_CORE_LIB="$(cd "$BUILD" && pwd)/libatalaia_core.so"
 # The FFI stub: the simulator's ctypes structs are checked against its layout report.
 export ATALAIA_CORE_STUB_LIB="$(cd "$BUILD" && pwd)/libatalaia_core_stub.so"

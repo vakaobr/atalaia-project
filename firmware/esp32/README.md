@@ -714,7 +714,7 @@ channel's settings, its desired state and the rules; only the last step is the p
 | Limits | A call never runs past the channel's max on. A simple output changes state at most every 500 ms (EXP-30, EXP-36): a shorter pulse runs 500 ms, a pattern under 500 ms on or off is refused, an on within 500 ms of the last change is refused; an off never is. A script starts a channel at most twice a second (more are dropped, one `script.error` a game) |
 | Game state (EXP-29) | On only while a game runs. Every output off at boot, when the game pauses (not back on at the resume), when the sandbox halts the script, and when the game ends: before the mode's `game.end` handlers run, so an end-of-game horn they pulse is allowed, for at most **10 s** after the end (the field's CMD 12 too). The admin's test only between games |
 | Events | `output.switched` (`capability`, `ms`, `source`: `script`, `field`, `gm`, `box_admin`) for each start and each off before its time; nothing for what the game state turns off. In a field game it goes to the controller on the radio (`field_link_send_box_event`, normal priority), otherwise to the log |
-| HELLO and `node.modules` | HELLO's capabilities (key 6, `protocol/schema/capabilities.yaml`) list what the box has: button, keypad, display, led, audio, nfc, battery from the parts that started, and `output` (11) while an output is enabled. Once the controller acknowledges the HELLO the box sends `node.modules` with its enabled simple outputs, `g46:servo:siren` (EXP-36: no version, no feedback); a box with none sends nothing |
+| HELLO, `node.modules` and `node.outputs_disabled` | HELLO's capabilities (key 6, `protocol/schema/capabilities.yaml`) list what the box has: button, keypad, display, led, audio, nfc, battery from the parts that started, and `output` (11) while an output is enabled. Once the controller acknowledges the HELLO the box sends `node.modules` with its enabled simple outputs, `g46:servo:siren` (EXP-36: no version, no feedback; none enabled: no `node.modules`), and `node.outputs_disabled` with the ones fitted that its admin has not enabled, `g45:servo:horn`, then each module's output channels not enabled as its entry with only those ids, `5c:out4/1.0.0:siren.2,smoke`, or the empty text (EXPL-13, EXPL-20: `outputs_disabled_text`, `expansion_box_disabled_text`, `box_game.c` `box_game_disabled_text` and `tell_outputs_disabled`), again whenever that text changes; a box with no output fitted sends neither |
 
 **The simple output's signal** (`main/simple_out.c`, platform-free, host tests in
 `test/test_simple_out.c`; `main/simple_out_esp.c` on the ESP32): 50 Hz, **2.0 ms on, 1.0 ms off**.
@@ -735,7 +735,7 @@ part uses, the other revision's front-end pin and 45 with the buzzer (`#error` i
 `simple_out_esp.c`); `simple_out_pin_problem` checks the same at run time and in the host tests.
 A bench build has `@hang` (the game task stops for good: bench test 12, BRING_UP.md step 8b).
 
-**The host box** (`test/box_host`, `--simple-out siren[@GPIO]`, twice at most) runs the same layer
+**The host box** (`test/box_host`, `--simple-out siren[@GPIO][,disabled]`, twice at most; `,disabled`: fitted with that function, not enabled, so it is in `node.outputs_disabled` and not in `node.modules`, EXPL-13) runs the same layer
 and scheduler and prints the pulse train: `PULSE g46 t=<ms> width=<us> frames=<n> until=<ms>[ flush]`
 per burst and `PIN g46 low t=<ms>` when the last one has gone out; `status` adds `outputs`;
 `controller/tests/test_box_e2e.py` checks it against the real controller.
@@ -754,6 +754,53 @@ Static internal RAM left for the heap (`check_fw_ram.py`): 192,757 bytes before,
 191,333 with the buzzer (the 120 KiB floor holds). The bench image: 2,150,000 off, 2,152,752 on, 2,159,280
 with the buzzer. Every build 0 warnings; a bench build with `--simple-out=15` (the amplifier's LRCLK) stops
 at the compile-time check, as it should.
+
+## The expansion port's driver (draft RFC "The expansion port", increment 6)
+
+Modules plugged into the box's M12 port (a target plate's hits now; an output module later) answer the
+expansion port's protocol v1 (`protocol/expansion-port.md`) at 0x58-0x5F on the board's I2C bus. The box's
+driver is `main/expansion.c` (platform-free, host tests in `test/test_expansion.c`); on the ESP32 its bus is
+`main/expansion_esp.c`, over `hal/esp/hal_esp_i2c.c`, so a module gets the same 10 ms timeouts, health
+records and back-off as the keypad and the NFC reader (a suspended module's skipped poll counts as a failed
+read). Since increment 8 the game task runs it through `main/expansion_box.c` (below).
+
+| What | The driver |
+| --- | --- |
+| Finding modules | `expansion_start` at boot: every address probed, `ALL_OFF` to each module that answers before anything else, then its IDENT and every CHANNEL read (3 tries each) and `CLEAR_FRESH`. Then `expansion_tick` probes each empty address every 2 s, one every 250 ms in turn; a module found is read, sent `ALL_OFF` and `CLEAR_FRESH`, and added. At most 4. A refused IDENT keeps a module out until its address's next probe; a refused channel is not used |
+| Polling | STATUS every 20 ms for a module with inputs, every 250 ms for an output-only one, up to 4 reads while MORE. An event is reported once (`EXP_EVT_INPUT`, with `t_ms = t_read - age` on the box's clock and its capability id) and acknowledged; a sequence number seen again is a lost ACK, acknowledged again and not reported; an event of a channel the box has not armed (`expansion_arm`) is acknowledged and dropped. OVERFLOW (`EXP_EVT_OVERFLOW`), CMD_ERROR and LEASE_EXPIRED are counted and logged |
+| Restart and loss | FRESH: the IDENT read again; a different module there is the old one lost (`bad_ident`) and the new one added; the same one gets `CLEAR_FRESH` and its state again. A refused STATUS, a failed read and a skipped poll count as failed reads; 25 in a row (0.5 s, or 6 s for an output-only module) and the module is gone (`EXP_EVT_LOST`, `no_answer`): its outputs count as off and its desired state is dropped |
+| Outputs | `expansion_output` sets a channel's desired state (off, on until a time or until off, a pattern), sent at the next tick; each STATUS is compared with it and a difference sent again with what is left, rounded up to 100 ms. While an output should be on, `OUTPUT` or `LEASE 15` reaches the module at least every 500 ms, so it turns its outputs off within 1.5 s of the box stopping. The module's max on ends a desired on on the box's side too, a start during its min off is `EXP_TOO_SOON`, a relay's on waits 100 ms after its off, a pattern under the channel's floor (100 ms on a relay) is refused. `expansion_all_off` sends `ALL_OFF`. `expansion_backend_drive` is an `out_backend_t` drive for the output layer |
+| Capability ids and `node.modules` | `hit`, `hit.2`; an output's hint (`siren`, ...) or `out.<channel + 1>`, then `.2`; `expansion_modules_text` gives the modules' entries (`58:target/1.0.0:hit;5c:out4/1.0.0:siren,strobe,smoke,out.4`), whole entries within 100 bytes |
+
+The host tests run every case of `protocol/vectors/expansion.json` (`test/expansion_vectors.h` and
+`test/expansion_cases.h`, generated by `tools/protogen.py`), the **module core**
+(`firmware/module-core/`, through `test/module_sim.c`, a simulated module on that core behind a fake
+bus; it replaced increment 6's C model of a module) against every COMMAND case and the seven lease
+timelines, and the driver against simulated modules on a fake bus, four of the timelines written by the
+driver byte for byte. **Not yet tried on hardware.**
+
+### In the game (increment 8)
+
+`main/expansion_box.c` (platform-free; host tests in `test/test_expansion_box.c`) joins the driver to the
+box (decisions EXPI8-2 to EXPI8-7 and EXPI8-16 to EXPI8-18):
+
+| What | How |
+| --- | --- |
+| Start and tick | `shell.c` starts it at boot right after the outputs (every module `ALL_OFF` first, then read and added) and ticks it every 10 ms in the game task, after `outputs_tick`. A board whose I2C bus cannot be installed logs it and runs without modules |
+| Hits | Each hit of a module's hit channel reaches the mode's script as `hit.hit` with `{"strength": 0-255}` (plus `"channel": n`, the number of `hit.n`, on a box with more than one hit channel: draft RFC 0000 Amendment 5), only while a game runs; at any other moment it is acknowledged and dropped |
+| Arming | `cap("hit"):arm()` and `:disarm()` (and `hit.2`, ...) go to `expansion_box_command` from the node runner; they are kept by capability id, so a target plugged in mid-game is armed at once. The plates are armed only while a game runs (paused: disarmed, so a hit then never counts); a game's end forgets what was armed |
+| HELLO and `node.modules` | HELLO lists `hit` (type 10) while a module has a hit channel when the box joins. `node.modules` is one text: the enabled simple outputs, then the modules in address order, whole entries within 100 bytes (`g46:servo:siren;58:target/1.0.0:hit`); `box_game.c` sends it after the HELLO is acknowledged and again whenever it changes, to nothing too |
+| `node.module_lost` | Critical, `{"modules": "<its entry>", "reason": "no_answer"\|"bad_ident"}`, when a module goes during a running or paused game |
+| A module's outputs | Each output channel joins the output layer (`outputs_add_module`) after the simple outputs, **disabled** until its admin enables it at the box (EXP-28; kept in RAM: a restart or a re-plug starts it disabled again), at most the module's max on, with the module's hint as its function; the output layer names them beside the simple outputs (a module's `siren` beside a simple output's is `siren.2`) and the driver's entry follows. Their back-end is `expansion_box_backend_set`: the desired state passes whole (on until a time, a pattern) to `expansion_output`, so the module runs its own timers; a module's relay takes patterns down to 100 ms (a simple output: 500 ms). A lost module's channels leave the layer |
+| The console and the log | `@modules` lists the modules (`[{"address":"58","model":"target","fw":"1.0.0","caps":["hit"],"armed":1,"events":3,"polls":...}]`); the log says `expansion: 0x58 added: ...`, `lost (no_answer)`, `hit hit, strength n`. `@outputs` and the picker's **Outputs** name a module's channel `module 5c channel 2` (`I2C 5c/2` on the screen) |
+
+The **host box** takes `--module target|out4[@ADDR]` (up to four): modules simulated on the real module core
+(`firmware/module-core/`, through `test/module_sim.c`) behind a fake I2C bus, `hit <addr> <strength>`,
+`unplug <addr>` and `plug <addr>` on stdin, and a `"modules"` array in its status line;
+`controller/tests/test_box_e2e.py` plays *Target Windows* on it with a target module (HELLO's `hit`, the
+node list's module, hits scoring, `node.module_lost`, the module back and armed). The Field Box image with
+the port in the game task: 2,187,200 bytes, 48 % of its 4 MB slot free, 0 warnings. The target module's
+own firmware is [`firmware/target-module/`](../target-module/README.md).
 
 ## Partition Table
 

@@ -11,7 +11,7 @@
     python -m atalaia_server demo reviewer --username NAME --out FILE
     python -m atalaia_server feedback list [--status new|seen|done|all] [--json]
     python -m atalaia_server purge [--dry-run]
-    python -m atalaia_server hosted init|create|list|migrate|check|suspend|resume|export|delete ...
+    python -m atalaia_server hosted init|create|list|migrate|check|suspend|resume|export|delete|shared-history ...
     python -m atalaia_server import-field FILE.zip
     python -m atalaia_server atak issue --field SLUG --device NAME [--days N] --out FILE.zip
     python -m atalaia_server atak list --field SLUG
@@ -79,6 +79,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import getpass
+import json
 import os
 import sys
 import time
@@ -571,6 +572,11 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("slug", nargs="?")
     p = hsub.add_parser("quota-hits", help="the fields the server refused for a quota: into the audit log, shown")
     p.add_argument("--actor")
+    p = hsub.add_parser("shared-history", help="the game history the fields that opted in share (HUBH-*; audited)")
+    p.add_argument("slug", nargs="?", help="one field only")
+    p.add_argument("--limit", type=int, default=50, help="the newest games shown (1-1000, 50 by default)")
+    p.add_argument("--json", action="store_true", help="print JSON")
+    p.add_argument("--actor")
     p = hsub.add_parser("domain", help="a field's custom host name: set, verify (DNS TXT challenge), remove (PKC-6)")
     p.add_argument("domain_action", choices=hosted.DOMAIN_ACTIONS)
     p.add_argument("slug")
@@ -618,6 +624,24 @@ def _run_domain(args: argparse.Namespace, url: str, actor: Optional[str], out: T
         host = asyncio.run(hosted.remove_custom_domain(url, args.slug, args.reason or "", actor))
         print(f"Removed {host} from {args.slug}." if host else f"The field {args.slug} had no custom host name.",
               file=out)
+
+
+def _print_shared_history(found: dict[str, Any], as_json: bool, out: TextIO) -> None:
+    """``hosted shared-history``: the sharing fields, then their games (game-level results only, HUBH-7)."""
+    if as_json:
+        print(json.dumps(found, default=lambda v: v.isoformat() if hasattr(v, "isoformat") else str(v), indent=2,
+                         sort_keys=True), file=out)
+        return
+    if not found["fields"]:
+        print("No field shares its game history (it is off by default; each field's admin turns it on).", file=out)
+        return
+    for f in found["fields"]:
+        print(f"{f['slug']}\t{f['status']}\t{f['field_name']}\tsharing since {f['since'].isoformat()}\t"
+              f"{f['games']} {'game' if f['games'] == 1 else 'games'}", file=out)
+    for g in found["games"]:
+        scores = ", ".join(f"{t.get('team')} {t.get('score')}" for t in g["teams"] if isinstance(t, dict))
+        print(f"  {g['ended_at'].isoformat()}\t{g['slug']}\t{g['mode_id']}\t{scores}\t"
+              f"winner {g['winner'] or '-'}", file=out)
 
 
 def run_hosted(args: argparse.Namespace, url: str, out: TextIO) -> None:
@@ -677,6 +701,8 @@ def run_hosted(args: argparse.Namespace, url: str, out: TextIO) -> None:
         for g in groups:
             print(f"{g['slug']}: refused for {g['quota']} (limit {g['limit']}), {g['count']} {'note' if g['count'] == 1 else 'notes'}, "
                   f"{g['first'].isoformat()} to {g['last'].isoformat()}; recorded in the hub's audit log.", file=out)
+    elif action == "shared-history":
+        _print_shared_history(asyncio.run(hosted.shared_history(url, args.slug, args.limit, actor)), args.json, out)
     elif action == "domain":
         _run_domain(args, url, actor, out)
     elif action in ("suspend", "resume"):

@@ -121,13 +121,17 @@
                                 # commands (plan phase 19, P4R12); every command is logged here
     library = true              # install the field's scenario library and game presets from the
                                 # site server (plan phase 20), on every controller of the field
+    push_walkins = false        # true: after a game made from a scheduled game, also push its walk-ins
+                                # (players without a registration) as guest registrations: player id,
+                                # display name, declarations' states; the site server deletes them 30
+                                # days after the game (ADR-P4-8's guest rule). false: a count only
 
     [firmware]                  # firmware updates for the Field Boxes (protocol/firmware-update.md,
                                 # firmware_updates.py): the GM uploads a signed release in the console
                                 # and starts an update per box or for all, never during a game
     release_keys = [...]        # Ed25519 public keys (standard base64, 44 characters each, at most 8;
                                 # from the environment, separated by commas) whose releases the
-                                # controller accepts; default: the project's three release keys
+                                # controller accepts; default: the project's two release keys
                                 # (docs/community/keys.md); empty: no release is accepted. A box checks the
                                 # signature again with the keys built into its own firmware
     dir = ""                    # where the images are kept; empty: "firmware" next to db_path
@@ -199,12 +203,12 @@ from . import REPO_ROOT
 # default of the boxes' CONFIG_ATALAIA_MODE_KEYS, so they are the default of [modes] box_keys too.
 # A field trusts them for its own installs only by listing them in [modes] keys.
 # The project's release keys (docs/community/keys.md): root 424d053af5cdbc35, held offline by the
-# maintainer, CI 32b3c815ac30ad43, which signs the GitHub releases, and the next CI key
-# a4f6002b0122b131, which takes over from it (firmware/esp32/docs/RELEASE_SIGNING.md, "Rotating the CI
-# key"). They are the default of the boxes' CONFIG_ATALAIA_OTA_RELEASE_KEYS, so the default of
-# [firmware] release_keys too.
-PROJECT_RELEASE_KEYS = ("5tzPkN0AJSn+g34CP59linCRf/fcaWFc7GAAg7qzYNc=", "rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw=",
-                        "76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=")
+# maintainer, and the CI key a4f6002b0122b131 (the next CI key of the 2026-11 rotation), which signs
+# the GitHub releases (firmware/esp32/docs/RELEASE_SIGNING.md, "Rotating the CI key"; the first CI key
+# was dropped at its step 3). They are the default of the boxes' CONFIG_ATALAIA_OTA_RELEASE_KEYS, so the
+# default of [firmware] release_keys too. Nothing stores the default: a Pi without release_keys in its
+# controller.toml takes this list at its next start, and one that lists them keeps its own list.
+PROJECT_RELEASE_KEYS = ("5tzPkN0AJSn+g34CP59linCRf/fcaWFc7GAAg7qzYNc=", "76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=")
 PROJECT_MODE_KEYS = ("I+m3rO++TcVNhvDHzI28pkNA8UGoTJSi84IWQguq4Mo=", "0nMp0OGboGJZUMsbc/ykqkxQFNdmI/a2k4nQ6YsdTIY=")
 
 SECTIONS = {
@@ -217,7 +221,7 @@ SECTIONS = {
     "mqtt": ("enabled", "host", "port", "username", "password", "tls_export_dir"),
     "join": ("key",),
     "sync": ("enabled", "url", "api_key", "ca_file", "interval_game_s", "interval_idle_s", "timeout_s",
-             "branding", "remote_gm", "library"),
+             "branding", "remote_gm", "library", "push_walkins"),
     "checkin": ("field_id", "field_name", "operator", "confirm", "federation", "federation_label",
                 "country", "apd_checkin", "apd_expiry", "apd_accepted", "max_replicas", "max_players", "chrono_valid_for",
                 "rate_per_minute", "urls",
@@ -316,6 +320,7 @@ class Config:
     sync_branding: str = "local"  # "local" (the console's) or "site" (pulled from the site server)
     sync_remote_gm: bool = False  # the remote GM through the site server's stream (plan phase 19)
     sync_library: bool = True  # pull the field's scenarios and presets from the site server (plan phase 20)
+    sync_push_walkins: bool = False  # push walk-ins as guest registrations (decisions PWI-*); off: a count only
     # [atak]
     atak_enabled: bool = False
     atak_multicast: str = "239.2.3.1:6969"

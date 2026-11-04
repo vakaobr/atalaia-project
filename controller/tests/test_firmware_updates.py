@@ -784,10 +784,14 @@ class ConfigTests(unittest.TestCase):
         from atalaia_controller.config import PROJECT_RELEASE_KEYS, load_config  # noqa: PLC0415
         from atalaia_controller.firmware_release import key_id  # noqa: PLC0415
 
-        # docs/community/keys.md: root 424d053af5cdbc35, CI 32b3c815ac30ad43, next CI a4f6002b0122b131.
-        self.assertEqual([key_id(k) for k in PROJECT_RELEASE_KEYS],
-                         ["424d053af5cdbc35", "32b3c815ac30ad43", "a4f6002b0122b131"])
+        # docs/community/keys.md: root 424d053af5cdbc35 and CI a4f6002b0122b131 (the next CI key of the
+        # 2026-11 rotation; the first CI key was dropped at its step 3).
+        self.assertEqual([key_id(k) for k in PROJECT_RELEASE_KEYS], ["424d053af5cdbc35", "a4f6002b0122b131"])
         self.assertEqual(load_config(None, {}).firmware_release_keys, list(PROJECT_RELEASE_KEYS))
+        # The example controller.toml lists the same keys (many Pis copied it, so the old CI key's
+        # removal there is what the manuals tell the operators to repeat).
+        example = load_config(str(REPO / "controller" / "controller.example.toml"), env={})
+        self.assertEqual(example.firmware_release_keys, list(PROJECT_RELEASE_KEYS))
         self.assertEqual(load_config(None, {"ATALAIA_FIRMWARE_RELEASE_KEYS": SIGNING["public_key_b64"]}
                                      ).firmware_release_keys, [SIGNING["public_key_b64"]])
 

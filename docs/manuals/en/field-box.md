@@ -172,8 +172,20 @@ What the box does:
 - An output never stays on longer than the time you set. It changes at most every half second.
 - If the box stops working, loses power or restarts, the switch loses its signal and turns off within about a second.
 - The GM sees the box's outputs in the console (a chip under the box, marked **not checked**, and the **Outputs** list on the **Game** tab) and can turn one on for a few seconds during the game, turn it off, or turn every output off at once ([GM manual, Outputs](game-master.md#outputs)).
+- When it joins a game, the box also tells the console which outputs are fitted but **not enabled**. The GM then sees **horn · fitted, not enabled by the box's admin** under the box, and a note before the start if the game would use that output, so they can ask you to enable it here. A disabled output still never fires.
 
 **Safety.** Only low-voltage devices on their own battery (at most 24 V). **Never** mains. A smoke machine only through its low-voltage remote input; never pyrotechnics. Hearing protection near sirens and horns. Smoke never in a closed room without the venue's approval. Before its first game, the builder checks each switch: it must turn off when its cable is pulled ([build manual, section 9.10](../../../hardware/field-box/BUILD.md#910-simple-output-optional)).
+
+### A target on the expansion port
+
+A box built with an **expansion port** (an M12 socket, [port guide](../../../hardware/expansion-port/BUILD.md)) takes a **target**: a plate that players shoot at, with a sensor and a small board of its own behind it, on a cable of up to 2 m ([target guide](../../../hardware/target-addon/BUILD.md)). The game *Target Windows* uses it: the box lights up in a team's colour for a few seconds, and a hit on the plate then scores for that team. Not yet tried on hardware.
+
+1. **Plug the target in before the box joins the game** (with the box on or off). The box finds it within 2 seconds; plugged in later, the box still finds it, and the game uses it at once.
+2. The GM's console shows it as a chip under the box: **target 1.0.0: hit**.
+3. During *Target Windows* the target counts hits only while the game runs: not before it starts, not while it is paused, not after it ends.
+4. If the cable comes out during the game, the GM's log says **box-4 lost a module: 58:target/1.0.0:hit (it stopped answering)**. Plug it back in: it carries on at once.
+
+**Safety.** Eye and face protection for everyone within range of the target, the plate angled down so BBs go to the ground, and never shoot at the box, the cable or the target's enclosure: only at the plate. The field's power limits apply to targets as to players.
 
 *Medic Kit* and *Hacking Terminal* do not follow the box language. Each takes its screen language from its own **Language** setting in the game; left empty, it is the game's language. *VIP / Payload* follows the box language, like the other modes (its old **Language** setting is no longer used).
 
@@ -249,7 +261,7 @@ An Android phone can be a box too. In the app choose **Game prop**, then **Join 
 | **PIN locked · try again in N min** | Wait. The count survives a restart. Do not keep guessing. |
 | The box rebooted in a game | It comes back in the same game. The organisers see **node.rebooted** in their log, with the reason the box gives (power, brownout, software, panic, watchdog); the console's feed says **A box crashed and restarted** for a program crash or a watchdog reset. A flaky keypad or screen wire no longer reboots a box: the failing part is set aside for a while and the game goes on (a keypad then reads as no key). |
 | The small screen is dark | Ask the builder. The big screen can still work. |
-| The siren (or strobe, smoke) never comes on | Enable the output at the box (admin PIN, **Outputs**) and give it the use the game asks for. It works only during a game, or with the 1-second test between games. Check the switch's own battery. |
+| The siren (or strobe, smoke) never comes on | If the console says **fitted, not enabled by the box's admin**, enable the output at the box (admin PIN, **Outputs**). Give it the use the game asks for. It works only during a game, or with the 1-second test between games. Check the switch's own battery. |
 | A switch stays on when the box is off | Stop using that switch: it must turn off when it loses its signal. Ask the builder. |
 | The pod's siren never comes on | The pod was built without the output, or with another use than the game asks for (ask the builder); the pod is not linked; no game running. |
 | The pod's output goes off by itself | The phone stopped talking to the pod (the app was sent to the background or closed) or the link dropped. Link again; keep the app in the foreground. |

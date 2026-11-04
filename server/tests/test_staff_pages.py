@@ -48,6 +48,8 @@ PAGES = {
     "settings": f"/staff/fields/{FIELD}/settings",
     # HLC-*
     "hubshare": "/staff/account/hub-share",
+    # HUBH-*
+    "hubhistory": f"/staff/fields/{FIELD}/hub-history",
 }
 
 
