@@ -679,10 +679,13 @@ controller's `test_sync_schedule.py` (7 new) and the answer vectors, 2,078 Dart
 tests (5 new in `controller_sync_test.dart`, the vectors in
 `controller_sync_format_test.dart`); `tools/check.sh` green.
 
-Not yet: a real field pair (HW1); the app's own screens for the person's
-consent per field (the endpoints exist, `PUT /api/v1/me/consents/chrono-sharing/{field}`);
-the player's own view of other fields' records in the app; a browser test of the
-console's new list.
+Not yet: a real field pair (HW1); the player's own view of other fields'
+records in the app; a browser test of the console's new list. The app's
+screens for the person's consent per field and their own chrono history were
+built on 2026-11-04 (`app/lib/site/chrono_screens.dart`: *My chrono checks and
+sharing*, a switch per field, off until turned on and confirmed, withdrawn
+after a confirmation; `GET /api/v1/me/chrono`, `PUT`/`DELETE
+/api/v1/me/consents/chrono-sharing/{field}`; decisions APPS-1 to APPS-8).
 
 ## Plan phase 17: registration import and platform adapters, and the app's registration screens (built 2026-10-20, in software)
 

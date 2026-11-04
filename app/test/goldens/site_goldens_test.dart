@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Online registration's screens (lib/site/, decision S16-13) in European
-// Portuguese and English on a 360x780 phone: the login at a site, the
-// field's games, the registration form with replicas, the kept ticket.
+// Online registration's screens (lib/site/, decision S16-13) in every
+// language on a 360x780 phone: the login at a site, the field's games, the
+// registration form with replicas, the kept ticket; the player's chrono
+// records with the consent per field (APPS-*).
 
 @Tags(['golden'])
 library;
@@ -11,6 +12,7 @@ library;
 import 'package:atalaia_app/checkin/my_replicas.dart';
 import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/site/account_screen.dart';
+import 'package:atalaia_app/site/chrono_screens.dart';
 import 'package:atalaia_app/site/hub_share.dart';
 import 'package:atalaia_app/site/privacy_notice.dart';
 import 'package:atalaia_app/site/privacy_screens.dart';
@@ -160,6 +162,36 @@ void main() {
       await tester.tap(find.byKey(const Key('hub-make')));
       await tester.pumpAndSettle();
       await snap(tester, 'hub_share', lang);
+    });
+
+    testWidgets('my chrono records and the consent per field (${lang.code})', (
+      tester,
+    ) async {
+      final site = FakeSite();
+      site.consentRecords.add({
+        'purpose': 'chrono_sharing',
+        'field_id': '0192f3a0-0000-7000-8000-00000000f2e2',
+        'withdrawn_at': null,
+      });
+      final h = await start(tester, site);
+      final session = h.services.sites.of(link.site);
+      await tester.pumpWidget(h.app(home: MyChronoScreen(session: session)));
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -300));
+      await tester.pumpAndSettle();
+      await snap(tester, 'my_chrono', lang);
+    });
+
+    testWidgets('one field\'s chrono records (${lang.code})', (tester) async {
+      final site = FakeSite();
+      final h = await start(tester, site);
+      await tester.pumpWidget(
+        h.app(
+          home: MyChronoFieldScreen(MyChronoField(site.chronoFields.first)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await snap(tester, 'my_chrono_field', lang);
     });
 
     testWidgets('registering (${lang.code})', (tester) async {

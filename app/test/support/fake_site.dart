@@ -295,6 +295,130 @@ class FakeSite {
   /// The code another field made, which `link` takes (once).
   var otherFieldCode = 'ABCD-EFGH-JKLM';
 
+  // --- the player's chrono history and sharing consents (api/me.py) -------------
+  /// `GET /me/chrono`'s fields: Campo Norte with two readings, a replica and
+  /// a violation; Campo Sul with nothing but the player id.
+  final chronoFields = <Map<String, Object?>>[
+    {
+      'field_id': '0192f3a0-0000-7000-8000-00000000f1e1',
+      'field': 'Campo Norte',
+      'player_id': 'p-sitemade2345',
+      'readings': [
+        {
+          'reading_id': 'r-1',
+          'replica_id': 'rep-1',
+          'type': 'checkin',
+          'velocity_mps': 98.5,
+          'bb_weight_g': 0.25,
+          'energy_j': 1.21,
+          'outcome': 'pass',
+          'timestamp': '2026-10-10T09:00:00+00:00',
+        },
+        {
+          'reading_id': 'r-2',
+          'replica_id': 'rep-1',
+          'type': 'spotcheck',
+          'velocity_mps': 110.0,
+          'bb_weight_g': 0.25,
+          'energy_j': 1.51,
+          'outcome': 'fail',
+          'timestamp': '2026-10-10T11:30:00+00:00',
+        },
+      ],
+      'replicas': [
+        {
+          'replica_id': 'rep-1',
+          'type': 'aeg',
+          'class': 'rifle',
+          'make_model': 'Tokyo Marui M4',
+        },
+      ],
+      'violations': [
+        {
+          'id': 'v-1',
+          'violation_type': 'over_limit',
+          'energy_j': 1.51,
+          'limit_j': 1.49,
+          'outcome': 'warning',
+          'ban_active': false,
+          'ban_expires_at': null,
+          'created_at': '2026-10-10T11:31:00+00:00',
+        },
+      ],
+      'refused_readings': [
+        {'reason': 'bad_signature', 'times': 2},
+      ],
+    },
+    {
+      'field_id': '0192f3a0-0000-7000-8000-00000000f2e2',
+      'field': 'Campo Sul',
+      'player_id': 'p-south000001',
+      'readings': <Object?>[],
+      'replicas': <Object?>[],
+      'violations': <Object?>[],
+      'refused_readings': <Object?>[],
+    },
+  ];
+
+  /// Every consent record, as `consents` in `GET /me/data` lists them.
+  final consentRecords = <Map<String, Object?>>[];
+
+  /// Fields `PUT /me/consents/chrono-sharing/{field}` knows (else 404).
+  late final knownFields = <String>{
+    fieldId,
+    '0192f3a0-0000-7000-8000-00000000f2e2',
+  };
+
+  Set<String> get liveConsents => {
+    for (final c in consentRecords)
+      if (c['purpose'] == 'chrono_sharing' && c['withdrawn_at'] == null)
+        '${c['field_id']}',
+  };
+
+  SiteResponse? _chrono(String method, String path) {
+    if (method == 'GET' && path == '/me/chrono') {
+      return SiteResponse(200, {'fields': chronoFields});
+    }
+    final m = RegExp(r'^/me/consents/chrono-sharing/([0-9a-f-]+)$')
+        .firstMatch(path);
+    if (m == null) return null;
+    final field = m.group(1)!;
+    final live = consentRecords.where(
+      (c) =>
+          c['purpose'] == 'chrono_sharing' &&
+          c['field_id'] == field &&
+          c['withdrawn_at'] == null,
+    );
+    if (method == 'PUT') {
+      if (!knownFields.contains(field)) {
+        return const SiteResponse(404, {'detail': 'field_not_found'});
+      }
+      final fresh = live.isEmpty;
+      if (fresh) {
+        consentRecords.add({
+          'purpose': 'chrono_sharing',
+          'field_id': field,
+          'notice_version': '2026-11',
+          'given_at': '2026-11-04T10:00:00+00:00',
+          'withdrawn_at': null,
+        });
+      }
+      return SiteResponse(fresh ? 201 : 200, {
+        'purpose': 'chrono_sharing',
+        'field_id': field,
+        'given': true,
+      });
+    }
+    if (method == 'DELETE') {
+      if (live.isEmpty) {
+        return const SiteResponse(404, {'detail': 'consent_not_found'});
+      }
+      live.first['withdrawn_at'] = '2026-11-04T11:00:00+00:00';
+      return const SiteResponse(204, null);
+    }
+    return null;
+  }
+
   SiteResponse? _noticeAndHub(
     String method,
     String path,
@@ -704,6 +828,8 @@ class FakeSite {
     if (login != null) return login;
     final own = _noticeAndHub(method, path, b);
     if (own != null) return own;
+    final chrono = _chrono(method, path);
+    if (chrono != null) return chrono;
     final regPath = RegExp(
       r'^/fields/([0-9a-f-]+)/scheduled-games/([0-9a-f-]+)/registrations$',
     ).firstMatch(path);
@@ -787,9 +913,13 @@ class FakeSite {
       case 'GET /fields-by-slug/campo-norte':
         return SiteResponse(200, {'field': _field(), 'games': games});
       case 'GET /me/data':
-        // Only the part the app reads: the player's own game history
-        // (services/history.player_history), oldest first.
-        return SiteResponse(200, {'game_history': history});
+        // Only the parts the app reads: the player's own game history
+        // (services/history.player_history), oldest first, and the consents
+        // (withdrawn ones stay, with their withdrawn_at).
+        return SiteResponse(200, {
+          'game_history': history,
+          'consents': consentRecords,
+        });
       case 'GET /me/registrations':
         return SiteResponse(200, [for (final r in regs.values) _regJson(r)]);
       case 'GET /me/player-ids':
