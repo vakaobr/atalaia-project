@@ -1706,6 +1706,20 @@ static void test_outputs_link_loss(void)
     /* The link is still up, so the switch keeps seeing a live off (1.0 ms) until it goes. */
     advance(600);
     CHECK(!level(0) && last_burst(0)->width == SO_OFF_US && outs.quiet_offs == 1);
+    /* A frame handled after the caller read its clock (heard a few ms after "now", as the host
+     * pod's loop does it): the phone was just heard, not silent for 49 days (ROB-5). */
+    setup_outputs();
+    phone_send_vector(POD_LINK_USB, "siren_pulse");
+    advance(100);
+    CHECK(level(0));
+    pod_outputs_tick(&outs, pod_phone_on(&pod), clock_ms + 3, clock_ms);
+    CHECK(level(0) && outs.quiet_offs == 0);
+    pod_outputs_tick(&outs, pod_phone_on(&pod), clock_ms + 1, clock_ms + 1);
+    CHECK(level(0) && outs.quiet_offs == 0);
+    /* ... and the lease still runs from the latest frame. */
+    advance(POD_OUT_QUIET_MS + 20);
+    CHECK(!level(0) && outs.quiet_offs == 1);
+    advance(600);
     /* It speaks again: outputs switch again. */
     phone_send_vector(POD_LINK_USB, "cmd_ping");
     advance(10);

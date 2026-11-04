@@ -304,9 +304,16 @@ class BoxHost:
     def hold(self, button: int, ms: int) -> None:
         self.send(f"hold {button} {ms}")
 
-    def logged(self, needle: str) -> bool:
+    def logged(self, needle: str, since: int = 0) -> bool:
+        """Whether a line from ``lines[since:]`` holds ``needle``, as read so far. A line the box
+        prints right after READY (its boot screen) may not be read yet when ``start()`` returns:
+        wait for it with ``wait_logged``."""
         with self._cond:
-            return any(needle in line for line in self.lines)
+            return any(needle in line for line in self.lines[since:])
+
+    def wait_logged(self, needle: str, since: int = 0, timeout: float = 5.0) -> bool:
+        """Waits (as ``wait_for``) for a line from ``lines[since:]`` with ``needle``."""
+        return wait_for(lambda: self.logged(needle, since), timeout)
 
     def status(self, timeout: float = 3.0) -> dict:
         import json

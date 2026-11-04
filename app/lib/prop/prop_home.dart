@@ -166,11 +166,26 @@ class _PropHomeScreenState extends State<PropHomeScreen> {
             onPressed: _join,
           ),
           SectionTitle(s.t('pod.title')),
-          if (_podLink?.phase == PodLinkPhase.reconnecting)
+          if (_podLink?.phase == PodLinkPhase.reconnecting &&
+              _podLink!.repairing)
+            Notice(
+              s.t('pod.repair'),
+              kind: NoticeKind.warning,
+              key: const Key('pod-repairing'),
+            )
+          else if (_podLink?.phase == PodLinkPhase.reconnecting)
             Notice(
               s.t('pod.reconnecting', {'n': _podLink!.attempt}),
               kind: NoticeKind.warning,
               key: const Key('pod-reconnecting'),
+            )
+          else if (_podLink?.phase == PodLinkPhase.relink)
+            Notice(
+              s.t('pod.relink', {
+                'why': s.t(_podLink!.relinkMessage ?? 'pod.repair_manual'),
+              }),
+              kind: NoticeKind.error,
+              key: const Key('pod-relink'),
             )
           else if (_podLink?.phase == PodLinkPhase.refused)
             Notice(
