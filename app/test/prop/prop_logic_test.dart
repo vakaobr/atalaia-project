@@ -161,6 +161,39 @@ void main() {
       expect(map.offers(respawn, 'team_input'), isTrue);
     });
 
+    test("HELLO's type ids: the screen's parts, the speaker and what the "
+        'pod lends, never what the shell gives no mode', () {
+      final phone = CapabilityMap.of(
+        const DeviceFeatures(
+          location: true,
+          accelerometer: true,
+          camera: true,
+          vibrator: true,
+        ),
+      );
+      // button 1 (the screen's team buttons), keypad 2, display 3, led 4
+      // (the ring and the team light), audio 5, gps 8.
+      expect(phone.helloTypes, [1, 2, 3, 4, 5, 8]);
+      final withPod = CapabilityMap.of(
+        const DeviceFeatures(touchscreen: false),
+        pod: const PodIdent(
+          fwVersion: '0.8.0',
+          capabilities: [
+            {'id': 'btn.red', 'type': 'button', 'team': 'red'},
+            {'id': 'keypad', 'type': 'keypad'},
+            {'id': 'ring', 'type': 'led'},
+            {'id': 'nfc', 'type': 'nfc'},
+            {'id': 'case', 'type': 'tamper'},
+            {'id': 'battery', 'type': 'battery'},
+            {'id': 'hit', 'type': 'hit'},
+            {'id': 'siren', 'type': 'output', 'feedback': false},
+          ],
+          hasRadio: false,
+        ),
+      );
+      expect(withPod.helloTypes, [1, 2, 4, 5, 6, 10, 11]);
+    });
+
     test('a phone without NFC cannot be a respawn point on its own; a pod '
         'with an NFC reader makes up for it', () {
       final respawn = catalog.byId('org.atalaia.respawn')!.role('respawn')!;
