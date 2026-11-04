@@ -125,6 +125,7 @@
     "missing_caps": "A box lacks what its role needs: {list}. Start anyway only if the game can do without it.",
     "missing_caps_short": "A box lacks what its role needs: {list}.",
     "not_checked": "{capability} on {name}: not checked (simple output). Look at it before the game.",
+    "outputs_disabled": "{name} ({role}): {caps} fitted, not enabled by the box's admin. The mode would switch it: enable it at the box with the admin PIN, or play without it.",
     "start_warnings": {
       "min": "{have} × {role} joined; the mode asks for {value} ({param}).",
       "optional_caps": "{name} ({role}) has no {caps}: the mode does without it.",
@@ -247,6 +248,8 @@
       "node_setup_applied": "{zone} confirmed its scenario setup",
       "battery_low": "A box's battery is low",
       "node_modules": "{zone} has: {modules}",
+      "node_outputs_disabled": "{zone}: fitted, not enabled by the box's admin: {modules}",
+      "node_outputs_disabled_none": "{zone}: every output fitted is enabled",
       "node_module_lost": "{zone} lost a module: {modules} ({reason})",
       "output_switched": "{zone}: {capability} on for {s} s ({source})",
       "output_switched_off": "{zone}: {capability} off ({source})",
@@ -305,6 +308,7 @@
     "command_sent": "sent",
     "not_checked": "not checked",
     "module_lost": "lost",
+    "outputs_disabled": "{caps} · fitted, not enabled by the box's admin",
     "conflict": "Two boxes share node {node}: one join was used on two boxes, and they use the same radio nonces. Take one of them out of the game and join it again with a new join (Join)."
   },
   "outputs": {

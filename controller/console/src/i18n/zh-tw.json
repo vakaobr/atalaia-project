@@ -122,6 +122,7 @@
     "missing_caps": "有盒子缺少其角色需要的功能：{list}。只有在遊戲不需要它時才強制開始。",
     "missing_caps_short": "有盒子缺少其角色需要的功能：{list}。",
     "not_checked": "{name} 上的 {capability}：未檢查（簡易輸出）。請在遊戲前親自確認。",
+    "outputs_disabled": "{name}（{role}）：已安裝 {caps}，但盒子的管理員尚未啟用。模式會啟動這個輸出：請在盒子上以管理員 PIN 啟用，或不使用它進行遊戲。",
     "start_warnings": {
       "min": "已加入 {have} × {role}；模式要求 {value}（{param}）。",
       "optional_caps": "{name}（{role}）沒有 {caps}：模式不需要它也能進行。",
@@ -241,6 +242,8 @@
       "node_setup_applied": "{zone}已確認情境設定",
       "battery_low": "一個盒子電量偏低",
       "node_modules": "{zone} 具備：{modules}",
+      "node_outputs_disabled": "{zone}：已安裝，盒子的管理員尚未啟用：{modules}",
+      "node_outputs_disabled_none": "{zone}：已安裝的輸出全部已啟用",
       "node_module_lost": "{zone} 遺失一個模組：{modules}（{reason}）",
       "output_switched": "{zone}：{capability} 開啟 {s} 秒（{source}）",
       "output_switched_off": "{zone}：{capability} 關閉（{source}）",
@@ -299,6 +302,7 @@
     "command_sent": "已傳送",
     "not_checked": "未檢查",
     "module_lost": "已遺失",
+    "outputs_disabled": "{caps} · 已安裝，盒子的管理員尚未啟用",
     "conflict": "兩個盒子共用節點 {node}：同一組加入資料被用在兩個盒子上，它們使用相同的無線電 nonce。請讓其中一個退出遊戲，再用新的加入資料重新加入（「加入」分頁）。"
   },
   "outputs": {

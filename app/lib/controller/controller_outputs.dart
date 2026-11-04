@@ -20,6 +20,11 @@
 ///   names the functions its mode switches: a box with outputs (its HELLO
 ///   lists `output` and its `node.modules` came) but none of them is the
 ///   warning `outputs`.
+/// - **Outputs fitted, not enabled** (EXPL-12, EXPL-13): a box's last
+///   `node.outputs_disabled` (its simple outputs its admin has not enabled,
+///   in `node.modules`' text), the node list's `outputs_disabled`; the start
+///   check's `outputs_disabled` is a note (never a refusal or a warning) for
+///   each box whose role's `outputs:` (or its scenario's) names one of them.
 /// - **CMD 12** (EXP-23, EXP-27, EXP-30): the params a GM's request or a field
 ///   script's `field.send(node, "output", {...})` become, checked as a box
 ///   checks them (`output_params_problem`), `src` set by the controller, and
@@ -237,8 +242,9 @@ Object? withOutputs(Object? spec, Object? extra) {
 }
 
 /// The capability part of the start check for the joined nodes, each
-/// `{node, name, role, capabilities, modules}` and, for a scenario's box, the
-/// `outputs` its triggers switch (outputs.py `check_nodes`).
+/// `{node, name, role, capabilities, modules, outputs_disabled}` and, for a
+/// scenario's box, the `outputs` its triggers switch (outputs.py
+/// `check_nodes`).
 Map<String, List<Map<String, Object?>>> checkNodes(
   Iterable<Map<String, Object?>> nodes,
   Object? Function(String role) roleSpec,
@@ -246,6 +252,7 @@ Map<String, List<Map<String, Object?>>> checkNodes(
   final missing = <Map<String, Object?>>[];
   final warnings = <Map<String, Object?>>[];
   final unchecked = <Map<String, Object?>>[];
+  final disabled = <Map<String, Object?>>[];
   for (final n in nodes) {
     final who = {'node': n['node'], 'name': n['name'], 'role': n['role']};
     for (final fn in simpleOutputs(n['modules'])) {
@@ -255,8 +262,26 @@ Map<String, List<Map<String, Object?>>> checkNodes(
         'text': '$fn on ${n['name']}: not checked (simple output)',
       });
     }
-    final types = typesOf(n['capabilities']);
     final spec = withOutputs(roleSpec('${n['role']}'), n['outputs']);
+    // Fitted, not enabled by the box's admin, and the role would switch it
+    // (EXPL-13): a note.
+    final off = outputCaps(n['outputs_disabled']);
+    final idle = spec is Map
+        ? [
+            for (final fn in _names(spec['outputs']))
+              if (off.contains(fn)) fn,
+          ]
+        : <String>[];
+    if (idle.isNotEmpty) {
+      disabled.add({
+        ...who,
+        'capabilities': idle,
+        'text':
+            "${n['name']} (${n['role']}): ${idle.join(', ')} fitted, not "
+            "enabled by the box's admin (enable at the box with the admin PIN)",
+      });
+    }
+    final types = typesOf(n['capabilities']);
     if (types.isEmpty || spec is! Map) continue;
     for (final name in _names(spec['requires'])) {
       if (hasCapability(types, name) == false) {
@@ -294,6 +319,7 @@ Map<String, List<Map<String, Object?>>> checkNodes(
     'missing_caps': missing,
     'warnings': warnings,
     'not_checked': unchecked,
+    'outputs_disabled': disabled,
   };
 }
 

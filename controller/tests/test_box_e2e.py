@@ -415,6 +415,27 @@ class FieldTests(unittest.TestCase):
         last = self.pulses(box)[-1]
         self.assertLessEqual(last["until"] - last["t"], 500)
 
+    def test_an_output_fitted_but_not_enabled(self):
+        """EXPL-12, EXPL-13 end to end: the host box with a siren enabled and a horn fitted but not enabled
+        by its admin (`--simple-out horn,disabled`) sends node.outputs_disabled with node.modules; the
+        controller's node list has the horn as `outputs_disabled` and the siren alone as `modules`, and a
+        GM's pulse on the horn is refused with the reason."""
+        box = self.box("alpha", "--simple-out", "siren", "--simple-out", "horn,disabled")
+        gid = self.game()
+        nid = self.join(box)
+        self.assertTrue(wait_for(lambda: self.node(nid).get("outputs_disabled") is not None, 6), box.lines[-8:])
+        self.assertEqual(self.node(nid)["outputs_disabled"],
+                         [{"address": "g45", "model": "servo", "fw": None, "caps": ["horn"], "feedback": False}])
+        self.assertTrue(wait_for(lambda: self.node(nid).get("modules") is not None, 6), box.lines[-8:])
+        self.assertEqual([m["caps"] for m in self.node(nid)["modules"]], [["siren"]])
+        self.assertEqual([(o["id"], o["enabled"]) for o in box.status()["outputs"]], [("siren", True), ("horn", False)])
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={}).status_code, 200)
+        r = self.client.post(f"/api/v1/games/{gid}/nodes/{nid}/output", headers=GM,
+                             json={"capability": "horn", "act": "pulse", "ms": 1000})
+        self.assertEqual(r.status_code, 409, r.text)
+        self.assertIn("not enabled by the box's admin", r.text)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/end", headers=GM, json={}).status_code, 200)
+
     def test_the_gm_switches_a_boxs_simple_output(self):
         """Draft RFC "The expansion port", increment 3, end to end: the controller keeps the box's
         node.modules in its node list (the simple output with "feedback": false), the start check names

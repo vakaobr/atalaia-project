@@ -2608,6 +2608,42 @@
       ]
     },
     {
+      "name": "EXPL outputs fitted, not enabled: a box's node.outputs_disabled in the node list and a note in the start check, never a refusal (EXPL-12, EXPL-13)",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Smoke", "mode_id": "org.atalaia.bomb", "assignments": {"4": "bomb", "5": "bomb", "6": "bomb"}}}, "status": 201, "save": {"gid": "id"}},
+        {"rx": {"source": 4, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-4", "platform": 1, "fw_version": "0.8.0", "core_version": "0.8.0", "tier": 0, "capabilities": [1, 2, 3, 4, 5, 11], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"rx": {"source": 5, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-5", "platform": 1, "fw_version": "0.8.0", "core_version": "0.8.0", "tier": 0, "capabilities": [1, 2, 3, 4, 5], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"rx": {"source": 6, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-6", "platform": 1, "fw_version": "0.7.0", "core_version": "0.7.0", "tier": 0, "capabilities": [1, 2, 3, 4, 5], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"rx": {"source": 4, "seq": 1, "epoch": 1, "type": "EVENT", "event": {"node": 4, "seq": 1, "t": 0, "type": "node.outputs_disabled", "data": {"modules": "g45:servo:siren"}}}},
+        {"rx": {"source": 4, "seq": 2, "epoch": 1, "type": "EVENT", "event": {"node": 4, "seq": 2, "t": 0, "type": "node.modules", "data": {"modules": "g46:servo:smoke"}}}},
+        {"rx": {"source": 5, "seq": 1, "epoch": 1, "type": "EVENT", "event": {"node": 5, "seq": 1, "t": 0, "type": "node.outputs_disabled", "data": {"modules": "g46:servo:horn;g45:servo:smoke"}}}},
+        {"rx": {"source": 6, "seq": 1, "epoch": 1, "type": "EVENT", "event": {"node": 6, "seq": 1, "t": 0, "type": "node.outputs_disabled", "data": {"modules": "not;a list"}}}},
+        {"request": {"method": "GET", "path": "/api/v1/nodes", "token": "read"}, "status": 200,
+         "json": [{"node_id": 4, "modules": [{"address": "g46", "caps": ["smoke"]}], "outputs_disabled": [{"address": "g45", "model": "servo", "fw": null, "caps": ["siren"], "feedback": false}]},
+                  {"node_id": 5, "modules": null, "outputs_disabled": [{"address": "g46", "caps": ["horn"]}, {"address": "g45", "caps": ["smoke"]}]},
+                  {"node_id": 6, "modules": null, "outputs_disabled": null}]},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/start-check", "token": "read"}, "status": 200,
+         "json": {"missing": [], "missing_caps": [],
+                  "warnings": [{"code": "optional_caps", "node": 5, "capabilities": ["output"]}, {"code": "optional_caps", "node": 6, "capabilities": ["output"]}],
+                  "not_checked": [{"node": 4, "capability": "smoke"}],
+                  "outputs_disabled": [{"node": 4, "name": "box-4", "role": "bomb", "capabilities": ["siren"], "text": "$any"},
+                                       {"node": 5, "name": "box-5", "role": "bomb", "capabilities": ["smoke"], "text": "$any"}],
+                  "ok": true}},
+        {"rx": {"source": 5, "seq": 2, "epoch": 1, "type": "EVENT", "event": {"node": 5, "seq": 2, "t": 0, "type": "node.outputs_disabled", "data": {"modules": ""}}}},
+        {"request": {"method": "GET", "path": "/api/v1/nodes", "token": "read"}, "status": 200,
+         "json": {"$contains": [{"node_id": 5, "outputs_disabled": []}]}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/start-check", "token": "read"}, "status": 200,
+         "json": {"outputs_disabled": [{"node": 4, "capabilities": ["siren"]}], "ok": true}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/log", "token": "read"}, "status": 200,
+         "json": {"$contains": [{"node": 4, "type": "node.outputs_disabled", "prio": "normal", "data": {"modules": "g45:servo:siren"}}]}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm"}, "status": 200, "json": {"state": "running"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/nodes/4/output", "token": "gm", "body": {"capability": "siren", "act": "pulse", "ms": 1000}}, "status": 409},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200},
+        {"request": {"method": "GET", "path": "/api/v1/nodes?game=${gid}", "token": "read"}, "status": 200,
+         "json": {"$contains": [{"node_id": 4, "outputs_disabled": [{"address": "g45"}]}]}}
+      ]
+    },
+    {
       "name": "EXP outputs: a box's modules in the node list, the capability start check, the GM's outputs and their limits (draft RFC 'The expansion port', increment 3: EXP-21, EXP-23, EXP-27, EXP-30, EXP-36)",
       "steps": [
         {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sirens", "mode_id": "org.atalaia.domination", "assignments": {"4": "zone", "5": "zone", "6": "zone"}}}, "status": 201,
