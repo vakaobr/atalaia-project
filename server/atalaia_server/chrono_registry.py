@@ -44,8 +44,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from . import hub_share, sharing_terms
 from .audit import record
 from .chrono_verify import Key, same_record, verify_reading
-from .models import (ChronoCopyRevocation, ChronoReading, ChronoReject, ChronoViolation, Consent, Field, FieldPlayerId, Game, MarshalKey,
-                     PlayerIdClaim, Replica)
+from .models import (WALKIN_SOURCE, ChronoCopyRevocation, ChronoReading, ChronoReject, ChronoViolation, Consent, Field, FieldPlayerId,
+                     Game, GameRegistration, MarshalKey, PlayerIdClaim, Replica)
 
 SHARING = "chrono_sharing"
 DEFAULT_BAN_DAYS = 365  # a ban lasts 12 months unless the field sets another length (PRIV-2)
@@ -525,12 +525,17 @@ async def erase_player(db: AsyncSession, field_id: uuid.UUID, player_id: str) ->
 async def erase_identity(db: AsyncSession, field_id: uuid.UUID, player_id: str) -> dict[str, int]:
     """What links an account to one player id at a field: the link itself (``field_player_ids``, the only way the
     game history's events name a person) and the claims of that id. The signed records are a chrono erasure's
-    (``erase_player``). The caller commits."""
+    (``erase_player``). A walk-in's guest registrations at the field (``[sync] push_walkins``, PWI-*) name the person
+    by the player id and the name given at the field, so they go too. The caller commits."""
+    guests = await db.execute(delete(GameRegistration).where(GameRegistration.field_id == field_id,
+                                                             GameRegistration.player_id == player_id,
+                                                             GameRegistration.source == WALKIN_SOURCE,
+                                                             GameRegistration.user_id.is_(None)))
     links = await db.execute(delete(FieldPlayerId).where(FieldPlayerId.field_id == field_id,
                                                          FieldPlayerId.player_id == player_id))
     claims = await db.execute(delete(PlayerIdClaim).where(PlayerIdClaim.field_id == field_id,
                                                           PlayerIdClaim.player_id == player_id))
-    return {"identities": links.rowcount or 0, "claims": claims.rowcount or 0}
+    return {"identities": links.rowcount or 0, "claims": claims.rowcount or 0, "guests": guests.rowcount or 0}
 
 
 async def apply_erasures(db: AsyncSession, field_id: uuid.UUID, body: dict[str, Any]) -> dict[str, int]:
@@ -539,7 +544,8 @@ async def apply_erasures(db: AsyncSession, field_id: uuid.UUID, body: dict[str, 
     ``identity`` the links of the player id to an account (``erase_identity``). Idempotent: a player the server
     has nothing of counts nothing, so a controller that sends again after a lost answer does no harm. The log
     keeps how much, never whose."""
-    totals = {"players": 0, "chrono_readings": 0, "chrono_rejects": 0, "replicas": 0, "identities": 0, "claims": 0}
+    totals = {"players": 0, "chrono_readings": 0, "chrono_rejects": 0, "replicas": 0, "identities": 0, "claims": 0,
+              "guests": 0}
     for entry in body["erasures"]:
         totals["players"] += 1
         counts: dict[str, int] = {}

@@ -121,6 +121,10 @@
                                 # commands (plan phase 19, P4R12); every command is logged here
     library = true              # install the field's scenario library and game presets from the
                                 # site server (plan phase 20), on every controller of the field
+    push_walkins = false        # true: after a game made from a scheduled game, also push its walk-ins
+                                # (players without a registration) as guest registrations: player id,
+                                # display name, declarations' states; the site server deletes them 30
+                                # days after the game (ADR-P4-8's guest rule). false: a count only
 
     [firmware]                  # firmware updates for the Field Boxes (protocol/firmware-update.md,
                                 # firmware_updates.py): the GM uploads a signed release in the console
@@ -217,7 +221,7 @@ SECTIONS = {
     "mqtt": ("enabled", "host", "port", "username", "password", "tls_export_dir"),
     "join": ("key",),
     "sync": ("enabled", "url", "api_key", "ca_file", "interval_game_s", "interval_idle_s", "timeout_s",
-             "branding", "remote_gm", "library"),
+             "branding", "remote_gm", "library", "push_walkins"),
     "checkin": ("field_id", "field_name", "operator", "confirm", "federation", "federation_label",
                 "country", "apd_checkin", "apd_expiry", "apd_accepted", "max_replicas", "max_players", "chrono_valid_for",
                 "rate_per_minute", "urls",
@@ -316,6 +320,7 @@ class Config:
     sync_branding: str = "local"  # "local" (the console's) or "site" (pulled from the site server)
     sync_remote_gm: bool = False  # the remote GM through the site server's stream (plan phase 19)
     sync_library: bool = True  # pull the field's scenarios and presets from the site server (plan phase 20)
+    sync_push_walkins: bool = False  # push walk-ins as guest registrations (decisions PWI-*); off: a count only
     # [atak]
     atak_enabled: bool = False
     atak_multicast: str = "239.2.3.1:6969"

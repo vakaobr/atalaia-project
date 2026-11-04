@@ -825,6 +825,9 @@ REGISTRATION_STATUSES = ("registered", "cancelled", "checked_in", "no_show")
 CLAIM_STATUSES = ("pending", "confirmed", "refused")
 
 
+WALKIN_SOURCE = "walkin"  # a walk-in a controller pushed with [sync] push_walkins: a guest (decisions PWI-*)
+
+
 class GameRegistration(Base):
     """A registration for a scheduled game (ADR-P4-11): the player's id at the field, a display name for
     that game, a team preference, the federation number when the game asks for one, and the SHA-256 of

@@ -936,6 +936,9 @@ const Map<String, String> zhTwStrings = {
   'ctl_site.library': '從場地伺服器取得場地的劇本與遊戲預設',
   'ctl_site.remote_gm': '遠端 GM',
   'ctl_site.remote_gm_hint': '場地伺服器上的場地 GM 可以開始、暫停和結束進行中的遊戲。預設關閉。',
+  'ctl_site.push_walkins': '將現場報名的玩家傳送到場地伺服器',
+  'ctl_site.push_walkins_hint':
+      '網站上的遊戲結束後，未報名的玩家會連同名稱與槍枝的測速結果傳送到場地伺服器；伺服器會在遊戲結束 30 天後刪除。預設關閉：只傳人數。',
   'ctl_site.atak': 'ATAK 資訊（Cursor on Target）',
   'ctl_site.atak_hint': '透過場地 Wi-Fi，把盒子和區域顯示在 ATAK 地圖上。',
   'ctl_site.multicast': '多點傳送位址（239.2.3.1:6969）',

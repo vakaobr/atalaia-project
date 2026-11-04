@@ -1143,6 +1143,9 @@ const Map<String, String> deStrings = {
   'ctl_site.library': 'Szenarien und Spielvorlagen des Felds vom Site-Server',
   'ctl_site.remote_gm': 'Remote-Spielleitung',
   'ctl_site.remote_gm_hint': 'Die Spielleitung des Felds auf dem Site-Server darf das laufende Spiel starten, pausieren und beenden. Standardmäßig aus.',
+  'ctl_site.push_walkins':
+      'Spontanteilnahmen als Gäste an den Site-Server senden',
+  'ctl_site.push_walkins_hint': 'Nach einem Spiel aus dem Spielplan gehen Spieler ohne Anmeldung mit ihrem Namen und den Chrono-Ergebnissen ihrer Repliken an den Site-Server; er löscht sie 30 Tage nach dem Spiel. Standardmäßig aus: nur die Anzahl.',
   'ctl_site.atak': 'ATAK-Feed (Cursor on Target)',
   'ctl_site.atak_hint':
       'Die Boxen und Zonen auf ATAK-Karten, über das WLAN des Felds.',

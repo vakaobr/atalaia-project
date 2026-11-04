@@ -3160,8 +3160,12 @@ S16-14, open):**
   `[checkin]` settings; a pre-declared replica the controller would refuse
   is dropped from its expected check-in (S16-6, S16-14).
 - **Outcomes** go back once the game has ended (not in batches during it);
-  walk-ins as a count only; `[sync] push_walkins` is not built (S16-11,
-  S16-13).
+  walk-ins as a count only (S16-11, S16-13); *built 2026-11-04 (decisions
+  PWI-1 to PWI-10):* with `[sync] push_walkins` (off by default, both
+  controllers) the walk-ins who are players also go, under `guests`, as guest
+  registrations (`source` `walkin`: player id, display name, declarations'
+  states), deleted 30 days after the game and with the controller's erasure
+  of the player.
 - **Registering on the web pages**: the public pages have no login and no
   JavaScript, so their *Register* button leads to a page that says how to
   register in the app with an account (S16-9).

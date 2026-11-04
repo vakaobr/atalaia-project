@@ -65,7 +65,7 @@ MAX_IGNORED = 50                # ignored column names listed in a preview
 REPLICA_TYPES = sync_format.REPLICA_TYPES
 FORMULA_START = "=+-@\t\r"
 SOURCE = re.compile(r"[a-z0-9][a-z0-9._-]{0,31}")
-RESERVED_SOURCES = frozenset({"site"})  # the site's own registrations (S16-1)
+RESERVED_SOURCES = frozenset({"site", "walkin"})  # the site's own registrations (S16-1), the walk-ins a controller pushed (PWI-*)
 
 
 class FileError(ValueError):
@@ -148,7 +148,8 @@ def csv_unsafe(value: str) -> str:
 # --- reading ------------------------------------------------------------------------------
 
 def check_source(value: Any) -> str:
-    """The import's source label (the platform's name, say): 1-32 of a-z, 0-9 and ``. _ -``, not ``site``."""
+    """The import's source label (the platform's name, say): 1-32 of a-z, 0-9 and ``. _ -``, not ``site`` or
+    ``walkin``."""
     if not isinstance(value, str) or not SOURCE.fullmatch(value) or value in RESERVED_SOURCES:
         raise FileError("source_invalid")
     return value
