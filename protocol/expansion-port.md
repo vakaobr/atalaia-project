@@ -173,6 +173,8 @@ Three standard events ([`schema/events.yaml`](schema/events.yaml), ids 57-59; da
 
 An address appears once. The controllers turn it into the node list's `modules`, a list of `{"address", "model", "fw", "caps", "feedback"}` (`fw` null and `feedback` false for a simple output), served the same by both controllers (contract cases in `controller_api.json` come with the controllers' increment).
 
+**A phone prop** sends the same events for its I/O pod (draft RFC "The expansion port", increment 9; decision EXPI9-19): the pod builds the text as a box does, its simple outputs `g33:servo:siren` included (the GPIO is the pod's, so no new entry form is needed), and hands it to the phone in its EVT `pod.modules` ([capability-proxy.md](capability-proxy.md), "The pod's expansion port"); the phone sends `node.modules` when the text changes and `node.module_lost` during a game ([prop-link.md](prop-link.md)). A prop's `output.switched` is the phone's own (its prop shell keeps the game's rules for the pod's outputs).
+
 ## 8. Switching an output from the field: CMD opcode 12
 
 [RFC 0001 Amendment 26](../docs/rfcs/0001-skirmesh-rf-wire-format.md) (EXP-23). `params`:

@@ -227,6 +227,8 @@ and 2026-11-01, #field-box-first-build). See site/README.md.
           <h2 id="io-pod-title">{{ build.pod.title }}</h2>
           <p>{{ build.pod.what }}</p>
           <p>{{ build.pod.lends }}</p>
+          <p>{{ build.pod.outputs }}</p>
+          <p>{{ build.pod.port }}</p>
 
           <h3>{{ build.parts }}</h3>
           <ul class="ways">
@@ -235,6 +237,8 @@ and 2026-11-01, #field-box-first-build). See site/README.md.
             <li>{{ build.pod.parts.switch }}</li>
             <li>{{ build.pod.parts.usb }}</li>
             <li>{{ build.pod.parts.uart }}</li>
+            <li>{{ build.pod.parts.simple_out }}</li>
+            <li>{{ build.pod.parts.port }}</li>
           </ul>
 
           <h3>{{ build.pins }}</h3>
@@ -254,6 +258,8 @@ and 2026-11-01, #field-box-first-build). See site/README.md.
                 <tr><td>{{ build.pin.lrclk }}</td><td data-kconfig="ATALAIA_AUDIO_LRCLK_PIN">15</td></tr>
                 <tr><td>{{ build.pin.dout }}</td><td data-kconfig="ATALAIA_AUDIO_DOUT_PIN">16</td></tr>
                 <tr><td>{{ build.pin.tamper }}</td><td data-kconfig="ATALAIA_POD_TAMPER_PIN">47</td></tr>
+                <tr><td>{{ build.pin.pod_out1 }}</td><td>33</td></tr>
+                <tr><td>{{ build.pin.pod_out2 }}</td><td>1</td></tr>
                 <tr><td>{{ build.pin.log }}</td><td>43</td></tr>
               </tbody>
             </table>
@@ -274,7 +280,7 @@ and 2026-11-01, #field-box-first-build). See site/README.md.
 
           <h3>{{ build.open }}</h3>
           <ul class="ways">
-            <li>{{ build.pod.open.siren }}</li>
+            <li>{{ build.pod.open.bench }}</li>
             <li>{{ build.pod.open.phone_power }}</li>
             <li>{{ build.pod.open.enclosure }}</li>
             <li>{{ build.pod.open.settings }}</li>

@@ -398,7 +398,7 @@ static out_result_t start(outputs_t *o, out_channel_t *c, out_act_t act, uint32_
                           uint32_t on_ms, uint32_t off_ms, out_source_t src)
 {
     uint32_t now = o->now;
-    if (!c->set.enabled) return OUT_DISABLED;
+    if (!c->set.enabled || c->withheld) return OUT_DISABLED;
     if (!may_start(o, src)) return OUT_NOT_NOW;
     uint32_t max_ms = c->set.max_on_s * 1000u;
     if (act == OUT_ACT_ON) {
@@ -602,7 +602,7 @@ size_t outputs_modules_text(const outputs_t *o, char *out, size_t cap)
     size_t limit = cap - 1 < OUT_MODULES_MAX ? cap - 1 : OUT_MODULES_MAX;
     for (int i = 0; i < o->simple; i++) {
         const out_channel_t *c = &o->ch[i];
-        if (!c->set.enabled) continue;
+        if (!c->set.enabled || c->withheld) continue;
         char entry[48];
         int n = snprintf(entry, sizeof(entry), "%sg%d:servo:%s", len ? ";" : "", c->gpio, c->id);
         if (n < 0 || len + (size_t)n > limit) break;

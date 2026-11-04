@@ -49,6 +49,15 @@ a shallow clone, which cannot count, the core's version and the commit: 0.3.0-de
                                                its patch's I2S off). Off when left out.
 All five apply to that build folder only, and are reset when left out.
 
+`pod` (the I/O pod) also takes --buzzer= and --simple-out= (draft RFC "The expansion port",
+increment 9, EXP-26): --simple-out=on puts the pod's simple output on GPIO 33, on2 a second one on
+GPIO 1 (with or without the buzzer), a number that GPIO. Their uses and longest on times are the
+build's (CONFIG_ATALAIA_POD_OUT1_FUNCTION, _MAX_ON_S: edit build-pod/sdkconfig, or menuconfig).
+The pod looks for modules on its expansion port in every build (CONFIG_ATALAIA_POD_PORT, the port
+half of increment 9); --module-outputs=on also lends an output module's channels to the phone
+(CONFIG_ATALAIA_POD_MODULE_OUTPUTS, off when left out; their longest on is
+CONFIG_ATALAIA_POD_MODULE_MAX_ON_S, 30 s).
+
 `build`, `bench`, `modem`, `pod` and `wokwi` also take:
     --region=eu868 | --region=as923-tw         the radio region the image is built for
                                                (Kconfig ATALAIA_RADIO_REGION, RFC 0001
@@ -336,12 +345,16 @@ def parts_options(build_dir: str) -> tuple[str, ...]:
     """The Field Box's optional parts (--buzzer, --simple-out; off when not given): a defaults
     file in the build folder, written in every case and only when it changes, so that a switch
     rebuilds the sdkconfig."""
-    if build_dir not in FIELD_BOX_BUILDS:
+    if build_dir not in FIELD_BOX_BUILDS + (POD_BUILD,):
         return ()
     buzzer = FW_OPTIONS.get("buzzer", "off") == "on"
     simple = FW_OPTIONS.get("simple_out", "off")
-    lines = ["# Written by tools/docker_fw.py (--buzzer, --simple-out): the optional parts of this build.",
+    lines = ["# Written by tools/docker_fw.py (--buzzer, --simple-out, --module-outputs): the optional parts "
+             "of this build.",
              "CONFIG_ATALAIA_BUZZER=y" if buzzer else "# CONFIG_ATALAIA_BUZZER is not set"]
+    if build_dir == POD_BUILD:
+        lines.append("CONFIG_ATALAIA_POD_MODULE_OUTPUTS=y" if FW_OPTIONS.get("module_outputs") == "on"
+                     else "# CONFIG_ATALAIA_POD_MODULE_OUTPUTS is not set")
     if simple == "off":
         lines.append("# CONFIG_ATALAIA_SIMPLE_OUT is not set")
     else:
@@ -372,7 +385,8 @@ def variant(build_dir: str, defaults: tuple[str, ...]) -> int:
     print(f"docker_fw: radio region {FW_OPTIONS.get('region', 'eu868')}, "
           f"listen before talk {FW_OPTIONS.get('lbt', 'on')}, antenna {FW_OPTIONS.get('antenna_dbi', '2')} dBi"
           + (f", buzzer {FW_OPTIONS.get('buzzer', 'off')}, simple output {FW_OPTIONS.get('simple_out', 'off')}"
-             if build_dir in FIELD_BOX_BUILDS else ""),
+             if build_dir in FIELD_BOX_BUILDS + (POD_BUILD,) else "")
+          + (f", module outputs {FW_OPTIONS.get('module_outputs', 'off')}" if build_dir == POD_BUILD else ""),
           flush=True)
     # The variant's sdkconfig lives in its build folder. Regenerate it when
     # the defaults change, so edits to them always take effect.
@@ -486,7 +500,7 @@ def main(argv: list[str]) -> int:
     box = ["--fw-version=", "--release-keys=", "--mode-keys=", "--region=", "--lbt=", "--antenna-dbi=",
            "--buzzer=", "--simple-out="]
     radio = ["--region=", "--lbt=", "--antenna-dbi="]
-    known = {"build": box, "wokwi": box, "modem": radio, "pod": radio,
+    known = {"build": box, "wokwi": box, "modem": radio, "pod": radio + ["--buzzer=", "--simple-out=", "--module-outputs="],
              "bench": box,
              "test": ["--update-screens"], "clean": [], "version": []}
     if command not in known:
@@ -530,12 +544,17 @@ def main(argv: list[str]) -> int:
             if value not in ("on", "on2", "off") and not (value.isdigit() and 0 <= int(value) <= 48):
                 return fail("--simple-out: off, on, on2 or a GPIO number (0-48)")
             FW_OPTIONS["simple_out"] = value
+        elif name == "--module-outputs=":
+            value = option.split("=", 1)[1]
+            if value not in ("on", "off"):
+                return fail("--module-outputs: on or off")
+            FW_OPTIONS["module_outputs"] = value
         elif name == "--mode-keys=":
             keys = release_keys_hex(option.split("=", 1)[1])
             if keys is None:
                 return fail("--mode-keys: 1-4 Ed25519 public keys, 64 hex digits or 44 base64 characters each")
             FW_OPTIONS["mode_keys"] = keys
-    if FW_OPTIONS.get("simple_out") == "on2" and FW_OPTIONS.get("buzzer") == "on":
+    if FW_OPTIONS.get("simple_out") == "on2" and FW_OPTIONS.get("buzzer") == "on" and command != "pod":
         return fail("--simple-out=on2 with --buzzer=on: GPIO 45 is the buzzer's or a second simple output")
     if command == "clean":
         return clean()

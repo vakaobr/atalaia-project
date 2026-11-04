@@ -438,6 +438,8 @@ final class RfCmd {
       ? rfCommands[cmd]
       : cmd == 11
       ? 'peer' // a node's epoch for the receivers (Amendment 24): the controller's own
+      : cmd == 12
+      ? 'output' // a box's output (Amendment 26), as the Wi-Fi link names it
       : 'cmd_$cmd';
 
   bool isFor(int node) => dest == null || dest == 0xffff || dest == node;

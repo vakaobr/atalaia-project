@@ -921,6 +921,11 @@ roadmap:
         - "Android props fetch signed mode packages from their controller, as boxes do. In software."
         - "The GM console can push an I/O pod's settings over the radio: the four buttons' colours, the LED ring's brightness, the volume and whether the enclosure switch reports. The pod authenticates the command like any other, keeps the settings in its flash and answers; the controller sends it again until it hears back. Before, they were set when the firmware was built. In software and against the pod's code on a computer, not tried with a real pod."
         - "An Android prop's box penalty now reaches the controller, over its Wi-Fi link and its radio link. In software."
+        - "The I/O pod lends the phone its simple outputs (a siren or a smoke machine's remote through an
+          RC relay switch, on GPIO 33, then 1) and its expansion port: a target addon's hits, and an output
+          module's relays on a pod built to lend them. The game on the phone switches them with a box's
+          rules, the pod turns them off when the phone goes, and the GM console shows a prop's outputs and
+          modules. In the firmware and against the pod's code on a computer, not tried with a real pod."
     g_controller:
       title: The phone as the field controller
       items:
@@ -1277,8 +1282,8 @@ build:
       servo signal through the level shifter's spare gate: 2.0&nbsp;ms is on, 1.0&nbsp;ms is off, in
       half-second bursts that only the running game renews. If the box hangs, resets or loses power,
       the pulses stop within 0.5&nbsp;s and the switch opens its relay. The firmware has it since
-      release 0.7.0, as a build option; it has not been built on hardware yet. The I/O pod gets it
-      later.
+      release 0.7.0, as a build option; it has not been built on hardware yet. The I/O pod's firmware
+      has it too, on GPIO&nbsp;33 (and 1): see <a href="#io-pod">the I/O pod</a>.
     needs:
       switch: >-
         <strong>An RC relay switch that opens its relay when the signal stops</strong>: a documented
@@ -1330,6 +1335,8 @@ build:
     buzzer: >-
       Passive piezo buzzer, optional (a boot strapping pin: its circuit keeps it low; firmware option, not yet built on hardware)
     tamper: Enclosure switch, to GND
+    pod_out1: Simple output 1, optional (through a spare gate of the 74AHCT125)
+    pod_out2: Simple output 2, optional (the board's battery-voltage pin, unused by the pod)
     log: >-
       Log output (UART0 TX): only a 3.3&nbsp;V USB-serial adapter's RX, on the bench
     disp_mosi: >-
@@ -1550,6 +1557,23 @@ build:
       Every part but the board is optional: the pod tells the phone what it has, and the phone uses
       only that. Button 1 is the game's first team, as on a Field Box. An opened enclosure reaches
       the GM console as a tamper alert.
+    outputs: >-
+      <strong>Simple outputs</strong>, optional: a siren, a strobe, a light or a smoke machine's
+      remote through an RC relay switch, wired as the Field Box's
+      <a href="#field-box-simple-output">simple output</a> but on GPIO&nbsp;33 (a second one on
+      GPIO&nbsp;1, with or without the piezo buzzer). A pod has no admin PIN, so building the output in
+      is what enables it, with its use (siren, strobe, smoke, light, horn) and its longest on. The game
+      on the phone switches it with a box's rules, and the pod turns it off by itself: at once when the
+      phone's link goes, and after 1.5&nbsp;s when the phone stops talking.
+    port: >-
+      <strong>The expansion port</strong>, optional: the Field Box's M12 socket and
+      <a href="#expansion-port">port board</a> on the pod's I2C bus (GPIO&nbsp;17 and 18). A
+      <a href="#target-addon">target addon</a>'s hits reach the game on the phone while it runs. An output
+      module's relays are lent to the game only by a pod built to lend them (off by default), and the pod
+      turns them off when the phone goes. A pod with every part has little room left to describe itself
+      to the phone: it lends as many outputs as fit, the first ones, and keeps the others off. The
+      outputs and the port are in the pod firmware and tested on a computer only: no pod has switched a
+      real relay or felt a real plate yet.
     parts:
       same: >-
         The Field Box's parts, less the screen: the board, the buttons (up to four), the keypad and
@@ -1564,9 +1588,14 @@ build:
         cable for the phone.
       uart: >-
         On the bench only: a 3.3&nbsp;V USB-serial adapter to read the pod's log.
+      simple_out: >-
+        Optional, for each simple output: an RC relay switch that opens when its signal stops, a
+        spare gate of the 74AHCT125, 10&nbsp;kΩ and 330&nbsp;Ω and an M8 socket, as the Field Box's.
+      port: >-
+        Optional: the expansion port's M12 socket and port board, as the Field Box's.
     free_pins: >-
-      The pod does not use the Field Box's other screen pins (GPIO 1, 3 and 33): leave them
-      unconnected.
+      GPIO&nbsp;33 and 1, free on a pod, carry the optional simple outputs; GPIO&nbsp;3, and an output
+      pin you leave unused, stay unconnected. The expansion port takes no GPIO of its own.
     diagram_ref: >-
       The pod's wiring is the Field Box's without the screen: follow the <a href="#field-box-wiring">Field Box's wiring diagrams</a> and leave out the screen and its wires. A drawing of its own does not exist yet.
     steps:
@@ -1578,8 +1607,10 @@ build:
         Mount the microswitch so the closed lid presses it, and wire it from GPIO 47 to GND. The pod
         watches it only after it has read closed once, so a pod without one never raises an alarm.
       flash: >-
-        Build the pod firmware (<code>python tools/docker_fw.py pod</code>) and flash it from the
-        <code>build-pod</code> folder, as the Field Box's.
+        Build the pod firmware (<code>python tools/docker_fw.py pod</code>; add
+        <code>--simple-out=on</code> for an output, <code>on2</code> for two, and
+        <code>--module-outputs=on</code> to lend an output module's relays) and flash it from the
+        <code>build-pod</code> folder, as the Field Box's. The boot log lists each output it lends.
       log: >-
         Read its log on GPIO 43 with the USB-serial adapter: the USB-C port carries the pod's link
         to the phone, not the log.
@@ -1589,19 +1620,19 @@ build:
         Run the pod's bring-up checks, including the radio's transmit power before any game.
     photo: the finished pod, with its enclosure switch, and the phone linked to it.
     open:
-      siren: >-
-        <strong>A siren, a strobe or a smoke remote</strong>: planned as the
-        <a href="#field-box-simple-output">simple output</a> on the pod's free GPIO&nbsp;33, with the
-        pod keeping the bursts going so that a lost phone link turns it off. The pod firmware gets it
-        in a later step; do not wire one to a pod yet.
+      bench: >-
+        <strong>Outputs and modules on a real pod</strong>: the simple outputs and the expansion port
+        are in the pod firmware and tested on a computer, not yet with a real relay, plate or phone; the
+        bench comes next.
       phone_power: >-
         <strong>Power from the phone</strong>: on a cable, the phone powers the pod and may charge
         its cell. Whether it should, and how much a phone gives, are to be checked at the first build.
       enclosure: >-
         <strong>The enclosure</strong>, and how the phone and the pod are carried together.
       settings: >-
-        <strong>Settings from the phone</strong>: button colours, the number of LEDs and the rest are
-        set in the firmware build for now.
+        <strong>Settings</strong>: the GM console can push the buttons' colours, the ring's brightness,
+        the volume and whether the enclosure switch reports over the radio; the number of LEDs, the pins
+        and the outputs are set in the firmware build.
     full: >-
       The full guide:
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/io-pod/BUILD.md">I/O

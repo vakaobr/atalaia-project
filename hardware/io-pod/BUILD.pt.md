@@ -78,6 +78,8 @@ O que o módulo empresta, segundo o firmware do módulo
 | Interruptor da caixa | aberta, fechada: o telemóvel comunica uma abertura à consola da organização como `node.tamper` |
 | Rádio LoRa | o rádio do campo: o telemóvel fala com o controlador de campo através dele, cifrado pelo módulo com a chave do jogo |
 | Medidor de bateria (MAX17048) | o nível da bateria do módulo |
+| Saídas simples (opcionais, um ou dois interruptores de relé RC) | uma sirene, um estroboscópio, uma luz ou o comando de uma máquina de fumo, ligados pelo modo e pelo campo; desligados quando a ligação ao telemóvel cai ([secção 8.1](#81-saídas-simples-opcionais)) |
+| Porta de expansão (opcional, a tomada M12) | os impactos de um módulo de alvo; os relés de um módulo de saídas, com a opção de compilação; ambos à vista na consola do GM ([secção 8.2](#82-porta-de-expansão-opcional)) |
 
 ## 2. O que está decidido e o que não está
 
@@ -96,20 +98,31 @@ Decidido (no firmware e nos documentos de conceção):
   decisões PF3, PF4).
 - **O registo (log)** vai para o pino de transmissão da UART0, o GPIO 43, e
   não para a porta USB-C, que leva as tramas do módulo.
+- **Saídas simples** (opcionais, desde 2026-11-04; rascunho do RFC «The
+  expansion port», incremento 9, EXP-26): uma sirene, um estroboscópio, uma
+  luz ou o comando de uma máquina de fumo através de um interruptor de relé RC
+  na porta livre do conversor de nível, como numa Field Box, no **GPIO 33**
+  (uma segunda no **GPIO 1**). O módulo envia os impulsos e desliga a saída
+  por si quando a ligação ao telemóvel cai ou o telemóvel deixa de falar
+  ([secção 8.1](#81-saídas-simples-opcionais)). No firmware e testadas só num
+  computador: nenhum módulo ligou ainda um relé verdadeiro.
+- **A porta de expansão** (opcional, desde 2026-11-04; incremento 9, EXP-26):
+  a tomada M12 e a placa da porta da Field Box no barramento I2C do módulo de
+  E/S (GPIO 17 e 18, sem GPIO próprio), com o controlador da porta da caixa.
+  Os impactos na placa de um módulo de alvo chegam ao jogo do telemóvel; os
+  relés de um módulo de saídas são-lhe emprestados numa compilação que o diga;
+  o módulo de E/S mantém a concessão (lease) do módulo da porta e desliga as
+  suas saídas quando o telemóvel se vai ([secção 8.2](#82-porta-de-expansão-opcional)).
+  No firmware e testada só num computador.
 
 Não decidido, ou ainda sem suporte:
 
-- **A sirene** da especificação de conceção: o som do módulo é o amplificador e
-  o altifalante. Uma sirene separada, um relé ou um estroboscópio (a
-  capacidade `output` da especificação) ainda não estão no firmware do módulo
-  (decisão P5J-7). O rascunho do RFC «The expansion port» prevê-os como uma
-  **saída simples** (um interruptor de relé RC na porta livre do conversor de
-  nível, ligado como diz a
-  [secção 9.10 da Field Box](../field-box/BUILD.pt.md#910-saída-simples-opcional))
-  no **GPIO 33** livre do módulo (depois o 1 e o 3), com o módulo a manter as
-  rajadas para que uma ligação perdida ao telemóvel a desligue; a Field Box e o
-  Satellite têm-na desde 2026-11-03, o firmware do módulo recebe-a num
-  incremento posterior (EXP-26). Não ligues ainda nenhuma a um módulo.
+- **Um módulo de E/S com todas as peças e um módulo de saídas**: a descrição
+  que o módulo de E/S dá de si ao telemóvel (256 bytes) tem então espaço para
+  poucas saídas do módulo da porta: empresta as que cabem, as primeiras, e
+  mantém as outras desligadas (com todas as peças e um out4, uma das quatro;
+  com um alvo também, nenhuma). Um módulo de E/S montado para um módulo de
+  saídas deixa de fora as peças que não usa (decisões EXPI9-23, EXPI9-27).
 - **Energia vinda do telemóvel.** Por USB, o telemóvel alimenta a placa; com o
   interruptor principal do módulo ligado, o carregador da placa pode então
   carregar a célula do módulo a partir do telemóvel, como uma Field Box carrega
@@ -199,6 +212,8 @@ falha se esta tabela divergir.
 | I2S LRCLK | 15 | `ATALAIA_AUDIO_LRCLK_PIN` | rosa | LRC do amplificador | 3,3 V | |
 | I2S DOUT | 16 | `ATALAIA_AUDIO_DOUT_PIN` | castanho | DIN do amplificador | 3,3 V | |
 | Interruptor da caixa | 47 | `ATALAIA_POD_TAMPER_PIN` | qualquer (não está no esquema da Field Box) | COM do microinterruptor ao GND, NO ao pino | 3,3 V, pull-up interna | Fechado enquanto a tampa está fechada |
+| Saída simples 1 (opcional) | 33 | `ATALAIA_SIMPLE_OUT_PIN` | qualquer (não está no esquema da Field Box) | entrada da porta 2 do 74AHCT125 (pino 5), 10 kohm ao GND | 3,3 V à entrada, 5 V à saída | Só numa compilação com a saída simples ([8.1](#81-saídas-simples-opcionais)) |
+| Saída simples 2 (opcional) | 1 | `ATALAIA_SIMPLE_OUT2_PIN` | qualquer | entrada da porta 3 do 74AHCT125 (pino 9), 10 kohm ao GND | 3,3 V à entrada, 5 V à saída | A entrada da tensão da bateria da placa, que o módulo não usa: serve para uma saída |
 | Registo (TX da UART0) | 43 | -- | qualquer | RX de um adaptador USB-UART de 3,3 V, com o seu GND | 3,3 V | Interno da placa: só enquanto lês o registo |
 
 Trilhos, não GPIO: 3V3 (violeta) para as peças I2C e para o expansor do
@@ -206,8 +221,9 @@ teclado; GND (preto); o trilho de 5 V (laranja) para o anel, o amplificador e
 os LED dos botões. A lista completa dos pinos que nunca deves ligar está na
 [referência de pinos da Field Box](../field-box/BUILD.pt.md#15-referência-de-pinos) (secção 15).
 
-Os outros pinos do ecrã de uma Field Box (GPIO 1, 3, 33) não são usados pelo
-módulo: deixa-os sem ligação. O GPIO 0, 45 e 46 são pinos de arranque (boot
+Os outros pinos do ecrã de uma Field Box (GPIO 1, 3, 33) não são usados pelas
+peças do módulo: os GPIO 33 e 1 levam as saídas simples opcionais; sem elas,
+deixa os três sem ligação. O GPIO 0, 45 e 46 são pinos de arranque (boot
 strap); os pinos internos da placa estão listados no
 [mapa de pinos da Field Box](../field-box/README.md#pin-assignments-default-kconfig----heltec-v43).
 
@@ -301,6 +317,84 @@ e depois junta o interruptor da caixa:
 Depois, a [inspeção final](../field-box/BUILD.pt.md) da Field Box (9.9), menos a
 linha do ecrã.
 
+### 8.1 Saídas simples (opcionais)
+
+**Ainda não montadas em hardware.** Uma sirene, um estroboscópio, uma luz ou o
+comando de uma máquina de fumo ligados pelo jogo no telemóvel (rascunho do RFC
+«The expansion port», incremento 9, decisão EXP-26). As ligações são as da
+[secção 9.10 da Field Box](../field-box/BUILD.pt.md#910-saída-simples-opcional):
+um interruptor de relé RC que **abre quando o sinal para**, alimentado pela
+bateria da própria carga, o sinal pela porta livre do 74AHCT125 até uma tomada
+M8, com as mesmas regras: **só cargas de baixa tensão (no máximo 24 V DC),
+nunca a rede elétrica, uma máquina de fumo só pela sua entrada de comando de
+baixa tensão, nunca pirotecnia.** O que muda num módulo:
+
+1. **Os pinos:** a saída 1 no **GPIO 33** (porta 2: pino 5 do GPIO 33, 10 kohm
+   do pino 5 ao GND, pino 6 através de 330 ohm à tomada «OUTPUT 1»); a saída 2
+   no **GPIO 1** (porta 3: pino 9, pino 8 à «OUTPUT 2»). Um módulo pode ter o
+   besouro piezoelétrico no GPIO 45 **e** duas saídas.
+2. **O firmware:** compila com `python tools/docker_fw.py pod --simple-out=on`
+   (`on2` para duas). Um módulo não tem PIN de administração, por isso **é ao
+   compilar a saída que ela fica ativa**, e o seu uso (o nome pelo qual os
+   jogos a chamam: `siren`, `strobe`, `smoke`, `light`, `horn`, `out.1`) e o
+   seu tempo máximo ligada são linhas em `build-pod\sdkconfig`
+   ([secção 9](#9-primeira-gravação), a tabela de definições). O registo de
+   arranque diz `output 1 on GPIO 33: siren, enabled, at most 30 s`.
+3. **O que a liga:** o modo que corre no telemóvel (o fumo e a sirene da Bomba
+   quando a bomba explode, por exemplo) e o campo (os acionadores dos
+   cenários, o painel de saídas da organização), com as regras de uma caixa:
+   só enquanto o jogo decorre (e até 10 s depois do fim, para uma buzina de
+   fim de jogo), desligada no início, numa pausa e no fim, nunca mais tempo do
+   que o seu máximo, no máximo uma mudança a cada meio segundo.
+4. **Quando o telemóvel se vai, a saída desliga-se**, pelo próprio módulo: de
+   imediato quando o cabo USB sai ou a ligação Bluetooth cai, e passados 1,5 s
+   quando o telemóvel deixa de falar (uma app encravada mantém a ligação USB;
+   enquanto uma saída está ligada, a app fala com o módulo duas vezes por
+   segundo). Se o próprio módulo encravar ou ficar sem energia, os impulsos
+   param em meio segundo e o interruptor abre por ter perdido o sinal.
+5. **Verificações:** como o passo 7 da Field Box, no GPIO 33 (e 1): 10 kohm ao
+   GND, 330 ohm da porta ao pino 4 da tomada, nada no seu pino 1. Antes do
+   primeiro jogo, cada interruptor RC passa a sua verificação de bancada
+   ([BRING_UP.md, passo 8b](../../firmware/esp32/docs/BRING_UP.md#step-8b-simple-output-rc-relay-switch)).
+   Depois, com um telemóvel ligado e um jogo a decorrer, tira o cabo USB com a
+   saída ligada: o relé abre em cerca de um segundo.
+
+### 8.2 Porta de expansão (opcional)
+
+**Ainda não montada em hardware.** A mesma porta de uma Field Box: a tomada
+M12 e a placa da porta (buffer de ligação a quente, TVS, fusível, díodo) no
+barramento I2C da placa, [guia de montagem da porta de
+expansão](../expansion-port/BUILD.pt.md). Num módulo de E/S o barramento é o
+do expansor do teclado, do leitor NFC e do medidor (GPIO 17 SDA, 18 SCL): nada
+mais muda nas ligações. Um módulo da porta por tomada: um [módulo de
+alvo](../target-addon/BUILD.pt.md) (endereço 0x58) ou um módulo de saídas
+(0x5C).
+
+1. **O firmware** procura módulos em todas as compilações do módulo de E/S
+   (`CONFIG_ATALAIA_POD_PORT`): no arranque, e até 2 s depois de um ser
+   ligado. O registo diz `expansion: 0x58 added: 58:target/1.0.0:hit`. Os
+   relés de um módulo de saídas só são emprestados ao telemóvel numa
+   compilação feita com `python tools/docker_fw.py pod --module-outputs=on`
+   (`CONFIG_ATALAIA_POD_MODULE_OUTPUTS`): um módulo de E/S não tem PIN de
+   administração, por isso compilá-los é o que os ativa, como às saídas
+   simples. O seu tempo máximo ligados é `CONFIG_ATALAIA_POD_MODULE_MAX_ON_S`
+   (30 s por omissão), nunca mais do que o do próprio módulo da porta. O
+   registo diz `module 5c channel 1 lent to the phone as siren, at most 30 s`.
+2. **Um alvo:** os impactos na placa chegam ao jogo no telemóvel enquanto o
+   jogo decorre e o jogo armou a placa (Target Windows, a placa da Bomba...).
+3. **Um módulo de saídas:** os seus relés ligam-se como as saídas simples (o
+   modo, o campo, o GM; as mesmas regras). **Quando o telemóvel se vai, o
+   módulo de E/S desliga-os**, logo que a ligação cai e ao fim de 1,5 s com um
+   telemóvel calado; se o próprio módulo de E/S parar, o módulo de saídas
+   desliga-os em 1,5 s (a sua concessão).
+4. **A consola do GM** mostra as saídas e os módulos do módulo de E/S debaixo
+   do telemóvel (o telemóvel passa-os), e **Desligar todas as saídas**
+   chega-lhes, pelo rádio do módulo de E/S e pelo Wi-Fi do campo.
+5. **Verificações:** a [secção 8 do guia da porta](../expansion-port/BUILD.pt.md#8-verificações-e-testes);
+   depois, com um telemóvel ligado e um jogo a decorrer, bate na placa (um
+   impacto no ecrã do telemóvel) e tira o cabo USB com um relé ligado: abre em
+   cerca de um segundo.
+
 ## 9. Primeira gravação
 
 O firmware do módulo grava-se a partir do teu computador, como o da Field Box
@@ -364,6 +458,10 @@ firmware/esp32/README.md):
 | Só USB, sem Bluetooth | `# CONFIG_ATALAIA_POD_BLE is not set` |
 | Anel de 12 ou 16 LED | `CONFIG_ATALAIA_LED_COUNT=12` (ou 16) |
 | Antena com mais de 2 dBi | `CONFIG_ATALAIA_RADIO_ANTENNA_GAIN_DBI=` o seu ganho, arredondado para cima |
+| O uso de uma saída simples ([8.1](#81-saídas-simples-opcionais)) | `CONFIG_ATALAIA_POD_OUT1_FUNCTION="siren"` (`strobe`, `smoke`, `light`, `horn`, `out.1`; saída 2: `POD_OUT2_FUNCTION`) |
+| O seu tempo máximo ligada | `CONFIG_ATALAIA_POD_OUT1_MAX_ON_S=10` (1-600 s, 30 por omissão; o módulo diz-o à app) |
+| Sem porta de expansão ([8.2](#82-porta-de-expansão-opcional)) | `# CONFIG_ATALAIA_POD_PORT is not set` (opcional: sem nenhum módulo ligado custa uma sondagem a cada 250 ms) |
+| Os relés de um módulo de saídas emprestados ao telemóvel | `docker_fw.py pod --module-outputs=on`, ou `CONFIG_ATALAIA_POD_MODULE_OUTPUTS=y`; o seu tempo máximo `CONFIG_ATALAIA_POD_MODULE_MAX_ON_S=60` (1-600 s, 30 por omissão) |
 
 Deixa `CONFIG_ATALAIA_POD_BLE_ENCRYPTED` ligado: impede que a chave do jogo
 circule numa ligação Bluetooth sem cifra.
@@ -439,6 +537,11 @@ módulo em particular:
 | O telemóvel nunca mostra "Alguém abriu o módulo de E/S" | Sem interruptor no GPIO 47, ou nunca o leu fechado (a tampa não o carrega); um interruptor ligado ao contrário exige `POD_TAMPER_OPEN_HIGH` desligado |
 | O módulo comunica uma abertura sozinho | O interruptor larga quando a caixa leva uma pancada: monta-o mais firme, ou usa um interruptor de alavanca |
 | O botão 4 nunca regista | Está no P7 do PCF8574: o expansor tem de estar montado e ser encontrado no arranque |
+| A sirene (ou o estroboscópio, o fumo) nunca liga | Uma compilação sem `--simple-out`; o seu uso em `build-pod\sdkconfig` não é o que o jogo pede (o registo de arranque mostra-o); nenhum jogo a decorrer; a bateria do próprio interruptor |
+| Um módulo da porta não é encontrado (nenhum `expansion: ... added` no registo) | Como numa Field Box ([guia da porta, secção 9](../expansion-port/BUILD.pt.md#9-resolução-de-problemas)): o seu endereço, o cabo, a alimentação, o firmware |
+| Os impactos do alvo nunca chegam ao jogo | O jogo não armou a placa, ou não está a decorrer; a app do telemóvel é mais antiga do que o módulo de E/S (ignora a placa) |
+| Os relés de um módulo de saídas não são oferecidos ao jogo (todos ou alguns) | Uma compilação sem `--module-outputs=on`; um módulo de E/S com todas as peças: empresta as que cabem, as primeiras, e o registo nomeia as outras (`IDENT has no room for 3 output(s), not lent (off, refused): strobe, smoke, out.4`; [secção 2](#2-o-que-está-decidido-e-o-que-não-está)) |
+| A saída desliga-se sozinha ao fim de um ou dois segundos | O telemóvel deixou de falar com o módulo (a app em segundo plano ou terminada: vê as definições de bateria da app) ou a ligação caiu: o módulo desliga-a de propósito |
 | Algo quente, um cheiro, fumo | Desliga o telemóvel, desliga o interruptor, tira o fusível, tira as células para um saco à prova de fogo |
 
 Se encontrares uma avaria que não está aqui, ou um passo errado, abre uma
