@@ -894,3 +894,14 @@ the app (`python tools/docker_app.py apk`). None of them has been run yet.
       Note the Android version.
     - [ ] *Without the OLED*: build with `CONFIG_ATALAIA_OLED_STATUS` off:
       pairing still works with the passkey read from the log.
+12. **The expansion port** (draft RFC "The expansion port", increment 9;
+    [I/O pod build guide, section 8.2](../../../hardware/io-pod/BUILD.md#82-expansion-port-optional)).
+    With a target module on the socket, the boot log says
+    `expansion: 0x58 added: 58:target/1.0.0:hit` and the `I/O pod ...` line
+    lists `{"id":"hit","type":"hit"}`; link the phone and run Target Windows:
+    a strike on the plate shows on the phone, and the GM console shows the
+    target's chip under the phone. Unplug the module during the game: the
+    console raises the module's loss. With an output module and a build with
+    `--module-outputs=on`, switch a relay from the GM console, then pull the
+    USB cable: the relay opens within about a second; power the pod off with
+    a relay on: the module opens it within 1.5 s (its lease).

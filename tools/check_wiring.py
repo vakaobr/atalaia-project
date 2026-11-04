@@ -131,6 +131,11 @@ RP2040_ADC_PINS = range(26, 30)
 EXPANSION_ADDRESSES = range(0x58, 0x60)
 BOX_ADDRESSES = {0x24: "the PN532", 0x36: "the battery gauge", 0x3C: "the board's OLED"}
 KEYPAD_SEARCH = (range(0x20, 0x28), range(0x38, 0x40))
+# A guide whose pins are those of another firmware variant: its table is checked against that
+# build's Kconfig defaults (the I/O pod's simple outputs: GPIO 33 and 1, not the Field Box's 46).
+GUIDE_CHOICE: dict[Path, frozenset[str]] = {
+    REPO / "hardware" / "io-pod" / "BUILD.md": frozenset({"ATALAIA_POD_MODE"}),
+}
 GUIDE_SYMBOL = re.compile(r"`(ATALAIA_\w+)`")
 # The project page's build page: <td data-kconfig="ATALAIA_BTN1_PIN">4</td>.
 SITE_CELL = re.compile(r'data-kconfig="(ATALAIA_\w+)"[^>]*>([^<]*)<')

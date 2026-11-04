@@ -30,7 +30,14 @@
 ///   goes. The model then counts them off too ([detach]).
 ///
 /// The pod keeps its own limits (its build's longest on, the 500 ms floor),
-/// so a phone that asks for more gets what the pod allows.
+/// so a phone that asks for more gets what the pod allows. A pod that tells
+/// each output's longest on (the EVT pod.modules' `max_on_s`, the port half
+/// of increment 9) has it used here instead of 30 s ([maxOn]).
+///
+/// The pod's expansion port lends an output module's channels the same way
+/// (`{"id": "strobe", "type": "output"}`, no `feedback` key): the phone
+/// treats them as it treats a simple output (its 500 ms floor too, which a
+/// module's channel would not need).
 library;
 
 import '../controller/controller_outputs.dart' show outputParamsProblem;
@@ -97,18 +104,61 @@ class PropOutputs {
   ({bool on, int leftMs, String? source}) state(String id, int t) =>
       has(id) ? _box.state(id, t) : (on: false, leftMs: 0, source: null);
 
-  /// The pod said who it is (linked, or linked again): its outputs, each
-  /// off (the pod starts them off). The game's state carries over.
+  /// Each output's longest on as the pod told it (ms), by id.
+  final _maxOnMs = <String, int>{};
+
+  /// The pod said who it is (linked, or linked again, or its capabilities
+  /// changed: a module plugged into its port): its outputs. One the model
+  /// had already keeps its state when the pod kept its link (a module
+  /// plugged in beside an output that is on); after a lost link every
+  /// output is off ([detach]). The game's state carries over.
   void attach(PodIdent ident) {
     final fitted = <String, int>{
       for (final c in ident.capabilities)
         if (c['type'] == 'output' && c['id'] is String)
-          c['id']! as String: podOutputMaxOnMs,
+          c['id']! as String: _maxOnMs[c['id']! as String] ?? podOutputMaxOnMs,
     };
-    _box = BoxOutputs(fitted, onSwitched, true)
-      ..game = _box.game
-      ..graceUntil = _box.graceUntil;
+    _rebuild(fitted);
     _linked = fitted.isNotEmpty;
+  }
+
+  /// The pod told each output's longest on, in seconds (the EVT pod.modules'
+  /// `max_on_s`): the model uses them from now on (1 to 600 s; others are
+  /// left at 30 s).
+  void maxOn(Map<String, Object?> seconds) {
+    _maxOnMs
+      ..clear()
+      ..addAll({
+        for (final e in seconds.entries)
+          if (e.value is int &&
+              (e.value! as int) >= 1 &&
+              (e.value! as int) <= 600)
+            e.key: (e.value! as int) * 1000,
+      });
+    _rebuild({
+      for (final id in _box.channels.keys) id: _maxOnMs[id] ?? podOutputMaxOnMs,
+    });
+  }
+
+  /// The longest on the model uses for [id] (ms), or null for none.
+  int? maxOnMs(String id) => _box.channels[id]?.maxOnMs;
+
+  /// A new model for [fitted], the state of the outputs it had carried over.
+  void _rebuild(Map<String, int> fitted) {
+    final old = _box;
+    _box = BoxOutputs(fitted, onSwitched, true)
+      ..game = old.game
+      ..graceUntil = old.graceUntil;
+    for (final c in _box.channels.values) {
+      final was = old.channels[c.id];
+      if (was == null) continue;
+      c
+        ..startMs = was.startMs
+        ..untilMs = was.untilMs
+        ..onMs = was.onMs
+        ..offMs = was.offMs
+        ..source = was.source;
+    }
   }
 
   /// The pod's link went: the pod turned its outputs off itself; the model

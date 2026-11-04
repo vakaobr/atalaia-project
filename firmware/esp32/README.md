@@ -483,6 +483,24 @@ then the version's build metadata, then the outputs (`pod_ident_level_t`). Size 
 always built in), 697,808 with one output, 704,336 with two and the buzzer (17 % of the 4 MB slot);
 0 warnings.
 
+**The expansion port** (`CONFIG_ATALAIA_POD_PORT`, on by default; the port half of increment 9,
+decisions EXPI9-18 to EXPI9-26; `main/pod/pod_port.c`): the box's port driver (`expansion.c`) and its
+game glue (`expansion_box.c`) on the pod's I2C bus (`expansion_esp.c` over `hal_esp_i2c`, GPIO 17/18,
+the bus of the keypad's expander, the NFC reader and the gauge), ticked by the pod's loop after the
+outputs, with a phone on a link in the game's place. A module's hit channels are lent as `hit`
+(`hit.2`, each with its `channel`), armed by the phone's CMD `arm`/`disarm` and only while a phone is
+linked (the arming forgotten when the last link goes); a hit is the EVT `hit` `{"strength"}`. An output
+module's channels join the output layer after the simple outputs and are lent as `output` without the
+`feedback` flag, only with `CONFIG_ATALAIA_POD_MODULE_OUTPUTS` (off by default; `docker_fw.py pod
+--module-outputs=on`), each at most `CONFIG_ATALAIA_POD_MODULE_MAX_ON_S` (30 s) and the module's own;
+the driver holds the module's lease, and the output layer's link and silence rules turn them off.
+After every IDENT and change the pod sends the EVT `pod.modules` (a box's `node.modules` text and each
+lent output's longest on, `max_on_s`), and `pod.module_lost` for a module that goes while a phone is
+linked; a change of what IDENT lends sends IDENT again. IDENT's compaction gains a level: from
+`POD_IDENT_COMPACT` the hit sensors' `channel` goes too, and `POD_IDENT_NO_PORT` leaves them out after
+the outputs. Size (ESP-IDF 5.3.2, 2026-11-04): 710,096 bytes with one simple output and the module
+outputs on (17 % of the slot); 0 warnings.
+
 The radio is the USB modem's own code (`main/modem/modem.c`, frames
 shifted by 3): the phone sends plaintext packets with RADIO_TX, the pod
 encrypts them with the game key, keeps the duty cycle and the TX power of
@@ -529,6 +547,9 @@ lists the checks that need the board and a phone. Code:
 - `main/pod/pod_settings.c` -- the settings pushed over the radio: parse, merge, stored form, apply (plain C);
 - `main/pod/pod_outputs.c` -- the simple outputs lent to the phone: descriptors, CMDs, the link and
   lease rules, on the box's output layer (plain C);
+- `main/pod/pod_port.c` -- the expansion port lent to the phone: the box's port driver, hits and
+  arming, a module's outputs, the EVTs `pod.modules` and `pod.module_lost`, IDENT's capabilities
+  (plain C);
 - `main/pod/pod_ble.c` -- the GATT service's logic, UUIDs and advertising
   data (plain C); `pod_ble_nimble.c` puts it on NimBLE;
 - `main/pod/pod_task.c`, `pod_main.c` -- the ESP-IDF task, USB, audio queue,
@@ -540,12 +561,17 @@ GATT service with the Bluetooth stack stubbed), `test/test_proxy_codec.c`
 (the frames); the simple outputs in `test/test_pod.c` too (`test_outputs_*`: the IDENT vector
 `pod_simple_output`, IDENT's room with every part, the CMDs and their limits against a fake RMT, the
 boot's end of signal, a live off while linked, off when USB goes, after 1.5 s of silence and not
-while the phone pings). `test/pod_host/` builds the pod's code with real AES-CCM into
+while the phone pings); the port in `test/test_pod.c` too (`test_port_*`, on the module core behind a
+fake bus: the IDENT vector `pod_port_modules`, the EVT `pod_modules`, arming, hits with their
+channel, a module plugged in and unplugged, a module's relay switched and turned off when the link
+goes or the phone falls silent, the module outputs not lent by default, IDENT's room). `test/pod_host/` builds the pod's code with real AES-CCM into
 a Linux program (USB and Bluetooth links as TCP sockets, the radio as UDP,
 the hardware on stdin; `--simple-out siren[@GPIO]`, twice at most, prints `OUTPUT siren on|off`
-and `PIN g33 low`, and `status` adds `outputs`) that the app's Dart tests
+and `PIN g33 low`, and `status` adds `outputs`; `--module target|out4[@ADDR]`, `--module-outputs`,
+`--module-max-on S` put simulated modules on the real module core on its port, with `hit`, `plug`,
+`unplug` and `@modules` on stdin and `MODULE 5c outputs=0x01` on stdout) that the app's Dart tests
 (`app/test/pod/pod_host_test.dart`, `app/test/radio/pod_radio_link_test.dart`,
-`app/test/prop/prop_pod_outputs_test.dart`)
+`app/test/prop/prop_pod_outputs_test.dart`, `app/test/prop/prop_pod_port_test.dart`)
 and the controller's end-to-end test (`controller/tests/test_pod_e2e.py`)
 drive.
 
@@ -604,7 +630,9 @@ I/O pod options (under "I/O pod"): `ATALAIA_POD_BTN1_TEAM` ..
 the game's N-th team), `ATALAIA_POD_TAMPER_PIN` (the enclosure switch,
 default 47, -1 = none) and `ATALAIA_POD_TAMPER_OPEN_HIGH`,
 `ATALAIA_POD_BLE` (the Bluetooth link, default on) and
-`ATALAIA_POD_BLE_ENCRYPTED` (frames only on an encrypted link, default on).
+`ATALAIA_POD_BLE_ENCRYPTED` (frames only on an encrypted link, default on). Under "Expansion port (I/O
+pod)": `ATALAIA_POD_PORT` (default on), `ATALAIA_POD_MODULE_OUTPUTS` (default off) and
+`ATALAIA_POD_MODULE_MAX_ON_S` (default 30).
 
 Piezo buzzer options (under "Piezo buzzer", the Field Box and the pod; decisions BZR-1 to BZR-8):
 `ATALAIA_BUZZER` (default **off**: a passive piezo is fitted) and `ATALAIA_BUZZER_PIN` (default 45).
@@ -752,7 +780,7 @@ per burst and `PIN g46 low t=<ms>` when the last one has gone out; `status` adds
 **Not in this increment** (the RFC's later ones): the controllers sending CMD 12, their output API,
 `modules` in the node list and the capability start check, the console's outputs panel (3); modes
 using outputs (4); scenario triggers (5); the I2C port and its modules (6-8, 11); the I/O pod's
-simple outputs (9: built on 2026-11-04, "The I/O pod" above; its port driver comes after 8). **Not yet
+simple outputs and port (9: built on 2026-11-04, "The I/O pod" above). **Not yet
 tried on hardware.**
 
 **Size** (ESP-IDF 5.3.2, 2026-11-03, against the commit before this change): the Field Box image grew from
