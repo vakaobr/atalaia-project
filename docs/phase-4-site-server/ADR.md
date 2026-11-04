@@ -3168,7 +3168,16 @@ S16-14, open):**
   of the player.
 - **Registering on the web pages**: the public pages have no login and no
   JavaScript, so their *Register* button leads to a page that says how to
-  register in the app with an account (S16-9).
+  register (S16-9). *Amended 2026-11-04 (decisions WREG-1 to WREG-12, open):*
+  that page now also leads to `/f/<slug>/games/<id>/register/web`, a page of
+  the staff pages' kind (no data in the page, same-origin modules, the API
+  with the bearer token, no cookie authorises a change) where a player logs
+  in (social login, a passkey, or the password when the server takes them),
+  makes the account with a social login under the app's rules (the notice
+  opened and ticked, 16 or older, its version; LEG-*), registers with the
+  same API, checks and records as the app, and gets the ticket as a QR code
+  and text to print; the app's way (S17-10) stays. The public pages
+  themselves keep no login and no JavaScript.
 
 ---
 

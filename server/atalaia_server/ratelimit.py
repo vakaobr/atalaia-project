@@ -16,6 +16,9 @@
 - 5 reports of club pages from one IP address an hour (plan phase 18).
 - 5 feedback forms from one IP address an hour, and 300 a day in all (a preview server's form, decision PV-8).
 - 30 remote GM commands a minute from one account (plan phase 19).
+- 20 game registrations and new tickets an hour from one account, whether from the app or the web registration page
+  (decision WREG-5): a registration needs an account and takes one place per game, so this only stops a script
+  from cycling register, cancel and new ticket.
 - 20 ATAK certificates an hour from one account, and 30 new connections a
   minute (16 open at once) from one address to the ATAK relay (Phase 4
   follow-up FU5; the relay keeps its own, ``atak_relay.py``), and 120 ``cot``
@@ -149,6 +152,7 @@ class Limits:
         self.feedback = RequestLimit(5, 3600, clock)              # preview feedback forms per IP address (PV-8)
         self.feedback_total = RequestLimit(300, 86400, clock)     # ... and all together, so the table cannot be flooded
         self.remote_commands = RequestLimit(30, 60, clock)        # remote GM commands per account (plan phase 19)
+        self.game_registrations = RequestLimit(20, 3600, clock)   # registrations and new tickets per account (WREG-5)
         self.atak_issue = RequestLimit(20, 3600, clock)           # ATAK certificates per account (FU5)
         self.hub_share = RequestLimit(10, 3600, clock)            # link codes and links per account (SVX-2)
         self.atak_cot = RequestLimit(120, 60, clock)              # a controller's cot messages per field (FU5-15)

@@ -89,7 +89,7 @@ On macOS and Linux, use `python3` if `python` is not found. The first build down
 
 A build from a checkout prints a version such as `0.6.1+12.g1a2b3c4` (or `0.7.0-dev.12+g1a2b3c4` between releases): the release's number, the number of changes since, and the code's identifier. It is also on the board's small screen at boot. Keep a note of it with the box. To get exactly a release's firmware, check out its tag (`git checkout v0.6.1`) and build there: a clean checkout of a tag says plain `0.6.1`.
 
-**Keys.** A build you make trusts the project's three release keys and two mode keys by default, the same as the released files, so a controller you run accepts the project's signed releases. Your own builds are not signed by the project: sign them with your own key and give the boxes its public half (`--release-keys=`, [section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)).
+**Keys.** A build you make trusts the project's two release keys and two mode keys by default, the same as the released files, so a controller you run accepts the project's signed releases. Your own builds are not signed by the project: sign them with your own key and give the boxes its public half (`--release-keys=`, [section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)).
 
 ## 3. Flash it
 
@@ -270,14 +270,14 @@ Two things use the field's Wi-Fi, and only between games: **firmware updates** a
 **The rules for firmware updates.** The box installs an update only if all of these are true:
 
 - No game is being played.
-- The update is signed by a **release key built into the box's own firmware** (`--release-keys`). By default that is the project's three release keys (root, CI, and the next CI key that replaces it), so the Field Box files from a GitHub release can be installed as updates; a box built with `--release-keys=` your own key trusts only that. The project's keys and what happens if one leaks are in [RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md).
+- The update is signed by a **release key built into the box's own firmware** (`--release-keys`). By default that is the project's two release keys (root and CI), so the Field Box files from a GitHub release can be installed as updates; a box built with `--release-keys=` your own key trusts only that. The project's keys and what happens if one leaks are in [RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md).
 - The version is higher than the one it runs.
 - It is the same variant and board (a V4.2 image never goes on a V4.3).
 - The battery is at 30 % or more, if the box has a gauge.
 
 **The short path.**
 
-**With the project's releases:** flash a box once over USB with a release, then upload a later release's `atalaia-field-box-<version>.bin` and its `.bin.release.json` in the console's **Boxes** tab. The controller's `[firmware] release_keys` already holds the project's keys by default. If your `controller.toml` lists them by hand (the example file did), add the next CI key `76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=` to the list: the project's releases move to that key after the first release that carries it ([RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md#rotating-the-ci-key-2026-11)). Press **Update to** (step 5). **With your own key:**
+**With the project's releases:** flash a box once over USB with a release, then upload a later release's `atalaia-field-box-<version>.bin` and its `.bin.release.json` in the console's **Boxes** tab. The controller's `[firmware] release_keys` already holds the project's keys by default (a Pi without the setting takes the new default when it starts). If your `controller.toml` lists them by hand (the example file did), make the list the root key `5tzPkN0AJSn+g34CP59linCRf/fcaWFc7GAAg7qzYNc=` and the CI key `76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=`, and drop the old CI key `rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw=` (key id `32b3c815ac30ad43`): the project's releases are signed with the CI key `a4f6002b0122b131` since the release after v0.7.0, and the old key is retired. Nothing removes it from your list for you. A site server's `ATALAIA_FIRMWARE_KEYS`, if you set it, drops it too. A box still on v0.6.1 or older trusts only the root and the old CI key: install v0.7.0 on it first (over the air or by USB), then the later releases ([RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md#rotating-the-ci-key-2026-11)). Press **Update to** (step 5). **With your own key:**
 
 1. Make a key with `tools/firmware_release.py keygen`. Keep the private file safe and out of the repository.
 2. Build the boxes with `--release-keys=<the public key>`. Flash them over USB, once. Updates cannot install a new bootloader.

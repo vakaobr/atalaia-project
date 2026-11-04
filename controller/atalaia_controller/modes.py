@@ -59,7 +59,7 @@ class ModePackage:
 
     def to_api(self) -> dict[str, Any]:
         manifest = yaml.safe_load(self.files["mode.yaml"]) or {}
-        return {
+        out: dict[str, Any] = {
             "id": self.mode.id,
             "kind": self.mode.kind,
             "name": self.mode.name,
@@ -77,6 +77,13 @@ class ModePackage:
             "files": sorted(self.files),
             "signed": self.signed,
         }
+        # A compiled scenario with triggers: the output functions they switch on each box (box name ->
+        # functions), which the console shows as a mode's roles' outputs (EXP-22, EXP-25).
+        block = manifest.get("scenario") if self.mode.kind == "scenario" else None
+        outputs = block.get("outputs") if isinstance(block, dict) else None
+        if isinstance(outputs, dict) and outputs:
+            out["outputs"] = outputs
+        return out
 
 
 def parse_package(files: dict[str, str], path: Path = Path("<upload>")) -> ModePackage:

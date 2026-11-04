@@ -11,6 +11,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:atalaia_app/controller/controller_outputs.dart';
+import 'package:atalaia_app/controller/controller_scenarios.dart';
 import 'package:atalaia_app/protocol/capability_types.g.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -192,6 +193,96 @@ void main() {
       ]);
       expect(codes(out), 'outputs:5:[siren]');
     });
+
+    test("a scenario's triggers count as the role's outputs (outputs.py)", () {
+      const objective = {
+        'requires': ['team_input'],
+        'optional': ['keypad', 'display'],
+      };
+      final b = capabilityTypeIds['button']!, o = capabilityTypeIds['output']!;
+      final k = capabilityTypeIds['keypad']!, d = capabilityTypeIds['display']!;
+      expect(withOutputs(objective, ['siren', 'horn', 'siren']), {
+        'requires': ['team_input'],
+        'optional': ['keypad', 'display', 'output'],
+        'outputs': ['siren', 'horn'],
+      });
+      expect(identical(withOutputs(objective, const []), objective), isTrue);
+      expect(identical(withOutputs(objective, null), objective), isTrue);
+      expect((withOutputs(bomb, ['horn', 'smoke'])! as Map)['outputs'], [
+        'smoke',
+        'siren',
+        'horn',
+      ]);
+      expect((withOutputs(alarm, ['horn'])! as Map)['optional'], isEmpty);
+      expect(withOutputs(null, ['horn']), {
+        'optional': ['output'],
+        'outputs': ['horn'],
+      });
+      Map<String, Object?> scenarioNode(
+        int n,
+        Object? caps,
+        Object? modules,
+        List<String> fns,
+      ) => {...node(n, 'objective', caps, modules), 'outputs': fns};
+      Map<String, List<Map<String, Object?>>> run(
+        List<Map<String, Object?>> nodes,
+      ) => checkNodes(nodes, (r) => {'objective': objective}[r]);
+      final strobe = modulesOf('g46:servo:strobe');
+      var out = run([
+        scenarioNode(4, [b, k, d, o], strobe, ['siren', 'horn']),
+        scenarioNode(5, [b, k, d], null, ['horn']),
+        scenarioNode(6, [b, k, d, o], strobe, []),
+      ]);
+      expect(out['missing_caps'], isEmpty);
+      expect(
+        out['warnings']!
+            .map((w) => '${w['code']}:${w['node']}:${w['capabilities']}')
+            .join(' '),
+        'outputs:4:[siren, horn] optional_caps:5:[output]',
+      );
+      expect(
+        out['warnings']!.first['text'],
+        'box-4 (objective) has none of the outputs the mode would switch: '
+        'siren, horn',
+      );
+      out = run([
+        scenarioNode(
+          4,
+          [b, k, d, o],
+          modulesOf('g46:servo:horn'),
+          ['siren', 'horn'],
+        ),
+      ]);
+      expect(out['warnings'], isEmpty);
+    });
+  });
+
+  test("a compiled scenario's outputs in its meta (scenario_service.py)", () {
+    expect(
+      boxOutputs({
+        'alpha': ['siren', 'horn'],
+        'bravo': <Object?>[],
+        'c': 'x',
+        'd': [1, 'light'],
+      }),
+      {
+        'alpha': ['siren', 'horn'],
+        'd': ['light'],
+      },
+    );
+    expect(boxOutputs(null), isEmpty);
+    const text =
+        "id: org.club.s\nversion: '1'\nkind: scenario\nname: S\nscenario:\n"
+        '  nodes: {alpha: {role: objective}}\n  objectives: []\n'
+        '  outputs: {alpha: [siren, horn]}\n';
+    final meta = ScenarioMeta.parse(text)!;
+    expect(meta.nodeOutputs('alpha'), ['siren', 'horn']);
+    expect(meta.nodeOutputs('bravo'), isEmpty);
+    expect(meta.nodeOutputs(null), isEmpty);
+    final before = ScenarioMeta.parse(
+      text.replaceFirst('  outputs: {alpha: [siren, horn]}\n', ''),
+    )!;
+    expect(before.outputs, isEmpty);
   });
 
   test('modules and a lost one', () {

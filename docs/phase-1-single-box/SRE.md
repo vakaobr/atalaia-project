@@ -19,6 +19,11 @@ restored on reboot; device never reboots after setup), one is a security
 defect (admin PIN in serial log), and one would cause an immediate OOM crash
 on any Reduced-tier board.
 
+**Update 2026-11-04:** all four were fixed before the firmware's first commit
+(74acd381, 2026-10-17, which added this review with it; `REVIEW.md` lists the
+fixes). The review's text is kept as written; each issue below and the
+troubleshooting rows say where the fix is.
+
 ---
 
 ## Operational Surface
@@ -142,8 +147,8 @@ For the 2-hour stability gate, watch for:
 | Device reboots repeatedly on boot | Panic in HAL init or LittleFS mount failure | Attach serial; read panic backtrace; check wiring / Vext (GPIO 36) |
 | `mem_monitor` line stops appearing | `mem_monitor` task or scheduler stalled | Note timestamp; capture serial log; reflash with debug build |
 | DRAM `min` drops to < 20 KB | Memory leak in Lua heap or audio buffers | Stop game; verify mode script; check `LVGL_MEM_SIZE` and Lua mem_limit |
-| Game does not resume after power cut | `state_persist_load` not called (Blocking Issue 2) | Known defect — currently not implemented |
-| Setup portal says "Rebooting..." but device stays up | `esp_restart()` commented out (Blocking Issue 4) | Manually power-cycle after setup |
+| Game does not resume after power cut | `state_persist_load` not called (Blocking Issue 2) | Known defect — currently not implemented. **Fixed** (74acd381, 2026-10-17): `shell.c` resumes a stand-alone game with `state_persist_load` at boot, and `box_game.c` a field game; if a game still does not resume, capture the serial log |
+| Setup portal says "Rebooting..." but device stays up | `esp_restart()` commented out (Blocking Issue 4) | Manually power-cycle after setup. **Fixed** (74acd381, 2026-10-17): `wifi_setup.c` restarts from a 500 ms `esp_timer` after the answer; if it still stays up, power-cycle and capture the serial log |
 | Serial log shows task stall / TWDT timeout | One of the four tasks is blocked on I/O | Check HAL driver (SPI, I2C, I2S) for blocking calls without timeout |
 
 ### Alerts to configure
@@ -159,7 +164,7 @@ and memory floor reached.
 
 ### Blocking (must fix)
 
-**B-1: Admin PIN logged in plaintext**
+**B-1: Admin PIN logged in plaintext** (fixed in 74acd381, 2026-10-17: the POST body is no longer logged; today `wifi_setup.c` logs only the box's name and region)
 `wifi_setup.c` line 48 logs the entire POST body — which contains the
 admin PIN — at INFO level:
 ```c
@@ -169,7 +174,7 @@ Anyone with access to the serial log during setup learns the PIN. Replace
 with a redacted log (e.g., log only field names and lengths, not values),
 or remove the log entirely after the form parser is implemented.
 
-**B-2: `state_persist_load` is never called**
+**B-2: `state_persist_load` is never called** (fixed in 74acd381, 2026-10-17: `shell.c` calls it at boot and resumes the game; since phase 2 also `box_game.c` for a field game)
 `state_persist_save` is called every second in `node_runner_tick`, but
 there is no code path in `shell.c` or `node_runner.c` that calls
 `state_persist_load` at boot. The binary state is written but never
@@ -177,7 +182,7 @@ read back. Power-loss recovery (BRING_UP.md Step 12) will fail: the game
 will start fresh, not resume. The load + resume path must be implemented
 before the power-loss recovery test can be closed.
 
-**B-3: `node_runner.c` hardcodes `mem_limit = 256 KB` regardless of tier**
+**B-3: `node_runner.c` hardcodes `mem_limit = 256 KB` regardless of tier** (fixed in 74acd381, 2026-10-17: `node_runner_init` takes `mem_limit`, which `shell.c` sets per tier)
 `shell.c` detects PSRAM and sets `mem_limit = 64 KB` for Reduced-tier
 boards, but this value is never passed to `node_runner_start`. The
 `node_runner.c` implementation hardcodes `cfg.mem_limit = 256u * 1024u`
@@ -188,7 +193,7 @@ acknowledges the variable but the wiring was never implemented. Pass
 `mem_limit` through to `node_runner_start` and store it in
 `node_runner_t` for use in `node_runner_start`.
 
-**B-4: Reboot not implemented after Wi-Fi setup completes**
+**B-4: Reboot not implemented after Wi-Fi setup completes** (fixed in 74acd381, 2026-10-17: a 500 ms `esp_timer` calls `esp_restart()` after the answer)
 `config_post_handler` in `wifi_setup.c` has `esp_restart()` commented
 out with a note about deferring it to a timer. The portal page sends the
 response `"Saved. Rebooting..."` but the device never reboots. The

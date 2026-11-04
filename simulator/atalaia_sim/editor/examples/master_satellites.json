@@ -3396,10 +3396,11 @@
                      },
                      "DO0": {
                       "block": {
-                       "type": "atalaia_field_send",
+                       "type": "atalaia_field_output",
                        "id": "o10",
                        "fields": {
-                        "CMD": "output"
+                        "FN": "siren",
+                        "ACT": "pulse"
                        },
                        "inputs": {
                         "NODE": {
@@ -3413,80 +3414,29 @@
                           }
                          }
                         },
-                        "DATA": {
+                        "MS": {
                          "block": {
-                          "type": "atalaia_pair",
-                          "id": "o9",
+                          "type": "math_arithmetic",
+                          "id": "o6",
                           "fields": {
-                           "KEY": "capability"
+                           "OP": "MULTIPLY"
                           },
                           "inputs": {
-                           "VALUE": {
+                           "A": {
                             "block": {
-                             "type": "text",
-                             "id": "o2",
+                             "type": "atalaia_param",
+                             "id": "o4",
                              "fields": {
-                              "TEXT": "siren"
+                              "NAME": "siren_all_s"
                              }
                             }
-                           }
-                          },
-                          "next": {
-                           "block": {
-                            "type": "atalaia_pair",
-                            "id": "o8",
-                            "fields": {
-                             "KEY": "act"
-                            },
-                            "inputs": {
-                             "VALUE": {
-                              "block": {
-                               "type": "text",
-                               "id": "o3",
-                               "fields": {
-                                "TEXT": "pulse"
-                               }
-                              }
-                             }
-                            },
-                            "next": {
-                             "block": {
-                              "type": "atalaia_pair",
-                              "id": "o7",
-                              "fields": {
-                               "KEY": "ms"
-                              },
-                              "inputs": {
-                               "VALUE": {
-                                "block": {
-                                 "type": "math_arithmetic",
-                                 "id": "o6",
-                                 "fields": {
-                                  "OP": "MULTIPLY"
-                                 },
-                                 "inputs": {
-                                  "A": {
-                                   "block": {
-                                    "type": "atalaia_param",
-                                    "id": "o4",
-                                    "fields": {
-                                     "NAME": "siren_all_s"
-                                    }
-                                   }
-                                  },
-                                  "B": {
-                                   "block": {
-                                    "type": "math_number",
-                                    "id": "o5",
-                                    "fields": {
-                                     "NUM": 1000
-                                    }
-                                   }
-                                  }
-                                 }
-                                }
-                               }
-                              }
+                           },
+                           "B": {
+                            "block": {
+                             "type": "math_number",
+                             "id": "o5",
+                             "fields": {
+                              "NUM": 1000
                              }
                             }
                            }

@@ -319,6 +319,19 @@ servidor. Os resultados de equipa e de squad sem identificadores de pessoas
 (sem listas de elementos; um squad com menos de 3 pessoas é incluído na sua
 equipa) guardam-se **365 dias** (secção 7).
 
+**[ESCOLHA DO CAMPO:] Partilha de resultados de jogos com outros campos de
+um hub alojado** (desligada por omissão). Se a administração do campo a
+ligar, o operador do hub guarda, para a equipa dos outros campos do mesmo
+hub que também partilham os seus, uma cópia do modo de
+cada jogo terminado, da hora de início e de fim, da pontuação final de cada
+equipa, da equipa vencedora e do nome do campo. **Não se partilha nenhum
+identificador, nome, conta, evento ou lista de elementos**, nem os nomes que
+o campo dá a um jogo ou a uma equipa. A cópia é apagada quando o campo
+desliga a partilha, e nunca se guarda mais tempo do que o campo guarda os
+resultados do jogo (365 dias). [ADVOGADO: confirmar se isto precisa de um
+fundamento ou de uma menção além deste parágrafo, e se os campos que
+partilham precisam de termos entre si.]
+
 Fundamento: f) gerir os jogos e guardar o seu histórico [ADVOGADO:
 confirmar].
 
@@ -574,6 +587,22 @@ não contém dados pessoais e não abre nada depois de os dados da app serem
 apagados). A app não tem nenhuma biblioteca de análise,
 publicidade ou relatórios de falhas.
 
+**Num browser, em vez da app** [RASCUNHO: a aguardar jurista]. A inscrição
+num jogo também se pode fazer nas páginas web do campo (decisões WREG-*). A
+página guarda então, no teu browser: o token de sessão de curta duração (15
+minutos) só nesse separador, que desaparece quando o separador fecha; um
+cookie com o token de renovação da sessão, que os scripts não leem e que só
+vai para o endereço de sessão do servidor, até saíres ou a sessão terminar
+(uma semana sem uso, 30 dias no máximo); durante uma entrada com Google,
+Microsoft ou Apple, um cookie de 10 minutos no máximo que liga essa entrada
+a este browser; e, se o campo pôs as páginas a lembrar a língua escolhida,
+um cookie só com essa língua. O teu bilhete de check-in é mostrado uma vez e
+a página não o guarda: uma impressão ou captura de ecrã que faças fica à tua
+guarda. As páginas não carregam nada de outros sites e não têm análise de
+utilização. [JURISTA: são necessários para o serviço que a pessoa pede; se
+dispensam consentimento (Diretiva ePrivacy, art. 5.º, n.º 3, tal como
+transposta) e se este parágrafo é sequer necessário.]
+
 ## 10. Segurança
 
 HTTPS entre todas as partes; palavras-passe como hashes Argon2id; segredos
@@ -628,6 +657,11 @@ Texto curto para o ecrã *criar conta* da app (decisão S17-16). Tem de ser
 mostrado **antes** de a conta ser criada, ligar ao aviso completo (Parte A)
 e a pessoa tem de escolher continuar. Leva versão como a Parte A. Deve ter
 mais ou menos este tamanho. O inglês está em `privacy-notice-en.md`.
+[JURISTA: uma conta também pode agora ser criada na página de inscrição
+online do campo (WREG-*), com uma entrada Google, Microsoft ou Apple. Essa
+página liga ao aviso completo (Parte A), que tem de ser aberto antes de a
+caixa se poder marcar, e tem as mesmas duas caixas; não mostra este texto
+curto. Se o deve mostrar.]
 
 > **A tua conta em [NOME DO CAMPO]**
 >
@@ -786,7 +820,12 @@ parecer aprovado:
    comentários que guarda um contacto opcional durante 90 dias e a mensagem
    durante 12 meses, sem conta nem endereço) tem um aviso próprio, em nome do
    projeto. Não faz parte deste aviso do campo.
-5. **Chegadas sem inscrição como convidados** (2.2, decisões PWI-*,
+5. **A inscrição nas páginas web do campo** (WREG-11, 2026-11-04): o
+   parágrafo «Num browser, em vez da app» na secção 9 (o que o browser
+   guarda e se precisa de consentimento) e se a Parte B também se mostra na
+   criação de conta pela web. Nada mais muda: os dados, as finalidades, os
+   fundamentos e os prazos de uma inscrição são os mesmos da app.
+6. **Chegadas sem inscrição como convidados** (2.2, decisões PWI-*,
    acrescentado a 2026-11-04): a opção `[sync] push_walkins` envia ao
    servidor o identificador de jogador, o nome e os resultados de cronógrafo
    de quem chega sem inscrição, guardados 30 dias depois do jogo. O

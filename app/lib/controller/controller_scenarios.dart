@@ -110,6 +110,19 @@ Object? _plain(Object? v) => switch (v) {
   _ => v,
 };
 
+/// A compiled scenario's `scenario.outputs` (box name to the output
+/// functions its triggers switch), only well-formed entries kept; empty for a
+/// package compiled before triggers or without them.
+Map<String, List<String>> boxOutputs(Object? value) => {
+  if (value is Map)
+    for (final e in value.entries)
+      if (e.value is List && (e.value as List).any((f) => f is String))
+        pyStr(e.key): [
+          for (final f in e.value as List)
+            if (f is String) f,
+        ],
+};
+
 /// A scenario package's mode.yaml: its names and its `scenario` block.
 final class ScenarioMeta {
   const ScenarioMeta({
@@ -124,6 +137,7 @@ final class ScenarioMeta {
     required this.objectives,
     this.reveal,
     this.disclosure = 'members',
+    this.outputs = const {},
   });
 
   final String id;
@@ -144,6 +158,12 @@ final class ScenarioMeta {
 
   /// `leader`: only the assignee squad's leaders get the details (SQ-3).
   final String disclosure;
+
+  /// The output functions its triggers switch on each box (box name to
+  /// functions), as the compiler writes them: a role's `outputs:` for the
+  /// start check and the console (EXP-22, EXP-25; scenario_service.py
+  /// `box_outputs`).
+  final Map<String, List<String>> outputs;
 
   /// Null for a package that is not a compiled scenario.
   static ScenarioMeta? parse(String modeYaml) {
@@ -183,8 +203,14 @@ final class ScenarioMeta {
           ? block['reveal']! as String
           : null,
       disclosure: block['disclosure'] == 'leader' ? 'leader' : 'members',
+      outputs: boxOutputs(block['outputs']),
     );
   }
+
+  /// The output functions the triggers switch on the box of that scenario
+  /// name (empty for none).
+  List<String> nodeOutputs(Object? name) =>
+      name is String ? List.of(outputs[name] ?? const []) : const [];
 
   /// The boxes the GM names in the Join tab: name to role.
   Map<String, String> boxNodes() => {

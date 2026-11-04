@@ -177,6 +177,13 @@
     "sound_tip": "Plays one of the box's sounds, e.g. captured, armed or explosion.",
     "team_display": "light the team display for %1",
     "team_display_tip": "Shows a team's colour on the box's lights (none turns them off).",
+    "output": "switch output %1 %2 for %3 ms",
+    "output_tip": "Switches one of the box's outputs (a siren, a smoke machine...): pulse for that long, on (for at most that long; empty: the output's own longest time) or off. Only while the game runs, and a box without that output ignores it. List the function in the role's outputs on the Mode tab.",
+    "output_pattern": "flash output %1 on %2 ms, off %3 ms, for %4 ms",
+    "output_pattern_tip": "Turns one of the box's outputs on and off in turn (0.5-10 s each) for that long, e.g. a strobe.",
+    "act_pulse": "pulse",
+    "act_on": "on",
+    "act_off": "off",
     "param": "setting %1",
     "param_tip": "The value of one of the mode's settings, as the GM chose it for this game.",
     "param_declare": "setting %1 is a %2",
@@ -242,6 +249,10 @@
     "on_command_tip": "Runs the blocks inside when the GM presses this command, or when the controller script sends it.",
     "field_send_mode": "send the mode command %1 to box %2",
     "field_send_mode_tip": "Sends one of the mode's own commands to a box, which gets it in \"when the mode command … arrives\".",
+    "field_output": "switch output %1 of box %2 %3 for %4 ms",
+    "field_output_tip": "Switches an output of one box from the controller (field.send … \"output\"): pulse or on for that long, or off; * with off: every output of the box. The controller sends a box at most one start every 2 s.",
+    "field_output_pattern": "flash output %1 of box %2 on %3 ms, off %4 ms, for %5 ms",
+    "field_output_pattern_tip": "Turns an output of one box on and off in turn (0.5-10 s each) for that long, from the controller.",
     "problem_screen_unknown": "The screen \"{name}\" is neither one of the box's nor one of the mode's screen files (Mode tab).",
     "problem_polygon_points": "An area needs 3 to {name} corners.",
     "problem_no_role": "The mode needs at least one role.",
@@ -252,6 +263,9 @@
     "problem_role_no_input": "The role \"{name}\" needs none of the inputs the box script reacts to.",
     "problem_role_unknown": "\"{name}\" is not one of the mode's roles (Mode tab).",
     "problem_command_twice": "The GM command \"{name}\" is declared twice.",
-    "problem_command_unhandled": "The GM command \"{name}\" has no \"when the mode command … arrives\" block."
+    "problem_command_unhandled": "The GM command \"{name}\" has no \"when the mode command … arrives\" block.",
+    "problem_output_ms": "This output block needs its time in ms.",
+    "problem_output_all": "* (every output) can only be switched off.",
+    "problem_output_unlisted": "The output \"{name}\" is in no role's outputs (Mode tab): list it there, so the console and the start check know the mode uses it."
   }
 }
