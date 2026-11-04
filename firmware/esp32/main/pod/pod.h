@@ -57,18 +57,21 @@ typedef enum {
  *   POD_IDENT_COMPACT     the buttons' colours, the outputs' "feedback" flags and the port's hit
  *                         sensors' "channel" left out (all optional to the phone);
  *   POD_IDENT_SHORT_FW    and fw_version cut to its release (0.8.0-dev.412+g8560d54: 0.8.0);
- *   POD_IDENT_NO_OUTPUTS  and the outputs left out (logged: a pod with every part, a long
- *                         version and two outputs);
- *   POD_IDENT_NO_PORT     and the expansion port's hit sensors left out too (logged).
- * After the last, the capabilities are left out altogether.
+ *   POD_IDENT_TRIM        and the outputs left out one at a time, the last first (trim 1, 2 ...:
+ *                         a pod with every part, a long version and two outputs, or every part
+ *                         and an output module), until the rest fit or none is left (logged,
+ *                         with the ones left out; decision EXPI9-27);
+ *   POD_IDENT_NO_PORT     and every output and the expansion port's hit sensors left out (logged).
+ * After the last, the capabilities are left out altogether. An output the IDENT sent left out is
+ * not lent: it is off and refused until an IDENT lists it (ident_sent, pod_port_ident_sent).
  */
 typedef enum {
     POD_IDENT_FULL = 0,
     POD_IDENT_COMPACT = 1,
     POD_IDENT_SHORT_FW = 2,
-    POD_IDENT_NO_OUTPUTS = 3,
+    POD_IDENT_TRIM = 3,
     POD_IDENT_NO_PORT = 4,
-    POD_IDENT_LEVELS = 5,
+    POD_IDENT_LEVELS = 5, /* ident_sent's level for an IDENT sent without capabilities */
 } pod_ident_level_t;
 
 /* What the pod's settings made of a CMD pod (pod_settings.h). */
@@ -89,8 +92,11 @@ typedef struct {
     bool (*command)(void *ctx, const atalaia_proxy_msg_t *cmd);
     /* The IDENT's fw_version, caps_json and battery; the pod fills has_radio,
      * protocol_version, measure, field_frames and pair_frames. level: what to leave out
-     * (pod_ident_level_t; the pod itself cuts fw_version from POD_IDENT_SHORT_FW on). */
-    void (*ident)(void *ctx, atalaia_proxy_ident_t *out, pod_ident_level_t level);
+     * (pod_ident_level_t; the pod itself cuts fw_version from POD_IDENT_SHORT_FW on); trim: at
+     * POD_IDENT_TRIM, how many outputs to leave out, the last first (0 at the other levels).
+     * Returns how many outputs caps_json lists (the pod trims while there are some). Called once
+     * per try: what it writes is only a proposal until ident_sent. */
+    int (*ident)(void *ctx, atalaia_proxy_ident_t *out, pod_ident_level_t level, int trim);
     /* A link became active (may be NULL): the capabilities may report their
      * state again (an open case). */
     void (*link_active)(void *ctx, pod_link_t link);
@@ -103,6 +109,10 @@ typedef struct {
      * {"rev"}; on APPLIED it also sends its IDENT again (the buttons' colours). May be NULL:
      * the CMD is then passed to the phone like any other packet. */
     pod_config_result_t (*config)(void *ctx, const char *params_json, uint32_t *rev);
+    /* The IDENT that goes out was the last ident call's (level and trim), or, at
+     * POD_IDENT_LEVELS, one without capabilities: what it did not list is not lent
+     * (pod_port_ident_sent). May be NULL. */
+    void (*ident_sent)(void *ctx, pod_ident_level_t level, int trim);
 } pod_io_t;
 
 typedef struct {

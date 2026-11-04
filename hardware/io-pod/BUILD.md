@@ -112,9 +112,11 @@ Decided (in the firmware and the design documents):
 Not decided, or not supported yet:
 
 - **A pod with every part and an output module**: the pod's description of
-  itself to the phone (256 bytes) then has room for the module's hit sensor
-  but not its outputs; a pod built for an output module leaves out the parts
-  it does not use (decision EXPI9-23).
+  itself to the phone (256 bytes) then has room for few of the module's
+  outputs: it lends as many as fit, the first ones, and keeps the others off
+  (with every part and an out4, one of the four; with a target as well, none).
+  A pod built for an output module leaves out the parts it does not use
+  (decisions EXPI9-23, EXPI9-27).
 - **Power from the phone.** On USB, the phone powers the board; with the pod's
   main switch on, the board's charger may then charge the pod's cell from the
   phone, as a Field Box charges from any USB charger. Whether a pod should do

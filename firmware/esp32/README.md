@@ -469,7 +469,8 @@ its last link goes** and **after 1.5 s without a frame from the phone while one 
 sends RADIO_CMD PING twice a second then; `POD_OUT_QUIET_MS`). The bursts are renewed by the pod's
 loop, so a hung pod stops them within 0.5 s. IDENT still fits in 256 bytes: with every part, the
 longest version and an output, the pod leaves out the buttons' colours and the `feedback` flags,
-then the version's build metadata, then the outputs (`pod_ident_level_t`). Size (ESP-IDF 5.3.2,
+then the version's build metadata, then the outputs one at a time, the last first
+(`pod_ident_level_t`, `POD_IDENT_TRIM`; decision EXPI9-27). Size (ESP-IDF 5.3.2,
 2026-11-04): the pod image was 689,888 bytes before; 694,704 with the option off (the output layer is
 always built in), 697,808 with one output, 704,336 with two and the buzzer (17 % of the 4 MB slot);
 0 warnings.
@@ -489,7 +490,12 @@ After every IDENT and change the pod sends the EVT `pod.modules` (a box's `node.
 lent output's longest on, `max_on_s`), and `pod.module_lost` for a module that goes while a phone is
 linked; a change of what IDENT lends sends IDENT again. IDENT's compaction gains a level: from
 `POD_IDENT_COMPACT` the hit sensors' `channel` goes too, and `POD_IDENT_NO_PORT` leaves them out after
-the outputs. Size (ESP-IDF 5.3.2, 2026-11-04): 710,096 bytes with one simple output and the module
+the outputs. The outputs go one at a time, the last first (`POD_IDENT_TRIM`, decisions EXPI9-27 and
+EXPI9-28): the pod logs which ones it left out, and a left-out output is **withheld** until an IDENT
+lists it again: turned off at once if it was on, refused (its CMD names no capability, and the output
+layer refuses it as disabled), and left out of `pod.modules` (`pod_port_ident_sent`). A pod with
+every part and an out4 module lends one of the four channels (vector `pod_full_out4_trimmed`); with a
+target too, none fits (236 bytes before the outputs, 22 for each). Size (ESP-IDF 5.3.2, 2026-11-04): 710,096 bytes with one simple output and the module
 outputs on (17 % of the slot); 0 warnings.
 
 The radio is the USB modem's own code (`main/modem/modem.c`, frames

@@ -63,8 +63,8 @@ void main() {
       'armed while the game runs, a module relay switched', () async {
     final pod = await HostPod.start(
       // A pod with one button and nothing else of its own, so that IDENT has
-      // room for every output (a pod with every part lends the module's hit
-      // but not its outputs: pod.h, POD_IDENT_NO_OUTPUTS).
+      // room for every output (a pod with every part and a target lends the
+      // module's hit and none of its outputs: pod.h, POD_IDENT_TRIM).
       args: [
         '--no-radio',
         '--buttons',

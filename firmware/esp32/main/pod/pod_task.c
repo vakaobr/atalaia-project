@@ -218,14 +218,23 @@ static int battery_pct(void)
     return b.voltage_mv > 0 ? (int)b.percent : -1;
 }
 
-static void io_ident(void *ctx, atalaia_proxy_ident_t *out, pod_ident_level_t level)
+static int io_ident(void *ctx, atalaia_proxy_ident_t *out, pod_ident_level_t level, int trim)
 {
     (void)ctx;
     memcpy(out->fw_version, fw_version, sizeof(out->fw_version));
-    pod_port_ident_caps(&port, &caps, level, out->caps_json, sizeof(out->caps_json));
+    int listed =
+        pod_port_ident_caps(&port, &caps, level, trim, out->caps_json, sizeof(out->caps_json));
     int pct = battery_pct();
     out->has_battery = pct >= 0;
     out->battery_pct = pct >= 0 ? (uint8_t)pct : 0;
+    return listed;
+}
+
+static void io_ident_sent(void *ctx, pod_ident_level_t level, int trim)
+{
+    (void)ctx;
+    (void)trim;
+    pod_port_ident_sent(&port, level);
 }
 
 static bool emit(void *ctx, const char *cap_id, const char *event, const char *data_json)
@@ -441,6 +450,7 @@ void pod_task_start(const hal_t *hal, const pod_caps_config_t *cfg)
         .now_ms = io_now,
         .command = io_command,
         .ident = io_ident,
+        .ident_sent = io_ident_sent,
         .link_active = io_link_active,
         .log = io_log,
         .ctx = NULL,
@@ -463,7 +473,7 @@ void pod_task_start(const hal_t *hal, const pod_caps_config_t *cfg)
 #endif
 
     char json[ATALAIA_PROXY_JSON_MAX];
-    pod_port_ident_caps(&port, &caps, POD_IDENT_FULL, json, sizeof(json));
+    pod_port_ident_caps(&port, &caps, POD_IDENT_FULL, 0, json, sizeof(json));
     ESP_LOGI(TAG,
              "I/O pod %s, core %s: radio %s, Bluetooth %s, %d simple output(s), expansion port %s "
              "(%d module(s)), capabilities %s",

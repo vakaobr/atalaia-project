@@ -119,9 +119,10 @@ Não decidido, ou ainda sem suporte:
 
 - **Um módulo de E/S com todas as peças e um módulo de saídas**: a descrição
   que o módulo de E/S dá de si ao telemóvel (256 bytes) tem então espaço para
-  o sensor de impactos do módulo da porta, mas não para as suas saídas; um
-  módulo de E/S montado para um módulo de saídas deixa de fora as peças que não
-  usa (decisão EXPI9-23).
+  poucas saídas do módulo da porta: empresta as que cabem, as primeiras, e
+  mantém as outras desligadas (com todas as peças e um out4, uma das quatro;
+  com um alvo também, nenhuma). Um módulo de E/S montado para um módulo de
+  saídas deixa de fora as peças que não usa (decisões EXPI9-23, EXPI9-27).
 - **Energia vinda do telemóvel.** Por USB, o telemóvel alimenta a placa; com o
   interruptor principal do módulo ligado, o carregador da placa pode então
   carregar a célula do módulo a partir do telemóvel, como uma Field Box carrega

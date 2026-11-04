@@ -123,6 +123,9 @@ typedef struct {
     uint32_t module_max_s;
     out_backend_t be;
     out_settings_t set;
+    /* The I/O pod's: left out of its IDENT for want of room, so not lent (pod_port.h, decision
+     * EXPI9-27): refused as disabled, and left out of node.modules. A box never sets it. */
+    bool withheld;
     char id[OUT_ID_MAX + 1]; /* the capability id: the function, or "<function>.2" */
     /* the desired state */
     bool on;
@@ -246,9 +249,10 @@ int outputs_find(const outputs_t *o, const char *id);
 /* How many channels are enabled (HELLO lists `output` when one is). */
 int outputs_enabled_count(const outputs_t *o);
 
-/* node.modules' text for the box's enabled simple outputs (a module's channels are in its own
- * entry: expansion_modules_text) ("g46:servo:siren;g45:servo:horn",
- * at most OUT_MODULES_MAX bytes); its length, 0 when there is none. */
+/* node.modules' text for the box's enabled simple outputs (not an I/O pod's withheld ones; a
+ * module's channels are in its own entry: expansion_modules_text)
+ * ("g46:servo:siren;g45:servo:horn", at most OUT_MODULES_MAX bytes); its length, 0 when there is
+ * none. */
 size_t outputs_modules_text(const outputs_t *o, char *out, size_t cap);
 
 /* What channel index shows now (true: on). */

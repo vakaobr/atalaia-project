@@ -80,10 +80,12 @@ typedef struct {
     pod_outputs_t *po;
     pod_port_config_t cfg;
     pod_port_ops_t ops;
-    bool phone; /* a phone was on a link at the last tick */
-    bool tell;  /* an IDENT went out: the modules EVT follows at the next tick */
-    bool told;  /* the modules EVT went out since the phone linked */
-    bool said;  /* a modules EVT with something in it went out since boot */
+    bool phone;   /* a phone was on a link at the last tick */
+    bool tell;    /* an IDENT went out: the modules EVT follows at the next tick */
+    bool told;    /* the modules EVT went out since the phone linked */
+    bool said;    /* a modules EVT with something in it went out since boot */
+    int listing;  /* the outputs the last pod_port_ident_caps listed (a proposal: ident_sent) */
+    bool trimmed; /* the last IDENT sent left outputs out: a channel found since waits for one */
     char told_text[POD_PORT_TEXT_MAX + 1];
     char told_max[96];
     uint32_t hits, module_lost; /* sent to the phone */
@@ -112,19 +114,30 @@ bool pod_port_command(pod_port_t *pp, const atalaia_proxy_msg_t *m);
  * IDENT's capability array for this pod (the io's ident callback): the parts (pod_caps), then the
  * port's hit sensors, then the outputs (the simple outputs, then a module's), leaving out what
  * the level says (pod_ident_level_t): from POD_IDENT_COMPACT the buttons' colours, the outputs'
- * "feedback" flags and the hit sensors' "channel"; from POD_IDENT_NO_OUTPUTS the outputs; at
- * POD_IDENT_NO_PORT the hit sensors too. Also marks the modules EVT due (it follows every
- * IDENT). Writes "[]" when nothing fits.
+ * "feedback" flags and the hit sensors' "channel"; at POD_IDENT_TRIM the last `trim` outputs; at
+ * POD_IDENT_NO_PORT every output and the hit sensors. Returns how many outputs it lists. Changes
+ * no output (pod_port_ident_sent does); marks the modules EVT due (it follows every IDENT).
+ * Writes "[]" when nothing fits.
  */
-void pod_port_ident_caps(pod_port_t *pp, const pod_caps_t *caps, pod_ident_level_t level, char *out,
-                         size_t cap);
+int pod_port_ident_caps(pod_port_t *pp, const pod_caps_t *caps, pod_ident_level_t level, int trim,
+                        char *out, size_t cap);
+
+/*
+ * The IDENT that went out (the io's ident_sent): the last pod_port_ident_caps' outputs are lent,
+ * the others withheld (decision EXPI9-27): turned off if on, refused (pod_outputs_owns is false,
+ * the output layer refuses them as disabled) and left out of the modules EVT, until an IDENT
+ * lists them again. At POD_IDENT_LEVELS (sent without capabilities) every output is withheld.
+ * Logs the ones left out.
+ */
+void pod_port_ident_sent(pod_port_t *pp, pod_ident_level_t level);
 
 /* node.modules' text as a box makes it: the enabled simple outputs, then the modules' entries,
- * whole entries only, at most POD_PORT_TEXT_MAX bytes. Its length. */
+ * whole entries only, at most POD_PORT_TEXT_MAX bytes; a withheld output is left out (a module
+ * whose channels are all withheld too). Its length. */
 size_t pod_port_modules_text(const pod_port_t *pp, char *out, size_t cap);
 
-/* The lent outputs' longest on, {"siren":30,"strobe.2":10} ("{}" for none). Its length, 0 when it
- * does not fit. */
+/* The lent outputs' longest on, {"siren":30,"strobe.2":10} ("{}" for none; a withheld output is
+ * not lent). Its length, 0 when it does not fit. */
 size_t pod_port_max_on_json(const pod_port_t *pp, char *out, size_t cap);
 
 /* One JSON array of the port's modules, as a box's @modules ("[]" without the port). */

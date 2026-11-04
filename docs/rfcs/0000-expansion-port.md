@@ -752,13 +752,15 @@ gains a target or outputs through its pod:
 - the app's prop shell passes the mode's `cap("siren")` calls to the pod, and
   handles CMD 12 from the controller like a box.
 
-Built in increment 9 (2026-11-04, decisions EXPI9-1 to EXPI9-26): the pod's
+Built in increment 9 (2026-11-04, decisions EXPI9-1 to EXPI9-33): the pod's
 simple outputs, then its port (`firmware/esp32/main/pod/pod_port.c`): a
 module's `hit` armed by the phone, an output module's channels lent on a pod
 built to lend them, the module's lease held by the pod; and the pod tells the
 phone a box's `node.modules` text and each output's longest on (the EVT
 `pod.modules`, draft RFC 0000 Amendment 7), which the phone sends to the
-controller, so a prop's outputs show in the console.
+controller, so a prop's outputs show in the console. When IDENT's 256 bytes
+cannot hold every output, the pod leaves them out one at a time, the last
+first, and a left-out output stays off and refused (EXPI9-27, EXPI9-28).
 
 The phone as field controller (Android) serves the same output API and CMD 12
 as the Pi (contract vectors). An iPhone is not a prop or a controller (those roles
