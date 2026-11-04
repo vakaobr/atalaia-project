@@ -142,14 +142,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    // The default is the project's three release keys (docs/community/keys.md).
+    // The default is the project's two release keys (docs/community/keys.md):
+    // root and the CI key of the 2026-11 rotation.
     expect(h.settings.firmwareKeys, projectReleaseKeys);
     expect(projectReleaseKeys.map(releaseKeyId), [
       '424d053af5cdbc35',
-      '32b3c815ac30ad43',
       'a4f6002b0122b131',
     ]);
-    expect(find.text(s.t('ctl.fw_keys_set', {'n': 3})), findsOneWidget);
+    expect(find.text(s.t('ctl.fw_keys_set', {'n': 2})), findsOneWidget);
     // Not a key: refused, nothing kept.
     await tester.tap(find.byKey(const Key('ctl-fw-keys')));
     await tester.pumpAndSettle();
@@ -180,30 +180,36 @@ void main() {
     expect(find.text(s.t('ctl.fw_keys_set', {'n': 2})), findsOneWidget);
   });
 
-  test(
-    'a stored earlier default takes the new release key; an edited list stays',
-    () {
-      List<String> load(List<String> keys) => AppSettings.fromJson(
-        jsonDecode(jsonEncode((AppSettings()..firmwareKeys = keys).toJson()))
-            as Map<String, Object?>,
-      ).firmwareKeys;
+  test('a stored earlier default takes the current release keys; an edited list stays', () {
+    List<String> load(List<String> keys) => AppSettings.fromJson(
+      jsonDecode(jsonEncode((AppSettings()..firmwareKeys = keys).toJson()))
+          as Map<String, Object?>,
+    ).firmwareKeys;
 
-      // Saved before the next CI key a4f6002b0122b131 (RELEASE_SIGNING.md,
-      // "Rotating the CI key"): the root and the old CI key, exactly.
-      expect(load(earlierProjectReleaseKeys.single), projectReleaseKeys);
-      expect(load(projectReleaseKeys), projectReleaseKeys);
-      // Changed by someone: kept as it is, even with the project keys in it.
-      const own = '11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=';
-      final withOwn = [...earlierProjectReleaseKeys.single, own];
+    // RELEASE_SIGNING.md, "Rotating the CI key": the defaults before the
+    // next CI key (root, first CI) and during the rotation (root, first CI,
+    // next CI) both move on to root and the next CI key, exactly.
+    final [twoKeys, threeKeys] = earlierProjectReleaseKeys;
+    expect(twoKeys.map(releaseKeyId), ['424d053af5cdbc35', '32b3c815ac30ad43']);
+    expect(threeKeys.map(releaseKeyId), [
+      '424d053af5cdbc35',
+      '32b3c815ac30ad43',
+      'a4f6002b0122b131',
+    ]);
+    expect(load(twoKeys), projectReleaseKeys);
+    expect(load(threeKeys), projectReleaseKeys);
+    expect(load(threeKeys), isNot(contains(twoKeys[1])));
+    expect(load(projectReleaseKeys), projectReleaseKeys);
+    // Changed by someone: kept as it is, even with the project keys in it,
+    // including the first CI key (the operator drops it themselves).
+    const own = '11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=';
+    for (final earlier in earlierProjectReleaseKeys) {
+      final withOwn = [...earlier, own];
       expect(load(withOwn), withOwn);
-      expect(load([earlierProjectReleaseKeys.single.first]), [
-        earlierProjectReleaseKeys.single.first,
-      ]);
-      expect(
-        load(earlierProjectReleaseKeys.single.reversed.toList()),
-        earlierProjectReleaseKeys.single.reversed.toList(),
-      );
-      expect(load(const []), isEmpty);
-    },
-  );
+      expect(load([earlier.first]), [earlier.first]);
+      expect(load(earlier.reversed.toList()), earlier.reversed.toList());
+      expect(load(earlier.sublist(1)), earlier.sublist(1));
+    }
+    expect(load(const []), isEmpty);
+  });
 }

@@ -54,6 +54,7 @@ REGIONS: dict[str, tuple[str, list]] = {
     "DE_TH": ("Thüringen", [("DE-TH", None)]),
     "POL": ("Poland", [("POL", None)]),
     "CZE": ("Czechia", [("CZE", None)]),
+    "AUT": ("Austria", [("AUT", None)]),
 }
 
 

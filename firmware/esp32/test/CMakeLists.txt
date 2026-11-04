@@ -190,7 +190,7 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/box_pair.c
     ${SHELL_DIR}/status_hold.c
     ${SHELL_DIR}/tft_splash.c
-    ${SHELL_DIR}/target_addon.c
+    ${SHELL_DIR}/expansion.c
     ${SHELL_DIR}/sound.c
     ${SHELL_DIR}/outputs.c
     ${SHELL_DIR}/outputs_admin.c
@@ -262,7 +262,8 @@ set(TEST_SOURCES
     test_box_pair.c
     test_status_hold.c
     test_tft_splash.c
-    test_target_addon.c
+    test_expansion.c
+    expansion_model.c
     test_sound.c
     test_outputs.c
     test_simple_out.c

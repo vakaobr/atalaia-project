@@ -55,12 +55,15 @@ leaving its offline media. What it means:
   keys were lost, boxes would need a firmware release with new keys.
 
 **The firmware release keys are other keys**, not these: a root release key
-(`424d053af5cdbc35`, offline), a CI release key (`32b3c815ac30ad43`, a secret
-of this repository that signs the GitHub releases) and, since 2026-11-03, the
-next CI release key (`a4f6002b0122b131`, `76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=`,
-a secret of the `release` environment) that takes over from the CI key over
-the air. All three are the defaults of `CONFIG_ATALAIA_OTA_RELEASE_KEYS` and of
-the controllers' `[firmware] release_keys`. They are in
+(`424d053af5cdbc35`, offline) and a CI release key (`a4f6002b0122b131`,
+`76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=`, a secret of the `release`
+environment that signs the GitHub releases; the "next CI key" of the 2026-11
+rotation). Both are the defaults of `CONFIG_ATALAIA_OTA_RELEASE_KEYS` and of
+the controllers' `[firmware] release_keys`. The first CI release key
+(`32b3c815ac30ad43`, `rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw=`) signed the
+releases up to v0.7.0 and is retired since 2026-11-04: firmware after v0.7.0 no
+longer trusts it, and a controller that lists `release_keys` by hand should
+drop it. They are in
 [firmware/esp32/docs/RELEASE_SIGNING.md](../../firmware/esp32/docs/RELEASE_SIGNING.md#the-projects-release-keys),
 with the CI key's rotation and what to do if a CI key leaks.
 
