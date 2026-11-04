@@ -53,6 +53,7 @@ import '../platform/services.dart';
 import '../pod/pod_client.dart';
 import '../pod/pod_codec.dart';
 import '../pod/pod_reconnect.dart';
+import '../pod/pod_transports.dart' show PodDevice;
 import '../protocol/join_payload.dart';
 import '../radio/pod_radio_link.dart';
 import '../security/ndef.dart';
@@ -321,6 +322,18 @@ class PropSession extends ChangeNotifier {
   /// "pod.repair_manual"), else null.
   String? get podRelinkMessage => _podLink?.relinkMessage;
 
+  /// The pod this prop expects: the one first linked (its name and address,
+  /// null for a link not opened from a scan) and what it said it lends. A
+  /// [PodLinkPhase.refused] link names it, since another pod answered.
+  PodDevice? get podDevice => _pod?.device;
+  PodIdent? get podExpected => _pod?.ident;
+
+  /// The admin's "Link the pod again" is offered (decision ROB-9): the
+  /// tries stopped or another pod answered.
+  bool get canRelinkPod =>
+      _podLink != null &&
+      (podPhase == PodLinkPhase.relink || podPhase == PodLinkPhase.refused);
+
   int? get remainingMs => timer.remainingMs(gameTimeMs);
 
   bool get running => phase == PropPhase.running || phase == PropPhase.paused;
@@ -492,6 +505,20 @@ class PropSession extends ChangeNotifier {
   }
 
   String? _podRelinkLogged;
+
+  /// The admin links the same pod again during the game (decision ROB-9):
+  /// the reconnect starts again at once, Android's pairing dialog included
+  /// and one automatic pairing again at most. The game goes on meanwhile;
+  /// once the pod is back, its inputs, outputs, capabilities and radio are
+  /// taken again as after a reconnect ([_podReplaced]). False when the pod
+  /// is not in a phase that needs it.
+  bool relinkPod() {
+    final link = _podLink;
+    if (link == null || !canRelinkPod || _closed) return false;
+    _log('pod: linking it again (admin)');
+    _podRelinkLogged = null;
+    return link.restart();
+  }
 
   /// The person unlinks the pod: it is closed and not opened again.
   Future<void> unlinkPod() async {

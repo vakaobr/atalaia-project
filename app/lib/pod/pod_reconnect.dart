@@ -31,7 +31,12 @@
 ///     or an Android that refuses to remove the bond stop the tries
 ///     ([PodLinkPhase.relink], with [relinkMessage]): the person links the
 ///     pod again by hand, so a pairing dialog is never asked for twice
-///     unasked.
+///     unasked;
+///   - [restart] is that "by hand" during a game (decision ROB-9): after
+///     [PodLinkPhase.relink] or [PodLinkPhase.refused] the tries start again
+///     at once, for the same pod and with the same rules (its IDENT must
+///     match the lost link's; one automatic pairing again at most), as if
+///     the link had just broken.
 library;
 
 import 'dart:async';
@@ -169,6 +174,7 @@ class PodReconnector extends ChangeNotifier {
     if (_halt || _running) return;
     phase = PodLinkPhase.reconnecting;
     attempt = 0;
+    relinkMessage = null;
     _repaired = false;
     repairing = false;
     _now = false;
@@ -304,6 +310,27 @@ class PodReconnector extends ChangeNotifier {
     notifyListeners();
     onRepair?.call();
     return false;
+  }
+
+  /// The person asks to link the same pod again after the tries stopped
+  /// ([PodLinkPhase.relink] or [PodLinkPhase.refused], decision ROB-9): the
+  /// tries start again at once, as after a broken link (the pairing again
+  /// once, the same-pod check). False, and nothing done, in any other phase,
+  /// while suspended or after [dispose].
+  bool restart() {
+    if (_disposed || _suspended || _running) return false;
+    if (phase != PodLinkPhase.relink && phase != PodLinkPhase.refused) {
+      return false;
+    }
+    phase = PodLinkPhase.reconnecting;
+    relinkMessage = null;
+    attempt = 0;
+    _repaired = false;
+    repairing = false;
+    _now = true;
+    notifyListeners();
+    unawaited(_loop());
+    return true;
   }
 
   bool _stop(String messageKey) {

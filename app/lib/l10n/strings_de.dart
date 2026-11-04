@@ -158,9 +158,12 @@ const Map<String, String> deStrings = {
       'Jemand hat während des Spiels den I/O-Pod geöffnet. Sag der '
       'Spielleitung Bescheid.',
   'prop.pod_reconnecting': 'Die Verbindung zum I/O-Pod ist abgebrochen. Verbinde neu (Versuch {n}) …',
-  'prop.pod_refused':
-      'Ein anderer Pod hat geantwortet, der I/O-Pod ist daher nicht mehr verbunden. '
-      'Verbinde einen Pod erneut.',
+  'prop.pod_refused': 'Ein anderer Pod hat geantwortet, der I/O-Pod ist daher nicht mehr verbunden. Verbinde den Pod im Menü der Spielleitung erneut, oder trenne ihn.',
+  'prop.pod_expected':
+      'Dieses Spiel erwartet den Pod {name}: Firmware {fw}, {n} Funktionen.',
+  'prop.pod_expected_one':
+      'Dieses Spiel erwartet den Pod {name}: Firmware {fw}, {n} Funktion.',
+  'prop.pod_relink': 'Pod erneut verbinden',
   'prop.pod_unlink': 'I/O-Pod trennen',
   'prop.hold': 'Gedrückt halten\n{team}',
   'prop.nfc_hint': 'Halte den Tag an die Rückseite des Handys.',
