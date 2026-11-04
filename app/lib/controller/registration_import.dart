@@ -62,7 +62,7 @@ const importReplicaTypes = [
 final _apdIdRe = RegExp(r'^[a-z0-9][a-z0-9-]{0,31}$');
 final _expiresRe = RegExp(r'^\d{4}-\d{2}-\d{2}$');
 final _sourceRe = RegExp(r'^[a-z0-9][a-z0-9._-]{0,31}$');
-const _reservedSources = {'site'};
+const _reservedSources = {'site', 'walkin'};
 
 /// The whole file is refused: [code] is the API's `detail`, [line] where it
 /// went wrong in a CSV, if known.

@@ -86,6 +86,20 @@
  * box by hand: the Field Box does not build it in until it is bench-tested), so a join can name
  * it.
  *
+ * --module NAME[@ADDR] (up to four; draft RFC "The expansion port", increment 8): a module on
+ * the expansion port, simulated on the real module core (firmware/module-core/, through
+ * test/module_sim.c) behind a fake I2C bus that the firmware's own port driver (main/expansion.c,
+ * main/expansion_box.c) reads and writes as on the box: NAME is target (one hit channel, 0x58 by
+ * default) or out4 (four relay outputs, siren, strobe, smoke and a generic one, 0x5C by default),
+ * ADDR 58-5f in hex. HELLO then lists `hit` (capability type 10) with a target, node.modules
+ * carries the module's entry ("58:target/1.0.0:hit") after the simple outputs', hits reach the
+ * mode's script as hit.hit while it has armed the channel and a game runs, a module that stops
+ * answering during a game is node.module_lost, and a module's outputs join the output layer
+ * (disabled until "@output <n> enable"). "MODULE <addr> outputs=<bitmap> t=<ms>" is printed each
+ * time the module's outputs change (as its relays would). With a module, Target Windows is stored
+ * as a preset too (as one put on a box by hand: the Field Box does not build it in until it is
+ * bench-tested), so a join can name it.
+ *
  * --no-wifi: an offer that passes them then runs the update (fw_update_run), which stops
  * with no_wifi as on a box whose Wi-Fi did not start, and prints "UPDATE result=<code>";
  * a refusal or that failure reaches the controller over LoRa (node.update_failed), as on
