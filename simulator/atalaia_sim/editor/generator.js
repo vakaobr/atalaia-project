@@ -12,7 +12,7 @@
 // added geo, the mode's GM commands (mode.yaml commands: and their cmd.mode handlers), several
 // roles with their own inputs, the kinds modifier and role, and the mode's screens by name.
 
-import { BUILTIN_SCREENS, luaName, POLYGON_MAX } from './blocks.js';
+import { BUILTIN_SCREENS, luaName, OUTPUT_FUNCTION, POLYGON_MAX } from './blocks.js';
 
 const PROCEDURES = new Set(['procedures_defnoreturn', 'procedures_defreturn']);
 const CALLS = new Set(['procedures_callnoreturn', 'procedures_callreturn']);
@@ -27,8 +27,6 @@ const STANDARD = [
 const INPUT_CAPS = [['team_input.', 'team_input'], ['keypad.', 'keypad'], ['nfc.', 'nfc'], ['hit.', 'hit'], ['gps.', 'gps']];
 /** Outputs a script uses, and the capability each one may use (roles: optional). */
 const OUTPUT_CAPS = [['atalaia_team_display', 'team_display'], ['atalaia_sound', 'audio'], ['atalaia_screen', 'display']];
-/** An output function a role may name in its `outputs:` (atalaia_sim.mode OUTPUT_FUNCTION, EXP-22). */
-const OUTPUT_FUNCTION = /^(siren|strobe|smoke|light|horn|out\.[1-9])(\.[2-9])?$/;
 const OUTPUTS_MAX = 8;
 /** The inputs a role may require, in the order mode.yaml lists them. */
 export const ROLE_INPUTS = INPUT_CAPS.map(([, cap]) => cap);
@@ -118,6 +116,23 @@ export function makeGenerator(lua) {
         return key;
     };
 
+    /**
+     * An output block's function, noted for the check against the roles' `outputs:` (generateScript),
+     * and its duration: ms (Lua) or '' when the block has none.
+     */
+    const outputFn = (block) => {
+        const fn = block.getFieldValue('FN');
+        g.outputsUsed_.push([fn, block]);
+        return fn;
+    };
+    const outputMs = (block, name = 'MS') => g.valueToCode(block, name, Order.NONE);
+    /** pattern's three durations; a missing one is a problem and 0 in the Lua. */
+    const patternArgs = (block) => ['ON_MS', 'OFF_MS', 'MS'].map((name) => {
+        const ms = outputMs(block, name);
+        if (!ms) problem('problem_output_ms', block);
+        return ms || '0';
+    });
+
     const on = (block) => 'on(' + quote(block.getFieldValue('EVENT')) + ', ' + callback(block, true) + ')\n';
     const timer = (name, named) => (block) => {
         const call = name + '(' + value(block, 'SECONDS', Order.NONE, '1') + ', ' + callback(block, false) + ')\n';
@@ -181,6 +196,19 @@ export function makeGenerator(lua) {
             return 'ui.screen(' + quote(name) + ', ' + table(block, 'DATA') + ')\n';
         },
         atalaia_sound: (block) => 'audio.play(' + quote(block.getFieldValue('CLIP')) + ')\n',
+        // cap("siren"):pulse(ms), :on() or :on(max_ms), :off(); a box without that output ignores it.
+        atalaia_output: (block) => {
+            const fn = outputFn(block);
+            const act = block.getFieldValue('ACT');
+            const ms = outputMs(block);
+            if (act === 'pulse' && !ms) problem('problem_output_ms', block);
+            const arg = act === 'off' ? '' : (ms || (act === 'pulse' ? '0' : ''));
+            return 'cap(' + quote(fn) + '):' + act + '(' + arg + ')\n';
+        },
+        atalaia_output_pattern: (block) => {
+            const fn = outputFn(block);
+            return 'cap(' + quote(fn) + '):pattern(' + patternArgs(block).join(', ') + ')\n';
+        },
         atalaia_team_display: (block) => 'cap("team_display"):show(' + value(block, 'TEAM', Order.NONE) + ')\n',
 
         atalaia_param: (block) => {
@@ -261,6 +289,26 @@ export function makeGenerator(lua) {
             const name = 'name = ' + quote(block.getFieldValue('NAME'));
             const params = data === '{}' ? '{ ' + name + ' }' : '{ ' + name + ', ' + data.slice(2);
             return 'field.send(' + value(block, 'NODE', Order.NONE, '0') + ', "mode", ' + params + ')\n';
+        },
+        // CMD 12 to a box (src field): on and pulse need ms (a box refuses an on without one), off none;
+        // * (every output of the box) only with off.
+        atalaia_field_output: (block) => {
+            const fn = outputFn(block);
+            const act = block.getFieldValue('ACT');
+            if (fn === '*' && act !== 'off') problem('problem_output_all', block);
+            const parts = ['capability = ' + quote(fn), 'act = ' + quote(act)];
+            if (act !== 'off') {
+                const ms = outputMs(block);
+                if (!ms) problem('problem_output_ms', block);
+                parts.push('ms = ' + (ms || '0'));
+            }
+            return 'field.send(' + value(block, 'NODE', Order.NONE, '0') + ', "output", { ' + parts.join(', ') + ' })\n';
+        },
+        atalaia_field_output_pattern: (block) => {
+            const fn = outputFn(block);
+            const [on, off, ms] = patternArgs(block);
+            return 'field.send(' + value(block, 'NODE', Order.NONE, '0') + ', "output", { capability = ' + quote(fn)
+                + ', act = "pattern", ms = ' + ms + ', on_ms = ' + on + ', off_ms = ' + off + ' })\n';
         },
         atalaia_field_score: (block) => ['field.score()[' + value(block, 'TEAM', Order.NONE) + ']', Order.HIGH],
 
@@ -357,6 +405,7 @@ export function generateScript(g, ws, kind, info, screens = []) {
     g.problems_ = [];
     g.frames_ = [];
     g.paramsUsed_ = [];
+    g.outputsUsed_ = [];
     g.memoryUsed_ = false;
     g.forward_ = new Set();
     g.init(ws);
@@ -398,6 +447,12 @@ export function generateScript(g, ws, kind, info, screens = []) {
     chunks.push(...Object.values(g.definitions_).map((d) => d + '\n'));
     chunks.push(...procCode, ...restCode);
     const body = chunks.filter((c) => c && c.trim());
+    // An output the script switches that no role names in its `outputs:` (Mode tab): the console and the
+    // start check would not know the mode uses it.
+    const listed = new Set(modeRoles(info).flatMap((r) => r.outputs));
+    for (const [fn, block] of g.outputsUsed_) {
+        if (fn !== '*' && !listed.has(fn)) g.problems_.push({ key: 'problem_output_unlisted', block: block.id, name: fn });
+    }
     const used = new Set(g.paramsUsed_.map(([name]) => name));
     const result = { code: '', problems: g.problems_, params: g.paramsUsed_, used, roles: g.rolesUsed_ };
     if (!body.length) return result;
