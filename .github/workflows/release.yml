@@ -25,19 +25,17 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # The project's two CI release keys (docs/community/keys.md; the rotation: RELEASE_SIGNING.md,
-  # "Rotating the CI key"). The variable ATALAIA_RELEASE_SIGNING_KEY chooses which one signs: unset
-  # (or "current") the CI key, from the secrets ATALAIA_RELEASE_CI_KEY and _PASSPHRASE; "next" the
-  # next CI key, from ATALAIA_RELEASE_CI_KEY_NEXT and _NEXT_PASSPHRASE (secrets of the environment
-  # "release"). A secret's mere existence changes nothing. The key's id is checked before anything
+  # The project's CI release key, the next CI key of the 2026-11 rotation (docs/community/keys.md;
+  # RELEASE_SIGNING.md, "Rotating the CI key"), from the secrets ATALAIA_RELEASE_CI_KEY_NEXT and
+  # _NEXT_PASSPHRASE of the environment "release". The first CI key was dropped at
+  # step 3 of the rotation: the variable ATALAIA_RELEASE_SIGNING_KEY may be unset or "next", both
+  # meaning this key; any other value fails the release. The key's id is checked before anything
   # is signed, so a wrong secret fails the release instead of publishing something no box accepts.
-  CI_KEY_ID: 32b3c815ac30ad43
   CI_KEY_NEXT_ID: a4f6002b0122b131
-  # The firmware's default trusted keys (Kconfig): root, CI, next CI; mode keys and release keys.
+  # The firmware's default trusted keys (Kconfig): root, next CI; mode keys and release keys.
   # The build checks the image carries exactly these, and the signature is checked against them.
   RELEASE_KEYS_HEX: >-
     e6dccf90dd002529fe837e023f9f658a70917ff7dc69615cec600083bab360d7
-    ac83bca20314dcb44b2ed9ede91cacf9445d2987e636fe66c6fb91250b17f53c
     efa798e41a0c438447a21857ffc892525214039a39127b5f93b105054c696d26
   MODE_KEYS_HEX: >-
     23e9b7acefbe4dc54d86f0c7cc8dbca64340f141a84c94a2f38216420baae0ca
@@ -136,7 +134,7 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           . "$IDF_PATH/export.sh"
           # The defaults of docker_fw.py: the sdkconfig lives in the build folder, EU868, listen
-          # before talk on, the project's two mode keys and three release keys (Kconfig), no bench option.
+          # before talk on, the project's two mode keys and two release keys (Kconfig), no bench option.
           idf.py -B ${{ matrix.dir }} -D SDKCONFIG=${{ matrix.dir }}/sdkconfig \
             -D "SDKCONFIG_DEFAULTS=${{ matrix.defaults }}" -D "ATALAIA_FW_VERSION=$FW_VERSION" \
             build 2>&1 | tee build.log
@@ -217,26 +215,23 @@ jobs:
           pattern: firmware-*
           merge-multiple: true
           path: dist
-      - name: Sign the app images (a CI key on a tag; a throw-away key on a dry run)
+      - name: Sign the app images (the CI key on a tag; a throw-away key on a dry run)
         env:
-          # Only this step sees a secret, and only the one the switch chooses (each line is empty
-          # unless it is chosen; GitHub compares strings ignoring case, the script below refuses
-          # anything but "", "current" and "next"). They are never echoed, and the key file lives
-          # in RUNNER_TEMP, outside the repository (the tool refuses a key inside it), and is deleted.
+          # Only this step sees the secret, and only on a tag with the variable unset or "next"
+          # (GitHub compares strings ignoring case, the script below refuses anything but "" and
+          # "next"). It is never echoed, and the key file lives in RUNNER_TEMP, outside the
+          # repository (the tool refuses a key inside it), and is deleted.
           SIGNING_KEY: ${{ vars.ATALAIA_RELEASE_SIGNING_KEY }}
-          CI_KEY_PEM: ${{ github.ref_type == 'tag' && vars.ATALAIA_RELEASE_SIGNING_KEY != 'next' && secrets.ATALAIA_RELEASE_CI_KEY || '' }}
-          CI_KEY_PASSPHRASE: ${{ github.ref_type == 'tag' && vars.ATALAIA_RELEASE_SIGNING_KEY != 'next' && secrets.ATALAIA_RELEASE_CI_KEY_PASSPHRASE || '' }}
-          CI_KEY_NEXT_PEM: ${{ github.ref_type == 'tag' && vars.ATALAIA_RELEASE_SIGNING_KEY == 'next' && secrets.ATALAIA_RELEASE_CI_KEY_NEXT || '' }}
-          CI_KEY_NEXT_PASSPHRASE: ${{ github.ref_type == 'tag' && vars.ATALAIA_RELEASE_SIGNING_KEY == 'next' && secrets.ATALAIA_RELEASE_CI_KEY_NEXT_PASSPHRASE || '' }}
+          CI_KEY_NEXT_PEM: ${{ github.ref_type == 'tag' && (vars.ATALAIA_RELEASE_SIGNING_KEY == '' || vars.ATALAIA_RELEASE_SIGNING_KEY == 'next') && secrets.ATALAIA_RELEASE_CI_KEY_NEXT || '' }}
+          CI_KEY_NEXT_PASSPHRASE: ${{ github.ref_type == 'tag' && (vars.ATALAIA_RELEASE_SIGNING_KEY == '' || vars.ATALAIA_RELEASE_SIGNING_KEY == 'next') && secrets.ATALAIA_RELEASE_CI_KEY_NEXT_PASSPHRASE || '' }}
         run: |
           set -eu
           umask 077
           case "$SIGNING_KEY" in
-            "" | current) secret=ATALAIA_RELEASE_CI_KEY; pem="$CI_KEY_PEM"; pass="$CI_KEY_PASSPHRASE"; key_id="$CI_KEY_ID" ;;
-            next) secret=ATALAIA_RELEASE_CI_KEY_NEXT; pem="$CI_KEY_NEXT_PEM"; pass="$CI_KEY_NEXT_PASSPHRASE"; key_id="$CI_KEY_NEXT_ID" ;;
-            *) echo "::error::the variable ATALAIA_RELEASE_SIGNING_KEY is \"$SIGNING_KEY\"; it must be unset, \"current\" or \"next\""; exit 1 ;;
+            "" | next) secret=ATALAIA_RELEASE_CI_KEY_NEXT; pem="$CI_KEY_NEXT_PEM"; pass="$CI_KEY_NEXT_PASSPHRASE"; key_id="$CI_KEY_NEXT_ID" ;;
+            *) echo "::error::the variable ATALAIA_RELEASE_SIGNING_KEY is \"$SIGNING_KEY\"; it must be unset or \"next\" (the old CI key was dropped)"; exit 1 ;;
           esac
-          unset CI_KEY_PEM CI_KEY_PASSPHRASE CI_KEY_NEXT_PEM CI_KEY_NEXT_PASSPHRASE
+          unset CI_KEY_NEXT_PEM CI_KEY_NEXT_PASSPHRASE
           keydir="$(mktemp -d "$RUNNER_TEMP/releasekey.XXXXXX")"
           trap 'rm -rf "$keydir"' EXIT
           key="$keydir/release.pem"
@@ -256,7 +251,7 @@ jobs:
             python3 tools/firmware_release.py keygen --unencrypted --out "$key" > /dev/null
             key_id="$(python3 tools/firmware_release.py pubkey --key "$key" | sed -n 's/^key id: *//p')"
             trusted="$(python3 tools/firmware_release.py pubkey --key "$key" | sed -n 's/^public key (base64): *//p')"
-            echo "Dry run: signed with a throw-away key; boxes do not trust it. A tag would sign with the ${SIGNING_KEY:-current} CI key."
+            echo "Dry run: signed with a throw-away key; boxes do not trust it. A tag would sign with the CI release key $CI_KEY_NEXT_ID."
           fi
           unset pass
           # Only the Field Box image is updated over the air (the modem and the pod have no
