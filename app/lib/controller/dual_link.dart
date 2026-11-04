@@ -18,7 +18,9 @@
 ///     scores merge by maximum).
 ///
 /// The radio's HELLO goes out once when the pod's radio is configured, and
-/// both HELLOs say "lora and wifi" in their transports.
+/// both HELLOs say "lora and wifi" in their transports. Both carry the
+/// prop's capability types ([updateCapabilities]), sent again when they
+/// change (decision PROPC-3).
 library;
 
 import 'dart:async';
@@ -39,6 +41,25 @@ class DualLink extends ChangeNotifier implements ControllerLink {
   var _started = false;
 
   PodRadioLink? get radio => _radio;
+
+  /// HELLO's capability type ids, once the prop has said them (null: the
+  /// links' own HELLO fields are left as they are).
+  List<int>? get capabilities => _capabilities;
+  List<int>? _capabilities;
+
+  /// The prop's capability type ids changed (its pod's IDENT came, or the
+  /// pod was unlinked or lost): both links' HELLO carry them, and a link
+  /// that is up sends its HELLO again. Nothing is sent when they are the
+  /// same as before.
+  void updateCapabilities(List<int> ids) {
+    final old = _capabilities;
+    if (old != null && listEquals(old, ids)) return;
+    _capabilities = List.unmodifiable(ids);
+    final w = wifi;
+    if (w != null) w.updateHello({...w.hello, 'capabilities': _capabilities});
+    final r = _radio;
+    if (r != null) r.updateHello({...r.hello, 'capabilities': _capabilities});
+  }
 
   bool get _wifiUp => wifi?.linked ?? false;
 
@@ -82,7 +103,12 @@ class DualLink extends ChangeNotifier implements ControllerLink {
     _radioSub = radio.messages.listen((m) {
       if (!_wifiUp) _messages.add(m);
     });
-    final fields = {...radio.hello, ...hello, 'transports': transports};
+    final fields = {
+      ...radio.hello,
+      ...hello,
+      'transports': transports,
+      'capabilities': ?_capabilities,
+    };
     radio.updateHello(fields);
     wifi?.updateHello({...?wifi?.hello, 'transports': transports});
     if (_started) radio.start();

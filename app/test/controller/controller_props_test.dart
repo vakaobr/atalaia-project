@@ -179,6 +179,44 @@ void main() {
     await link.close();
   });
 
+  test('a command to every node reaches the Wi-Fi props, dest 65535 too '
+      '(EXPI9-20)', () async {
+    // CMD 12's every-output off goes out with no dest; a packet that names
+    // dest 65535 (every node) reaches the props as well, told dest null.
+    final link = prop(joined(7));
+    final heard = <LinkMessage>[];
+    link.messages.listen(heard.add);
+    link.start();
+    expect(await waitFor(() => link.linked), isTrue);
+    const off = {'capability': '*', 'act': 'off', 'src': 'gm'};
+    expect(
+      api.props.forward(
+        RfType.cmd,
+        const RfCmd(cmd: 12, params: off, dest: 65535).encode(),
+      ),
+      isTrue,
+    );
+    expect(
+      await waitFor(
+        () => heard.whereType<LinkCommand>().any((c) => c.cmd == 'output'),
+      ),
+      isTrue,
+    );
+    expect(
+      heard
+          .whereType<LinkCommand>()
+          .singleWhere((c) => c.cmd == 'output')
+          .params,
+      off,
+    );
+    // A command to another node does not.
+    expect(
+      api.props.forward(RfType.cmd, const RfCmd(cmd: 5, dest: 4).encode()),
+      isFalse,
+    );
+    await link.close();
+  });
+
   test('a prop with the wrong key is refused', () async {
     final j = joined(7);
     final wrong = JoinPayload(

@@ -678,6 +678,17 @@ exp_result_t expansion_arm(expansion_t *e, uint8_t addr, uint8_t bitmap)
     return EXP_OK;
 }
 
+bool expansion_set_cap(expansion_t *e, uint8_t addr, uint8_t channel, const char *id)
+{
+    exp_module_t *m = find(e, addr);
+    if (m == NULL || channel >= EXP_CHANNELS_MAX || !(m->usable & (1u << channel)) || id == NULL ||
+        strlen(id) > EXP_CAP_ID_MAX || strcmp(m->cap[channel], id) == 0) {
+        return false;
+    }
+    snprintf(m->cap[channel], sizeof(m->cap[channel]), "%s", id);
+    return true;
+}
+
 bool expansion_find(const expansion_t *e, const char *cap, uint8_t *addr, uint8_t *channel)
 {
     for (int i = 0; i < EXP_MODULES_MAX; i++) {

@@ -13,6 +13,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 
 import 'pod_client.dart';
+import 'pod_pairing.dart';
 
 /// A pod the phone can see.
 final class PodDevice {
@@ -26,7 +27,7 @@ final class PodDevice {
   final String name;
 }
 
-class ChannelPodTransport implements PodTransport {
+class ChannelPodTransport implements PodTransport, PodBonds {
   ChannelPodTransport._(this.kind)
     : _ch = MethodChannel('org.atalaia.app/pod/$kind'),
       _bytes = EventChannel('org.atalaia.app/pod/$kind/bytes');
@@ -65,6 +66,36 @@ class ChannelPodTransport implements PodTransport {
   Future<bool> open(PodDevice device) async {
     try {
       return await _ch.invokeMethod<bool>('open', {'id': device.id}) ?? false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Over Bluetooth, how the last link's pairing ended badly (BlePodPlugin.kt's
+  /// "last_error", decisions PODPK-4 and PODPK-8); null over USB.
+  @override
+  Future<PodPairError?> lastPairError() async {
+    if (kind != 'ble') return null;
+    try {
+      return PodPairError.fromCode(
+        await _ch.invokeMethod<String>('last_error'),
+      );
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
+  }
+
+  /// Removes Android's bond with a Bluetooth pod, so the next link pairs
+  /// anew with the passkey; false when Android refuses (or over USB).
+  @override
+  Future<bool> forgetBond(PodDevice device) async {
+    if (kind != 'ble') return false;
+    try {
+      return await _ch.invokeMethod<bool>('forget', {'id': device.id}) ?? false;
     } on MissingPluginException {
       return false;
     } on PlatformException {

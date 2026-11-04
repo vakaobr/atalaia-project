@@ -23,6 +23,18 @@
 /// the radio for when the Wi-Fi link is down; an opened pod is node.tamper
 /// too (reason pod_opened).
 ///
+/// A linked pod's simple outputs (draft RFC "The expansion port", increment
+/// 9) are the mode's `cap("siren")` and the controller's CMD 12 (`output`),
+/// handled by [outputs] with a box's rules: on only while the game runs (and
+/// in the end's 10 s grace), off at its start, a pause, the end and a halted
+/// script; each start is an output.switched for the controller.
+///
+/// HELLO lists the prop's capability types ([helloCapabilities]: the
+/// phone's own parts and what its pod lends), so the controllers' start
+/// check takes a prop as it takes a box; they are said again whenever the
+/// pod's IDENT changes them, the pod's link breaks or the person unlinks it
+/// (decisions PROPC-1 to PROPC-4).
+///
 /// A [ChangeNotifier]: the game screen rebuilds when it changes. It has no
 /// widgets and no platform code of its own (the services are injected), so
 /// the tests drive it on the real core with a manual clock.
@@ -47,7 +59,10 @@ import '../security/ndef.dart';
 import '../security/nfc_tag_signer.dart';
 import '../ui/template/screen_template.dart';
 import 'button_tracker.dart';
+import 'capability_mapper.dart';
 import 'game_timer.dart';
+import 'prop_hits.dart';
+import 'prop_outputs.dart';
 import 'screen_manager.dart';
 import 'shell_screens.dart';
 
@@ -218,6 +233,67 @@ class PropSession extends ChangeNotifier {
   /// The game's log: events, the script's log lines, errors (newest last).
   final log = <String>[];
 
+  /// The linked pod's simple outputs (prop_outputs.dart).
+  late final PropOutputs outputs = PropOutputs(
+    send: (cap, method, args) {
+      final pod = _pod;
+      if (pod != null && !pod.broken) unawaited(pod.command(cap, method, args));
+    },
+    ping: () =>
+        unawaited(_pod?.sendRadio(FrameType.radioCmd, const [RadioOp.ping])),
+    onSwitched: _outputSwitched,
+    onScriptError: (message) {
+      _log(message);
+      _link?.sendEvent(
+        seq: ++_shellSeq,
+        tMs: gameTimeMs,
+        type: 'script.error',
+        prio: 'normal',
+        data: {'message': message},
+      );
+    },
+  );
+
+  /// The linked pod's hit sensors (a target module on its expansion port:
+  /// prop_hits.dart).
+  late final PropHits hits = PropHits(
+    send: (cap, method, args) {
+      final pod = _pod;
+      if (pod != null && !pod.broken) unawaited(pod.command(cap, method, args));
+    },
+  );
+
+  /// The node.modules text last told to the controller (the pod's, from its
+  /// EVT pod.modules), or null before any.
+  String? _modulesTold;
+
+  /// The phone's features (read when the session opens) and the pod whose
+  /// IDENT HELLO counts (null: none, or its link is down or unlinked).
+  DeviceFeatures? _features;
+  PodIdent? _capsPod;
+
+  /// What this prop offers a mode: the phone's parts and its pod's.
+  CapabilityMap get capabilities =>
+      CapabilityMap.of(_features ?? const DeviceFeatures(), pod: _capsPod);
+
+  /// HELLO's capability type ids (key 6), as the controller last heard them
+  /// or will hear them.
+  List<int> get helloCapabilities => capabilities.helloTypes;
+
+  /// The controller hears the prop's capability types again when they
+  /// changed (DualLink sends nothing when they did not).
+  void _tellCapabilities() {
+    final l = _link;
+    if (l == null) return;
+    final ids = helloCapabilities;
+    final old = l.capabilities;
+    if (old != null && listEquals(old, ids)) return;
+    _log('HELLO capabilities ${ids.join(',')}');
+    l.updateCapabilities(ids);
+  }
+
+  int get _nowMs => _now().millisecondsSinceEpoch;
+
   /// Kiosk mode was left while the game ran (ADR-P3-9 tamper detection).
   bool tamper = false;
 
@@ -235,6 +311,15 @@ class PropSession extends ChangeNotifier {
   /// Tries made to open the pod again, and when the next one starts.
   int get podAttempt => _podLink?.attempt ?? 0;
   DateTime? get podRetryAt => _podLink?.retryAt;
+
+  /// Over Bluetooth, while the pod pairs anew by itself (the phone's bond
+  /// was removed: Android asks for the passkey on the pod's screen).
+  bool get podRepairing => _podLink?.repairing ?? false;
+
+  /// Why the pod has to be linked again by hand ([PodLinkPhase.relink]): a
+  /// message key ("pod.wrong_passkey", "pod.pair_timeout",
+  /// "pod.repair_manual"), else null.
+  String? get podRelinkMessage => _podLink?.relinkMessage;
 
   int? get remainingMs => timer.remainingMs(gameTimeMs);
 
@@ -271,6 +356,12 @@ class PropSession extends ChangeNotifier {
         phase = PropPhase.ready;
         final l = _link;
         if (l != null) {
+          try {
+            _features = await device.features();
+          } on Object {
+            // Unknown: the screen's parts and the speaker, as a phone has.
+          }
+          _tellCapabilities();
           _linkSub = l.messages.listen(_onLink);
           l.start();
         }
@@ -288,6 +379,10 @@ class PropSession extends ChangeNotifier {
   /// Starts the game (the Field Box's "start" after its confirmation).
   Future<void> start() async {
     if (phase != PropPhase.ready) return;
+    // The outputs first: what the mode's game.start handlers switch is the
+    // game's (as on a box).
+    outputs.gameStart(_nowMs);
+    hits.gameStart();
     final ok = await _node?.input('game.start') ?? false;
     if (!ok) return;
     phase = PropPhase.running;
@@ -381,10 +476,22 @@ class PropSession extends ChangeNotifier {
         backoff: podBackoff,
         identTimeout: podIdentWait,
         onReplaced: _podReplaced,
-      )..addListener(notifyListeners);
+        onRepair: () => _log('pod: its bond was refused, pairing again'),
+      )..addListener(_podLinkChanged);
     }
     await client.start();
   }
+
+  void _podLinkChanged() {
+    final why = _podLink?.relinkMessage;
+    if (why != null && why != _podRelinkLogged) {
+      _podRelinkLogged = why;
+      _log('pod: link it again ($why)');
+    }
+    notifyListeners();
+  }
+
+  String? _podRelinkLogged;
 
   /// The person unlinks the pod: it is closed and not opened again.
   Future<void> unlinkPod() async {
@@ -392,6 +499,12 @@ class PropSession extends ChangeNotifier {
     if (pod == null) return;
     _log('pod unlinked');
     _podInputs = null;
+    outputs.detach(_nowMs);
+    hits.detach();
+    // Its outputs and modules are gone from this prop: the controller is told.
+    if (_modulesTold != null && _modulesTold!.isNotEmpty) _tellModules('');
+    _capsPod = null;
+    _tellCapabilities();
     final link = _podLink;
     if (link != null) {
       await link.unlink();
@@ -425,14 +538,27 @@ class PropSession extends ChangeNotifier {
     switch (e) {
       case PodIdentified(:final ident):
         _podInputs = PodInputs(ident, teams: setup.teams);
+        outputs.attach(ident);
+        hits.attach(ident.capabilities);
         _log(
           'pod ${ident.fwVersion}: ${ident.capabilities.length} capabilities',
         );
+        // HELLO first, so a radio through this pod starts with them too.
+        _capsPod = ident;
+        _tellCapabilities();
         _attachRadio(client, ident, replace: reconnected);
         notifyListeners();
       case PodCapabilityEvent(:final message):
         if (message.capId == 'pod' && message.name == 'config') {
           _podSettingsTaken(message.data);
+          return;
+        }
+        if (message.capId == 'pod' && message.name == 'modules') {
+          _podModules(message.data);
+          return;
+        }
+        if (message.capId == 'pod' && message.name == 'module_lost') {
+          _podModuleLost(message.data);
           return;
         }
         unawaited(screenManager.activity());
@@ -456,10 +582,22 @@ class PropSession extends ChangeNotifier {
             teams: setup.teams,
           ),
         );
-        if (mapped != null) unawaited(_input(mapped.$1, mapped.$2));
+        if (mapped == null) return;
+        // A hit reaches the mode only while the game runs, as on a box.
+        if (mapped.$1 == 'hit.hit' && !hits.take()) return;
+        unawaited(_input(mapped.$1, mapped.$2));
       case PodLinkBroken(:final why):
         _log('pod link lost: $why');
         _podInputs = null;
+        // The pod turns its outputs off when its link goes (pod_outputs.c),
+        // and forgets its hit sensors' arming (pod_port.c).
+        outputs.detach(_nowMs);
+        hits.detach();
+        // What it lent is not this prop's while its link is down: HELLO
+        // (on Wi-Fi; a radio through it is down too) says so, and the
+        // next IDENT lends it again.
+        _capsPod = null;
+        _tellCapabilities();
         notifyListeners();
       case PodRadioFrame():
         break; // the radio link (PodRadioLink) reads them
@@ -478,6 +616,67 @@ class PropSession extends ChangeNotifier {
     if (r == null) return;
     _log('radio link through the pod');
     unawaited(l.attachRadio(r, hello: link?.hello ?? const {}));
+  }
+
+  /// An output switched on, or off before its time: output.switched for the
+  /// controller (normal priority), as a box sends it.
+  void _outputSwitched(int tMs, Map<String, Object?> data) {
+    _log(
+      'output.switched ${data['capability']} ${data['ms']} ${data['source']}',
+    );
+    _link?.sendEvent(
+      seq: ++_shellSeq,
+      tMs: gameTimeMs,
+      type: 'output.switched',
+      prio: 'normal',
+      data: data,
+    );
+    notifyListeners();
+  }
+
+  /// The pod's EVT pod.modules (its simple outputs and the modules on its
+  /// expansion port, in node.modules' text; each lent output's longest on):
+  /// told to the controller as node.modules when the text changed, as a box
+  /// tells it (EXP-21), and the longest ons taken for the outputs' model.
+  void _podModules(Map<String, Object?> data) {
+    final maxOn = data['max_on_s'];
+    if (maxOn is Map) outputs.maxOn(maxOn.cast<String, Object?>());
+    final text = data['modules'];
+    if (text is! String || text == _modulesTold) return;
+    _tellModules(text);
+  }
+
+  void _tellModules(String text) {
+    _modulesTold = text;
+    _log('node.modules ${text.isEmpty ? '(none)' : text}');
+    _link?.sendEvent(
+      seq: ++_shellSeq,
+      tMs: gameTimeMs,
+      type: 'node.modules',
+      prio: 'normal',
+      data: {'modules': text},
+    );
+    notifyListeners();
+  }
+
+  /// A module on the pod's port stopped answering: node.module_lost
+  /// (critical) during a game, as a box tells it; between games the next
+  /// node.modules says it.
+  void _podModuleLost(Map<String, Object?> data) {
+    final text = data['modules'];
+    if (text is! String) return;
+    _log('module lost: $text ${data['reason']}');
+    if (!running) return;
+    _link?.sendEvent(
+      seq: ++_shellSeq,
+      tMs: gameTimeMs,
+      type: 'node.module_lost',
+      prio: 'critical',
+      data: {
+        'modules': text,
+        'reason': data['reason'] is String ? data['reason'] : 'no_answer',
+      },
+    );
   }
 
   /// The pod took the settings the field controller pushed over the radio
@@ -536,6 +735,7 @@ class PropSession extends ChangeNotifier {
   Future<void> _onTick(int ms, {bool snapshotNow = false}) async {
     if (_closed) return;
     tracker.tick(ms);
+    outputs.tick(_nowMs);
     _sinceSnapshot += ms;
     _sinceSlow += ms;
     _sinceState += ms;
@@ -600,6 +800,7 @@ class PropSession extends ChangeNotifier {
     if (phase == PropPhase.running && timer.update(gameTimeMs)) {
       // The game's length is up: the shell ends the game (decision PC6).
       _log('time is up: game.end');
+      outputs.end(_nowMs);
       await node.input('game.end');
     }
     if (before != (gameTimeMs ~/ 1000, scores, phase, _lost)) {
@@ -667,6 +868,11 @@ class PropSession extends ChangeNotifier {
                 'peer epoch ${params['src']} at ${params['epoch']} told to the pod',
               );
             }
+          case 'output':
+            // CMD 12 (RFC 0001 Amendment 26): the shell's, whatever the
+            // mode, as on a box (box_game.c).
+            final r = outputs.command(_nowMs, params);
+            _log('CMD output ${params['capability']} ${params['act']}: $r');
           case 'message':
             gmMessage = params['text'] is String
                 ? params['text']! as String
@@ -700,7 +906,17 @@ class PropSession extends ChangeNotifier {
     };
     if (next == phase) return;
     phase = next;
-    if (phase == PropPhase.halted) error = s.lastError;
+    if (phase == PropPhase.halted) {
+      error = s.lastError;
+      outputs.halt(_nowMs);
+      hits.end();
+    }
+    // The mode ended the game: its game.end event has turned them off
+    // already; this covers a snapshot that saw the end first.
+    if (phase == PropPhase.ended) {
+      outputs.end(_nowMs);
+      hits.end();
+    }
     if (phase == PropPhase.ended || phase == PropPhase.halted) {
       _stopGps();
       tracker.releaseAll();
@@ -711,6 +927,19 @@ class PropSession extends ChangeNotifier {
   Future<void> _input(String type, [Map<String, Object?>? data]) async {
     final node = _node;
     if (node == null || _closed) return;
+    // The outputs before the mode's handlers (node_runner.c): a pause or an
+    // end turns them off, and what a game.end handler switches is the grace's.
+    switch (type) {
+      case 'game.pause':
+        outputs.pause(_nowMs);
+        hits.pause();
+      case 'game.resume':
+        outputs.resume();
+        hits.resume();
+      case 'game.end':
+        outputs.end(_nowMs);
+        hits.end();
+    }
     try {
       await node.input(type, data);
     } on Object catch (e) {
@@ -723,6 +952,12 @@ class PropSession extends ChangeNotifier {
       case NodeCommandOutput(:final command):
         _onCommand(command);
       case NodeEventOutput(:final event):
+        // The mode ended the game (game.finish, game.win): every output off
+        // before its game.end handlers' commands, which come after it.
+        if (event.type == 'game.end') {
+          outputs.end(_nowMs);
+          hits.end();
+        }
         _log('${event.type} ${event.dataJson}');
         if (event.type == 'zone.captured') _ownerTeam = event.team;
         if (event.type == 'zone.neutralized') _ownerTeam = 0;
@@ -780,6 +1015,11 @@ class PropSession extends ChangeNotifier {
       if (c.method == 'play' && args.isNotEmpty) unawaited(_play('${args[0]}'));
       return;
     }
+    // One of the pod's outputs: the box's rules, then the pod's CMD.
+    if (outputs.scriptCall(_nowMs, c.target, c.method, args)) return;
+    // A hit sensor's arm or disarm: kept, and told to the pod while the game
+    // runs.
+    if (hits.scriptCall(c.target, c.method)) return;
     if ((c.target == 'ring' && c.method == 'fill') ||
         (c.target == 'team_display' && c.method == 'show')) {
       final team = args.isEmpty ? null : '${args[0]}';

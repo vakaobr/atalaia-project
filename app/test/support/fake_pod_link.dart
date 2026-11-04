@@ -12,6 +12,8 @@ import 'dart:typed_data';
 
 import 'package:atalaia_app/pod/pod_client.dart';
 import 'package:atalaia_app/pod/pod_codec.dart';
+import 'package:atalaia_app/pod/pod_pairing.dart';
+import 'package:atalaia_app/pod/pod_transports.dart';
 
 const podIdent = PodIdent(
   fwVersion: '0.3.0',
@@ -99,6 +101,45 @@ class FakePodLink implements PodTransport {
     log?.add('close');
     if (!_in.isClosed) await _in.close();
   }
+}
+
+/// The plugin's side of the bonds: what each failed try's pairing said, in
+/// order (null: nothing, as for a pod out of reach), then null.
+class ScriptedBonds implements PodBonds {
+  ScriptedBonds(this.errors, {this.canForget = true});
+
+  final List<PodPairError?> errors;
+  final bool canForget;
+  final log = <String>[];
+  var _asked = 0;
+
+  @override
+  Future<PodPairError?> lastPairError() async {
+    final i = _asked++;
+    final e = i < errors.length ? errors[i] : null;
+    log.add('last_error ${e?.name}');
+    return e;
+  }
+
+  @override
+  Future<bool> forgetBond(PodDevice device) async {
+    log.add('forget ${device.id}');
+    return canForget;
+  }
+}
+
+/// A Bluetooth link whose transport is the plugin too, as
+/// ChannelPodTransport is.
+class FakeBleLink extends FakePodLink implements PodBonds {
+  FakeBleLink(this.bonds, {super.ident}) : super(kind: 'ble');
+
+  final ScriptedBonds bonds;
+
+  @override
+  Future<PodPairError?> lastPairError() => bonds.lastPairError();
+
+  @override
+  Future<bool> forgetBond(PodDevice device) => bonds.forgetBond(device);
 }
 
 Future<void> until(bool Function() ok, {int ms = 3000}) async {

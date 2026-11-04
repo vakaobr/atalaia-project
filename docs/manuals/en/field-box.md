@@ -175,6 +175,17 @@ What the box does:
 
 **Safety.** Only low-voltage devices on their own battery (at most 24 V). **Never** mains. A smoke machine only through its low-voltage remote input; never pyrotechnics. Hearing protection near sirens and horns. Smoke never in a closed room without the venue's approval. Before its first game, the builder checks each switch: it must turn off when its cable is pulled ([build manual, section 9.10](../../../hardware/field-box/BUILD.md#910-simple-output-optional)).
 
+### A target on the expansion port
+
+A box built with an **expansion port** (an M12 socket, [port guide](../../../hardware/expansion-port/BUILD.md)) takes a **target**: a plate that players shoot at, with a sensor and a small board of its own behind it, on a cable of up to 2 m ([target guide](../../../hardware/target-addon/BUILD.md)). The game *Target Windows* uses it: the box lights up in a team's colour for a few seconds, and a hit on the plate then scores for that team. Not yet tried on hardware.
+
+1. **Plug the target in before the box joins the game** (with the box on or off). The box finds it within 2 seconds; plugged in later, the box still finds it, and the game uses it at once.
+2. The GM's console shows it as a chip under the box: **target 1.0.0: hit**.
+3. During *Target Windows* the target counts hits only while the game runs: not before it starts, not while it is paused, not after it ends.
+4. If the cable comes out during the game, the GM's log says **box-4 lost a module: 58:target/1.0.0:hit (it stopped answering)**. Plug it back in: it carries on at once.
+
+**Safety.** Eye and face protection for everyone within range of the target, the plate angled down so BBs go to the ground, and never shoot at the box, the cable or the target's enclosure: only at the plate. The field's power limits apply to targets as to players.
+
 *Medic Kit* and *Hacking Terminal* do not follow the box language. Each takes its screen language from its own **Language** setting in the game; left empty, it is the game's language. *VIP / Payload* follows the box language, like the other modes (its old **Language** setting is no longer used).
 
 ## 7. What the lights and screens tell you
@@ -230,6 +241,10 @@ More: the [radio page](https://atalaia-project.link/en/radio/), the [radio field
 
 An Android phone can be a box too. In the app choose **Game prop**, then **Join a game** and scan the **join QR code** the organisers show, or hold a join card. The phone shows the mode's screen with team buttons on the screen. An optional **I/O pod** adds a radio and big buttons. Set the **Field join key** and the **Admin PIN** in **Settings**. In **Settings**, **Kiosk mode** pins the phone to the app and **Battery and background** tells you how to stop Android from sleeping the app. If the game uses a mode the app does not carry, and the organisers allow it, the phone gets the mode from the field controller over the field's Wi-Fi before you start: it takes only a package **signed** by a mode key you trust. Add the project's (or your club's) key in **Settings › Mode keys for fetched modes**, and ask the organisers for it. A package that is unsigned, signed by another key or damaged is refused with a message and never runs. Not yet tested on a field. See the [app guide](../../../app/README.md).
 
+**Outputs through the pod.** A pod built with a **simple output** (a siren, a strobe, a light or a smoke machine's remote on an RC relay switch; [I/O pod build guide, section 8.1](../../../hardware/io-pod/BUILD.md#81-simple-outputs-optional)) lends it to the phone: the game on the phone switches it as a box switches its own ([Outputs](#outputs-a-siren-a-strobe-a-smoke-machine)), and so does the GM from the console. The same rules: only during the game (and an end-of-game horn for up to 10 seconds), off when the game starts, is paused or ends, never longer than its longest time, at most one change every half second. There is nothing to enable on the phone or the pod: the builder set the output's use (**siren**, **smoke**...) when building the pod. **If the phone goes, the output goes off**: the pod turns it off when the USB cable is pulled, the Bluetooth link drops, or the app stops talking to it for 1.5 seconds; keep the app in the foreground (**Battery and background** in **Settings**). Not yet tried on hardware.
+
+**A target or an output module on the pod.** A pod with an expansion port takes the same modules as a box ([I/O pod build guide, section 8.2](../../../hardware/io-pod/BUILD.md#82-expansion-port-optional)): plug a target in and the game on the phone counts its hits while the game runs, as on a box; an output module's relays work as the pod's simple outputs, if the pod was built to lend them. Plug modules in before the game, as on a box. The GM sees them under the phone in the console. Not yet tried on hardware.
+
 ## Troubleshooting
 
 | Problem | What to do |
@@ -249,5 +264,7 @@ An Android phone can be a box too. In the app choose **Game prop**, then **Join 
 | The small screen is dark | Ask the builder. The big screen can still work. |
 | The siren (or strobe, smoke) never comes on | Enable the output at the box (admin PIN, **Outputs**) and give it the use the game asks for. It works only during a game, or with the 1-second test between games. Check the switch's own battery. |
 | A switch stays on when the box is off | Stop using that switch: it must turn off when it loses its signal. Ask the builder. |
+| The pod's siren never comes on | The pod was built without the output, or with another use than the game asks for (ask the builder); the pod is not linked; no game running. |
+| The pod's output goes off by itself | The phone stopped talking to the pod (the app was sent to the background or closed) or the link dropped. Link again; keep the app in the foreground. |
 
 For building and bench faults see [the build manual's troubleshooting table](../../../hardware/field-box/BUILD.md#13-troubleshooting).

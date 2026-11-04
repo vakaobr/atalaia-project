@@ -415,6 +415,54 @@ bool oled_text_hold(oled_text_t *t, const oled_hold_t *holds, int n, uint32_t ho
     return true;
 }
 
+bool oled_text_pair(const oled_pair_view_t *v, oled_text_t *out)
+{
+    memset(out, 0, sizeof(*out));
+    out->bar = -1;
+    out->since = -1;
+    if (!v || v->show == OLED_PAIR_NONE) return false;
+    /* The pod's name, as the phone's pairing question shows it, unless a hint says more. */
+    const char *foot = v->name;
+    const char *head = "BLUETOOTH";
+    switch (v->show) {
+    case OLED_PAIR_PASSKEY: {
+        uint32_t k = v->passkey % 1000000u;
+        head = "PAIR";
+        snprintf(out->big, sizeof(out->big), "%03lu %03lu", (unsigned long)(k / 1000),
+                 (unsigned long)(k % 1000));
+        if (v->secs_left >= 0) clock_text(v->secs_left, out->head_right, sizeof(out->head_right));
+        break;
+    }
+    case OLED_PAIR_PAIRED: set(out->big, sizeof(out->big), "PAIRED"); break;
+    case OLED_PAIR_FAILED:
+        set(out->big, sizeof(out->big), "FAILED");
+        foot = "Try again";
+        break;
+    case OLED_PAIR_TIMEOUT:
+        set(out->big, sizeof(out->big), "TOO SLOW");
+        foot = "Try again";
+        break;
+    case OLED_PAIR_AGAIN:
+        set(out->big, sizeof(out->big), "PAIR AGAIN");
+        foot = "Forget on phone";
+        break;
+    case OLED_PAIR_CLEARING:
+        head = "FORGET ALL";
+        set(out->big, sizeof(out->big), "HOLD");
+        foot = "";
+        out->bar = v->progress < 0 ? 0 : v->progress > 100 ? 100 : v->progress;
+        break;
+    case OLED_PAIR_CLEARED:
+        set(out->big, sizeof(out->big), "CLEARED");
+        foot = "Pair again";
+        break;
+    default: return false;
+    }
+    set(out->head, sizeof(out->head), head);
+    set(out->foot, sizeof(out->foot), foot);
+    return true;
+}
+
 /* "g" and at least 4 hex digits: the commit of FV-3's build metadata ("gabc1234"). */
 static bool commit_id(const char *s, size_t n)
 {
@@ -645,6 +693,12 @@ void oled_view_draw(lv_obj_t *scr, const oled_text_t *t)
     if (!scr) return;
     draw(scr, t);
     base_on = false; /* drawn from outside: nothing of a screen message's to keep up */
+}
+
+void oled_view_clear(lv_obj_t *scr)
+{
+    if (!scr) return;
+    clean(scr);
 }
 
 void oled_view_splash(lv_obj_t *scr, const char *version, uint32_t now_ms, uint32_t hold_ms)

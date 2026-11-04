@@ -55,6 +55,7 @@ int main(void)
     run_screen_template_tests();
     run_pod_tests();
     run_pod_settings_tests();
+    run_pod_pair_tests();
     run_fw_update_tests();
     run_mode_package_tests();
     run_mode_fetch_tests();
@@ -65,6 +66,7 @@ int main(void)
     run_status_hold_tests();
     run_tft_splash_tests();
     run_expansion_tests();
+    run_expansion_box_tests();
     run_sound_tests();
     run_outputs_tests();
     run_simple_out_tests();
