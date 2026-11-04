@@ -3,98 +3,183 @@ SPDX-FileCopyrightText: 2026 The Atalaia contributors
 SPDX-License-Identifier: CC-BY-SA-4.0
 -->
 
-# Target addon build guide (not buildable yet)
+# Target addon build guide
 
 Portuguese (pt-PT): [BUILD.pt.md](BUILD.pt.md).
 
-The target addon is a plate that players shoot at, with a sensor that feels
-each hit, which plugs into a box and turns it into a scoring target: the
-hardware of the *Target Windows* mode, where a hit while the target shows a
-team's colour scores for that team.
+The target addon (the **target module**) is a plate that players shoot at,
+with a piezo sensor that feels each hit and a small RP2040 board of its own,
+which plugs into a box's [expansion port](../expansion-port/BUILD.md) and turns
+it into a scoring target: the hardware of the *Target Windows* mode, where a
+hit while the target shows a team's colour scores for that team. Written for a
+club member who can solder header pins and wires and use a multimeter.
 
-> **Status: the box's side is decided; the addon is not.** Since 2026-10-23
-> the port on the box is specified (3.3 V only, four wires, no interrupt
-> line: the box polls the addon; decisions P5J-15 to P5J-21), and the Field
-> Box's firmware has a tested polling driver for it (a stub, not called yet).
-> The addon itself is **not buildable yet**: its processor is not chosen, no
-> firmware for it exists, its I2C address and "identify" answer are not
-> decided, and the sensor and the plate are not designed (phase 4, plan phase
-> HW2; [section 5](#5-what-is-not-decided)). This guide says what is decided,
-> with where each decision comes from, and lists exactly what is not, so
-> nobody builds something the firmware will not support. **Do not wire a
-> plate to a Field Box from this page.** When the addon is designed, this page
-> becomes its build guide, with photos (plan phase HW2); this guide never uses
-> mock-up or generated photos.
+> **Status: the hardware is decided and can be built; it cannot be used
+> yet.** The draft RFC "The expansion port"
+> ([`docs/rfcs/0000-expansion-port.md`](../../docs/rfcs/0000-expansion-port.md),
+> approved by the maintainer on 2026-11-03) decided what this guide used to
+> list as open: the processor (an RP2040 board, EXP-15), the address (0x58,
+> EXP-7), the "identify" answer and the hit report (the expansion protocol v1,
+> [`protocol/expansion-port.md`](../../protocol/expansion-port.md), EXP-9), the
+> sensor's circuit in outline and the port's protection (EXP-4). **What is not
+> there yet is the firmware**: the module's own firmware (on pico-sdk, with its
+> UF2 file), the box's port driver called from its game task, and *Target
+> Windows* as a box preset all come with **increment 8** of the RFC's plan. So
+> a builder can make the plate, the sensor's front end, the module's enclosure
+> and cable, and the box's port now, and check them with a meter; the module
+> cannot be flashed, and no box reads it, until then. Every step that depends
+> on increment 8 says so (**after increment 8**), and
+> [section 10](#10-what-waits-for-increment-8) lists them. **No target has been
+> built from this guide yet.** Steps marked **Verify at the first build** are
+> open questions; please report what you find in an issue. Photos will be
+> added after the first build (plan phase HW2); this guide never uses mock-up
+> or generated photos.
 
-## 1. What is decided
+## Contents
+
+1. [What you are building](#1-what-you-are-building)
+2. [What is decided and what is not](#2-what-is-decided-and-what-is-not)
+3. [Parts](#3-parts)
+4. [Tools and safety](#4-tools-and-safety)
+5. [The box's side: the expansion port](#5-the-boxs-side-the-expansion-port)
+6. [The module, step by step](#6-the-module-step-by-step)
+7. [Checks at the build](#7-checks-at-the-build)
+8. [Plate, stand and enclosure](#8-plate-stand-and-enclosure)
+9. [How the box reads hits](#9-how-the-box-reads-hits)
+10. [What waits for increment 8](#10-what-waits-for-increment-8)
+11. [Photos](#11-photos)
+12. [Helping](#12-helping)
+
+## 1. What you are building
+
+```
+plate ── rubber pad ── piezo disc ── front end ── RP2040 board ── M12 (male) ═══ 2 m cable ═══ M12 (female) ── port board ── box
+         (steel or polycarbonate)    (divider, bleed,   (ADC, I2C target   pin 1 3.3 V, 2 SDA,                 (buffer, TVS,
+                                      clamps)            at 0x58)          3 GND, 4 SCL, 5 n.c.                 fuse, diode)
+```
+
+- The **piezo disc**, bonded through a rubber pad to the back of the plate,
+  turns each hit into a short voltage spike.
+- The **front end** (a resistor divider, a 1 Mohm bleed, two Schottky clamps)
+  scales the spike into the RP2040's ADC range and keeps it between GND and
+  3.3 V.
+- The **RP2040 board** samples the piezo continuously, finds each hit's peak
+  (its strength, 0-255) with a hold-off against a ringing plate, keeps it with
+  its age until the box takes it, and answers the box's I2C reads at address
+  **0x58** (EXP-10, EXP-15).
+- The **box** reads the module's `STATUS` every 20 ms through its expansion
+  port, and passes each hit to the mode's script as `hit.hit` with its
+  `strength` (**after increment 8**).
+
+*Target Windows* lights the **box's own LED ring**, so the module needs no
+lights (P5J-16). Approximate cost: €10-15 for the module without the plate and
+cable (RFC section 3), plus the plate, the cable and the box's port
+([port guide](../expansion-port/BUILD.md), €6-14); hobby-market prices, not a
+quote.
+
+## 2. What is decided and what is not
 
 | What | Decided | Where |
 | --- | --- | --- |
-| Purpose | A hit-scoring target for any box | [Design specification](../../docs/design-spec.md), section 6 |
-| Parts, in outline | A steel or polycarbonate plate, a piezo sensor, a small processor (RP2040 or ATtiny class) for hit detection. LEDs of its own only with a supply of its own ([section 2](#2-the-port-on-the-box)) | Design specification, section 6; P5J-16 |
-| Approximate cost | €20–30 in parts at hobby-market prices (not a quote) | Design specification, section 6 |
-| How it connects | A waterproof **5-pin M12 connector** on the box carrying **3.3 V only**: the board's 3V3 rail, GND, and the box's I2C bus (SDA, SCL) at 3.3 V. **No 5 V on the port.** The fifth pin is not connected. The addon carries its own small processor, which answers an "identify" request with a capability descriptor, so the box needs no new driver for each addon | Design specification, section 6, "Expansion port and simple output" (corrected 2026-10-23; renamed 2026-11-03); P5J-15, following M3 |
-| Power from the box | At most **25 mA** from the port's 3.3 V, for the processor and the sensor's circuit, through a resettable fuse in the box | P5J-16 |
-| The window's lights | *Target Windows* lights the **box's own LED ring** (`cap("ring")` in `modes/target_windows/node.lua`), so an addon needs no LEDs. An addon with lights of its own powers them from its own cell, never from the port | P5J-16 |
-| No interrupt line | The box **polls** the addon over I2C every 20 ms; a hit reaches the game within about 21 ms ([section 4](#4-how-the-box-reads-hits-no-interrupt-line)). No GPIO is needed, so the Field Box's pin map does not change | P5J-18 |
-| Cable | I2C at 100 kHz over at most **2 m** of 5-core M12 cable; a target further away uses a Satellite or a thin node over the radio instead | Design specification, section 6; P5J-17 |
-| What the box's game scripts see | The `hit` capability: an event `hit` with a `strength` from 0 to 255 (scripts get `hit.hit`), and the commands `arm` and `disarm` (it reports hits only while armed) | Design specification, section 7; draft RFC 0000 Amendment 1; decision P4R4 |
-| How a hit crosses the wire (draft) | A 5-byte report the box reads (flags, the hit's sequence number, its strength, its age, a CRC-8) and three commands it writes (acknowledge a hit, arm, disarm). The addon holds each hit until the box acknowledges it, so none is lost to a busy bus | [`firmware/esp32/main/target_addon.h`](../../firmware/esp32/main/target_addon.h); P5J-19 |
-| On a phone's I/O pod | The same `hit` capability in the capability proxy protocol (`{"id": "hit", "type": "hit"}`), with shared test vectors `target_addon`, `target_hit` and `target_arm`, so a pod could lend one to a phone. No pod built so far has one | [protocol/capability-proxy.md](../../protocol/capability-proxy.md), "A hit sensor" |
-| The game mode | *Target Windows* (`modes/target_windows/`): the role `target` needs `hit` and `led`. The target is dark for `interval_s`, then lights a random team's colour for `window_s`; a hit of at least `min_strength` in the window scores `hit_points` for that team. Built and tested in the simulator; not a Field Box preset until the addon exists | [Phase 4 plan](../../docs/phase-4-site-server/PLAN.md), plan phase 2; decisions M2-1 to M2-5 |
-| What comes next | The addon's processor and its firmware, the polling driver called from the box's game loop, the `hit` capability in the Field Box's firmware, the sensor's threshold and debounce tuned on steel and on polycarbonate plates; then *Target Windows* becomes a built-in preset | Phase 4 plan, HW2 |
+| Purpose | A hit-scoring target for any box (Field Box, Satellite, I/O pod) | [Design specification](../../docs/design-spec.md), section 6; EXP-2 |
+| How it connects | The box's **expansion port**: an M12 A-coded 5-pin socket, 3.3 V only (1 brown 3.3 V, 2 white SDA, 3 blue GND, 4 black SCL, 5 grey not connected), behind the box's port board | EXP-1, EXP-4; [port guide](../expansion-port/BUILD.md) |
+| Processor | An **RP2040 board** (RP2040-Zero class, or a Pico), run at a reduced clock (48 MHz) to stay within the port's current | EXP-15; RFC section 3 (a) |
+| Power from the box | At most **25 mA** from the port's 3.3 V (about 3.0 V at the module), for the processor and the sensor's front end; **measured** at the first build | EXP-3; P5J-16 |
+| Pull-ups | **None** in the module: the box's port board has them | EXP-4; P5J-17 |
+| Reverse polarity | The module protects itself against a hand-made cable wired wrongly: a P-channel MOSFET in its supply ([section 6.1](#61-supply-entry)) | RFC section 1 ("Plugging in reversed"); this guide (EXPI10-8) |
+| Address | **0x58**; two solder jumpers add 1-3 (0x59-0x5B) for a second target on the same box | EXP-7 |
+| "Identify" and the hit report | The expansion protocol v1: `IDENT` (model 0x0001 `target`, one channel), `CHANNEL` (kind hit), `STATUS` (the oldest hit with its sequence, strength and age), `COMMAND` (`ACK`, `ARM`, `CONFIG` for the threshold, the hold-off and the debounce, `LOCATE`). It replaces the 5-byte draft of P5J-19, which nothing was built against | EXP-9, EXP-10; [protocol/expansion-port.md](../../protocol/expansion-port.md) |
+| Sensor | A piezo disc of 27-35 mm, bonded to the back of the plate through a rubber pad; a resistor divider and a 1 Mohm bleed to set the level, Schottky clamps to 3.3 V and GND, into an ADC pin | RFC section 3 (a) |
+| Hit detection | In the module: a peak above the threshold, scaled to 0-255, a hold-off (default 50 ms) against ringing; at least 16 hits queued, each with its age | EXP-10 |
+| Plate | Steel or polycarbonate, angled down, the electronics behind it | RFC section 3 (a); [section 8](#8-plate-stand-and-enclosure) |
+| What the box's game scripts see | The `hit` capability: an event `hit` with a `strength` from 0 to 255 (scripts get `hit.hit`), and the commands `arm` and `disarm` | Design specification, section 7; draft RFC 0000 Amendment 1; EXP-18 |
+| The game mode | *Target Windows* (`modes/target_windows/`): the role `target` needs `hit` and `led`. The target is dark for `interval_s`, then lights a random team's colour for `window_s`; a hit of at least `min_strength` in the window scores `hit_points` for that team. Built and tested in the simulator; a Field Box preset once the target is bench-tested | [Phase 4 plan](../../docs/phase-4-site-server/PLAN.md), plan phase 2; M2-1 to M2-5; RFC increment 8 |
 
-## 2. The port on the box
+Not decided, or not built yet:
 
-The port is the box's I2C bus taken out through a connector, so it follows the
-rules every I2C module in the Field Box already follows: powered from the
-board's 3V3, never from 5 V, and nothing pulls SDA or SCL above 3.3 V
-(decision M3, confirmed by the maintainer on 2026-10-21; the
-[Field Box build manual, section 9.2](../field-box/BUILD.md#92-i2c-modules);
-the keypad expander's "powered from 3V3, never 5V" in the
-[parts list](../field-box/README.md#bill-of-materials-per-box)).
+1. **The module's firmware** (pico-sdk, on the portable module core of
+   increment 7) and its UF2 file from CI and the releases: **after increment
+   8**. With it come the module's pin table (which RP2040 pins carry the I2C
+   target, the ADC input and the address jumpers), how its board LED shows
+   `LOCATE`, and how it takes 3.3 V on its 3V3 pin.
+2. **The strength scale, the threshold and the hold-off** on real steel and
+   polycarbonate plates (bench test 8, HW2), and with them the front end's
+   two divider resistors.
+3. **The plate's size and thickness, its stand and its angle** (HW2).
+4. **A carrier PCB** for the module: later; perfboard until then.
 
-| M12 pin (A-coded, 5-pin) | Usual wire colour | Signal | On the box |
-| --- | --- | --- | --- |
-| 1 | brown | 3.3 V | The interconnect board's 3V3 rail, through a resettable fuse (PTC, about 50 mA hold) |
-| 2 | white | SDA | The SDA rail (board GPIO 17) |
-| 3 | blue | GND | The GND rail |
-| 4 | black | SCL | The SCL rail (board GPIO 18) |
-| 5 | grey | not connected | Free at both ends, and never 5 V. A later box with a GPIO to spare could make it an interrupt line |
+## 3. Parts
 
-**Pin reference for the port.** The port uses no GPIO of its own. It is the
-box's I2C bus and rails, so it follows the
-[Field Box pin reference](../field-box/BUILD.md#15-pin-reference):
+One target. The box's port is a separate set of parts
+([port guide, section 3](../expansion-port/BUILD.md#3-parts-and-what-each-protects-against)).
 
-| Port signal | Board pin | Firmware option | Level |
-| --- | --- | --- | --- |
-| 3.3 V | the board's 3V3 pin, through the hub and a resettable fuse | -- | 3.3 V |
-| SDA | GPIO 17 | `ATALAIA_NFC_SDA_PIN` | 3.3 V, 100 kHz |
-| SCL | GPIO 18 | `ATALAIA_NFC_SCL_PIN` | 3.3 V |
-| GND | the hub's GND rail | -- | 0 V |
+| # | Part | Qty | What it is for | What to check |
+| --- | --- | --- | --- | --- |
+| 1 | RP2040 board: **RP2040-Zero** class (or a Raspberry Pi Pico) | 1 | Samples the piezo, finds the hits, answers the box at 0x58 | A genuine RP2040 with its USB-C (or micro-USB) for flashing by UF2 |
+| 2 | Piezo disc, **27-35 mm**, with leads | 1 (2 spare) | Feels each hit through the plate | Bare brass disc with a ceramic centre; buy spares, they crack |
+| 3 | Rubber pad (2-3 mm, neoprene or EPDM) and contact adhesive | 1 | Bonds the piezo to the plate and spreads the shock, so a direct hit does not crack it | Covers the whole disc |
+| 4 | 1 Mohm resistor, 1/4 W | 1 | The **bleed** across the piezo: drains its charge, so the ADC sees a spike, not a slowly drifting level | |
+| 5 | Two resistors for the divider (values chosen on real plates) and a 2-pin socket strip for each | 2 | Scale the spike into the ADC's range | Fit them in sockets, so they can be swapped at bench test 8 |
+| 6 | Small Schottky diodes, **BAT85** class | 2 | **Clamps**: keep the ADC pin between GND and 3.3 V whatever the plate does | Low forward voltage |
+| 7 | P-channel MOSFET for a low gate voltage, **AO3401** or SI2301 class (SOT-23), on a SOT-23 adapter; a 10 kohm resistor | 1 each | **Reverse-polarity protection** of the module's supply, with almost no voltage drop (a diode would drop 0.3 V more, and the bus's high level would then sit above the module's supply) | Rated for a gate voltage of -2.5 V or less |
+| 8 | Solder jumpers or a 2-position DIP switch | 1 | The address: open-open is 0x58; the others 0x59-0x5B | Which RP2040 pins they go to: **after increment 8** |
+| 9 | M12 A-coded 5-pin **male** panel connector, IP67 | 1 | The module's end of the cable | A-coded, 5-pin |
+| 10 | M12 A-coded 5-pole sensor extension cable, male to female, 1-2 m | 1 | Box to module, at most 2 m | Check the colours with a meter |
+| 11 | Small IP65 enclosure, cable gland or the M12 connector through its wall, perfboard, 0.25 mm² wire, heat-shrink | 1 set | Holds the RP2040 board and the front end behind the plate | Not metal if it can be avoided; out of the line of fire |
+| 12 | Steel plate or polycarbonate sheet, and a stand | 1 | What players shoot at | Size, thickness and stand: HW2 ([section 8](#8-plate-stand-and-enclosure)) |
 
-Checked against the firmware on 2026-10-28: the polling driver
-(`firmware/esp32/main/target_addon.c`) is still not called by the box and has
-no I2C address, so a Field Box cannot talk to an addon yet. **Not yet tested
-on a real board**: the port, the fuse and the cable.
+## 4. Tools and safety
 
-SDA and SCL are on pins 2 and 4, across the connector from each other rather
-than side by side (decision P5J-20). The port waits for the first addon: a
-Field Box built today does not need it.
+The tools are the Field Box's ([manual, section 3](../field-box/BUILD.md#3-tools-and-consumables)).
+At the bench:
 
-The addon's side, from the same decisions:
+1. **Never connect the module's USB cable and the port cable at the same
+   time.** Flash the module (after increment 8) with the port unplugged.
+2. **3.3 V only** on every pin of the module's connector; **pin 5 not
+   connected**; **no pull-ups** in the module; **at most 25 mA** (P5J-16,
+   P5J-17).
+3. **No lights on the port's supply.** A module with lights of its own needs a
+   cell of its own, its own fuse and charging, its GND joined to the port's,
+   its supply never reaching the port.
+4. **Static**: touch the box's GND before plugging a module in.
 
-- **Nothing above 3.3 V on any pin.** The addon's processor runs from the
-  port's 3.3 V; a part on its side that needs more makes it from its own
-  supply, which never connects to the port.
-- **No pull-up resistors on SDA or SCL in the addon**: the box's bus has them
-  (P5J-17).
-- **At most 25 mA** from pin 1 (P5J-16). An ATtiny-class processor and the
-  piezo's circuit draw a few milliamperes; an RP2040 at full speed comes close
-  to the limit, so it must be measured, or run slower.
-- **Its own lights, if any, from its own cell**: a protected 1S cell with its
-  own fuse and boost converter, as in the Satellite's power path, its GND
-  joined to the port's GND; its supply never reaches the port (P5J-16).
+Whenever anyone shoots at the target, at the bench too:
+
+- **Eye and face protection** for everyone within range of the target,
+  including while the sensor is tuned.
+- **Ricochets.** BBs bounce off a hard plate, and some come back. Set a steel
+  plate at an angle that sends them down to the ground, never flat towards the
+  shooter. Never shoot at the box, the cable, the connector or the module's
+  enclosure, only at the plate.
+- **Shield the electronics.** The module, its wiring and the cable sit behind
+  the plate or in their own enclosure, out of the line of fire.
+- **The field's power limits** (the chrono, the joule limit) apply to shooting
+  at targets as to shooting at players; the target is not a reason to raise
+  them.
+- **A game prop**: bright colours and a "GAME PROP" label, like every Atalaia
+  device; the box it plugs into follows its own build guide's battery rules
+  ([Field Box](../field-box/BUILD.md#4-safety-rules),
+  [Satellite](../satellite/BUILD.md#4-tools-and-safety)).
+
+## 5. The box's side: the expansion port
+
+The box needs an expansion port: the M12 socket and its port board (the
+hot-swap buffer, the TVS array, the 100 ohm resistors, the 50 mA fuse and the
+back-feed diode). Build and check it from the
+[expansion port build guide](../expansion-port/BUILD.md); it is the same on
+the Field Box, the Satellite and the I/O pod, and uses no GPIO. Its pin table
+is checked against the firmware by `tools/check_wiring.py`
+([port guide, section 5](../expansion-port/BUILD.md#5-the-ports-pins)).
+
+The rules the module follows, from the same decisions:
+
+- **Nothing above 3.3 V on any pin.** The module runs from the port's 3.3 V
+  (about 3.0 V after the box's diode); a part that needs more makes it from a
+  supply of its own, which never connects to the port.
+- **No pull-up resistors on SDA or SCL** in the module (P5J-17). If the RP2040
+  board you use has any on the pins you choose, remove them.
+- **At most 25 mA** from pin 1 (P5J-16). An RP2040 at 48 MHz and the front end
+  are expected to stay under it; **to be measured** (bench test 4).
 
 ### Why 25 mA
 
@@ -104,135 +189,168 @@ transmits), the TFT with its backlight (40-100 mA), the PN532 (50-150 mA with
 its field on), and the keypad expander and the gauge (under 1 mA): roughly
 170-400 mA in a game, with peaks near 750 mA
 ([Field Box power budget](../field-box/BUILD.md#power-budget-estimates-not-measurements),
-estimates, not measurements). The LED ring, the amplifier and the button LEDs
-are on the 5 V boost converter, not on 3.3 V. The regulator's own limit is not
-documented here, and whether it copes with the TFT and the NFC reader is still
-a **Verify at the first build** item of the Field Box. So the port promises
-only a small, fixed share: 25 mA is about 3 % of those peaks, and the fuse
-keeps a short in the cable or the connector from browning the box out. A
-single WS2812 LED draws up to 60 mA, so lights on the port are out of the
-question.
+estimates, not measurements). The port promises only a small, fixed share:
+25 mA is about 3 % of those peaks, and the fuse keeps a short in the cable or
+the connector from browning the box out. A single WS2812 LED draws up to
+60 mA, so lights on the port are out of the question.
 
-## 3. Checks at the first build (to verify)
+## 6. The module, step by step
 
-- **Pull-ups and cable.** At 100 kHz the bus must rise within 1 µs. At about
-  100 pF per metre of cable, 2 m of cable and the box's own modules come to
-  roughly 300 pF, which needs the pull-ups on the box's bus, all in parallel,
-  between about **1 kΩ and 3.9 kΩ** (1 kΩ keeps the current a device must
-  sink under 3 mA). Measure it with the box unpowered and every module
-  fitted: SDA to 3V3 and SCL to 3V3, on the meter's resistance range. Above
-  3.9 kΩ, fit a 2.2 kΩ pair from SDA and SCL to the 3V3 rail on the
-  interconnect board. Then check that the keypad, the NFC reader and the gauge
-  still work with the cable and an addon plugged in.
-- **The fuse.** A short between pins 1 and 3 of the port must not reset the
-  box.
-- **Protecting the bus on an outside connector** (static from a hand, water in
-  the connector): small series resistors and protection diodes at the port are
-  likely; their values are not chosen.
-- **The addon's current**, against the 25 mA.
+Lay the module out on a small perfboard: the RP2040 board on header pins, the
+front end next to its ADC pin, the MOSFET next to its 3V3 pin, and the M12
+connector's leads to one edge.
 
-## 4. How the box reads hits (no interrupt line)
+### 6.1 Supply entry
+
+1. M12 **pin 1** (brown) to the MOSFET's **drain**; its **source** to the RP2040
+   board's **3V3** pin; its **gate** through 10 kohm to GND. With the right
+   polarity the MOSFET turns fully on; with pins 1 and 3 swapped in a
+   hand-made cable it stays off.
+2. M12 **pin 3** (blue) to the board's **GND**.
+3. **Never** to the board's 5V / VBUS / VSYS pin: that is the USB side.
+4. M12 **pin 5** (grey): cut short and insulated, not connected.
+5. **Verify at the first build:** how the chosen board takes 3.3 V on its 3V3
+   pin with its own regulator unpowered, and the voltage at the 3V3 pin with
+   the module running (about 3.0 V expected); the module firmware's
+   documentation fixes this with increment 8.
+
+### 6.2 The piezo and its front end
+
+```
+piezo + ──┬── R1 ──┬──────────────── ADC pin
+          │        ├── R2 ── GND
+        1 Mohm     ├── BAT85 (cathode to 3V3)
+          │        └── BAT85 (anode to GND, cathode to the ADC node)
+piezo − ──┴── GND
+```
+
+1. Bond the piezo disc to the rubber pad and the pad to the back of the plate,
+   in the plate's centre, brass side towards the pad. Let the adhesive cure as
+   its maker says.
+2. The **1 Mohm** bleed across the piezo's leads, at the module.
+3. **R1** from the piezo's + lead to the ADC node; **R2** from the ADC node to
+   GND (both in sockets: their values come from bench test 8).
+4. The two **BAT85** clamps on the ADC node: one with its cathode (band) to
+   3V3, its anode to the node; the other with its cathode to the node, its
+   anode to GND.
+5. The ADC node to one of the RP2040's ADC pins (GPIO 26-28); which one: the
+   module firmware's pin table, **after increment 8**.
+6. Run the piezo's leads as a twisted pair, tied down, behind the plate.
+
+### 6.3 Bus and address
+
+1. M12 **pin 2** (white, SDA) and **pin 4** (black, SCL) to the RP2040's I2C
+   target pins: which pins, **after increment 8**. Short wires; no pull-ups.
+2. The two address jumpers between the RP2040 pins the firmware names and
+   GND: both open is **0x58**, the address every box looks at first. Leave
+   them open unless the box carries a second target.
+
+### 6.4 The connector and the enclosure
+
+The M12 male connector through the enclosure's wall, its O-ring outside, the
+enclosure behind the plate with the connector facing away from the shooters
+([section 8](#8-plate-stand-and-enclosure)). Heat-shrink every solder cup.
+
+## 7. Checks at the build
+
+With a meter, the module unpowered:
+
+- [ ] M12 pin 1 to pin 3: no short.
+- [ ] M12 pin 5: open to every other pin.
+- [ ] M12 pins 2 and 4 to pin 1: **no pull-up** (open, or above 100 kohm).
+- [ ] The ADC node to GND: R2 in parallel with the rest; to 3V3 and to GND,
+      the clamps read as diodes (about 0.2-0.4 V one way, open the other).
+- [ ] The piezo's leads: about 1 Mohm (the bleed).
+
+**After increment 8** (the module firmware and the box's port driver):
+
+1. **Flash the module**: hold its BOOT button while plugging its USB cable into
+   a computer, and drag the target module's UF2 file onto the drive that
+   appears (the port unplugged). The UF2 files come from CI and the releases
+   with increment 8.
+2. **Current** (bench test 4): a meter in series with pin 1, the module
+   sampling: **under 25 mA**.
+3. **Found by the box**: plug the module into a box's port; the box finds it
+   within 2 s (the log and the box's module list, with increment 8).
+4. **Tuning** (bench test 8): threshold, hold-off and strength scale on steel
+   and polycarbonate plates, at the field's joule limit, with eye protection;
+   swap R1 and R2 until a hit at range reads clearly above the threshold and a
+   hit right over the piezo does not reach the clamps (it would saturate).
+
+## 8. Plate, stand and enclosure
+
+Decided: a **steel or polycarbonate** plate, **angled down** so BBs go to the
+ground, the **electronics behind the plate** or in their own enclosure, out of
+the line of fire (RFC section 3 (a)). Not decided yet (HW2): the plate's
+material grade, thickness and size, the stand, and the exact angle; the first
+builds settle them and this section gains them, with photos. Until then:
+
+- the piezo bonded through its pad to the plate's back, the module's enclosure
+  fixed to the stand, not to the plate (so the plate's shock does not shake
+  the electronics);
+- the cable leaves the enclosure downwards and runs along the ground, behind
+  the plate, to the box, which stands out of the line of fire.
+
+## 9. How the box reads hits
 
 The Field Box uses all eight of the board's GPIOs that are free of any board
-part (3, 4, 6, 15, 16, 33, 47, 48;
-[pin table](../field-box/README.md#peripheral-pins)), and the GNSS connector
-keeps 34 and 38-42, so there is no pin for an interrupt line. It does not need
-one (decision P5J-18):
+part, and the GNSS connector keeps 34 and 38-42, so there is no pin for an
+interrupt line. It does not need one (P5J-18, EXP-8):
 
-- All of the box's I2C traffic, the keypad's included, already runs in its game
-  loop, every 10 ms. An interrupt would be noticed only at the next tick, so
-  the best it could give is a hit within 10 ms; polling every 20 ms gives it
-  within 20 ms, plus 0.56 ms to read the report.
-- **Bus time.** At 100 kHz a byte with its acknowledge takes 90 µs. A poll (the
-  address and 5 bytes) takes about **0.56 ms**: every 20 ms, about **3 %** of
-  the bus. Taking a hit adds a 2-byte acknowledge (0.28 ms). The keypad's scan,
-  every 10 ms, already uses about 18 %; the gauge (every 10 s) next to nothing;
-  the board's OLED a few milliseconds when its picture changes.
-- **Latency.** A hit reaches the script about 10 ms after the addon felt it on
-  average, and within about 21 ms, against a target of 50 ms: a hit's light and
-  sound feel immediate, and a window is open for at least 1 s (5 s by
-  default), so 20 ms is at most 2 % of it; a BB takes 0.2-0.3 s to cross
-  20-30 m anyway. Slower moments: an NFC poll (every 300 ms in a game) can hold
-  the loop for up to about 200 ms when the reader is slow to answer, and
-  reading a player's tag for longer. Hits are not lost then: the addon keeps
-  them, with their age, until the box takes them.
-- The options left aside: sharing the keypad expander's INT line (it is not
-  wired, `ATALAIA_KP_INT_PIN` is -1, wiring it would take a GPIO too, and all
-  eight of the expander's pins are in use), or freeing a GPIO by giving up the
-  sound or button 3, which would cost every box a feature for 10 ms.
+- All of the box's I2C traffic, the keypad's included, runs in its game loop
+  every 10 ms; an interrupt would be noticed only at the next tick. The box
+  reads the module's 9-byte `STATUS` every **20 ms**: a pointer write, a
+  repeated start and 9 bytes, about 12 bytes on the wire (1.1 ms), about
+  **5 %** of the bus. The keypad's scan already uses about 18 %.
+- **Latency.** A hit reaches the script within about 21 ms of the module
+  feeling it, against a target of 50 ms: a window is open for at least 1 s
+  (5 s by default), and a BB takes 0.2-0.3 s to cross 20-30 m anyway. When the
+  game loop is slow (an NFC read can hold it for 200 ms), hits are not lost:
+  the module keeps at least 16, with their age, and the box dates each one on
+  its own clock (`t_event = t_read - age`).
+- The box acknowledges each hit by its sequence number, so a lost
+  acknowledge never counts a hit twice; it arms and disarms the module as the
+  mode asks; a module that fails 25 reads in a row (0.5 s) is gone, and the
+  controller is told (`node.module_lost` during a game).
 
-The driver (`firmware/esp32/main/target_addon.c`, host tests in
-`firmware/esp32/test/test_target_addon.c`) polls, takes each hit once (a lost
-acknowledge does not count a hit twice), sends `arm` and `disarm` again until
-the addon's report agrees, refuses reports with a bad CRC, and counts the addon
-as gone after 25 failed reads in a row (0.5 s). **Not done yet**, for when the
-addon's address is decided: the I2C reads and writes at that address
-(`hal_esp_i2c`), finding the addon at start and adding `hit` to the box's
-capabilities, calling the driver from the game loop and passing each hit to the
-script as `hit.hit` with its `strength`, sending the script's
-`cap("hit"):arm()` and `:disarm()` to it (`command_dispatch.c`), and making
-*Target Windows* a preset (P4R23).
+The box's port driver (`firmware/esp32/main/expansion.c`, replacing the stub
+`target_addon.c`) is being written (increment 6), with host tests against the
+protocol's shared vectors; it is called from the game task, and hits reach the
+script, **after increment 8**.
 
-## 5. What is not decided
+## 10. What waits for increment 8
 
-Each of these needs a decision before anyone builds an addon:
+Written from what the RFC fixes; the rest comes with the firmware:
 
-1. **The processor**: RP2040 or ATtiny (the specification names both),
-   within the 25 mA, and the firmware it runs.
-2. **The addon's I2C address and its "identify" answer** (the capability
-   descriptor). The address must keep clear of the box's devices: 0x20-0x27
-   and 0x38-0x3F (where the box looks for its keypad expander), 0x24 (NFC),
-   0x36 (gauge) and 0x3C (OLED). The hit report and the commands have a
-   **draft** ([section 1](#1-what-is-decided)) that both firmwares can be
-   written against; it becomes final with the first addon.
-3. **The connector's parts and the cable's maker**, and the protection at the
-   port ([section 3](#3-checks-at-the-first-build-to-verify)).
-4. **The sensor circuit**: the piezo element, how it is mounted on the plate
-   (and isolated from it), its protection and the analogue front end; the
-   threshold and debounce are to be tuned on real plates (HW2).
-5. **The plate**: material and thickness, size, its stand and the angle it is
-   set at, and the enclosure that protects the processor and the cable.
-6. **Lights on the addon itself**: not needed for *Target Windows*; if a later
-   design wants them, its own cell, charging and enclosure.
+- the module's firmware (pico-sdk, ADC with DMA at about 20 ksample/s, peak
+  detection, the protocol core of increment 7), built in Docker
+  (`tools/docker_module.py`), and its **UF2 file** from CI and the releases;
+- the module's pin table: the I2C target pins, the ADC pin, the address
+  jumpers, the board LED for `LOCATE`;
+- how the chosen RP2040 board takes 3.3 V on its 3V3 pin;
+- the box calling its port driver, adding `hit` to its capabilities and to
+  `node.modules` (`58:target/<version>:hit`), and passing hits to the script;
+- the box's log lines and console view for the module, and BRING_UP's step for
+  the port (`firmware/esp32/docs/BRING_UP.md`);
+- *Target Windows* as a Field Box preset, once bench-tested (P4R23);
+- the I/O pod lending `hit` to a phone (increment 9, on the port driver of 8).
 
-## 6. Safety, once there is something to build
-
-These hold for any target used with airsoft or paintball, whatever the
-design:
-
-- **Eye and face protection** for everyone within range of the target while
-  anyone shoots at it, including at the bench while the sensor is tuned.
-- **Ricochets.** BBs bounce off a hard plate, and some come back. Set a steel
-  plate at an angle that sends them down to the ground, never flat towards the
-  shooter. Never shoot at the box, the cable or the
-  connector, only at the plate.
-- **Shield the electronics.** The processor, its wiring and the cable sit
-  behind the plate or in their own enclosure, out of the line of fire.
-- **The field's power limits** (the chrono, the joule limit) apply to shooting
-  at targets as to shooting at players; the target is not a reason to raise
-  them.
-- **A game prop**: bright colours and a "GAME PROP" label, like every Atalaia
-  device; and the box it plugs into follows its own build guide's battery
-  rules ([Field Box](../field-box/BUILD.md#4-safety-rules),
-  [Satellite](../satellite/BUILD.md#4-tools-and-safety)), as does an addon's
-  own cell, if it has one.
-
-## 7. Photos
+## 11. Photos
 
 <!-- PHOTO: target-addon-plate.jpg | the finished target: plate and sensor mounting, front and back -->
 > **Photo to be added after the first build:** the finished target, plate and
 > sensor mounting, front and back.
 
-<!-- PHOTO: target-addon-port.jpg | the M12 addon port on a box, and the addon's cable plugged in -->
-> **Photo to be added after the first build:** the M12 addon port on a box,
-> with the addon's cable plugged in.
+<!-- PHOTO: target-addon-port.jpg | the M12 expansion port on a box, and the module's cable plugged in -->
+> **Photo to be added after the first build:** the M12 expansion port on a
+> box, with the module's cable plugged in.
 
-## 8. Helping
+## 12. Helping
 
-If you want to design the addon, open an issue or a discussion first: the
-decisions above come before any wiring, and the rest of the firmware side
-(calling the port's driver, and the `hit` capability on a box) has to be
-written with it. Designs are CERN-OHL-S-2.0, like the rest of the hardware
+Build one and report what you measured (the current, the voltage at the
+module, the rise time, the tuning on your plates) in an issue; the
+**Verify at the first build** items and the plate's dimensions come from
+those reports. Designs are CERN-OHL-S-2.0, like the rest of the hardware
 ([LICENSING.md](../../LICENSING.md)).
 
 ---
