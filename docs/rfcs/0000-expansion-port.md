@@ -6,7 +6,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 # RFC 0000: The expansion port, the simple output, and their first modules
 
 - **Author(s):** The Atalaia contributors (design requested by the maintainer on 2026-11-03)
-- **Status:** Draft (2026-11-03): a design for the maintainer to approve; its open questions were approved on 2026-11-03, and increments 1 to 6 of section 8's plan are built (each in `docs/phase-5-community/STATUS.md`; the port driver of 6 is not yet called by the game task). Decisions are numbered **EXP-1** to **EXP-38** in this file. Updated the same day with the maintainer's decision EXP-31: two output paths, the single-GPIO simple output preferred
+- **Status:** Draft (2026-11-03): a design for the maintainer to approve; its open questions were approved on 2026-11-03, and increments 1 to 7 of section 8's plan are built (each in `docs/phase-5-community/STATUS.md`; the port driver of 6 is not yet called by the game task, and the module core of 7 runs on no module yet). Decisions are numbered **EXP-1** to **EXP-38** in this file. Updated the same day with the maintainer's decision EXP-31: two output paths, the single-GPIO simple output preferred
 - **Discussion:** the pull request that adds this file
 - **Replaces, once accepted:** the target addon's open items (P5J-9, P5J-21) and the draft report format of P5J-19; revisits P5J-7 (no outputs on the pod)
 
