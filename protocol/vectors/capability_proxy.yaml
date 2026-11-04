@@ -138,6 +138,13 @@ radio:
     fields: {"opcode": 7}
     payload: "07"
     frame: "a50800010742d5"
+  # The modem's PING (opcode 1, no token): what a phone sends a pod at least every 500 ms while one
+  # of the pod's outputs is on, when it has nothing else to say (the outputs' lease; increment 9).
+  - name: cmd_ping
+    type: 8
+    fields: {"opcode": 1}
+    payload: "01"
+    frame: "a5080001012213"
   - name: status
     type: 9
     fields: {"json": "{\"cmd\":4,\"configured\":true,\"radio\":\"sx1262\"}"}
@@ -219,6 +226,13 @@ pod_relay:
       fields: {"fw_version": "0.3.0", "capabilities": [], "has_radio": false, "protocol_version": 1, "field_frames": true, "pair_frames": true, "measure": false}
       payload: "a70165302e332e30028004f4050106f507f508f4"
       frame: "a5010014a70165302e332e30028004f4050106f507f508f4d95a"
+    # A pod built with a simple output (draft RFC "The expansion port", increment 9, EXP-26): its
+    # descriptor last, "feedback": false, as the pod firmware writes it (firmware/esp32/test/test_pod.c
+    # checks the pod's IDENT against these bytes). Written with the Python reference codec.
+    - name: pod_simple_output
+      fields: {"fw_version": "0.8.0", "capabilities": [{"id": "btn.1", "type": "button"}, {"id": "btn.2", "type": "button"}, {"id": "ring", "type": "led", "count": 24}, {"id": "case", "type": "tamper"}, {"id": "siren", "type": "output", "feedback": false}], "battery_pct": 87, "has_radio": true, "protocol_version": 1, "field_frames": true, "pair_frames": true, "measure": true}
+      payload: "a80165302e382e300285a26269646562746e2e31647479706566627574746f6ea26269646562746e2e32647479706566627574746f6ea36269646472696e676474797065636c656465636f756e741818a2626964646361736564747970656674616d706572a362696465736972656e6474797065666f757470757468666565646261636bf403185704f5050106f507f508f5"
+      frame: "a5010092a80165302e382e300285a26269646562746e2e31647479706566627574746f6ea26269646562746e2e32647479706566627574746f6ea36269646472696e676474797065636c656465636f756e741818a2626964646361736564747970656674616d706572a362696465736972656e6474797065666f757470757468666565646261636bf403185704f5050106f507f508f52317"
   radio:
     - name: field_tx
       type: 12

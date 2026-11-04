@@ -399,18 +399,9 @@ A standby controller cannot start a game. It says **This controller is not in ch
 
 The boxes also turn their outputs off on their own when the game is paused or ends. A GM on the site server's **Remote GM** page can only turn every output off (**All outputs off**, in any state of the live game until it has ended), never one on.
 
+**A phone prop's outputs.** A phone prop with an I/O pod built with a simple output switches it as a box does: the mode on the phone fires it, and so do scenario triggers and field scripts. **All outputs off** reaches it over the pod's radio, but not yet over the field's Wi-Fi: turn a Wi-Fi prop's output off at the phone (pause or end its game). The phone does not list its pod's outputs to the controller yet, so the prop has no chip and no line in **Outputs**; the start check does not count them either. The pod turns them off by itself when the phone's link drops. Not yet tried on hardware.
+
 **Modes that switch outputs.** *Bomb / Rush* fires the bomb box's **smoke** and **siren** when it explodes, for the seconds you give in **Smoke when it explodes** and **Siren when it explodes** (at most 10: the explosion ends the game, and a box keeps an output on for at most 10 seconds after the end). *Master and Satellites* sounds the master box's **siren** when one team holds every satellite, for the seconds in **Siren on the master when one team holds every satellite** (the box's own longest time still wins), and again only after that team lost one. Left empty (the default), nothing is switched, and the game is as before. When you pick such a mode, the form says which outputs it would use (**Bomb / Rush would switch these outputs on a box that has them: smoke, siren**). For it to work, the box's admin must have enabled the output at the box with the admin PIN and given it that use (**smoke**, **siren**; see the [Field Box manual](field-box.md#outputs-a-siren-a-strobe-a-smoke-machine)). A box without it plays the game the same, with nothing fired; if it has outputs but none of those, the start check says so (**box-4 (bomb) has none of the outputs the mode would switch (smoke, siren): it plays without them.**). A scenario whose triggers switch outputs is shown the same way, box by box (**Foxhound would switch these outputs on a box that has them: siren, strobe (master); horn (gate)**), and the start check looks at each box you named in the **Join** tab as it would for a mode's role.
-
-### Targets
-
-A box can carry a **target** on its expansion port: a plate with a sensor that feels each hit ([Field Box manual](field-box.md#a-target-on-the-expansion-port)). *Target Windows* is the mode for it (role **target**).
-
-- **Before the game**, plug the target into the box, then let the box join. The **Boxes** tab shows it as a chip under the box: **target 1.0.0: hit**. A box whose role needs a hit sensor and has none makes the start check say so (**A box lacks what its role needs: box-4 (target): hit**); look at the cable before you **Start anyway**.
-- **During the game** each hit reaches the mode: in *Target Windows*, a hit while the box shows a team's colour scores **Points for a hit in the window** for that team, and the **Log** says **A target was hit**. Hits count only while the game runs (not while it is paused). **Weakest hit that counts** (0-255) ignores light taps; the right value depends on the plate, set it at a test game.
-- **If a target goes** (a cable pulled, a broken connector), the **Log** says **box-4 lost a module: 58:target/1.0.0:hit (it stopped answering)** and its chip goes. Plugged in again, it counts at once.
-- A box with two targets names them **hit** and **hit.2**.
-
-Not yet tried on hardware: the target and its firmware are built and tested on a computer only.
 
 ### Targets
 

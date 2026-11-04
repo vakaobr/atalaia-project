@@ -24,6 +24,7 @@ import '../storage/app_store.dart';
 import '../l10n/strings.dart';
 import '../platform/services.dart';
 import '../pod/pod_client.dart';
+import '../pod/pod_pairing.dart';
 import '../pod/pod_transports.dart';
 import '../security/bytes.dart';
 import '../ui/qr_painter.dart';
@@ -177,17 +178,28 @@ class _ControllerScreenState extends State<ControllerScreen> {
     final services = context.services;
     final transport = d.kind == 'usb' ? services.usbPods : services.blePods;
     if (transport == null) return;
-    setState(() => _podBusy = true);
-    final ok = await transport.open(d);
+    setState(() {
+      _podBusy = true;
+      _podError = null;
+    });
+    // Over Bluetooth the pod shows a passkey that Android's dialog asks for; a pod that does
+    // not trust this phone's bond is paired again once (lib/pod/pod_pairing.dart, PODPK-4).
+    final outcome = await linkPod(
+      d,
+      () async =>
+          (await transport.open(d) ? transport : null, 'pod.open_failed'),
+      bonds: transport,
+    );
     if (!mounted) return;
     setState(() {
       _podBusy = false;
-      if (ok) {
-        _pod = transport;
-        _podName = d.name;
-        _found = null;
-      } else {
-        _podError = 'pod.open_failed';
+      switch (outcome) {
+        case PodLinked():
+          _pod = transport;
+          _podName = d.name;
+          _found = null;
+        case PodLinkFailed(:final messageKey):
+          _podError = messageKey;
       }
     });
   }

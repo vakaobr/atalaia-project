@@ -1,15 +1,20 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-/// A box's outputs in the Dart mode runner: the port of
-/// simulator/atalaia_sim/box_outputs.py (draft RFC "The expansion port",
-/// increment 4), the box's output layer (firmware/esp32/main/outputs.c) as far
-/// as a mode's tests need it: an output switches on only while the game runs
-/// or in the 10 s grace after its end; every output goes off at the start, a
-/// pause, the end and a halted script; a call never runs longer than the
-/// output's max on; a simple output shows a change for at least 500 ms; a
+/// A box's outputs: the port of simulator/atalaia_sim/box_outputs.py (draft
+/// RFC "The expansion port", increment 4), the box's output layer
+/// (firmware/esp32/main/outputs.c): an output switches on only while the game
+/// runs or in the 10 s grace after its end; every output goes off at the
+/// start, a pause, the end and a halted script; a call never runs longer than
+/// the output's max on; a simple output shows a change for at least 500 ms; a
 /// call to an output the box lacks does nothing. Each start, and each off
 /// before its time, is an output.switched.
+///
+/// The Dart mode runner's boxes use it (app/test/support/mode_runner.dart,
+/// as the simulator's does), and so does a phone prop for its I/O pod's
+/// outputs (prop_outputs.dart, increment 9), with [BoxOutputs.strict]: an
+/// output that went off less than 500 ms ago does not switch on again, as
+/// the pod's own output layer refuses it (the simulator leaves that out).
 library;
 
 const outputGraceMs = 10000;
@@ -71,13 +76,17 @@ Map<String, int> fittedOutputs(Object? spec, String where) {
 
 /// One box's outputs; [onSwitched] gets each output.switched's data.
 class BoxOutputs {
-  BoxOutputs(Map<String, int> fitted, [this.onSwitched])
+  BoxOutputs(Map<String, int> fitted, [this.onSwitched, this.strict = false])
     : channels = {
         for (final e in fitted.entries) e.key: OutputChannel(e.key, e.value),
       };
 
   final Map<String, OutputChannel> channels;
   final void Function(int tMs, Map<String, Object?> data)? onSwitched;
+
+  /// Refuses an on within 500 ms of the output's last off (`too_soon`), as
+  /// the firmware's output layer does.
+  final bool strict;
   String game = 'none'; // none, running, paused, ended, halted
   int graceUntil = 0;
 
@@ -139,7 +148,8 @@ class BoxOutputs {
     }
   }
 
-  /// outputs_switch: ok, no_such, not_now or bad_args.
+  /// outputs_switch: ok, no_such, not_now, bad_args (or too_soon when
+  /// [strict]).
   String switchOutput(
     int t,
     String capability,
@@ -185,6 +195,11 @@ class BoxOutputs {
       final left = graceUntil - t;
       if (left < _simpleMinMs) return 'not_now';
       if (d > left) d = left;
+    }
+    // Off to on: not within 500 ms of the last change (an off is never held
+    // back). An output that is off went off at untilMs.
+    if (strict && !c.on(t) && c.untilMs > 0 && t - c.untilMs < _simpleMinMs) {
+      return 'too_soon';
     }
     c
       ..startMs = t

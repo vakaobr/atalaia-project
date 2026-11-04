@@ -969,6 +969,7 @@ roadmap:
         - "Die App verbindet sich mit einem verlorenen I/O-Pod von selbst wieder. Nicht mit einem echten Pod ausprobiert."
         - "Android-Props holen signierte Modus-Pakete von ihrem Controller, wie die Boxen. In Software."
         - "Die GM-Konsole kann die Einstellungen eines I/O-Pods per Funk schicken: die Farben der vier Knöpfe, die Helligkeit des LED-Rings, die Lautstärke und ob der Gehäuseschalter meldet. Der Pod prüft den Befehl wie jeden anderen, speichert die Einstellungen in seinem Flash und antwortet; der Controller sendet ihn erneut, bis er eine Antwort hört. Vorher wurden sie beim Bauen der Firmware festgelegt. In Software und gegen den Code des Pods auf einem Computer, nicht mit einem echten Pod probiert."
+        - "Das Koppeln eines Handys mit einem I/O-Pod per Bluetooth verlangt einen 6-stelligen Code, den der Pod auf seinem kleinen Display zeigt, damit sich niemand dazwischenschalten kann; ein auf die alte Art gekoppeltes Handy wird einmal gebeten, neu zu koppeln, und die PRG-Taste des Pods vergisst alle Handys. In Software und in Tests auf einem Computer, nicht mit einem echten Pod ausprobiert."
         - "Die Strafe einer Box eines Android-Props erreicht den Controller jetzt, über die WLAN-Verbindung und die Funkverbindung. In Software."
     g_controller:
       title: Das Handy als Feld-Controller

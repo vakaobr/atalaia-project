@@ -2,8 +2,10 @@
  * SPDX-FileCopyrightText: 2026 The Atalaia contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Reference-image tests for the on-board OLED's status view (oled_view.h)
- * and the USB radio modem's screens (modem_screen.h, the modem_* cases).
+ * Reference-image tests for the on-board OLED's status view (oled_view.h),
+ * the USB radio modem's screens (modem_screen.h, the modem_* cases) and the
+ * I/O pod's Bluetooth pairing screens (oled_text_pair, the pod_pair_* cases,
+ * decision PODPK-2).
  * Each case draws one screen through the real LVGL 9.2.2 build on a
  * headless 128x64 display, packs it to one bit per pixel as the device does
  * (oled_pack), writes the result to <build>/screens/oled/ and compares it
@@ -431,6 +433,25 @@ static const modem_case_t modem_cases[] = {
 };
 #define MODEM_CASE_COUNT ((int)(sizeof(modem_cases) / sizeof(modem_cases[0])))
 
+/* The I/O pod's pairing screens (English only: the pod has no language, PODPK-7). */
+typedef struct {
+    const char *name;
+    oled_pair_view_t view;
+} pair_case_t;
+
+#define POD_NAME "atalaia-pod-1A2B"
+static const pair_case_t pair_cases[] = {
+    {"pod_pair_passkey", {OLED_PAIR_PASSKEY, 123456, 30, 0, POD_NAME}},
+    {"pod_pair_passkey_zeros", {OLED_PAIR_PASSKEY, 7089, 9, 0, POD_NAME}},
+    {"pod_pair_paired", {OLED_PAIR_PAIRED, 0, -1, 0, POD_NAME}},
+    {"pod_pair_failed", {OLED_PAIR_FAILED, 0, -1, 0, POD_NAME}},
+    {"pod_pair_timeout", {OLED_PAIR_TIMEOUT, 0, -1, 0, POD_NAME}},
+    {"pod_pair_again", {OLED_PAIR_AGAIN, 0, -1, 0, POD_NAME}},
+    {"pod_pair_clearing", {OLED_PAIR_CLEARING, 0, -1, 60, POD_NAME}},
+    {"pod_pair_cleared", {OLED_PAIR_CLEARED, 0, -1, 0, POD_NAME}},
+};
+#define PAIR_CASE_COUNT ((int)(sizeof(pair_cases) / sizeof(pair_cases[0])))
+
 _Alignas(64) static uint8_t framebuffer[W * H * 2];
 static lv_display_t *display;
 static uint32_t fake_ms;
@@ -629,6 +650,10 @@ static void check_no_stale_references(void)
         }
         for (int i = 0; i < MODEM_CASE_COUNT; i++) {
             const char *n = modem_cases[i].name;
+            if (strlen(n) == len - 4 && strncmp(n, e->d_name, len - 4) == 0) known = true;
+        }
+        for (int i = 0; i < PAIR_CASE_COUNT; i++) {
+            const char *n = pair_cases[i].name;
             if (strlen(n) == len - 4 && strncmp(n, e->d_name, len - 4) == 0) known = true;
         }
         if (!known) fail(e->d_name, "reference PNG without a test case; delete it or add a case");
@@ -845,6 +870,28 @@ int main(void)
         check_labels_fit(modem_cases[i].name);
         compare_with_reference(modem_cases[i].name);
     }
+    for (int i = 0; i < PAIR_CASE_COUNT; i++) {
+        box_lang_set_code("");
+        lv_obj_t *scr = lv_screen_active();
+        oled_text_t t;
+        if (!oled_text_pair(&pair_cases[i].view, &t)) fail(pair_cases[i].name, "no screen");
+        oled_view_clear(scr); /* the modem's screens had the objects: the view builds its own */
+        oled_view_draw(scr, &t);
+        capture(scr);
+        char msg[200] = "";
+        if (font_check_labels(scr, msg, sizeof(msg)) > 0) fail(pair_cases[i].name, msg);
+        check_labels_fit(pair_cases[i].name);
+        compare_with_reference(pair_cases[i].name);
+    }
+    /* Between pairings the pod's OLED is dark: every pixel off. */
+    oled_view_clear(lv_screen_active());
+    capture(lv_screen_active());
+    for (size_t i = 0; i < sizeof(rendered); i++) {
+        if (rendered[i] != 0) {
+            fail("pod_pair_dark", "a pixel is lit");
+            break;
+        }
+    }
     check_splash_hold();
     check_version_widths();
     if (!update_mode()) check_no_stale_references();
@@ -854,6 +901,6 @@ int main(void)
         return 1;
     }
     printf("oled screens: %d renders match their reference images (%s)\n",
-           CASE_COUNT + MODEM_CASE_COUNT, OLED_OUT_DIR);
+           CASE_COUNT + MODEM_CASE_COUNT + PAIR_CASE_COUNT, OLED_OUT_DIR);
     return 0;
 }
