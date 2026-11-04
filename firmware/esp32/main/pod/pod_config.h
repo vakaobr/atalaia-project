@@ -54,10 +54,22 @@
 #else
 #define POD_BLE_ENCRYPTED 0
 #endif
+#ifdef CONFIG_ATALAIA_POD_BLE_PASSKEY
+#define POD_BLE_PASSKEY 1
+#else
+#define POD_BLE_PASSKEY 0
+#endif
+#ifdef CONFIG_ATALAIA_POD_BOND_CLEAR_PIN
+#define POD_BOND_CLEAR_PIN CONFIG_ATALAIA_POD_BOND_CLEAR_PIN
+#else
+#define POD_BOND_CLEAR_PIN -1
+#endif
 #else /* host builds: the defaults */
 #define POD_TAMPER_OPEN_LEVEL 1
 #define POD_BLE_ENABLED       1
 #define POD_BLE_ENCRYPTED     1
+#define POD_BLE_PASSKEY       1
+#define POD_BOND_CLEAR_PIN    0
 #endif
 
 #endif /* ATALAIA_POD_CONFIG_H */

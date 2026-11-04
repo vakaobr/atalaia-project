@@ -166,14 +166,16 @@ class ConsoleFilesTests(unittest.TestCase):
         self.assertEqual(csp["default-src"], "'self'")
         # MF-65 to MF-80: the open orthophotos, each WMS origin as images (the map's tiles) and as a connection
         # (the drawn image's one picture); a WMTS on an origin of its own as images only (MF-79), except a source
-        # with only a WMTS, whose tiles are also fetched for the image (basemap.at, MF-97); nothing else.
+        # with only a WMTS, whose tiles are also fetched for the image (basemap.at, MF-97; LGL
+        # Baden-Württemberg, MF-103); nothing else.
         ortho = ("https://ortos.dgterritorio.gov.pt https://www.ign.es https://data.geopf.fr https://service.pdok.nl "
                  "https://wms.ngi.be https://geo.api.vlaanderen.be https://geoservices.wallonie.be "
                  "https://wms.geoportail.lu https://wms.geo.admin.ch https://gdi.berlin.de https://isk.geobasis-bb.de "
                  "https://geoservices.bayern.de https://geodienste.bremen.de https://www.gds-srv.hessen.de "
                  "https://www.geodaten-mv.de https://www.wms.nrw.de https://geo4.service24.rlp.de "
                  "https://geoportal.saarland.de https://geodienste.sachsen.de https://www.geoproxy.geoportal-th.de "
-                 "https://mapy.geoportal.gov.pl https://ags.cuzk.gov.cz https://mapsneu.wien.gv.at")
+                 "https://mapy.geoportal.gov.pl https://ags.cuzk.gov.cz https://mapsneu.wien.gv.at "
+                 "https://owsproxy.lgl-bw.de")
         tiles = "https://wmts1.geoportail.lu https://wmts.geo.admin.ch https://www.wmts.nrw.de"
         self.assertEqual(csp["img-src"], f"'self' blob: data: https://tile.openstreetmap.org {ortho} {tiles}")
         self.assertEqual(csp["connect-src"], "'self' https://overpass-api.de https://overpass.private.coffee "

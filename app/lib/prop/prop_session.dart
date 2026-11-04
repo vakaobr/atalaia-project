@@ -60,6 +60,7 @@ import '../platform/services.dart';
 import '../pod/pod_client.dart';
 import '../pod/pod_codec.dart';
 import '../pod/pod_reconnect.dart';
+import '../pod/pod_transports.dart' show PodDevice;
 import '../protocol/join_payload.dart';
 import '../radio/pod_radio_link.dart';
 import '../security/ndef.dart';
@@ -323,6 +324,27 @@ class PropSession extends ChangeNotifier {
   int get podAttempt => _podLink?.attempt ?? 0;
   DateTime? get podRetryAt => _podLink?.retryAt;
 
+  /// Over Bluetooth, while the pod pairs anew by itself (the phone's bond
+  /// was removed: Android asks for the passkey on the pod's screen).
+  bool get podRepairing => _podLink?.repairing ?? false;
+
+  /// Why the pod has to be linked again by hand ([PodLinkPhase.relink]): a
+  /// message key ("pod.wrong_passkey", "pod.pair_timeout",
+  /// "pod.repair_manual"), else null.
+  String? get podRelinkMessage => _podLink?.relinkMessage;
+
+  /// The pod this prop expects: the one first linked (its name and address,
+  /// null for a link not opened from a scan) and what it said it lends. A
+  /// [PodLinkPhase.refused] link names it, since another pod answered.
+  PodDevice? get podDevice => _pod?.device;
+  PodIdent? get podExpected => _pod?.ident;
+
+  /// The admin's "Link the pod again" is offered (decision ROB-9): the
+  /// tries stopped or another pod answered.
+  bool get canRelinkPod =>
+      _podLink != null &&
+      (podPhase == PodLinkPhase.relink || podPhase == PodLinkPhase.refused);
+
   int? get remainingMs => timer.remainingMs(gameTimeMs);
 
   bool get running => phase == PropPhase.running || phase == PropPhase.paused;
@@ -478,9 +500,35 @@ class PropSession extends ChangeNotifier {
         backoff: podBackoff,
         identTimeout: podIdentWait,
         onReplaced: _podReplaced,
-      )..addListener(notifyListeners);
+        onRepair: () => _log('pod: its bond was refused, pairing again'),
+      )..addListener(_podLinkChanged);
     }
     await client.start();
+  }
+
+  void _podLinkChanged() {
+    final why = _podLink?.relinkMessage;
+    if (why != null && why != _podRelinkLogged) {
+      _podRelinkLogged = why;
+      _log('pod: link it again ($why)');
+    }
+    notifyListeners();
+  }
+
+  String? _podRelinkLogged;
+
+  /// The admin links the same pod again during the game (decision ROB-9):
+  /// the reconnect starts again at once, Android's pairing dialog included
+  /// and one automatic pairing again at most. The game goes on meanwhile;
+  /// once the pod is back, its inputs, outputs, capabilities and radio are
+  /// taken again as after a reconnect ([_podReplaced]). False when the pod
+  /// is not in a phase that needs it.
+  bool relinkPod() {
+    final link = _podLink;
+    if (link == null || !canRelinkPod || _closed) return false;
+    _log('pod: linking it again (admin)');
+    _podRelinkLogged = null;
+    return link.restart();
   }
 
   /// The person unlinks the pod: it is closed and not opened again.

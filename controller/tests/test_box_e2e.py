@@ -601,16 +601,20 @@ class FieldTests(unittest.TestCase):
         PIN's lock until its first game had ended). BN-14: the controller's box language reaches
         the box in the join (key 15); the box keeps it after the game and across a reboot."""
         box = self.box("alpha")
-        self.assertTrue(box.logged("SCREEN ready {}"), box.lines[-5:])
+        # The box prints its boot screen right after READY, when start() has returned: the line is
+        # waited for, not looked up at once (that raced the reader thread under load).
+        self.assertTrue(box.wait_logged("SCREEN ready {}"), box.lines[-5:])
         self.assertEqual(box.status()["lang"], "")
         r = self.client.put("/api/v1/settings/box-language", headers=GM, json={"box_language": "pt"})
         self.assertEqual(r.status_code, 200, r.text)
         self.play_and_end(box, 1)
         self.assertEqual(box.status()["lang"], "pt")
         box.kill()
+        rebooted = len(box.lines)
         box.start()
         self.assertEqual(box.status()["lang"], "pt")
-        self.assertTrue(box.logged("SCREEN ready {}"))
+        # Ready again after the reboot: a line of this boot, not the first boot's.
+        self.assertTrue(box.wait_logged("SCREEN ready {}", since=rebooted), box.lines[rebooted:][-5:])
 
     def test_a_box_updated_from_the_old_epoch_store(self):
         """A box that ran the firmware before the per-key epoch: its one epoch counter (120 here,

@@ -156,7 +156,12 @@ const Map<String, String> ptStrings = {
       'Alguém abriu o módulo de E/S durante o jogo. Avisa a organização.',
   'prop.pod_reconnecting':
       'A ligação ao módulo de E/S perdeu-se. A religar (tentativa {n})…',
-  'prop.pod_refused': 'Respondeu outro módulo, por isso o módulo de E/S deixou de estar ligado. Liga um módulo outra vez.',
+  'prop.pod_refused': 'Respondeu outro módulo, por isso o módulo de E/S deixou de estar ligado. Liga o módulo outra vez no menu da Organização, ou desliga-o.',
+  'prop.pod_expected':
+      'Este jogo espera o módulo {name}: firmware {fw}, {n} capacidades.',
+  'prop.pod_expected_one':
+      'Este jogo espera o módulo {name}: firmware {fw}, {n} capacidade.',
+  'prop.pod_relink': 'Ligar o módulo outra vez',
   'prop.pod_unlink': 'Desligar o módulo de E/S',
   'prop.hold': 'Manter premido\n{team}',
   'prop.nfc_hint': 'Encosta a etiqueta às costas do telemóvel.',
@@ -234,9 +239,15 @@ const Map<String, String> ptStrings = {
   'pod.linked_one': 'Módulo ligado por {kind}: firmware {fw}, {n} capacidade.',
   'pod.open_failed': 'Não foi possível abrir a ligação ao módulo.',
   'pod.no_ident': 'O módulo não respondeu.',
+  'pod.pair_hint': 'Emparelhamento: o módulo mostra um código de 6 dígitos no ecrã. Escreve-o quando o Android pedir.',
+  'pod.wrong_passkey': 'O emparelhamento falhou: o código não coincidiu ou foi cancelado. Liga o módulo outra vez e escreve os 6 dígitos do ecrã dele.',
+  'pod.pair_timeout': 'O emparelhamento demorou demasiado. Liga o módulo outra vez e escreve o código em menos de 30 segundos.',
+  'pod.repair': 'Este módulo tem de ser emparelhado outra vez (foi emparelhado sem código, ou os emparelhamentos dele foram apagados). A app esqueceu o emparelhamento antigo: escreve o código novo do ecrã do módulo.',
+  'pod.repair_manual': 'Este módulo tem de ser emparelhado outra vez. Esquece-o nas definições de Bluetooth do Android, liga-o de novo e escreve o código do ecrã dele.',
   'pod.reconnecting':
       'A ligação ao módulo perdeu-se. A religar (tentativa {n})…',
   'pod.refused': 'Respondeu outro módulo, por isso a ligação não foi retomada. Liga um módulo outra vez.',
+  'pod.relink': 'A app não conseguiu voltar a ligar o módulo sozinha. {why}',
   'pod.unlink': 'Desligar o módulo',
 
   // Capacidades

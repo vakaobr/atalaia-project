@@ -158,9 +158,12 @@ const Map<String, String> deStrings = {
       'Jemand hat während des Spiels den I/O-Pod geöffnet. Sag der '
       'Spielleitung Bescheid.',
   'prop.pod_reconnecting': 'Die Verbindung zum I/O-Pod ist abgebrochen. Verbinde neu (Versuch {n}) …',
-  'prop.pod_refused':
-      'Ein anderer Pod hat geantwortet, der I/O-Pod ist daher nicht mehr verbunden. '
-      'Verbinde einen Pod erneut.',
+  'prop.pod_refused': 'Ein anderer Pod hat geantwortet, der I/O-Pod ist daher nicht mehr verbunden. Verbinde den Pod im Menü der Spielleitung erneut, oder trenne ihn.',
+  'prop.pod_expected':
+      'Dieses Spiel erwartet den Pod {name}: Firmware {fw}, {n} Funktionen.',
+  'prop.pod_expected_one':
+      'Dieses Spiel erwartet den Pod {name}: Firmware {fw}, {n} Funktion.',
+  'prop.pod_relink': 'Pod erneut verbinden',
   'prop.pod_unlink': 'I/O-Pod trennen',
   'prop.hold': 'Gedrückt halten\n{team}',
   'prop.nfc_hint': 'Halte den Tag an die Rückseite des Handys.',
@@ -240,11 +243,18 @@ const Map<String, String> deStrings = {
   'pod.linked_one': 'Pod über {kind} verbunden: Firmware {fw}, {n} Funktion.',
   'pod.open_failed': 'Die Verbindung zum Pod ließ sich nicht öffnen.',
   'pod.no_ident': 'Der Pod hat nicht geantwortet.',
+  'pod.pair_hint': 'Koppeln: Der Pod zeigt auf seinem Display einen 6-stelligen Code. Gib ihn ein, wenn Android danach fragt.',
+  'pod.wrong_passkey': 'Koppeln fehlgeschlagen: Der Code stimmte nicht, oder das Koppeln wurde abgebrochen. Verbinde den Pod erneut und gib die 6 Ziffern von seinem Display ein.',
+  'pod.pair_timeout': 'Das Koppeln hat zu lange gedauert. Verbinde den Pod erneut und gib den Code innerhalb von 30 Sekunden ein.',
+  'pod.repair': 'Dieser Pod muss neu gekoppelt werden (er wurde ohne Code gekoppelt, oder seine Kopplungen wurden gelöscht). Die App hat die alte Kopplung vergessen: Gib den neuen Code von seinem Display ein.',
+  'pod.repair_manual': 'Dieser Pod muss neu gekoppelt werden. Entferne ihn in den Bluetooth-Einstellungen von Android, verbinde ihn dann erneut und gib den Code von seinem Display ein.',
   'pod.reconnecting':
       'Die Verbindung zum Pod ist abgebrochen. Verbinde neu (Versuch {n}) …',
   'pod.refused':
       'Ein anderer Pod hat geantwortet, die Verbindung wurde daher nicht wiederhergestellt. '
       'Verbinde einen Pod erneut.',
+  'pod.relink':
+      'Die App konnte den Pod nicht von selbst wieder verbinden. {why}',
   'pod.unlink': 'Pod trennen',
 
   // Capabilities

@@ -432,9 +432,18 @@ on two links at once:
   `4174616c-6169-6100-0000-000000000000` with Pod TX (notify), Pod RX
   (write without response) and Pod Status (read, notify), advertised as
   `atalaia-pod-XXXX`, one phone at a time, a 247-byte MTU. The pod asks the
-  phone to pair (LE Secure Connections, Just Works, bonded): frames go out
-  and Pod RX writes are taken only on an encrypted link, so the game key
-  in RADIO_CMD CONFIGURE never crosses the air in the clear (decision PF4).
+  phone to pair (LE Secure Connections, bonded): frames go out and Pod RX
+  writes are taken only on an encrypted link, so the game key in RADIO_CMD
+  CONFIGURE never crosses the air in the clear (decision PF4). Pairing is by
+  passkey entry (decisions PODPK-1 to PODPK-11, `pod_pair.c`): the pod is
+  DisplayOnly and shows a random 6-digit passkey on the board's OLED
+  (`pod_display.c`, the OLED view's layout; dark otherwise) and in the log;
+  only a key made so (MITM-protected) carries frames. A bond without MITM
+  protection (Just Works, an older pod) or unknown to the pod is forgotten
+  and the link dropped with HCI reason 0x05, so the app pairs again. Holding
+  the PRG button (`CONFIG_ATALAIA_POD_BOND_CLEAR_PIN`, GPIO 0) for 5 s
+  clears every bond; `CONFIG_ATALAIA_POD_BLE_PASSKEY` off goes back to Just
+  Works, for a pod whose OLED is broken.
 
 What it lends (only what is fitted is in IDENT; decision PF6):
 

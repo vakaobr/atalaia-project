@@ -10,7 +10,7 @@
 //    there is one (the *Mapa* / *Ortofoto* switch, MF-54 to MF-57: the DGT's in mainland Portugal, and
 //    since MF-65 IGN España's, IGN France's and PDOK's, since MF-73 those of Belgium's regions,
 //    Luxembourg, Switzerland, eleven German Länder, Poland and Czechia, since MF-94 Austria's basemap.at,
-//    ortho-sources.js): the level's current map
+//    since MF-100 Baden-Württemberg's LGL, ortho-sources.js): the level's current map
 //    position, else the GM's own location when the browser already allows it (MF-41, MF-42), a typed
 //    "latitude, longitude", *Use my location*, or a place's name searched with OpenStreetMap's
 //    Nominatim (MF-44 to MF-46; place-search.js);

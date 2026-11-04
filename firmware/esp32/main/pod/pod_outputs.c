@@ -144,7 +144,11 @@ bool pod_outputs_any_on(const pod_outputs_t *po)
 void pod_outputs_tick(pod_outputs_t *po, bool phone_on, uint32_t heard_ms, uint32_t now_ms)
 {
     bool on = pod_outputs_any_on(po);
-    bool quiet = phone_on && on && (uint32_t)(now_ms - heard_ms) >= POD_OUT_QUIET_MS;
+    /* Signed: a frame handled after the caller read its clock makes heard_ms a little later than
+     * now_ms. That is a phone just heard; as an unsigned difference it was 49 days of silence, and
+     * every output went off as the phone spoke (the host pod reads its clock before its frames). */
+    int32_t since = (int32_t)(now_ms - heard_ms);
+    bool quiet = phone_on && on && since >= (int32_t)POD_OUT_QUIET_MS;
     if (quiet) {
         po->quiet_offs++;
         say(po, "the phone said nothing for %u ms with an output on: every output off",

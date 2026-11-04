@@ -148,7 +148,12 @@ const Map<String, String> enStrings = {
   'prop.pod_opened':
       'Someone opened the I/O pod during the game. Tell the game master.',
   'prop.pod_reconnecting': 'The I/O pod link was lost. Reconnecting (try {n})…',
-  'prop.pod_refused': 'A different pod answered, so the I/O pod is not linked any more. Link a pod again.',
+  'prop.pod_refused': 'A different pod answered, so the I/O pod is not linked any more. Link the pod again from the Game master menu, or unlink it.',
+  'prop.pod_expected':
+      'This game expects the pod {name}: firmware {fw}, {n} capabilities.',
+  'prop.pod_expected_one':
+      'This game expects the pod {name}: firmware {fw}, {n} capability.',
+  'prop.pod_relink': 'Link the pod again',
   'prop.pod_unlink': 'Unlink the I/O pod',
   'prop.hold': 'Hold\n{team}',
   'prop.nfc_hint': 'Hold the tag to the back of the phone.',
@@ -224,8 +229,14 @@ const Map<String, String> enStrings = {
   'pod.linked_one': 'Pod linked over {kind}: firmware {fw}, {n} capability.',
   'pod.open_failed': 'Could not open the link to the pod.',
   'pod.no_ident': 'The pod did not answer.',
+  'pod.pair_hint': 'Pairing: the pod shows a 6-digit code on its screen. Type it when Android asks.',
+  'pod.wrong_passkey': 'Pairing failed: the code did not match, or pairing was cancelled. Link the pod again and type the 6 digits from its screen.',
+  'pod.pair_timeout': 'Pairing took too long. Link the pod again and type the code within 30 seconds.',
+  'pod.repair': "This pod needs pairing again (it was paired without a code, or its pairings were cleared). The app has forgotten the old pairing: type the new code from the pod's screen.",
+  'pod.repair_manual': "This pod needs pairing again. Forget it in Android's Bluetooth settings, then link it again and type the code from its screen.",
   'pod.reconnecting': 'The link to the pod was lost. Reconnecting (try {n})…',
   'pod.refused': 'A different pod answered, so the link was not restored. Link a pod again.',
+  'pod.relink': 'The app could not link the pod again by itself. {why}',
   'pod.unlink': 'Unlink the pod',
 
   // Capabilities

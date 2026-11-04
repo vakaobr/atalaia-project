@@ -46,7 +46,7 @@ meta:
   build:
     title: Build guides · Atalaia
     description: >-
-      How to build Atalaia's Satellite, I/O pod, expansion port and target addon from off-the-shelf
+      How to build Atalaia's Satellite, I/O pod, expansion port, target addon and I2C output module from off-the-shelf
       parts, how a box switches a siren or a smoke machine, and where the Field Box's build manual is.
   glossary:
     title: Glossary · Atalaia
@@ -379,10 +379,11 @@ modes:
     title: Target Windows
     text: >-
       A target lights up in a random team's colour for a few seconds, and a hit while it is lit
-      scores for that team. The game is written and tested in software; the target addon it needs
-      (a plate with a hit sensor that plugs into a box, whose own lights show the window) has a build
-      guide, but its firmware is still to come and none has been built yet.
-    meta: A box with the target addon · not available yet
+      scores for that team. The game is written and tested in software, end to end with a simulated
+      target; the target addon it needs (a plate with a hit sensor that plugs into a box, whose own
+      lights show the window) has a build guide and its firmware, but none has been built or tried on
+      a real plate yet.
+    meta: A box with the target addon · not yet tried on hardware
   hacking_terminal:
     title: Hacking Terminal
     text: >-
@@ -916,9 +917,10 @@ roadmap:
           radio through an I/O pod."
         - "The pod's firmware lends the phone a Heltec board's team buttons, keypad, lights, siren,
           NFC reader, enclosure switch and LoRa radio, over USB or Bluetooth."
-        - "The app reconnects to a lost I/O pod by itself. Not tried with a real pod."
+        - "The app reconnects to a lost I/O pod by itself; when it cannot, or a different pod answers, the prop's admin links the same pod again from the game's menu, without restarting the game. Not tried with a real pod."
         - "Android props fetch signed mode packages from their controller, as boxes do. In software."
         - "The GM console can push an I/O pod's settings over the radio: the four buttons' colours, the LED ring's brightness, the volume and whether the enclosure switch reports. The pod authenticates the command like any other, keeps the settings in its flash and answers; the controller sends it again until it hears back. Before, they were set when the firmware was built. In software and against the pod's code on a computer, not tried with a real pod."
+        - "Pairing a phone with an I/O pod over Bluetooth asks for a 6-digit code that the pod shows on its small screen, so nobody can sit between the two; a phone paired the old way is asked once to pair again, and the pod's PRG button forgets every phone. In software and in tests on a computer, not tried with a real pod."
         - "An Android prop's box penalty now reaches the controller, over its Wi-Fi link and its radio link. In software."
         - "The I/O pod lends the phone its simple outputs (a siren or a smoke machine's remote through an
           RC relay switch, on GPIO 33, then 1) and its expansion port: a target addon's hits, and an output
@@ -1005,7 +1007,7 @@ roadmap:
         - "VIP / Payload: a team escorts its VIP, or a phone with GPS, to an extraction zone;
           checkpoint boxes score while held; positions stay on the field controller and the phone."
         - "The rules of Target Windows: a hit while the target shows a team's colour scores for that
-          team. The target addon is not built yet."
+          team. The target addon's firmware is written; no target has been built yet."
         - "Geo utilities in the core: distances and zones for every script, identical on every
           platform."
     g_scenarios:
@@ -1034,7 +1036,7 @@ roadmap:
           place's name and traces its outline on OpenStreetMap, and the browser draws the field
           image from OpenStreetMap's data over the country's open aerial imagery (mainland
           Portugal, Spain, France with its overseas territories, the Netherlands, Belgium,
-          Luxembourg, Switzerland, Liechtenstein, eleven German states, Poland, Czechia and Austria). The
+          Luxembourg, Switzerland, Liechtenstein, twelve German states, Poland, Czechia and Austria). The
           outline becomes the field boundary, the outside dimmed."
         - "Players' phones warn them with a banner and a vibration when they leave the boundary,
           from their own GPS, sending nothing."
@@ -1175,7 +1177,8 @@ roadmap:
       - A real server with its domain.
       - "The hosted go-live conditions (a signed DPA for each field, the sharing terms, a filled-in notice) and each field filling in its own notice and impact assessment. The maintainer's lawyer approved the legal positions on 30 October 2026; hosted mode is still not offered. None of the security, radio and legal work of 30 October has been tried on a real board or phone: it runs in software and on the preview server."
       - "The tests on hardware: real boards, a real ATAK phone, a real 4G link, a real chronograph."
-      - The target addon, which the Target Windows rules wait for.
+      - "The target addon on a real plate (its firmware is written), after which Target Windows
+        becomes a Field Box preset."
       - "Trying Apple's login against the real provider, and the username step and the account merge on the test server."
       - "jogarairsoft.pt: the maintainer wrote to them on 28 October 2026 proposing an integration (their events, teams and APDs to us; our games feed, field profiles, public clubs and results to them). Waiting for their answer; nothing is promised."
     gate: >-
@@ -1185,7 +1188,8 @@ roadmap:
     title: Community
     short: >-
       Visual mode editor, signed mode packages, the mode registry as a template, German and
-      Traditional Chinese, build guides. Every software step is built.
+      Traditional Chinese, build guides, the expansion port's target and output modules. Every software
+      step is built.
     done:
       - "<strong>The visual mode editor</strong>: a page of the simulator where a mode is put
         together from blocks (what happens when a team holds the button, timers, points, screens
@@ -1222,6 +1226,13 @@ roadmap:
         <a href="{{ page.to.build }}">Build guides</a> for the Satellite, the I/O pod, the expansion
         port, the target addon and the simple output (a siren or smoke through an RC relay switch), as
         text. No box has been built from them yet.
+      - "<strong>The expansion port in the firmware</strong>: a box finds a module plugged into its
+        port within 2&nbsp;s and passes each hit to the mode's script, and the target module has its
+        own firmware, with UF2 files in the releases. Tested on a computer against a simulated
+        module, not yet on a real port or plate."
+      - "<strong>The I2C output module</strong>: up to four relays or MOSFETs on a box's port, behind an
+        isolator and from a supply of its own, with its firmware (a UF2 file in the releases) and
+        its build guide. Its firmware is tested on a computer only, never on a board."
       - "<strong>User manuals</strong> for players, game masters, marshals and Field Box operators, in English and Portuguese."
       - "Build manuals with a pin table for each board, a firmware guide (download a release or build it) and a controller setup guide, in English and Portuguese."
       - "The simulator's web view has every input a mode uses: tags, keypad, hits and GM commands, with an event-log download."
@@ -1233,15 +1244,16 @@ roadmap:
     next:
       - "The review of the German and the Chinese: if you play in German or in Chinese, help us
         review them. Translations into other languages start at docs/translations."
-      - "The hardware: the carrier PCB (a ready-made circuit board that makes builds easier) after
-        the first built boxes, build photos, community content from a field."
+      - "The hardware: the bench tests of the expansion port and the target module, the carrier PCB
+        (a ready-made circuit board that makes builds easier) after the first built boxes, build
+        photos, community content from a field."
     gate: Ongoing after the first release.
 
 build:
   title: Build guides
   intro: >-
     Atalaia's props are built from off-the-shelf parts around one ESP32 board, with no custom
-    circuit board. This page has the Field Box's pins and wiring diagrams, its simple output for a siren or a smoke machine, and the guides for the Satellite, the I/O pod, the expansion port and the target addon,
+    circuit board. This page has the Field Box's pins and wiring diagrams, its simple output for a siren or a smoke machine, and the guides for the Satellite, the I/O pod, the expansion port, the target addon and the I2C output module,
     shortened; the full guides, with every check and the troubleshooting tables, are in the
     repository.
     To put the firmware on a board, <a href="https://github.com/vakaobr/atalaia-project/releases">download a ready-made release</a> or build it yourself: the <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/firmware.md">firmware guide</a> explains both. The field controller has its own <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/controller-setup.md">setup guide</a>. The radio modem has its own <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/modem.md">modem guide</a>.
@@ -1261,7 +1273,7 @@ build:
   steps: Steps
   open: Not decided yet
   photo: "Photo to come, after the first build:"
-  coming: Coming with the firmware (increment 8)
+  after_bench: "After the bench: what needs real hardware"
   simple_out:
     title: "The simple output: a siren, a strobe or a smoke remote"
     what: >-
@@ -1673,9 +1685,11 @@ build:
   port:
     title: Expansion port
     status: >-
-      <strong>Designed, not yet built, and not yet used by the box's firmware.</strong> A port can be
-      built now and checked with a meter and the box's own parts; no module answers until the box's
-      port driver runs in its game, with increment 8 of the expansion port plan, still to come.
+      <strong>Designed, not yet built; the box's firmware uses it.</strong> A port can be built now and
+      checked with a meter and the box's own parts. Since increment 8 of the expansion port plan the
+      box runs its port driver in its game: it finds a module within 2&nbsp;s of being plugged in,
+      reads it and lists it. That is tested on a computer only, against a simulated module, not yet on
+      a real port.
     what: >-
       A waterproof 5-pin M12 socket on the box, where modules plug in from outside: the
       <a href="#target-addon">target addon</a> now, contacts and other sensors later. It is the box's
@@ -1686,8 +1700,8 @@ build:
       sensor needs one. About <span class="nowrap">€6–14</span> in parts (the design's estimate).
     not_outputs: >-
       Not for sirens, strobes or smoke: those take the
-      <a href="#field-box-simple-output">simple output</a>. The port is for inputs, and later for an
-      output module on a box that needs more channels.
+      <a href="#field-box-simple-output">simple output</a>. The port is for inputs, and for the
+      <a href="#output-module">I2C output module</a> on a box that needs more channels.
     parts:
       socket: >-
         A <strong>female</strong> M12 A-coded 5-pin panel socket (IP67; its contacts are recessed, as
@@ -1767,14 +1781,19 @@ build:
         <strong>Cap the socket</strong> when nothing is plugged in, and run the cable on the ground,
         never in the line of fire. Nothing on either side of the port ever touches mains.
     photo: the finished port board, both sides, and the socket on a box.
-    coming:
-      driver: >-
-        <strong>The box reading the port</strong>: the port driver is being written, and the box's
-        game calls it from increment 8. With it come the box's log line for a module, its console's
-        list of modules and the port's step in the bring-up list.
+    box_title: What the box says about the port
+    box: >-
+      On its serial log (USB, 115200 baud) the box writes a line when it finds a module
+      (<code>expansion: 0x58 added: 58:target/1.0.0:hit</code>), when one stops answering
+      (<code>expansion: 0x58 lost (no_answer)</code>) and for each hit during a game.
+      <code>@modules</code> on its serial console lists the modules, and in a game the GM console shows
+      each one as a chip under its box. The firmware's bring-up list has the port's step.
+    after:
       tests: >-
-        <strong>The bench tests that need a module</strong>: 100 plug and unplug cycles during a game,
-        noise next to a switching siren and strobe, and the module's current.
+        <strong>The port's bench tests with a module</strong>: 100 plug and unplug cycles during a
+        running game, each plug-in found within 2&nbsp;s (test 3), and 30 minutes next to a switching
+        12&nbsp;V siren and strobe, counting CRC errors and missed polls (test 6). They can run as soon
+        as a target module is built; please report what you measure in an issue.
     open:
       splitter: >-
         <strong>A splitter</strong> for more than one module on a box.
@@ -1790,29 +1809,33 @@ build:
   target:
     title: Target addon
     status: >-
-      <strong>Can be built, cannot be used yet.</strong> The hardware is decided; its firmware is not
-      written. You can build the plate, the sensor's circuit, the module's enclosure and cable and the
-      box's port now, and check them with a meter; the module cannot be flashed, and no box reads it,
-      until increment 8 of the expansion port plan. No target has been built from the guide yet.
+      <strong>Can be built, and its firmware is ready; not yet tried on a real plate or a real
+      box.</strong> Increment 8 of the expansion port plan wrote the module's firmware, fixed its pins
+      and put its UF2 files in the releases, and the box now reads the module and passes each hit to
+      the mode's script: all of it tested on a computer only, against a simulated module. You can build
+      the target, flash it and plug it into a box's port now; its current, the sensor's tuning and the
+      divider are settled at the first build (below). No target has been built from the guide yet.
     what: >-
       A plate that players shoot at, with a piezo sensor that feels each hit and a small RP2040 board
       of its own (the <strong>target module</strong>). It plugs into a box's
       <a href="#expansion-port">expansion port</a> and turns the box into a scoring target for
       <a href="{{ page.to.modes }}#target-windows">Target Windows</a>, whose rules are built and
-      tested in the simulator; the box's own ring of lights shows the window, so the module needs no
-      lights. Any box with a port takes one: a Field Box, a Satellite or an I/O pod.
+      tested in the simulator and, end to end, with a simulated target; the box's own ring of lights
+      shows the window, so the module needs no lights. Any box with a port takes one: a Field Box, a
+      Satellite or an I/O pod.
     how: >-
       The piezo, bonded to the back of the plate, turns a hit into a short spike; the module finds its
       peak, its strength from 0 to 255, and keeps up to 16 hits with their age until the box takes
       them. The box reads it every 20&nbsp;ms through the port, about 5&nbsp;% of the bus, so a hit
       reaches the game within about 21&nbsp;ms, and none is counted twice. Game scripts see each hit
-      with its strength and can arm and disarm the target. About
+      as <code>hit.hit</code> with its strength, only while a game runs, and can arm and disarm the
+      target. About
       <span class="nowrap">€10–15</span> for the module, plus the plate, the cable and the box's port
       (the design's estimates).
     parts:
       board: >-
-        An <strong>RP2040 board</strong>, RP2040-Zero class or a Raspberry Pi Pico, run at a reduced
-        clock to stay within the port's 25&nbsp;mA.
+        An <strong>RP2040 board</strong>, RP2040-Zero class or a Raspberry Pi Pico, run at 48&nbsp;MHz
+        to stay within the port's 25&nbsp;mA.
       piezo: >-
         A <strong>piezo disc</strong> of 27–35&nbsp;mm (and spares: they crack), a 2–3&nbsp;mm rubber
         pad and contact adhesive.
@@ -1826,47 +1849,93 @@ build:
       address: >-
         Two solder jumpers (or a 2-position DIP switch) for the address: 0x58 with both open,
         0x59–0x5B for a second target on the same box.
+      led: >-
+        A 3&nbsp;mm LED and a 1&nbsp;kΩ resistor: it blinks while the box asks the module to show
+        itself, to find it on the field.
       connector: >-
         A <strong>male</strong> M12 A-coded 5-pin panel connector, the M12 extension cable (at most
         2&nbsp;m), a small IP65 enclosure, perfboard and wire.
       plate: A steel plate or a polycarbonate sheet, and a stand.
+    pins_title: The module's pins
+    pins_intro: >-
+      As the module's firmware uses them: the same GPIO numbers on an RP2040-Zero and on a Pico. Every
+      other pin stays unconnected.
+    pin_rp2040: RP2040 pin
+    pin:
+      v3: >-
+        Supply, about 3.0&nbsp;V: M12 pin 1 (brown), through the MOSFET. On a Pico, also tie 3V3_EN to
+        GND
+      gnd: "Ground: M12 pin 3 (blue)"
+      sda: "I2C SDA, no pull-up: M12 pin 2 (white)"
+      scl: "I2C SCL, no pull-up: M12 pin 4 (black)"
+      adc0: "The piezo's front end (ADC0)"
+      adc1: "A second plate's front end (ADC1), two-plate firmware only"
+      a0: "Address jumper to GND: adds 1"
+      a1: "Address jumper to GND: adds 2"
+      led: "The LED's anode; its cathode through 1&nbsp;kΩ to GND"
     steps:
       port: >-
         Build and check the box's <a href="#expansion-port">expansion port</a> first.
       supply: >-
-        The supply: M12 pin 1 through the MOSFET to the RP2040 board's 3V3 pin, never to its 5&nbsp;V
-        or USB pin; pin 3 to ground; pin 5 cut short and insulated.
+        The supply: M12 pin 1 through the MOSFET to the RP2040 board's 3V3 pin, never to its 5&nbsp;V,
+        VBUS, VSYS or USB pin; pin 3 to ground; pin 5 cut short and insulated. On an RP2040-Zero its own
+        regulator then stays unpowered; on a Pico, tie 3V3_EN to GND so that its regulator is off.
       piezo: >-
         Bond the piezo through its pad to the centre of the plate's back; the bleed across its leads,
-        then the divider and the clamps on the way to one of the RP2040's analogue pins
-        (GPIO&nbsp;26–28).
+        then the divider and the clamps on the way to GP26 (a two-plate module's second front end goes
+        to GP27).
       bus: >-
-        SDA (pin 2) and SCL (pin 4) to the RP2040's I2C pins, with no pull-up resistors in the module;
-        leave both address jumpers open for 0x58.
+        SDA (pin 2) to GP4 and SCL (pin 4) to GP5, with no pull-up resistors in the module; the address
+        jumpers from GP2 and GP3 to ground, both left open for 0x58; the LED on GP14.
       enclosure: >-
         The enclosure behind the plate, fixed to the stand rather than to the plate, its connector
         facing away from the shooters, and the cable running down and along the ground to the box.
       check: >-
         Check with the meter, the module unpowered: no short between pins 1 and 3, pin 5 open, no
         pull-up on pins 2 and 4, the clamps reading as diodes, about 1&nbsp;MΩ across the piezo.
-    coming:
-      firmware: >-
-        <strong>The module's firmware</strong>, and its UF2 file from CI and the releases, to flash it
-        by dropping the file onto the drive the board shows over USB.
-      pins: >-
-        <strong>The module's pin table</strong>: which RP2040 pins carry I2C, the piezo's input, the
-        address jumpers and its LED, and how the chosen board takes 3.3&nbsp;V on its 3V3 pin. Until
-        then the guide leaves those wires for later.
-      box: >-
-        <strong>The box reading the module</strong>: its port driver called from the game, each hit
-        passed to the mode's script, and the module in the box's log and the GM console.
+    flash_title: Flashing the module
+    flash_intro: >-
+      The module's firmware is a UF2 file, flashed over USB by hand and never over the air, with the
+      module unplugged from the box: never connect its USB cable and the port cable at the same time.
+    flash:
+      download: >-
+        <strong>Get the UF2 file</strong>: <code>atalaia-target-module-&lt;version&gt;.uf2</code>
+        (<code>atalaia-target-module-2-&lt;version&gt;.uf2</code> for two plates) from a
+        <a href="https://github.com/vakaobr/atalaia-project/releases">release</a>, from the first one
+        after 0.7.0, and check it against the release's <code>SHA256SUMS</code>: module files are not
+        signed. Or build it yourself with <code>python3 tools/docker_module.py build</code>.
+      boot: >-
+        <strong>Flash it</strong>: hold the board's BOOT button while plugging its USB cable into a
+        computer, drag the UF2 file onto the drive that appears (<code>RPI-RP2</code>), and unplug the
+        USB cable once the board restarts.
+      found: >-
+        <strong>Plug it into the box's port</strong>: within 2&nbsp;s the box's serial log says
+        <code>expansion: 0x58 added: 58:target/1.0.0:hit</code>, and <code>@modules</code> on its
+        serial console lists the target.
+      armed: >-
+        <strong>Try it in a game</strong>: start Target Windows on the box; the plate is armed, and a
+        tap on it logs <code>expansion: hit hit, strength &lt;n&gt;</code>.
+    after:
+      power: >-
+        <strong>The module's current and 3V3</strong>: under 25&nbsp;mA at 48&nbsp;MHz, with a meter in
+        series with pin 1 (bench test 4), and about 3.0&nbsp;V at its 3V3 pin while it runs.
       tuning: >-
-        <strong>Measurements at the first build</strong>: the module's current (under 25&nbsp;mA), and
-        the sensor tuned on real steel and polycarbonate plates, which settles the threshold and the
-        divider resistors.
-      mode: >-
-        <strong>Target Windows as a Field Box preset</strong>, once the target is bench-tested, and
-        later the I/O pod lending a target to a phone.
+        <strong>The threshold, the hold-off and the strength scale</strong> on real steel and
+        polycarbonate plates, at the field's power limit and with eye protection (bench test 8). The
+        firmware's defaults (a threshold of 300 of 4095, a 50&nbsp;ms hold-off) are only a starting
+        point.
+      divider: >-
+        <strong>The divider's two resistors</strong>, chosen at the same test (that is why they sit in
+        sockets): a hit at range clearly above the threshold, a hit right over the piezo not reaching
+        the clamps.
+      port: >-
+        <strong>The port's tests with a module</strong>: plug cycles during a game and noise next to a
+        siren, in the <a href="#expansion-port">expansion port</a>'s list.
+      preset: >-
+        <strong>Target Windows as a built-in Field Box preset</strong>, once the target is
+        bench-tested; until then a field puts the mode on a box like any other mode. The I/O pod
+        already lends a target addon's hits to a game on a phone (increment 9), tested on a computer
+        only: see <a href="#io-pod">the I/O pod</a>.
     open:
       plate: >-
         <strong>The plate</strong>: its material grade, size, thickness, stand and angle, from the
@@ -1891,8 +1960,144 @@ build:
         <strong>The field's power limits</strong> apply to shooting at targets as at players.
     photo: the finished target, plate and sensor, and the port on a box.
     full: >-
-      Every step, check and decision, and the list of what waits for increment 8:
+      Every step, check and decision, and what still waits for the bench:
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/target-addon/BUILD.md">target addon build guide</a>.
+  out_module:
+    title: I2C output module
+    status: >-
+      <strong>Designed, not yet built; later and optional.</strong> Its firmware is written (increment
+      11 of the expansion port plan) and tested on a computer only: it builds for the RP2040 and its
+      UF2 file comes with the releases, but it has never run on a board, and no box has driven a real
+      one. No module has been built from the guide yet.
+    what: >-
+      A module for a box's <a href="#expansion-port">expansion port</a> that switches up to four
+      loads (a siren, a strobe, a horn, a smoke machine's low-voltage remote) through relays or
+      MOSFETs, from <strong>a supply of its own</strong>. A small RP2040 board runs its firmware: the
+      box keeps an output on only while it keeps writing to it (every output is off 1.5&nbsp;s after
+      the box stops), and the module holds its own hard limits, a maximum on time and a minimum off
+      time per channel, with a second, independent guard. About <span class="nowrap">€25–35</span>
+      without the supply and the loads (the design's estimate).
+    how: >-
+      An <strong>I2C isolator</strong> (ISO1540 or ADuM1250 class) passes the bus across a barrier:
+      the box's ground and the module's ground never connect, so a relay's spike, a load's short or a
+      battery wired the wrong way round stays on the module's side. The isolator's box side is the
+      only thing on the port's 3.3&nbsp;V (a few mA); everything else runs from the module's own
+      9–15&nbsp;V input (a 12&nbsp;V battery, or the siren's own pack).
+    simple_first: >-
+      <strong>Use the <a href="#field-box-simple-output">simple output</a> first</strong>: for one
+      siren, one strobe or one smoke remote it is cheaper and simpler, with no firmware of its own.
+      This module is for a box that needs more channels than it has free pins, or wants to know that
+      the loads' supply is there.
+    rules_title: Rules for the output module
+    rules:
+      mains: >-
+        <strong>Never mains.</strong> It switches safety extra-low voltage loads only: at most
+        24&nbsp;V DC and 2&nbsp;A per channel. Nothing in it, on it or wired to it ever touches 230 or
+        110&nbsp;V wiring, not even through a relay rated for it; a mains device needs a commercially
+        made, certified, enclosed switching unit with a low-voltage control input.
+      smoke: >-
+        <strong>Smoke machines only through their documented low-voltage remote input</strong> (a
+        contact input or a low-voltage trigger written in the maker's manual), or a battery smoke
+        device made to be triggered by a contact. Many cheap mains fog machines carry mains on their
+        wired remote's cable: never wire a relay into one, and never open one. If the manual does not
+        say so in writing, the machine is not used.
+      pyro: >-
+        <strong>Never pyrotechnics</strong>, igniters or smoke grenades.
+      bare: >-
+        <strong>Never a bare PCF8574 or MCP23017 relay board</strong> on the port in its place: it has
+        no time limit of its own, so a relay stays on if the box crashes.
+    parts:
+      board: >-
+        An <strong>RP2040 board</strong>: a Raspberry Pi Pico or an RP2040-Zero.
+      isolator: >-
+        An <strong>I2C isolator</strong> breakout, ISO1540 or ADuM1250 class, with two separate
+        supplies and grounds; the pull-up resistors on its box side come off (the port board has
+        them).
+      mosfet: >-
+        A <strong>P-channel MOSFET</strong> (AO3401 or SI2301 class) and a 10&nbsp;kΩ resistor, so a
+        hand-made cable wired the wrong way round cannot feed the isolator backwards.
+      relays: >-
+        A 4-channel opto-isolated <strong>relay board with high-level trigger</strong> (input high is
+        relay on, or a trigger jumper set to high), 5&nbsp;V coils, contacts of at least 2&nbsp;A at
+        30&nbsp;V DC, and a 10&nbsp;kΩ pull-down on each input, so every relay stays off while the
+        board is in reset or being flashed. Or a MOSFET board made for 3.3&nbsp;V logic, for DC loads
+        switched often, such as strobes.
+      supply: >-
+        <strong>Its own supply</strong>: a 9–15&nbsp;V DC input, a 1&nbsp;A slow-blow fuse, a
+        1N5819-class Schottky diode against a battery connected the wrong way round, and a buck
+        converter (MP1584 or LM2596 class) set to 5.0&nbsp;V for the RP2040 board and the relay coils.
+      loads: >-
+        <strong>For each load</strong>: its own battery and its own fuse of at most 2&nbsp;A, through
+        the relay's dry contacts (COM and NO), and a flyback diode across a motor siren, a horn or any
+        coil.
+      connector: >-
+        A <strong>male</strong> M12 A-coded 5-pin panel connector and the M12 cable (at most
+        2&nbsp;m), a plastic IP65 enclosure of about 150&nbsp;×&nbsp;110&nbsp;×&nbsp;70&nbsp;mm with
+        cable glands, a status LED, perfboard, wire and labels ("SELV ONLY, NEVER MAINS").
+    pins_title: The module's pins
+    pins_intro: >-
+      As the module's firmware uses them, on a Pico's or an RP2040-Zero's headers; the M12 pins go to
+      the isolator's box side only, and its pin 3 (the box's ground) to nothing else.
+    pin:
+      sda: "I2C SDA: the isolator's module side (4.7&nbsp;kΩ to its 3.3&nbsp;V)"
+      scl: "I2C SCL: the isolator's module side (4.7&nbsp;kΩ to its 3.3&nbsp;V)"
+      ch1: "OUT 1: the relay board's IN1, high is on; 10&nbsp;kΩ to GND"
+      ch2: "OUT 2: IN2; 10&nbsp;kΩ to GND"
+      ch3: "OUT 3: IN3; 10&nbsp;kΩ to GND"
+      ch4: "OUT 4: IN4; 10&nbsp;kΩ to GND"
+      a0: "Address jumper to GND: adds 1"
+      a1: "Address jumper to GND: adds 2"
+      led: "The status LED's anode; its cathode through 1&nbsp;kΩ to GND"
+      sense: "The supply sense (optional): a 100&nbsp;kΩ / 22&nbsp;kΩ divider from the loads' battery"
+    pins_more: >-
+      The address is 0x5C with both jumpers open (0x5D–0x5F with them). The buck converter's 5&nbsp;V
+      goes to the Pico's VSYS or the RP2040-Zero's 5&nbsp;V pin, the board's 3V3 to the isolator's
+      module side.
+    flash_title: Flashing and first power-up
+    flash:
+      download: >-
+        <strong>Get the UF2 file</strong>: <code>atalaia-output-module-&lt;version&gt;.uf2</code>
+        from a <a href="https://github.com/vakaobr/atalaia-project/releases">release</a>, from the
+        first one after 0.7.0, checked against its <code>SHA256SUMS</code> (not signed). It has the
+        default channel list, four generic relays of at most 30&nbsp;s each, for a first bench test;
+        for other loads, build your own with the channel list of what is fitted
+        (<code>python3 tools/docker_module.py build</code>).
+      boot: >-
+        <strong>Flash it</strong> with the supply off, the M12 cable unplugged and the loads
+        disconnected: hold the board's BOOT button while plugging it into a computer's USB, copy the
+        UF2 file onto the drive that appears, and unplug the USB.
+      first: >-
+        <strong>First power, loads disconnected</strong>: no relay clicks, at power-up or after 20
+        power cycles, and the LED stays dark (a fast blink means the firmware refused its channel
+        list).
+      box: >-
+        <strong>On a box</strong>: the box finds it as <code>5c:out4/1.0.0</code>, and its outputs
+        stay <strong>off until the box's admin enables them</strong> at the box, with each channel's
+        function and maximum on time; the admin's 1&nbsp;s test then clicks each relay in turn.
+    after:
+      lease: >-
+        <strong>Off within 1.5&nbsp;s</strong> with a relay on, each time the box loses power,
+        resets, or the cable is cut or unplugged (bench test 5, timed on video).
+      isolator: >-
+        <strong>The isolator at the port's 3.0&nbsp;V</strong>, the bottom of its range, and the
+        bus's low level through it and the port's buffer (with a scope); the module's current from
+        the port (a few mA expected).
+      relays: >-
+        <strong>The relays pulling in from 3.3&nbsp;V</strong>, their coil current, the module's own
+        supply current and the input fuse's rating, the supply sense against a meter, and the
+        watchdog and the guard on a real board.
+      noise: >-
+        <strong>Noise</strong>: a 12&nbsp;V siren and a strobe switching for 30 minutes next to the
+        box and its cable, counting CRC errors and missed polls (bench test 6).
+      smoke: >-
+        <strong>Smoke</strong>: a battery smoke device, or a fog machine with a documented
+        low-voltage input, fired by Bomb's explosion and stopped by the GM's "All outputs off" and by
+        the end of the game (bench test 10).
+    photo: the finished module, both sides of the isolator, and its labels.
+    full: >-
+      Every part, the two sides, the supply, the loads, the pins, the checks and what waits for the
+      bench:
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/output-module/BUILD.md">I2C output module build guide</a>.
 
 hub:
   title: Community hub

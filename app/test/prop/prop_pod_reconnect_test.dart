@@ -5,15 +5,21 @@
 // (decision PF15): the session shows the state, opens the same pod again
 // by itself, takes its buttons again and, with a radio, a new radio link
 // (a new epoch); the person's unlink and the end of the game stop it. Then
-// the prop's screen: the banner, the icon, and the admin's "unlink".
+// the prop's screen: the banner, the icon, and the admin's "unlink"; and the
+// admin's "Link the pod again" once the tries stopped or another pod
+// answered (decision ROB-9).
 
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:atalaia_app/core/node_types.dart';
+import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/modes/mode_catalog.dart';
 import 'package:atalaia_app/pod/pod_client.dart';
 import 'package:atalaia_app/pod/pod_codec.dart';
+import 'package:atalaia_app/pod/pod_pairing.dart';
 import 'package:atalaia_app/pod/pod_reconnect.dart';
+import 'package:atalaia_app/pod/pod_transports.dart';
 import 'package:atalaia_app/prop/prop_game.dart';
 import 'package:atalaia_app/prop/prop_session.dart';
 import 'package:atalaia_app/protocol/join_payload.dart';
@@ -68,6 +74,44 @@ bool pressed(FakeRunningNode node, String team) =>
     node.inputs.any((i) => i.$1 == 'team_input.press' && i.$2?['team'] == team);
 
 void main() {
+  test('over Bluetooth, a pod that refuses the bond pairs again once; a wrong '
+      'passkey then stops the tries and says to link it again', () async {
+    const device = PodDevice(
+      kind: 'ble',
+      id: 'AA:BB',
+      name: 'atalaia-pod-AABB',
+    );
+    final node = FakeRunningNode();
+    final bonds = ScriptedBonds([
+      PodPairError.needsRepair,
+      PodPairError.wrongPasskey,
+    ]);
+    var tries = 0;
+    final s = session(
+      node,
+      reopen: (lost) async {
+        tries++;
+        return null;
+      },
+    );
+    await s.open();
+    final first = FakeBleLink(bonds);
+    await s.attachPod(PodClient(first, device: device));
+    await until(() => s.pod != null);
+    final repairing = <bool>[];
+    s.addListener(() => repairing.add(s.podRepairing));
+    await first.drop();
+    await until(() => s.podPhase == PodLinkPhase.relink);
+    expect(tries, 2);
+    expect(repairing, contains(true));
+    expect(s.podRepairing, isFalse);
+    expect(s.podRelinkMessage, 'pod.wrong_passkey');
+    expect(bonds.log, contains('forget AA:BB'));
+    expect(s.log, contains('pod: its bond was refused, pairing again'));
+    expect(s.log, contains('pod: link it again (pod.wrong_passkey)'));
+    await s.close();
+  });
+
   test('the pod comes back by itself and its buttons work again', () async {
     final node = FakeRunningNode();
     final links = <FakePodLink>[];
@@ -284,5 +328,414 @@ void main() {
     expect(session0.podPhase, PodLinkPhase.unlinked);
     expect(find.byKey(const Key('prop-pod-reconnecting')), findsNothing);
     await tester.runAsync(session0.close);
+  });
+
+  testWidgets('the game screen says while the pod pairs anew by itself, and '
+      'the banner goes once it is linked again', (tester) async {
+    tester.view.physicalSize = const Size(400, 840);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    const device = PodDevice(kind: 'ble', id: 'AA:BB', name: 'atalaia-pod');
+    final node = FakeRunningNode();
+    final h = harness(runner: FakeNodeRunner(node));
+    final bonds = ScriptedBonds([PodPairError.needsRepair]);
+    // The second try (the pairing anew) waits until the test lets it.
+    final paired = Completer<void>();
+    var tries = 0;
+    final session0 = session(
+      node,
+      reopen: (lost) async {
+        tries++;
+        if (tries == 1) return null;
+        await paired.future;
+        return PodClient(FakeBleLink(bonds), device: device);
+      },
+    );
+    final first = FakeBleLink(bonds);
+    await tester.runAsync(() async {
+      await session0.open();
+      await session0.attachPod(PodClient(first, device: device));
+      await until(() => session0.pod != null);
+    });
+    await tester.pumpWidget(
+      h.app(
+        home: PropGameScreen(
+          setup: setup(),
+          session: session0,
+          modeName: 'Domination',
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byKey(const Key('prop-pod-repairing')), findsNothing);
+
+    await tester.runAsync(() async {
+      await first.drop();
+      await until(() => session0.podRepairing);
+    });
+    await tester.pump();
+    expect(find.byKey(const Key('prop-pod-repairing')), findsOneWidget);
+    expect(find.text(AppLanguage.pt.table['pod.repair']!), findsOneWidget);
+    // The plain "reconnecting" gives way to it.
+    expect(find.byKey(const Key('prop-pod-reconnecting')), findsNothing);
+    expect(find.byKey(const Key('prop-pod-relink')), findsNothing);
+
+    await tester.runAsync(() async {
+      paired.complete();
+      await until(() => session0.podPhase == PodLinkPhase.linked);
+    });
+    await tester.pump();
+    expect(session0.podRepairing, isFalse);
+    for (final k in [
+      'prop-pod-repairing',
+      'prop-pod-reconnecting',
+      'prop-pod-relink',
+      'prop-pod-refused',
+    ]) {
+      expect(find.byKey(Key(k)), findsNothing, reason: k);
+    }
+    await tester.runAsync(session0.close);
+  });
+
+  testWidgets('when the tries stop, the game screen says to link the pod '
+      'again and why, until the admin unlinks it', (tester) async {
+    tester.view.physicalSize = const Size(400, 840);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    const device = PodDevice(kind: 'ble', id: 'AA:BB', name: 'atalaia-pod');
+    final node = FakeRunningNode();
+    final h = harness(
+      language: AppLanguage.en,
+      runner: FakeNodeRunner(node),
+      settings: AppSettings()..setPin('1234'),
+    );
+    final bonds = ScriptedBonds([
+      PodPairError.needsRepair,
+      PodPairError.wrongPasskey,
+    ]);
+    final session0 = session(node, reopen: (lost) async => null);
+    final first = FakeBleLink(bonds);
+    await tester.runAsync(() async {
+      await session0.open();
+      await session0.attachPod(PodClient(first, device: device));
+      await until(() => session0.pod != null);
+    });
+    await tester.pumpWidget(
+      h.app(
+        home: PropGameScreen(
+          setup: setup(),
+          session: session0,
+          modeName: 'Domination',
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.runAsync(() async {
+      await first.drop();
+      await until(() => session0.podPhase == PodLinkPhase.relink);
+    });
+    await tester.pump();
+    final relink = find.byKey(const Key('prop-pod-relink'));
+    expect(relink, findsOneWidget);
+    expect(
+      tester.widget<Text>(relink).data,
+      'The app could not link the pod again by itself. '
+      '${AppLanguage.en.table['pod.wrong_passkey']}',
+    );
+    expect(find.byKey(const Key('prop-pod-repairing')), findsNothing);
+    expect(find.byKey(const Key('prop-pod-reconnecting')), findsNothing);
+    expect(find.byKey(const Key('prop-pod-refused')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('prop-admin')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('pin-field')), '1234');
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('admin-unlink-pod')));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pumpAndSettle();
+    expect(session0.podPhase, PodLinkPhase.unlinked);
+    expect(relink, findsNothing);
+    await tester.runAsync(session0.close);
+  });
+
+  // Decision ROB-9: "Link the pod again" in the admin menu during a game.
+  group('link the pod again', () {
+    const device = PodDevice(
+      kind: 'ble',
+      id: 'AA:BB',
+      name: 'atalaia-pod-AABB',
+    );
+
+    Future<void> openAdmin(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('prop-admin')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('pin-field')), '1234');
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+    }
+
+    /// Until [ok]: the tap started the tries in the test's fake time, so
+    /// both clocks move (real for the fake links, fake for the tries).
+    Future<void> settle(WidgetTester tester, bool Function() ok) async {
+      for (var i = 0; i < 300 && !ok(); i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 2)),
+        );
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      expect(ok(), isTrue);
+    }
+
+    Future<void> closeSheet(WidgetTester tester) async {
+      await tester.tapAt(const Offset(200, 20));
+      await tester.pumpAndSettle();
+    }
+
+    /// A running game whose Bluetooth pod lost its link; [reopen] is each
+    /// try, [errors] what the plugin says of each failed one.
+    Future<(PropSession, FakeBleLink)> game(
+      WidgetTester tester,
+      FakeRunningNode node, {
+      required List<PodPairError?> errors,
+      required PodReopen reopen,
+    }) async {
+      tester.view.physicalSize = const Size(400, 840);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final h = harness(
+        language: AppLanguage.en,
+        runner: FakeNodeRunner(node),
+        settings: AppSettings()..setPin('1234'),
+      );
+      final s = session(node, reopen: reopen);
+      final first = FakeBleLink(ScriptedBonds(errors));
+      await tester.runAsync(() async {
+        await s.open();
+        await s.attachPod(PodClient(first, device: device));
+        await until(() => s.pod != null);
+        await s.start();
+      });
+      await tester.pumpWidget(
+        h.app(
+          home: PropGameScreen(
+            setup: setup(),
+            session: s,
+            modeName: 'Domination',
+          ),
+        ),
+      );
+      await tester.pump();
+      return (s, first);
+    }
+
+    testWidgets('offered only once the tries stopped, behind the PIN', (
+      tester,
+    ) async {
+      final node = FakeRunningNode();
+      // Made in the real clock's zone, as the tries that wait on it.
+      late final Completer<void> gate;
+      await tester.runAsync(() async => gate = Completer<void>());
+      final (s, first) = await game(
+        tester,
+        node,
+        errors: [PodPairError.wrongPasskey],
+        reopen: (lost) async {
+          await gate.future;
+          return null;
+        },
+      );
+      // Linked: not offered.
+      await openAdmin(tester);
+      expect(find.byKey(const Key('admin-unlink-pod')), findsOneWidget);
+      expect(find.byKey(const Key('admin-relink-pod')), findsNothing);
+      await closeSheet(tester);
+
+      // Reconnecting by itself: not offered either.
+      await tester.runAsync(() async {
+        await first.drop();
+        await until(() => s.podPhase == PodLinkPhase.reconnecting);
+      });
+      await tester.pump();
+      await openAdmin(tester);
+      expect(find.byKey(const Key('admin-relink-pod')), findsNothing);
+      await closeSheet(tester);
+
+      // The tries stopped: offered.
+      await tester.runAsync(() async {
+        gate.complete();
+        await until(() => s.podPhase == PodLinkPhase.relink);
+      });
+      await tester.pump();
+      expect(s.canRelinkPod, isTrue);
+
+      // Without the PIN, no menu: a wrong one, then Cancel.
+      await tester.tap(find.byKey(const Key('prop-admin')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('pin-field')), '9999');
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      expect(find.text('Wrong PIN.'), findsOneWidget);
+      expect(find.byKey(const Key('admin-relink-pod')), findsNothing);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('admin-relink-pod')), findsNothing);
+      expect(s.podPhase, PodLinkPhase.relink);
+
+      await openAdmin(tester);
+      expect(find.byKey(const Key('admin-relink-pod')), findsOneWidget);
+      expect(find.text('Link the pod again'), findsOneWidget);
+      await closeSheet(tester);
+
+      // Unlinked: gone.
+      await tester.runAsync(s.unlinkPod);
+      await tester.pump();
+      await openAdmin(tester);
+      expect(find.byKey(const Key('admin-relink-pod')), findsNothing);
+      await closeSheet(tester);
+      await tester.runAsync(s.close);
+    });
+
+    testWidgets('the same pod linked again: the banner goes, the game goes '
+        'on with the pod\'s buttons and capabilities', (tester) async {
+      final node = FakeRunningNode();
+      final links = <FakeBleLink>[];
+      final bonds = ScriptedBonds(const []);
+      var tries = 0;
+      final (s, first) = await game(
+        tester,
+        node,
+        errors: [PodPairError.needsRepair, PodPairError.wrongPasskey],
+        reopen: (lost) async {
+          tries++;
+          // The first link's tries fail; the admin's comes back.
+          if (tries <= 2) return null;
+          final l = FakeBleLink(bonds);
+          links.add(l);
+          return PodClient(l, device: device);
+        },
+      );
+      final linkedCaps = s.helloCapabilities;
+      await tester.runAsync(() async {
+        await first.drop();
+        await until(() => s.podPhase == PodLinkPhase.relink);
+      });
+      await tester.pump();
+      expect(find.byKey(const Key('prop-pod-relink')), findsOneWidget);
+      // The pod's IDENT is not this prop's while its link is down.
+      bool podIdent(String l) =>
+          RegExp(r'^pod .*: \d+ capabilities').hasMatch(l);
+      expect(s.log.where(podIdent), hasLength(1));
+
+      await openAdmin(tester);
+      await tester.tap(find.byKey(const Key('admin-relink-pod')));
+      await tester.pumpAndSettle();
+      await settle(tester, () => s.podPhase == PodLinkPhase.linked);
+      await tester.pump();
+      for (final k in [
+        'prop-pod-relink',
+        'prop-pod-refused',
+        'prop-pod-repairing',
+        'prop-pod-reconnecting',
+      ]) {
+        expect(find.byKey(Key(k)), findsNothing, reason: k);
+      }
+      expect(tries, 3);
+      expect(s.phase, PropPhase.running);
+      // The mode gets the pod's capabilities again, as on a reconnect.
+      expect(s.helloCapabilities, linkedCaps);
+      expect(s.log.where(podIdent), hasLength(2));
+      expect(s.log, contains('pod: linking it again (admin)'));
+      expect(s.log, contains('pod link restored'));
+      expect(s.log.where((l) => l.contains('pod unlinked')), isEmpty);
+      links.single.event('btn.red', 'press', 1);
+      await settle(tester, () => pressed(node, 'red'));
+      await tester.runAsync(s.close);
+    });
+
+    testWidgets('it fails again: the red banner is back, with the new reason', (
+      tester,
+    ) async {
+      final node = FakeRunningNode();
+      final (s, first) = await game(
+        tester,
+        node,
+        errors: [PodPairError.wrongPasskey, PodPairError.timeout],
+        reopen: (lost) async => null,
+      );
+      await tester.runAsync(() async {
+        await first.drop();
+        await until(() => s.podPhase == PodLinkPhase.relink);
+      });
+      await tester.pump();
+      final relink = find.byKey(const Key('prop-pod-relink'));
+      final en = AppLanguage.en.table;
+      expect(
+        tester.widget<Text>(relink).data,
+        contains(en['pod.wrong_passkey']),
+      );
+
+      await openAdmin(tester);
+      await tester.tap(find.byKey(const Key('admin-relink-pod')));
+      await tester.pumpAndSettle();
+      await settle(
+        tester,
+        () =>
+            s.podPhase == PodLinkPhase.relink &&
+            s.podRelinkMessage == 'pod.pair_timeout',
+      );
+      await tester.pump();
+      expect(relink, findsOneWidget);
+      expect(
+        tester.widget<Text>(relink).data,
+        'The app could not link the pod again by itself. '
+        '${en['pod.pair_timeout']}',
+      );
+      expect(s.phase, PropPhase.running);
+      expect(s.log, contains('pod: link it again (pod.pair_timeout)'));
+      await tester.runAsync(s.close);
+    });
+
+    testWidgets('another pod answered: the banner names the pod the game '
+        'expects, and the item links that one again', (tester) async {
+      final node = FakeRunningNode();
+      var tries = 0;
+      final (s, first) = await game(
+        tester,
+        node,
+        errors: const [],
+        reopen: (lost) async {
+          tries++;
+          return tries == 1
+              ? PodClient(
+                  FakeBleLink(ScriptedBonds(const []), ident: otherPodIdent),
+                )
+              : PodClient(FakeBleLink(ScriptedBonds(const [])), device: device);
+        },
+      );
+      await tester.runAsync(() async {
+        await first.drop();
+        await until(() => s.podPhase == PodLinkPhase.refused);
+      });
+      await tester.pump();
+      final refused = find.byKey(const Key('prop-pod-refused'));
+      final n = first.ident!.capabilities.length;
+      expect(
+        tester.widget<Text>(refused).data,
+        '${AppLanguage.en.table['prop.pod_refused']} This game expects the '
+        'pod atalaia-pod-AABB (AA:BB): firmware ${first.ident!.fwVersion}, '
+        '$n ${n == 1 ? 'capability' : 'capabilities'}.',
+      );
+      await openAdmin(tester);
+      await tester.tap(find.byKey(const Key('admin-relink-pod')));
+      await tester.pumpAndSettle();
+      await settle(tester, () => s.podPhase == PodLinkPhase.linked);
+      await tester.pump();
+      expect(refused, findsNothing);
+      expect(tries, 2);
+      await tester.runAsync(s.close);
+    });
   });
 }
