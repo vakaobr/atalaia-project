@@ -52,8 +52,8 @@ def create_sql(role: str) -> str:
 
 
 def drop_sql(role: str, schema: str) -> list[str]:
-    """Takes back every grant the role holds (its schema, its tables and sequences, the hub's sharing objects), then
-    drops it. Run as the owner role, which made the grants; the schema may already be gone."""
+    """Takes back every grant the role holds (its schema, its tables and sequences, the hub's sharing and shared
+    history objects), then drops it. Run as the owner role, which made the grants; the schema may already be gone."""
     r = _q(check_tenant_role(role))
     if not SCHEMA_PATTERN.fullmatch(schema):
         raise ValueError(f"not a tenant schema name: {schema!r}")
@@ -70,6 +70,10 @@ def drop_sql(role: str, schema: str) -> list[str]:
         f"FROM {r}; "
         f"REVOKE ALL ON FUNCTION public.atalaia_share_read(uuid[], integer), public.atalaia_share_redeem(bytea), "
         f"public.atalaia_share_peers(uuid), public.atalaia_caller_tenant() FROM {r}; END IF; "
+        f"IF to_regclass('public.atalaia_hub_games') IS NOT NULL THEN "  # the shared game history (HUBH-*)
+        f"REVOKE ALL ON public.atalaia_hub_history_members, public.atalaia_hub_games FROM {r}; "
+        f"REVOKE ALL ON FUNCTION public.atalaia_hub_history_read(timestamp with time zone, text, integer), "
+        f"public.atalaia_hub_history_fields(), public.atalaia_caller_tenant() FROM {r}; END IF; "
         f"REVOKE ALL ON SCHEMA public FROM {r}; END IF; END $do$",
         f"DROP ROLE IF EXISTS {r}",
     ]

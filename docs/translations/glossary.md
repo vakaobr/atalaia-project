@@ -105,6 +105,7 @@ process.
 | floor plan / level | planta / piso | Grundriss / Ebene | 平面圖 / 樓層 | |
 | Bluetooth beacon (indoor positions) | baliza | Beacon | 信標 | as the app's dialog and sharing line write it: "Usar as balizas", "Beacons nutzen", "使用信標" (LSW-3); a Field Box is a beacon too |
 | map grid / grid square ("C4") | quadrícula / quadrícula C4 | Gitter / Planquadrat C4 | 方格 / 方格 C4 | rows are letters (zh-tw: 列), columns numbers (欄); "grelha" stays the boxes' plain placeholder grid (MF-91) |
+| map tile (of an aerial photo or a map) | mosaico | Kachel | 圖磚 | the 256-pixel squares a WMTS sends; the console names them only when some are missing or did not arrive (MF-96) |
 | crest | emblema | Wappen | 隊徽 | |
 | federation number | número de federado | Verbandsnummer | 協會會員編號 | |
 | APD (membership) | APD (filiação) | APD (Mitgliedschaft) | APD（會員資格） | APD stays as is in every language; pt-PT: the membership is "filiação"; the number is "número de associado" (the maintainer, 2026-10-28), never "sócio" |

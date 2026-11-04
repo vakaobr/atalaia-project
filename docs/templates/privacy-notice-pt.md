@@ -318,6 +318,19 @@ servidor. Os resultados de equipa e de squad sem identificadores de pessoas
 (sem listas de elementos; um squad com menos de 3 pessoas é incluído na sua
 equipa) guardam-se **365 dias** (secção 7).
 
+**[ESCOLHA DO CAMPO:] Partilha de resultados de jogos com outros campos de
+um hub alojado** (desligada por omissão). Se a administração do campo a
+ligar, o operador do hub guarda, para a equipa dos outros campos do mesmo
+hub que também partilham os seus, uma cópia do modo de
+cada jogo terminado, da hora de início e de fim, da pontuação final de cada
+equipa, da equipa vencedora e do nome do campo. **Não se partilha nenhum
+identificador, nome, conta, evento ou lista de elementos**, nem os nomes que
+o campo dá a um jogo ou a uma equipa. A cópia é apagada quando o campo
+desliga a partilha, e nunca se guarda mais tempo do que o campo guarda os
+resultados do jogo (365 dias). [ADVOGADO: confirmar se isto precisa de um
+fundamento ou de uma menção além deste parágrafo, e se os campos que
+partilham precisam de termos entre si.]
+
 Fundamento: f) gerir os jogos e guardar o seu histórico [ADVOGADO:
 confirmar].
 

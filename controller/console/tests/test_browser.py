@@ -87,8 +87,8 @@ BOX = 7
 FIXTURES = HERE / "fixtures"
 CORS = {"Access-Control-Allow-Origin": "*"}
 OUTLINE = [(39.6015, -8.4030), (39.6012, -8.3990), (39.5990, -8.3985), (39.5984, -8.4010), (39.5995, -8.4035)]
-# The open orthophotos' origins (api.py FIELD_MAP_ORTHOPHOTOS, its WMS, and FIELD_MAP_ORTHO_TILES, WMTS on
-# origins of their own; MF-65 to MF-80), every one answered by a fixture.
+# The open orthophotos' origins (api.py FIELD_MAP_ORTHOPHOTOS, its WMS or a WMTS-only source's WMTS, and
+# FIELD_MAP_ORTHO_TILES, WMTS on origins of their own; MF-65 to MF-80, MF-97), every one answered by a fixture.
 ORTHO_WMS_ORIGINS = (
     "https://ortos.dgterritorio.gov.pt", "https://www.ign.es", "https://data.geopf.fr", "https://service.pdok.nl",
     "https://wms.ngi.be", "https://geo.api.vlaanderen.be", "https://geoservices.wallonie.be",
@@ -96,7 +96,7 @@ ORTHO_WMS_ORIGINS = (
     "https://geoservices.bayern.de", "https://geodienste.bremen.de", "https://www.gds-srv.hessen.de",
     "https://www.geodaten-mv.de", "https://www.wms.nrw.de", "https://geo4.service24.rlp.de",
     "https://geoportal.saarland.de", "https://geodienste.sachsen.de", "https://www.geoproxy.geoportal-th.de",
-    "https://mapy.geoportal.gov.pl", "https://ags.cuzk.gov.cz")
+    "https://mapy.geoportal.gov.pl", "https://ags.cuzk.gov.cz", "https://mapsneu.wien.gv.at")
 ORTHO_TILE_ORIGINS = ("https://wmts1.geoportail.lu", "https://wmts.geo.admin.ch", "https://www.wmts.nrw.de")
 ORTHO_ORIGINS = ORTHO_WMS_ORIGINS + ORTHO_TILE_ORIGINS
 
@@ -3245,7 +3245,8 @@ class ConsoleBrowserTests(unittest.TestCase):
     OVERPASS_2 = "https://overpass.private.coffee/api/interpreter"
 
     def map_routes(self, page, wms: str = "orthophoto.png", overpass: "list | None" = None,
-                   nominatim: "dict[str, int] | None" = None, fallbacks: "dict[str, list] | None" = None) -> dict:
+                   nominatim: "dict[str, int] | None" = None, fallbacks: "dict[str, list] | None" = None,
+                   wmts=None) -> dict:
         """Answers the field-map page's origins from fixtures; anything else outside the controller is
         refused and recorded (no real network in the tests). Nominatim answers fixtures/nominatim.json, an
         empty list for a q containing "nowhere", or the status nominatim maps a q to. Each Overpass instance
@@ -3254,8 +3255,10 @@ class ConsoleBrowserTests(unittest.TestCase):
         answers); the main instance answers `overpass` (default 200), the other one `fallbacks` by URL
         (default "abort"). seen["hosts"] lists the instances asked, in order; seen["wms"] the orthophoto
         for the image (a GetMap in EPSG:4326, any of the four orthophotos' origins: they all answer `wms`),
-        seen["wms_tiles"] the map's *Ortofoto* tiles (any other request to those origins)."""
-        seen: dict = {"tiles": 0, "overpass": [], "hosts": [], "wms": [], "wms_tiles": [], "search": [],
+        seen["wms_tiles"] the map's *Ortofoto* tiles (any other image request to those origins), seen["wmts"]
+        the tiles fetched to stitch a WMTS-only source's picture (MF-94: fetch(), not an <img>); `wmts(url)`
+        may answer those with another status (404: no picture there, 500, "abort")."""
+        seen: dict = {"tiles": 0, "overpass": [], "hosts": [], "wms": [], "wms_tiles": [], "wmts": [], "search": [],
                       "other": []}
         answers = {self.OVERPASS_2: ["abort"], **(fallbacks or {}),
                    "https://overpass-api.de/api/interpreter": list(overpass or [200])}
@@ -3308,7 +3311,17 @@ class ConsoleBrowserTests(unittest.TestCase):
         def orthophoto(route):
             url = route.request.url
             tile = not ("REQUEST=GetMap" in url and "EPSG%3A4326" in url)
-            seen["wms_tiles" if tile else "wms"].append(url)
+            if tile and route.request.resource_type == "fetch":
+                seen["wmts"].append(url)
+                status = wmts(url) if wmts else 200
+                if status == "abort":
+                    route.abort("connectionrefused")
+                    return
+                if status != 200:
+                    route.fulfill(status=status, content_type="text/plain", headers=CORS, body="no tile")
+                    return
+            else:
+                seen["wms_tiles" if tile else "wms"].append(url)
             body = (FIXTURES / ("orthophoto.png" if tile else wms)).read_bytes()
             route.fulfill(status=200, content_type="image/png", headers=CORS, body=body)
 
@@ -3558,7 +3571,7 @@ class ConsoleBrowserTests(unittest.TestCase):
             expect(page.get_by_test_id("fm-off")).to_contain_text(words)
             expect(page.get_by_test_id("tm")).to_have_count(0)
         self.assertEqual(seen["tiles"], 0)
-        for what in ("overpass", "hosts", "wms", "wms_tiles", "search", "other"):
+        for what in ("overpass", "hosts", "wms", "wms_tiles", "wmts", "search", "other"):
             self.assertEqual(seen[what], [], what)
         # On again: the map page is itself again.
         self.field.http.put("/api/v1/settings/map-fetching", json={"map_fetching": True})
@@ -3959,14 +3972,15 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.reload()
         expect(page.get_by_test_id("fm-layer-ortho")).to_be_checked()
         expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"^https://ortos\."))
-        # Outside every orthophoto's coverage (Vienna): only the map, and why.
-        page.get_by_test_id("fm-go").fill("48.2082, 16.3738")
+        # Outside every orthophoto's coverage (Ljubljana): only the map, and why.
+        page.get_by_test_id("fm-go").fill("46.0569, 14.5058")
         page.get_by_test_id("fm-go-button").click()
         expect(page.get_by_test_id("fm-layers")).to_have_count(0)
         expect(page.get_by_test_id("fm-layer-none")).to_have_text(
             "Aqui só há o mapa do OpenStreetMap: só há fotografia aérea aberta de alta resolução que se possa usar "
             "em Portugal continental, Espanha, França (com a Córsega e os territórios ultramarinos), nos Países "
-            "Baixos, na Bélgica, no Luxemburgo, na Suíça e no Liechtenstein, na Polónia, na Chéquia e na Alemanha "
+            "Baixos, na Bélgica, no Luxemburgo, na Suíça e no Liechtenstein, na Polónia, na Chéquia, na Áustria e na "
+            "Alemanha "
             "menos Baden-Württemberg, Baixa Saxónia, Hamburgo, Saxónia-Anhalt e Schleswig-Holstein.")
         expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"^https://tile\.openstreetmap\.org/"))
         for origin in ORTHO_ORIGINS:
@@ -4014,7 +4028,7 @@ class ConsoleBrowserTests(unittest.TestCase):
     def test_field_map_orthophoto_chosen_by_country(self):
         """MF-66, MF-67: the orthophoto is the one of the country the point is in (the map's centre), or of
         the outline's centroid; by a border, both, the centroid's country first; none outside every
-        coverage (the sea, the Azores, Madeira, the UK, Austria, Italy, Denmark, Andorra, and the German Länder
+        coverage (the sea, the Azores, Madeira, the UK, Slovenia, Hungary, Italy, Denmark, Andorra, and the German Länder
         left out by MF-80). MF-73 to MF-78: Belgium by region (Brussels before Flemish Brabant around it),
         Germany by Land (Berlin before Brandenburg around it), Switzerland with Liechtenstein, France's overseas
         departments and collectivities."""
@@ -4044,8 +4058,9 @@ class ConsoleBrowserTests(unittest.TestCase):
             "de-th": [(50.9848, 11.0299), (50.955, 11.105)],
             "gugik": [(52.2297, 21.0122), (50.0647, 19.945), (54.352, 18.6466)],
             "cuzk": [(50.0875, 14.4213), (49.1951, 16.6068)],
-            "": [(51.5072, -0.1276), (37.7412, -25.6756), (32.65, -16.9083), (39.5, -11.5), (48.2082, 16.3738),
-                 (47.2692, 11.4041), (41.9028, 12.4964), (55.6761, 12.5683), (42.5063, 1.5218), (48.7758, 9.1829),
+            "basemap-at": [(48.2082, 16.3738), (47.2692, 11.4041), (47.0707, 15.4395), (47.5031, 9.7471)],
+            "": [(51.5072, -0.1276), (37.7412, -25.6756), (32.65, -16.9083), (39.5, -11.5), (46.0569, 14.5058),
+                 (47.4979, 19.0402), (41.9028, 12.4964), (55.6761, 12.5683), (42.5063, 1.5218), (48.7758, 9.1829),
                  (52.3759, 9.732), (53.5511, 9.9937), (52.1205, 11.6276), (54.3233, 10.1228)],
         }
         for want, pts in points.items():
@@ -4233,6 +4248,7 @@ class ConsoleBrowserTests(unittest.TestCase):
             ["de-th", "https://www.geoproxy.geoportal-th.de/geoproxy/services/DOP", "th_dop", 4096],
             ["gugik", "https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMS/HighResolution", "Raster", 4096],
             ["cuzk", "https://ags.cuzk.gov.cz/arcgis1/services/ORTOFOTO/MapServer/WMSServer", "0", 4096],
+            ["basemap-at", None, None, 4096],
         ])
         for sid, (lat, lon), name, tiles, credit, image_credit, wms in self.NEW_SOURCES:
             with self.subTest(sid):
@@ -4284,7 +4300,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         """MF-67: by the border between Elvas and Badajoz the centroid's country (Portugal) is asked first; a
         white picture (no photo there) asks the other country's once, and both white leave OpenStreetMap
         alone, said in words; so in Berlin (inside Brandenburg's outer ring, MF-76) Berlin's then Brandenburg's.
-        Outside every coverage (Vienna) there is no orthophoto to tick and none is asked."""
+        Outside every coverage (Ljubljana) there is no orthophoto to tick and none is asked."""
         page, seen = self.field_map(wms="orthophoto-white.png")
         page.get_by_test_id("fm-go").fill("38.88, -7.075")
         page.get_by_test_id("fm-go-button").click()
@@ -4307,13 +4323,13 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertEqual([urlsplit(u).hostname for u in seen["wms"][2:]], ["gdi.berlin.de", "isk.geobasis-bb.de"])
         expect(page.get_by_test_id("fm-notice")).to_have_text(
             "A ortofoto (Geoportal Berlin) não tem imagem desta área: a imagem é desenhada só com o OpenStreetMap.")
-        # Vienna: no orthophoto, no switch, nothing asked.
+        # Ljubljana: no orthophoto, no switch, nothing asked.
         page.get_by_test_id("fm-clear").click()
-        page.get_by_test_id("fm-go").fill("48.2082, 16.3738")
+        page.get_by_test_id("fm-go").fill("46.0569, 14.5058")
         page.get_by_test_id("fm-go-button").click()
         expect(page.get_by_test_id("fm-layers")).to_have_count(0)
         expect(page.get_by_test_id("fm-layer-none")).to_be_visible()
-        self.trace(page, self.outline_at(48.2082, 16.3738))
+        self.trace(page, self.outline_at(46.0569, 14.5058))
         expect(page.get_by_test_id("fm-ortho")).to_have_count(0)
         page.get_by_test_id("fm-draw").click()
         expect(page.get_by_test_id("fm-preview")).to_be_visible()
@@ -4322,6 +4338,181 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertEqual(len(seen["wms"]), 4)
         self.assertEqual(seen["wms_tiles"], [])
         self.assertEqual(seen["other"], [])
+
+    BASEMAP_AT = "https://mapsneu.wien.gv.at/basemap/bmaporthofoto30cm/normal/google3857/"
+    PLAN_JS = ("(pts) => import('./components/field-render.js').then((m) => { const b = m.areaFor(pts); "
+               "const f = m.frameFor(b); return { ...m.wmtsPlan(b, f, 19), width: f.width, height: f.height, "
+               "max: m.WMTS_MAX_TILES }; })")
+
+    @staticmethod
+    def zxy(url: str) -> tuple:
+        """basemap.at's tile URL (.../google3857/z/row/column.jpeg) as (z, x, y)."""
+        z, y, x = urlsplit(url).path.rsplit("/", 3)[1:]
+        return int(z), int(x.split(".")[0]), int(y)
+
+    def test_field_map_in_austria_from_wmts_tiles(self):
+        """MF-94 to MF-98: in Austria the orthophoto is basemap.at's, which has only a WMTS. The *Ortofoto*
+        layer shows its tiles with its credit; the drawn image is stitched from its tiles over the area (fetched
+        with CORS, at the zoom nearest the image's scale, each once), cropped to the image's edges at the
+        image's size, with "Datenquelle: basemap.at" burned in. A tile it has no picture for (404) stays white
+        and is said; a tile that does not arrive fails the picture (OpenStreetMap alone, said); none at all is
+        "no picture here". A large area asks at most WMTS_MAX_TILES tiles, at a coarser zoom. With map fetching
+        off, nothing is asked."""
+        state = {"mode": 200, "x0": None}
+
+        def wmts(url):
+            if state["mode"] == "partial":
+                return 404 if self.zxy(url)[1] == state["x0"] else 200
+            if state["mode"] == "fail":
+                return 500 if self.zxy(url)[1] == state["x0"] else 200
+            return state["mode"]
+
+        page, seen = self.field_map(wmts=wmts)
+        page.get_by_test_id("fm-go").fill("48.2082, 16.3738")
+        page.get_by_test_id("fm-go-button").click()
+        self.check_tiles(page, seen, self.BASEMAP_AT + "17/", "Ortofoto (basemap.at)",
+                         "Datenquelle: basemap.at (CC BY 4.0)")
+        expect(page.get_by_test_id("tm-credit").locator("a")).to_have_attribute("href", "https://basemap.at/")
+        outline = self.outline_at(48.2082, 16.3738)
+        plan = page.evaluate(self.PLAN_JS, [{"lat": a, "lon": b} for a, b in outline])
+        state["x0"] = plan["x0"]
+        # The image's 0.5 m a pixel at 48° N: zoom 18 (0.40 m), its tiles over the area, each asked once.
+        self.assertEqual(plan["z"], 18)
+        want = {(18, plan["x0"] + i, plan["y0"] + j) for i in range(plan["cols"]) for j in range(plan["rows"])}
+        self.assertEqual(len(want), plan["tiles"])
+        self.assertLessEqual(plan["tiles"], plan["max"])
+
+        def draw():
+            seen["wmts"].clear()
+            self.trace(page, outline)
+            page.get_by_test_id("fm-draw").click()
+            expect(page.get_by_test_id("fm-preview")).to_be_visible()
+
+        draw()
+        expect(page.locator("label.fm-ortho")).to_have_text("Ortofoto (basemap.at) como base")
+        self.assertEqual(seen["wms"], [])
+        self.assertTrue(all(u.startswith(self.BASEMAP_AT) for u in seen["wmts"]), seen["wmts"])
+        self.assertEqual(sorted(self.zxy(u) for u in seen["wmts"]), sorted(want))
+        size = page.get_by_test_id("fm-image").evaluate("(i) => [i.naturalWidth, i.naturalHeight]")
+        self.assertEqual(size, [plan["width"], plan["height"]])
+        # The fixture's colours, not the white of a missing picture, in the image's middle.
+        middle = page.get_by_test_id("fm-image").evaluate(
+            "(i) => { const c = document.createElement('canvas'); c.width = i.naturalWidth; c.height = i.naturalHeight;"
+            " const g = c.getContext('2d'); g.drawImage(i, 0, 0);"
+            " return [...g.getImageData(Math.round(c.width / 3), Math.round(c.height / 3), 1, 1).data]; }")
+        self.assertFalse(all(v > 245 for v in middle[:3]), middle)
+        expect(page.get_by_test_id("fm-size")).to_contain_text("A ortofoto (basemap.at) com os caminhos")
+        expect(page.get_by_test_id("fm-image-credit")).to_have_text(
+            "Créditos na imagem: Datenquelle: basemap.at (CC BY 4.0) · © OpenStreetMap contributors")
+        expect(page.get_by_test_id("fm-notice")).to_have_count(0)
+        # Partial coverage: its first column of tiles has no picture (404): white there, and said.
+        page.get_by_test_id("fm-clear").click()
+        state["mode"] = "partial"
+        draw()
+        self.assertEqual(len(seen["wmts"]), plan["tiles"])
+        expect(page.get_by_test_id("fm-notice")).to_have_text(
+            f"A ortofoto (basemap.at) não tem imagem de parte desta área ({plan['rows']} de {plan['tiles']} "
+            "mosaicos): essa parte fica em branco.")
+        expect(page.get_by_test_id("fm-image-credit")).to_have_text(
+            "Créditos na imagem: Datenquelle: basemap.at (CC BY 4.0) · © OpenStreetMap contributors")
+        # A tile that does not arrive (500): no picture with holes; OpenStreetMap alone, and why.
+        page.get_by_test_id("fm-clear").click()
+        state["mode"] = "fail"
+        draw()
+        expect(page.get_by_test_id("fm-notice")).to_have_text(re.compile(
+            r"^Não foi possível obter a ortofoto \(basemap\.at\) \(não chegaram \d+/" + str(plan["tiles"])
+            + r" mosaicos da ortofoto\): a imagem é desenhada só com o OpenStreetMap\.$"))
+        expect(page.get_by_test_id("fm-image-credit")).to_have_text("Créditos na imagem: © OpenStreetMap contributors")
+        # The network down for those tiles: the same.
+        page.get_by_test_id("fm-clear").click()
+        state["mode"] = "abort"
+        draw()
+        expect(page.get_by_test_id("fm-notice")).to_contain_text("Não foi possível obter a ortofoto (basemap.at)")
+        # No picture anywhere (every tile 404): "no picture of this area".
+        page.get_by_test_id("fm-clear").click()
+        state["mode"] = 404
+        draw()
+        self.assertEqual(len(seen["wmts"]), plan["tiles"])
+        expect(page.get_by_test_id("fm-notice")).to_have_text(
+            "A ortofoto (basemap.at) não tem imagem desta área: a imagem é desenhada só com o OpenStreetMap.")
+        # A large area (about 3.5 km): at most WMTS_MAX_TILES tiles, at a coarser zoom than its scale asks.
+        page.get_by_test_id("fm-clear").click()
+        state["mode"] = 200
+        big = self.outline_at(48.2082, 16.3738, scale=7)
+        plan = page.evaluate(self.PLAN_JS, [{"lat": a, "lon": b} for a, b in big])
+        self.assertLessEqual(plan["tiles"], plan["max"])
+        self.assertLess(plan["z"], 18)
+        seen["wmts"].clear()
+        self.trace(page, big)
+        page.get_by_test_id("fm-draw").click()
+        # Every tile goes through the test's route (Python), a few hundred milliseconds each under load.
+        expect(page.get_by_test_id("fm-preview")).to_be_visible(timeout=60000)
+        self.assertEqual(len(seen["wmts"]), plan["tiles"])
+        self.assertEqual({self.zxy(u)[0] for u in seen["wmts"]}, {plan["z"]})
+        self.assertEqual(seen["other"], [])
+        # Map fetching off (LEG-50): the page asks basemap.at for nothing.
+        page.get_by_test_id("fm-clear").click()
+        self.field.http.put("/api/v1/settings/map-fetching", json={"map_fetching": False})
+        asked = (len(seen["wmts"]), len(seen["wms_tiles"]))
+        page.goto(self.field.base + "/console/field-map.html")
+        expect(page.get_by_test_id("fm-off")).to_be_visible()
+        self.assertEqual((len(seen["wmts"]), len(seen["wms_tiles"])), asked)
+        self.field.http.put("/api/v1/settings/map-fetching", json={"map_fetching": True})
+        # The tiles answered 404 and 500 or refused on purpose (the browser reports each; the HTTP failures
+        # are basemap.at's only).
+        self.assertTrue(all(self.BASEMAP_AT in e for e in self.errors if e.startswith("HTTP ")), self.errors)
+        self.drop_errors(self.BASEMAP_AT, "Failed to load resource")
+
+    GEOMETRY_JS = """async (pts) => {
+        const r = await import('./components/field-render.js');
+        const { project } = await import('./components/tile-map.js');
+        const { ORTHO_SOURCES } = await import('./components/ortho-sources.js');
+        const source = ORTHO_SOURCES.find((s) => s.id === 'basemap-at');
+        // Each tile's pixel (px, py) is coloured (px, py, 0): the picture's colours say where it came from.
+        const fetcher = async (url) => {
+            const c = new OffscreenCanvas(256, 256);
+            const g = c.getContext('2d');
+            const d = g.createImageData(256, 256);
+            for (let y = 0; y < 256; y += 1) for (let x = 0; x < 256; x += 1) {
+                const i = 4 * (y * 256 + x);
+                d.data[i] = x; d.data[i + 1] = y; d.data[i + 3] = 255;
+            }
+            g.putImageData(d, 0, 0);
+            return new Response(await c.convertToBlob({ type: 'image/png' }), { headers: { 'content-type': 'image/png' } });
+        };
+        const b = r.areaFor(pts);
+        const frame = r.frameFor(b);
+        const report = {};
+        const bitmap = await r.fetchOrthophoto(b, frame, source, fetcher, report);
+        const c = new OffscreenCanvas(bitmap.width, bitmap.height);
+        const g = c.getContext('2d');
+        g.drawImage(bitmap, 0, 0);
+        const out = [];
+        for (const [fu, fv] of [[0.1, 0.1], [0.5, 0.5], [0.9, 0.2], [0.3, 0.8], [0.75, 0.6]]) {
+            const u = Math.floor(fu * c.width);
+            const v = Math.floor(fv * c.height);
+            const lat = b.north - ((v + 0.5) / c.height) * (b.north - b.south);
+            const lon = b.west + ((u + 0.5) / c.width) * (b.east - b.west);
+            const w = project(lat, lon, report.zoom);
+            const px = g.getImageData(u, v, 1, 1).data;
+            out.push([px[0], px[1], w.x % 256, w.y % 256]);
+        }
+        return { size: [bitmap.width, bitmap.height], frame: [frame.width, frame.height], out, report };
+    }"""
+
+    def test_field_map_wmts_picture_is_cropped_to_the_image(self):
+        """MF-96: the picture stitched from a WMTS lands where the image's frame says: at sample points, the
+        tile pixel drawn there is the one whose Web Mercator position is that pixel's latitude and longitude
+        (the frame is linear in latitude, the tiles in Mercator rows), within a pixel or two."""
+        page, _ = self.field_map()
+        got = page.evaluate(self.GEOMETRY_JS, [{"lat": a, "lon": b} for a, b in self.outline_at(47.2692, 11.4041)])
+        self.assertEqual(got["size"], got["frame"])
+        self.assertEqual(got["report"]["missing"], 0)
+        for r, g, x, y in got["out"]:
+            if min(x, y) < 4 or max(x, y) > 252:
+                continue  # by a tile's edge the colour wraps from 255 to 0
+            self.assertLessEqual(abs(r - x), 2.5, got["out"])
+            self.assertLessEqual(abs(g - y), 2.5, got["out"])
 
     def test_reconnects_after_the_stream_drops(self):
         self.field.create_game(start=True)
