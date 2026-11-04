@@ -224,25 +224,34 @@ static const uint8_t vector_30_cbor[] = {
     0x18, 0x2c, 0x00, 0x18, 0x2d, 0x62, 0x67, 0x6d,
 };
 static const uint8_t vector_31_cbor[] = {
+    0xa5, 0x01, 0x03, 0x02, 0x06, 0x03, 0x00, 0x04, 0x18, 0x3c, 0x08, 0xa1,
+    0x18, 0x2a, 0x6e, 0x67, 0x34, 0x35, 0x3a, 0x73, 0x65, 0x72, 0x76, 0x6f,
+    0x3a, 0x68, 0x6f, 0x72, 0x6e,
+};
+static const uint8_t vector_32_cbor[] = {
+    0xa5, 0x01, 0x03, 0x02, 0x06, 0x03, 0x00, 0x04, 0x18, 0x3c, 0x08, 0xa1,
+    0x18, 0x2a, 0x60,
+};
+static const uint8_t vector_33_cbor[] = {
     0xa5, 0x01, 0x04, 0x02, 0x00, 0x03, 0x19, 0xee, 0x48, 0x04, 0x16, 0x08,
     0xa1, 0x14, 0x13,
 };
-static const uint8_t vector_32_cbor[] = {
+static const uint8_t vector_34_cbor[] = {
     0xa5, 0x01, 0x03, 0x02, 0x01, 0x03, 0x1a, 0x00, 0x01, 0xe8, 0x48, 0x04,
     0x14, 0x08, 0xa1, 0x17, 0x19, 0x13, 0x88,
 };
-static const uint8_t vector_33_cbor[] = {
+static const uint8_t vector_35_cbor[] = {
     0xa5, 0x01, 0x03, 0x02, 0x02, 0x03, 0x1a, 0x00, 0x01, 0xfb, 0xd0, 0x04,
     0x13, 0x08, 0xa2, 0x15, 0x65, 0x30, 0x2e, 0x39, 0x2e, 0x30, 0x16, 0x64,
     0x66, 0x75, 0x6c, 0x6c,
 };
-static const uint8_t vector_34_cbor[] = {
+static const uint8_t vector_36_cbor[] = {
     0xa5, 0x01, 0x03, 0x02, 0x05, 0x03, 0x00, 0x04, 0x18, 0x34, 0x08, 0xa3,
     0x15, 0x65, 0x30, 0x2e, 0x32, 0x2e, 0x30, 0x03, 0x67, 0x6e, 0x6f, 0x5f,
     0x77, 0x69, 0x66, 0x69, 0x18, 0x25, 0x70, 0x30, 0x31, 0x32, 0x33, 0x34,
     0x35, 0x36, 0x37, 0x38, 0x39, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66,
 };
-static const uint8_t vector_35_cbor[] = {
+static const uint8_t vector_37_cbor[] = {
     0xa5, 0x01, 0x03, 0x02, 0x06, 0x03, 0x00, 0x04, 0x18, 0x35, 0x08, 0xa2,
     0x18, 0x26, 0x71, 0x6f, 0x72, 0x67, 0x2e, 0x65, 0x78, 0x61, 0x6d, 0x70,
     0x6c, 0x65, 0x2e, 0x72, 0x65, 0x6c, 0x61, 0x79, 0x03, 0x67, 0x6e, 0x6f,
@@ -520,26 +529,34 @@ static const protocol_vector_t protocol_vectors[] = {
      {7, 12, 1830000u, 0, 0, ATALAIA_PRIO_NORMAL, "output.switched"},
      "{\"capability\":\"siren\",\"ms\":0,\"source\":\"gm\"}",
      vector_30_cbor, sizeof(vector_30_cbor)},
+    {"A box's horn is fitted but its admin has not enabled it (id 60; modules, key 42)",
+     {3, 6, 0u, 0, 0, ATALAIA_PRIO_NORMAL, "node.outputs_disabled"},
+     "{\"modules\":\"g45:servo:horn\"}",
+     vector_31_cbor, sizeof(vector_31_cbor)},
+    {"Every output of the box is enabled (id 60, the empty text)",
+     {3, 6, 0u, 0, 0, ATALAIA_PRIO_NORMAL, "node.outputs_disabled"},
+     "{\"modules\":\"\"}",
+     vector_32_cbor, sizeof(vector_32_cbor)},
     {"A box's battery gauge reads 19 % (id 22, telemetry by default; percent, key 20)",
      {4, 0, 61000u, 0, 0, ATALAIA_PRIO_TELEMETRY, "battery.low"},
      "{\"percent\":19}",
-     vector_31_cbor, sizeof(vector_31_cbor)},
+     vector_33_cbor, sizeof(vector_33_cbor)},
     {"The controller logs a silent box offline (id 20; last_seen, key 23)",
      {3, 1, 125000u, 0, 0, ATALAIA_PRIO_TELEMETRY, "node.offline"},
      "{\"last_seen\":5000}",
-     vector_32_cbor, sizeof(vector_32_cbor)},
+     vector_34_cbor, sizeof(vector_34_cbor)},
     {"The controller hears the box again (id 19; fw and tier, keys 21 and 22)",
      {3, 2, 130000u, 0, 0, ATALAIA_PRIO_TELEMETRY, "node.online"},
      "{\"fw\":\"0.9.0\",\"tier\":\"full\"}",
-     vector_33_cbor, sizeof(vector_33_cbor)},
+     vector_35_cbor, sizeof(vector_35_cbor)},
     {"A box tells the controller over LoRa that its firmware update failed without Wi-Fi (id 52; release, key 37)",
      {3, 5, 0u, 0, 0, ATALAIA_PRIO_CRITICAL, "node.update_failed"},
      "{\"fw\":\"0.2.0\",\"reason\":\"no_wifi\",\"release\":\"0123456789abcdef\"}",
-     vector_34_cbor, sizeof(vector_34_cbor)},
+     vector_36_cbor, sizeof(vector_36_cbor)},
     {"A box tells the controller over LoRa that it could not get a mode package without Wi-Fi (id 53; mode, key 38)",
      {3, 6, 0u, 0, 0, ATALAIA_PRIO_CRITICAL, "node.modes_failed"},
      "{\"mode\":\"org.example.relay\",\"reason\":\"no_wifi\"}",
-     vector_35_cbor, sizeof(vector_35_cbor)},
+     vector_37_cbor, sizeof(vector_37_cbor)},
 };
 
 static const protocol_bad_vector_t protocol_bad_vectors[] = {

@@ -230,6 +230,37 @@ size_t expansion_box_modules_text(const expansion_box_t *xb, char *out, size_t c
     return expansion_modules_text(&xb->exp, out, cap);
 }
 
+size_t expansion_box_disabled_text(const expansion_box_t *xb, char *out, size_t cap)
+{
+    if (cap == 0) return 0;
+    out[0] = '\0';
+    if (xb->outs == NULL) return 0;
+    const outputs_t *o = xb->outs;
+    size_t len = 0;
+    for (int a = EXP_ADDR_FIRST; a <= EXP_ADDR_LAST; a++) {
+        const exp_module_t *m = expansion_module(&xb->exp, (uint8_t)a);
+        if (m == NULL) continue;
+        char model[8], entry[EXP_MODULES_TEXT_MAX + 1];
+        expansion_model_name(m->ident.model, model, sizeof(model));
+        int n = snprintf(entry, sizeof(entry), "%02x:%s/%u.%u.%u:", m->addr, model, m->ident.fw[0],
+                         m->ident.fw[1], m->ident.fw[2]);
+        bool any = false;
+        for (int i = o->simple; i < o->count && n > 0 && (size_t)n < sizeof(entry); i++) {
+            const out_channel_t *c = &o->ch[i];
+            if (!c->module || c->addr != m->addr || c->set.enabled) continue;
+            n += snprintf(entry + n, sizeof(entry) - (size_t)n, "%s%s", any ? "," : "", c->id);
+            any = true;
+        }
+        if (!any || n <= 0 || (size_t)n >= sizeof(entry)) continue; /* none, or too long whole */
+        size_t need = (size_t)n + (len > 0 ? 1 : 0);
+        if (len + need > EXP_MODULES_TEXT_MAX || len + need + 1 > cap) continue; /* whole only */
+        if (len > 0) out[len++] = ';';
+        memcpy(out + len, entry, (size_t)n + 1);
+        len += (size_t)n;
+    }
+    return len;
+}
+
 size_t expansion_box_status_json(const expansion_box_t *xb, char *out, size_t cap)
 {
     if (cap < 3) return 0;

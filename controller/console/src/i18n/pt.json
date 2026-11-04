@@ -125,6 +125,7 @@
     "missing_caps": "Falta a uma caixa o que o seu papel precisa: {list}. Só se deve começar mesmo assim se o jogo passar sem isso.",
     "missing_caps_short": "Falta a uma caixa o que o seu papel precisa: {list}.",
     "not_checked": "{capability} em {name}: não verificado (saída simples). Convém confirmar antes do jogo.",
+    "outputs_disabled": "{name} ({role}): {caps} instalada, mas não ativada pela administração da caixa. O modo acionaria esta saída: ativa-a na própria caixa com o PIN de administração, ou joga sem ela.",
     "start_warnings": {
       "min": "{have} × {role} juntas; o modo pede {value} ({param}).",
       "optional_caps": "{name} ({role}) não tem {caps}: o modo funciona sem isso.",
@@ -247,6 +248,8 @@
       "node_setup_applied": "{zone} confirmou a configuração do cenário",
       "battery_low": "Uma caixa tem a bateria fraca",
       "node_modules": "{zone} tem: {modules}",
+      "node_outputs_disabled": "{zone}: instalada, não ativada pela administração da caixa: {modules}",
+      "node_outputs_disabled_none": "{zone}: todas as saídas instaladas estão ativadas",
       "node_module_lost": "{zone} perdeu um módulo: {modules} ({reason})",
       "output_switched": "{zone}: {capability} ligado durante {s} s ({source})",
       "output_switched_off": "{zone}: {capability} desligado ({source})",
@@ -305,6 +308,7 @@
     "command_sent": "enviado",
     "not_checked": "não verificado",
     "module_lost": "perdido",
+    "outputs_disabled": "{caps} · instalada, não ativada pela administração da caixa",
     "conflict": "Duas caixas partilham o n.º {node}: a mesma entrada foi usada em duas caixas, que usam os mesmos nonces do rádio. Tira uma delas do jogo e junta-a de novo com outra entrada (Juntar)."
   },
   "outputs": {

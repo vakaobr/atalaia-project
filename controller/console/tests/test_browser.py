@@ -1300,6 +1300,50 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("start-warnings")).to_contain_text(
             "box-7 (bomb) não tem nenhuma das saídas que o modo acionaria (smoke, siren)")
 
+    def test_outputs_fitted_but_not_enabled(self):
+        """EXPL-12, EXPL-13: a bomb box with its smoke enabled and its siren fitted but not enabled by its
+        admin (node.outputs_disabled "g45:servo:siren"): the start panel's note and the Boxes tab's chip say
+        so in four languages, and the feed says it in words; Start is not held back."""
+        self.field.create_game(mode_id="org.atalaia.bomb", assignments={str(BOX): "bomb"}, params={"smoke_s": 5})
+        self.field.box_hello(caps=[1, 2, 3, 4, 5, 11])
+        for seq, kind, text in ((1, "node.modules", "g46:servo:smoke"), (2, "node.outputs_disabled", "g45:servo:siren")):
+            ev = codec.encode_event({"node": BOX, "seq": seq, "t": 0, "type": kind, "data": {"modules": text}})
+            self.field.box("EVENT", ev, ack=True)
+        page = self.console()
+        page.get_by_test_id("lang").select_option("en")
+        note = page.get_by_test_id("start-outputs-disabled")
+        expect(note).to_contain_text("box-7 (bomb): siren fitted, not enabled by the box's admin. "
+                                     "The mode would switch it: enable it at the box with the admin PIN")
+        expect(page.get_by_test_id("start-warnings")).to_have_count(0)
+        for lang, words in (("pt", "box-7 (bomb): siren instalada, mas não ativada pela administração da caixa"),
+                            ("de", "box-7 (bomb): siren eingebaut, aber vom Admin der Box nicht freigegeben"),
+                            ("zh-tw", "box-7（bomb）：已安裝 siren，但盒子的管理員尚未啟用")):
+            page.get_by_test_id("lang").first.select_option(lang)
+            expect(note).to_contain_text(words)
+        page.get_by_test_id("lang").first.select_option("en")
+        page.get_by_test_id("tab-nodes").click()
+        chip = page.get_by_test_id(f"node-output-disabled-{BOX}-g45")
+        expect(chip).to_have_text("siren · fitted, not enabled by the box's admin")
+        expect(page.get_by_test_id(f"node-module-{BOX}-g46")).to_have_text("smoke · not checked")
+        for lang, words in (("pt", "siren · instalada, não ativada pela administração da caixa"),
+                            ("de", "siren · eingebaut, vom Admin der Box nicht freigegeben"),
+                            ("zh-tw", "siren · 已安裝，盒子的管理員尚未啟用")):
+            page.get_by_test_id("lang").first.select_option(lang)
+            expect(chip).to_have_text(words)
+        page.get_by_test_id("lang").first.select_option("en")
+        page.get_by_test_id("tab-feed").click()
+        expect(page.locator('[data-testid=feed] [data-type="node.outputs_disabled"]')).to_contain_text(
+            "box 7: fitted, not enabled by the box's admin: g45:servo:siren")
+        # The admin enabled it and the box joined again: the note and the chip go.
+        ev = codec.encode_event({"node": BOX, "seq": 3, "t": 0, "type": "node.outputs_disabled", "data": {"modules": ""}})
+        self.field.box("EVENT", ev, ack=True)
+        expect(page.locator('[data-testid=feed] [data-type="node.outputs_disabled"]',
+                            has_text="box 7: every output fitted is enabled")).to_have_count(1)
+        page.get_by_test_id("tab-nodes").click()
+        expect(chip).to_have_count(0)
+        page.get_by_test_id("tab-game").click()
+        expect(note).to_have_count(0)
+
     def test_a_scenarios_outputs_in_the_form_and_the_start_check(self):
         """Increment 5's leftover: a scenario's triggers name output functions on its boxes; the game form
         says which, box by box, in four languages, and a box named in the Join tab with an output but none

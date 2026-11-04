@@ -389,6 +389,8 @@ A standby controller cannot start a game. It says **This controller is not in ch
 
 **Outputs** on the **Game** tab lists the outputs of the game's boxes: a siren, a strobe or a smoke machine on a box's simple output (marked **not checked**). Outputs are enabled at the box, with the admin PIN (see the Field Box manual); a box with none enabled is not listed.
 
+**Fitted, not enabled.** A box tells the console which of its outputs are fitted but not enabled by its admin. The **Boxes** tab shows a chip for each, for example **horn · fitted, not enabled by the box's admin**. If the game would switch one (a mode's role or a scenario's trigger), the start panel adds a note: **box-4 (bomb): siren fitted, not enabled by the box's admin. The mode would switch it: enable it at the box with the admin PIN, or play without it.** It does not stop the start. Only someone with the box's admin PIN can enable it, at the box. Boxes with older firmware do not say, so they show nothing.
+
 - Type the **Seconds** (5 by default, up to 600) and tap **On for 5 s**. It asks **Turn siren on box-4 on for 5 s? Check that nobody is right next to it.** Tap **Yes**. The output turns off by itself after that time (or the box's own longest time, whichever is shorter). This works only while the game runs.
 - **Off** turns it off at once, with no question.
 - **All outputs off** turns every output of the game off at once.
@@ -412,7 +414,7 @@ Not yet tried on hardware: the target and its firmware are built and tested on a
 
 ### The Boxes tab
 
-Each box shows its **No.**, **Name** (with a chip for each module or output the box has, for example **siren · not checked**), **Role**, **Owner** (team), **Tier**, **Battery** (with **low** below 20%), **Signal**, **Last heard**, **Firmware** and **Epoch**. A box that has not been heard shows **not heard**. You can change a box's owner team with the drop-down. Some modes add buttons, for example a medic kit's refill.
+Each box shows its **No.**, **Name** (with a chip for each module or output the box has, for example **siren · not checked**, and for each output fitted but not enabled, **horn · fitted, not enabled by the box's admin**), **Role**, **Owner** (team), **Tier**, **Battery** (with **low** below 20%), **Signal**, **Last heard**, **Firmware** and **Epoch**. A box that has not been heard shows **not heard**. You can change a box's owner team with the drop-down. Some modes add buttons, for example a medic kit's refill.
 
 ### The Log tab
 

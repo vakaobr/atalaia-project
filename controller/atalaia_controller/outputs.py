@@ -22,6 +22,13 @@
   (increment 5's ``triggers:``) runs the objectives package's roles, which list no output: the
   functions the triggers switch on it (the compiled ``scenario.outputs``, by the box's scenario name)
   count as its role's ``outputs:`` with ``output`` optional (``with_outputs``).
+- **Outputs fitted, not enabled** (EXPL-12, EXPL-13): a box's last ``node.outputs_disabled`` (its
+  simple outputs its admin has not enabled, in ``node.modules``' text), parsed the same way;
+  ``GET /api/v1/nodes`` gives it as ``outputs_disabled`` (null until the box says: a box from before
+  never does; ``[]`` when every output is enabled). The start check gives a note (never a refusal or
+  a warning), ``outputs_disabled``, for each box whose role's ``outputs:`` (or its scenario's)
+  names a function the box has fitted but not enabled, so the GM knows to enable it at the box with
+  the admin PIN.
 - **CMD 12** (EXP-23, EXP-27, EXP-30): the params a GM's request or a field script's
   ``field.send(node, "output", {...})`` become, checked as the box checks them
   (``atalaia_sim.expansion.output_params_problem``), with ``src`` set here (``gm`` or ``field``,
@@ -112,24 +119,33 @@ def with_outputs(spec: Any, extra: Any) -> Any:
 
 def check_nodes(nodes: Iterable[dict[str, Any]], role_spec: Any) -> dict[str, list[dict[str, Any]]]:
     """The capability part of the start check for the joined nodes, each ``{node, name, role,
-    capabilities (HELLO), modules}`` and, for a scenario's box, the ``outputs`` its triggers switch;
-    ``role_spec(role)`` gives the role's manifest entry (or None).
+    capabilities (HELLO), modules, outputs_disabled}`` and, for a scenario's box, the ``outputs`` its
+    triggers switch; ``role_spec(role)`` gives the role's manifest entry (or None).
 
     ``missing_caps``: ``{node, name, role, capability}`` for each required one a node lacks;
     ``warnings``: one ``{code: "optional_caps", node, name, role, capabilities}`` per node lacking
     optional ones, and one ``{code: "outputs", node, name, role, capabilities}`` per node with
     outputs but none of the functions its role's ``outputs:`` names (``capabilities``: those
-    functions); ``not_checked``: ``{node, name, role, capability}`` for each simple output."""
+    functions); ``not_checked``: ``{node, name, role, capability}`` for each simple output;
+    ``outputs_disabled``: one note ``{node, name, role, capabilities}`` per node with outputs fitted
+    but not enabled that its role's ``outputs:`` names (``capabilities``: those functions)."""
     missing: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
     unchecked: list[dict[str, Any]] = []
+    disabled: list[dict[str, Any]] = []
     for n in nodes:
         who = {"node": n["node"], "name": n["name"], "role": n["role"]}
         for fn in simple_outputs(n.get("modules")):
             unchecked.append({**who, "capability": fn,
                               "text": f"{fn} on {n['name']}: not checked (simple output)"})
-        types = types_of(n.get("capabilities"))
         spec = with_outputs(role_spec(n["role"]), n.get("outputs"))
+        off = output_caps(n.get("outputs_disabled"))
+        idle = [fn for fn in _names(spec.get("outputs")) if fn in off] if isinstance(spec, dict) else []
+        if idle:
+            disabled.append({**who, "capabilities": idle,
+                             "text": f"{n['name']} ({n['role']}): {', '.join(idle)} fitted, not enabled by "
+                                     "the box's admin (enable at the box with the admin PIN)"})
+        types = types_of(n.get("capabilities"))
         if not types or not isinstance(spec, dict):
             continue  # it reports no capability (older firmware, a phone): not checked
         for name in _names(spec.get("requires")):
@@ -146,7 +162,7 @@ def check_nodes(nodes: Iterable[dict[str, Any]], role_spec: Any) -> dict[str, li
                 warnings.append({"code": "outputs", **who, "capabilities": wanted,
                                  "text": f"{n['name']} ({n['role']}) has none of the outputs the mode "
                                          f"would switch: {', '.join(wanted)}"})
-    return {"missing_caps": missing, "warnings": warnings, "not_checked": unchecked}
+    return {"missing_caps": missing, "warnings": warnings, "not_checked": unchecked, "outputs_disabled": disabled}
 
 
 def _names(value: Any) -> list[str]:

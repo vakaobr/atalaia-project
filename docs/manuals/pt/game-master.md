@@ -389,6 +389,8 @@ Um controlador de reserva não pode começar um jogo. Diz **Este controlador nã
 
 **Saídas**, no separador **Jogo**, lista as saídas das caixas do jogo: uma sirene, um estroboscópio ou uma máquina de fumo na saída simples de uma caixa (marcada **não verificado**). As saídas ativam-se na própria caixa, com o PIN de administração (vê o manual da Field Box); uma caixa sem nenhuma ativa não aparece.
 
+**Instalada, não ativada.** Uma caixa diz à consola que saídas tem instaladas mas não ativadas pela sua administração. O separador **Caixas** mostra uma etiqueta para cada, por exemplo **horn · instalada, não ativada pela administração da caixa**. Se o jogo acionaria uma delas (o papel de um modo ou um gatilho de um cenário), o painel de início junta uma nota: **box-4 (bomb): siren instalada, mas não ativada pela administração da caixa. O modo acionaria esta saída: ativa-a na própria caixa com o PIN de administração, ou joga sem ela.** Não impede o início. Só quem tem o PIN de administração da caixa a pode ativar, na própria caixa. As caixas com firmware mais antigo não o dizem, por isso não mostram nada.
+
 - Escreve os **Segundos** (5 por omissão, até 600) e toca em **Ligar 5 s**. Pergunta **Ligar siren em box-4 durante 5 s? Confirmar que não está ninguém mesmo ao lado.** Toca em **Sim**. A saída desliga-se sozinha passado esse tempo (ou o tempo máximo da própria caixa, se for menor). Só funciona com o jogo a decorrer.
 - **Desligar** desliga-a logo, sem perguntar.
 - **Desligar todas as saídas** desliga logo todas as saídas do jogo.
@@ -412,7 +414,7 @@ Ainda não testado em hardware: o alvo e o seu firmware estão feitos e testados
 
 ### O separador Caixas
 
-Cada caixa mostra o **N.º**, o **Nome** (com uma etiqueta por cada módulo ou saída que a caixa tem, por exemplo **siren · não verificado**), o **Papel**, a **Dona** (equipa), o **Nível**, a **Bateria** (com **fraca** abaixo de 20%), o **Sinal**, a **Última notícia**, o **Firmware** e a **Época**. Uma caixa de que não há notícias mostra **sem notícias**. Podes mudar a equipa dona de uma caixa com a lista. Alguns modos juntam botões, por exemplo a recarga de um kit de ligaduras.
+Cada caixa mostra o **N.º**, o **Nome** (com uma etiqueta por cada módulo ou saída que a caixa tem, por exemplo **siren · não verificado**, e por cada saída instalada mas não ativada, **horn · instalada, não ativada pela administração da caixa**), o **Papel**, a **Dona** (equipa), o **Nível**, a **Bateria** (com **fraca** abaixo de 20%), o **Sinal**, a **Última notícia**, o **Firmware** e a **Época**. Uma caixa de que não há notícias mostra **sem notícias**. Podes mudar a equipa dona de uma caixa com a lista. Alguns modos juntam botões, por exemplo a recarga de um kit de ligaduras.
 
 ### O separador Registo
 

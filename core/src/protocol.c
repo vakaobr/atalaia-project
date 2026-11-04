@@ -59,6 +59,7 @@ static const uint8_t data_node_setup_applied[] = {11};
 static const uint8_t data_node_modules[] = {42};
 static const uint8_t data_node_module_lost[] = {42, 3};
 static const uint8_t data_output_switched[] = {43, 44, 45};
+static const uint8_t data_node_outputs_disabled[] = {42};
 
 const atalaia_event_def_t atalaia_event_defs[] = {
     {"game.start", ATALAIA_EV_GAME_START, ATALAIA_PRIO_CRITICAL, data_game_start, 1},
@@ -118,6 +119,7 @@ const atalaia_event_def_t atalaia_event_defs[] = {
     {"node.modules", ATALAIA_EV_NODE_MODULES, ATALAIA_PRIO_NORMAL, data_node_modules, 1},
     {"node.module_lost", ATALAIA_EV_NODE_MODULE_LOST, ATALAIA_PRIO_CRITICAL, data_node_module_lost, 2},
     {"output.switched", ATALAIA_EV_OUTPUT_SWITCHED, ATALAIA_PRIO_NORMAL, data_output_switched, 3},
+    {"node.outputs_disabled", ATALAIA_EV_NODE_OUTPUTS_DISABLED, ATALAIA_PRIO_NORMAL, data_node_outputs_disabled, 1},
 };
 const size_t atalaia_event_def_count =
     sizeof(atalaia_event_defs) / sizeof(atalaia_event_defs[0]);

@@ -172,6 +172,7 @@ O que a caixa faz:
 - Uma saída nunca fica ligada mais tempo do que o que definiste. Muda no máximo de meio em meio segundo.
 - Se a caixa deixar de funcionar, ficar sem energia ou reiniciar, o interruptor perde o sinal e desliga-se em cerca de um segundo.
 - A organização vê as saídas da caixa na consola (uma etiqueta debaixo da caixa, marcada **não verificado**, e a lista **Saídas** no separador **Jogo**) e pode ligar uma durante uns segundos no jogo, desligá-la ou desligar todas as saídas de uma vez ([manual de GM, Saídas](game-master.md#saídas)).
+- Quando se junta a um jogo, a caixa também diz à consola que saídas estão instaladas mas **não ativadas**. A organização vê então **horn · instalada, não ativada pela administração da caixa** debaixo da caixa, e uma nota antes de começar se o jogo usaria essa saída, e pode pedir-te que a ative aqui. Uma saída desativada continua a nunca ligar.
 
 **Segurança.** Só aparelhos de baixa tensão com bateria própria (no máximo 24 V). **Nunca** a rede elétrica. Uma máquina de fumo só pela sua entrada de comando de baixa tensão; nunca pirotecnia. Proteção auditiva perto de sirenes e buzinas. Fumo nunca numa sala fechada sem autorização do recinto. Antes do primeiro jogo, quem monta verifica cada interruptor: tem de desligar quando se tira o cabo ([manual de montagem, secção 9.10](../../../hardware/field-box/BUILD.pt.md#910-saída-simples-opcional)).
 
@@ -258,7 +259,7 @@ Um telemóvel Android também pode ser uma caixa. Na app escolhe **Dispositivo d
 | **PIN bloqueado · tente daqui a N min** | Espera. A contagem sobrevive a um reinício. Não continues a adivinhar. |
 | A caixa reiniciou num jogo | Volta no mesmo jogo. A organização vê **node.rebooted** no registo dela, com o motivo que a caixa indica (alimentação, queda de tensão, software, falha do programa, watchdog); o fluxo da consola diz **Uma caixa falhou e reiniciou** quando foi uma falha do programa ou um reinício do watchdog. Um fio solto no teclado ou no ecrã já não reinicia a caixa: a peça que falha é posta de lado por um tempo e o jogo continua (o teclado conta então como sem tecla). |
 | O ecrã pequeno está apagado | Fala com quem montou a caixa. O ecrã grande pode continuar a funcionar. |
-| A sirene (ou o estroboscópio, o fumo) nunca liga | Ativa a saída na caixa (PIN de administração, **Saídas**) e dá-lhe o uso que o jogo pede. Só funciona durante um jogo, ou com o teste de 1 segundo entre jogos. Verifica a bateria do próprio interruptor. |
+| A sirene (ou o estroboscópio, o fumo) nunca liga | Se a consola disser **instalada, não ativada pela administração da caixa**, ativa a saída na caixa (PIN de administração, **Saídas**). Dá-lhe o uso que o jogo pede. Só funciona durante um jogo, ou com o teste de 1 segundo entre jogos. Verifica a bateria do próprio interruptor. |
 | Um interruptor fica ligado com a caixa desligada | Deixa de usar esse interruptor: tem de desligar quando perde o sinal. Fala com quem montou a caixa. |
 
 Para avarias de montagem e de bancada, vê [a tabela de resolução de problemas do manual de montagem](../../../hardware/field-box/BUILD.pt.md#13-resolução-de-problemas).

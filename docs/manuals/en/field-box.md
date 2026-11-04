@@ -172,6 +172,7 @@ What the box does:
 - An output never stays on longer than the time you set. It changes at most every half second.
 - If the box stops working, loses power or restarts, the switch loses its signal and turns off within about a second.
 - The GM sees the box's outputs in the console (a chip under the box, marked **not checked**, and the **Outputs** list on the **Game** tab) and can turn one on for a few seconds during the game, turn it off, or turn every output off at once ([GM manual, Outputs](game-master.md#outputs)).
+- When it joins a game, the box also tells the console which outputs are fitted but **not enabled**. The GM then sees **horn · fitted, not enabled by the box's admin** under the box, and a note before the start if the game would use that output, so they can ask you to enable it here. A disabled output still never fires.
 
 **Safety.** Only low-voltage devices on their own battery (at most 24 V). **Never** mains. A smoke machine only through its low-voltage remote input; never pyrotechnics. Hearing protection near sirens and horns. Smoke never in a closed room without the venue's approval. Before its first game, the builder checks each switch: it must turn off when its cable is pulled ([build manual, section 9.10](../../../hardware/field-box/BUILD.md#910-simple-output-optional)).
 
@@ -258,7 +259,7 @@ An Android phone can be a box too. In the app choose **Game prop**, then **Join 
 | **PIN locked · try again in N min** | Wait. The count survives a restart. Do not keep guessing. |
 | The box rebooted in a game | It comes back in the same game. The organisers see **node.rebooted** in their log, with the reason the box gives (power, brownout, software, panic, watchdog); the console's feed says **A box crashed and restarted** for a program crash or a watchdog reset. A flaky keypad or screen wire no longer reboots a box: the failing part is set aside for a while and the game goes on (a keypad then reads as no key). |
 | The small screen is dark | Ask the builder. The big screen can still work. |
-| The siren (or strobe, smoke) never comes on | Enable the output at the box (admin PIN, **Outputs**) and give it the use the game asks for. It works only during a game, or with the 1-second test between games. Check the switch's own battery. |
+| The siren (or strobe, smoke) never comes on | If the console says **fitted, not enabled by the box's admin**, enable the output at the box (admin PIN, **Outputs**). Give it the use the game asks for. It works only during a game, or with the 1-second test between games. Check the switch's own battery. |
 | A switch stays on when the box is off | Stop using that switch: it must turn off when it loses its signal. Ask the builder. |
 
 For building and bench faults see [the build manual's troubleshooting table](../../../hardware/field-box/BUILD.md#13-troubleshooting).
