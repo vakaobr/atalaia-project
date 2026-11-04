@@ -122,6 +122,36 @@ class PropLinkTests(P3Case):
         finally:
             ws.__exit__(None, None, None)
 
+    def test_a_command_to_every_node_reaches_the_prop(self):
+        """EXPI9-20: CMD 12's every-output off (the GM's All outputs off) reaches a Wi-Fi prop, and so
+        does a CMD whose packet names dest 65535 (every node) rather than leaving it out; the prop is
+        told dest null, the prop link's "every node"."""
+        from atalaia_sim.packet import cmd_encode
+        from atalaia_sim.protocol import MESSAGE_TYPES
+        ws = self.connect()
+        try:
+            ws.receive_json()
+            self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM, json={"force": True})
+            ws.receive_json()
+            ws.receive_json()
+            r = self.client.post(f"/api/v1/games/{self.gid}/outputs/off", headers=GM)
+            self.assertEqual(r.status_code, 202, r.text)
+            m = ws.receive_json()
+            self.assertEqual((m["type"], m["cmd"], m["opcode"], m["params"], m["dest"]),
+                             ("cmd", "output", 12, {"capability": "*", "act": "off", "src": "gm"}, None))
+            payload = cmd_encode({"cmd": 12, "params": {"capability": "*", "act": "off", "src": "gm"},
+                                  "dest": 65535})
+            self.assertTrue(self.ctrl.prop_links.forward(MESSAGE_TYPES["CMD"], payload))
+            m = ws.receive_json()
+            self.assertEqual((m["cmd"], m["dest"]), ("output", None))
+            # A CMD to another node still does not reach it.
+            self.assertFalse(self.ctrl.prop_links.forward(MESSAGE_TYPES["CMD"],
+                                                          cmd_encode({"cmd": 5, "dest": 4})))
+            ws.send_json({"type": "ping"})
+            self.assertEqual(ws.receive_json(), {"type": "pong"})
+        finally:
+            ws.__exit__(None, None, None)
+
     def test_refused_without_the_game_key_or_an_assignment(self):
         for kw in ({"key": bytes(16)}, {"node_id": 9}, {"game_id": self.gid + 1 if self.gid < 65534 else 1},
                    {"node_id": self.ctrl.node_id or 65534}):

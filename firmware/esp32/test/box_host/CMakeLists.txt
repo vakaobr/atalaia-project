@@ -17,6 +17,7 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 get_filename_component(CORE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../../core" ABSOLUTE)
 get_filename_component(MAIN_DIR "${CMAKE_CURRENT_LIST_DIR}/../../main" ABSOLUTE)
+get_filename_component(MODULE_CORE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../module-core" ABSOLUTE)
 
 find_library(MBEDCRYPTO_LIB mbedcrypto)
 # TLS and X.509 too: the mode fetch over HTTPS from the real controller (box_host_https.c).
@@ -75,6 +76,11 @@ add_executable(box_host
     ${MAIN_DIR}/outputs.c
     ${MAIN_DIR}/outputs_admin.c
     ${MAIN_DIR}/simple_out.c
+    ${MAIN_DIR}/expansion.c
+    ${MAIN_DIR}/expansion_box.c
+    # --module: simulated modules on the real module core (firmware/module-core/).
+    ${CMAKE_CURRENT_LIST_DIR}/../module_sim.c
+    ${MODULE_CORE_DIR}/src/module_core.c
 )
 # Monocypher (components/monocypher): fw_update.c's Ed25519.
 set(MONOCYPHER_DIR ${CMAKE_CURRENT_LIST_DIR}/../../components/monocypher/src)
@@ -82,7 +88,8 @@ add_library(box_host_monocypher STATIC ${MONOCYPHER_DIR}/monocypher.c
     ${MONOCYPHER_DIR}/optional/monocypher-ed25519.c)
 target_include_directories(box_host_monocypher PUBLIC ${MONOCYPHER_DIR} ${MONOCYPHER_DIR}/optional)
 target_link_libraries(box_host PRIVATE box_host_monocypher)
-target_include_directories(box_host PRIVATE ${MAIN_DIR} ${MAIN_DIR}/radio ${CORE_DIR}/src)
+target_include_directories(box_host PRIVATE ${MAIN_DIR} ${MAIN_DIR}/radio ${CORE_DIR}/src
+    ${CMAKE_CURRENT_LIST_DIR}/.. ${MODULE_CORE_DIR}/include)
 find_library(BOX_HOST_MATH_LIB m)
 if(BOX_HOST_MATH_LIB)
     target_link_libraries(box_host PRIVATE ${BOX_HOST_MATH_LIB}) # outputs.c: floor()

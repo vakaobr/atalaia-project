@@ -69,6 +69,20 @@
  * mode's cap(fn) calls reach it, and once the HELLO is acknowledged the box sends node.modules
  * ("g46:servo:siren").
  *
+ * --module NAME[@ADDR] (up to four; draft RFC "The expansion port", increment 8): a module on
+ * the expansion port, simulated on the real module core (firmware/module-core/, through
+ * test/module_sim.c) behind a fake I2C bus that the firmware's own port driver (main/expansion.c,
+ * main/expansion_box.c) reads and writes as on the box: NAME is target (one hit channel, 0x58 by
+ * default) or out4 (four relay outputs, siren, strobe, smoke and a generic one, 0x5C by default),
+ * ADDR 58-5f in hex. HELLO then lists `hit` (capability type 10) with a target, node.modules
+ * carries the module's entry ("58:target/1.0.0:hit") after the simple outputs', hits reach the
+ * mode's script as hit.hit while it has armed the channel and a game runs, a module that stops
+ * answering during a game is node.module_lost, and a module's outputs join the output layer
+ * (disabled until "@output <n> enable"). "MODULE <addr> outputs=<bitmap> t=<ms>" is printed each
+ * time the module's outputs change (as its relays would). With a module, Target Windows is stored
+ * as a preset too (as one put on a box by hand: the Field Box does not build it in until it is
+ * bench-tested), so a join can name it.
+ *
  * --no-wifi: an offer that passes them then runs the update (fw_update_run), which stops
  * with no_wifi as on a box whose Wi-Fi did not start, and prints "UPDATE result=<code>";
  * a refusal or that failure reaches the controller over LoRa (node.update_failed), as on
@@ -83,11 +97,16 @@
  *   @tag <uid hex> [<tag hex>]  a player tag read (as the NFC reader would, in a game)
  *   hold <button 1-4> <ms>      hold a team button for ms, then release it
  *   keys <0-9*#...>             keypad presses (keypad.key events to the mode)
+ *   hit <addr> <0-255> [<channel>]  a hit on a module's plate (its piezo), as its firmware feels it
+ *   unplug <addr> / plug <addr> a module's cable pulled out or plugged in again (a restart)
+ *   @modules                    one "LOG modules: [...]" line: the port's modules
  *   battery <0-100|-1>          the battery gauge's reading (-1: no gauge); 87 at the start
  *   lbtbusy N                   the next N channel checks answer "busy" (-1: every one, 0: none)
  *   status                      print one STATUS line (JSON): the game, the link, and between
  *                               games the device id and whether the box takes an invite, and
  *                               "outputs": each simple output's id, GPIO, enabled, on, pulsing
+ *                               (a module's channel: "gpio": -1 and its "module"), and
+ *                               "modules": the expansion port's modules
  *   @outputs                    one "LOG outputs: ..." line: the simple outputs' settings
  *   @output <n> enable|disable|test <PIN>, @output <n> function <name> <PIN>,
  *   @output <n> max <seconds> <PIN>
@@ -126,6 +145,8 @@
 #include "radio/radio_lbt.h"
 #include "mode_fetch.h"
 #include "mode_store.h"
+#include "expansion_box.h"
+#include "module_sim.h"
 #include "outputs.h"
 #include "outputs_admin.h"
 #include "simple_out.h"
@@ -538,7 +559,7 @@ static bool fake_rmt_send(void *ctx, uint16_t width_us, uint16_t frames, bool fl
 /* "PIN g<gpio> low" once the last queued burst has gone out. */
 static void pins_low(uint32_t now)
 {
-    for (int i = 0; i < outs.count; i++) {
+    for (int i = 0; i < outs.simple; i++) {
         if (pin_low_at[i] != 0 && (int32_t)(now - pin_low_at[i]) >= 0 &&
             !simple_out_pulsing(&simple[i], now)) {
             out("PIN g%d low t=%lu", simple[i].gpio, (unsigned long)pin_low_at[i]);
@@ -566,7 +587,7 @@ static bool outputs_save(void *ctx, int index, const out_settings_t *s)
     (void)ctx;
     char text[OUTPUTS_MAX * 48] = "";
     size_t len = 0;
-    for (int i = 0; i < outs.count; i++) {
+    for (int i = 0; i < outs.simple; i++) {
         const out_settings_t *x = i == index ? s : &outs.ch[i].set;
         len += (size_t)snprintf(text + len, sizeof(text) - len, "%d %d %s %lu\n", i,
                                 x->enabled ? 1 : 0, x->function, (unsigned long)x->max_on_s);
@@ -599,7 +620,7 @@ static bool outputs_load(int index, out_settings_t *s)
  * FUNCTION ("-": a new box's, disabled). False for a bad FUNCTION or GPIO. */
 static bool add_simple_out(const char *arg, uint32_t now)
 {
-    int i = outs.count;
+    int i = outs.simple;
     if (i >= OUTPUTS_MAX) return false;
     char fn[OUT_ID_MAX + 1];
     int gpio = i == 0 ? 46 : 45;
@@ -634,6 +655,14 @@ static void print_outputs(char *buf, size_t cap)
     size_t len = (size_t)snprintf(buf, cap, "[");
     for (int i = 0; i < outs.count && len + 2 < cap; i++) {
         const out_channel_t *c = &outs.ch[i];
+        if (c->module) {
+            len += (size_t)snprintf(buf + len, cap - len,
+                                    "%s{\"id\":\"%s\",\"gpio\":-1,\"module\":\"%02x\","
+                                    "\"channel\":%u,\"enabled\":%s,\"on\":%s}",
+                                    i ? "," : "", c->id, c->addr, (unsigned)c->mch + 1u,
+                                    c->set.enabled ? "true" : "false", c->level ? "true" : "false");
+            continue;
+        }
         len += (size_t)snprintf(buf + len, cap - len,
                                 "%s{\"id\":\"%s\",\"gpio\":%d,\"enabled\":%s,\"on\":%s,"
                                 "\"pulsing\":%s,\"bursts\":%lu}",
@@ -643,6 +672,146 @@ static void print_outputs(char *buf, size_t cap)
                                 (unsigned long)simple[i].bursts);
     }
     if (len + 2 <= cap) snprintf(buf + len, cap - len, "]");
+}
+
+/* ---- Modules on the expansion port (--module): the module core behind a fake I2C bus ---- */
+
+static expansion_box_t port;
+static module_sim_t modules[EXP_ADDR_COUNT];
+static bool module_present[EXP_ADDR_COUNT]; /* a module at that address (plugged in or not) */
+static bool module_plugged[EXP_ADDR_COUNT];
+static uint8_t module_shown[EXP_ADDR_COUNT]; /* its outputs as last printed */
+static int module_count;
+
+static module_sim_t *module_at(uint8_t addr)
+{
+    if (addr < EXP_ADDR_FIRST || addr > EXP_ADDR_LAST) return NULL;
+    int i = addr - EXP_ADDR_FIRST;
+    return module_present[i] && module_plugged[i] ? &modules[i] : NULL;
+}
+
+static bool sim_probe(void *ctx, uint8_t addr)
+{
+    (void)ctx;
+    return module_at(addr) != NULL;
+}
+
+static int sim_write(void *ctx, uint8_t addr, const uint8_t *data, size_t len)
+{
+    (void)ctx;
+    module_sim_t *m = module_at(addr);
+    if (m == NULL) return EXP_BUS_FAIL;
+    module_sim_write(m, host_now, data, len);
+    return EXP_BUS_OK;
+}
+
+static int sim_write_read(void *ctx, uint8_t addr, const uint8_t *o, size_t olen, uint8_t *in,
+                          size_t ilen)
+{
+    (void)ctx;
+    module_sim_t *m = module_at(addr);
+    if (m == NULL) return EXP_BUS_FAIL;
+    module_sim_write(m, host_now, o, olen);
+    module_sim_read(m, host_now, in, ilen);
+    return EXP_BUS_OK;
+}
+
+/* "--module NAME[@ADDR]": false for an unknown NAME, a bad or taken address. */
+static bool add_module(const char *arg)
+{
+    char name[16];
+    unsigned addr = 0;
+    const char *at = strchr(arg, '@');
+    size_t n = at ? (size_t)(at - arg) : strlen(arg);
+    if (n == 0 || n >= sizeof(name)) return false;
+    memcpy(name, arg, n);
+    name[n] = '\0';
+    if (at != NULL &&
+        (sscanf(at + 1, "%x", &addr) != 1 || addr < EXP_ADDR_FIRST || addr > EXP_ADDR_LAST)) {
+        return false;
+    }
+    module_sim_t probe;
+    if (!module_sim_named(&probe, name, (uint8_t)addr, 0)) return false;
+    int i = probe.cfg.address - EXP_ADDR_FIRST;
+    if (module_present[i]) return false;
+    modules[i] = probe;
+    /* the core keeps a pointer to the module for its outputs: start it where it stays */
+    module_sim_restart(&modules[i], 0);
+    module_present[i] = module_plugged[i] = true;
+    module_count++;
+    return true;
+}
+
+/* Every turn: the modules' own timers, and their outputs printed when they change. */
+static void modules_tick(uint32_t now)
+{
+    for (int i = 0; i < EXP_ADDR_COUNT; i++) {
+        if (!module_present[i] || !module_plugged[i]) continue;
+        uint8_t outputs = 0;
+        module_sim_state(&modules[i], now, &outputs, NULL);
+        if (outputs != module_shown[i]) {
+            module_shown[i] = outputs;
+            out("MODULE %02x outputs=0x%02x t=%lu", EXP_ADDR_FIRST + i, (unsigned)outputs,
+                (unsigned long)now);
+        }
+    }
+}
+
+/* "hit <addr> <strength> [<channel>]", "unplug <addr>", "plug <addr>". */
+static bool module_command(const char *line, uint32_t now)
+{
+    unsigned addr = 0, value = 0, channel = 0;
+    if (sscanf(line, "hit %x %u %u", &addr, &value, &channel) >= 2) {
+        module_sim_t *m = module_at((uint8_t)addr);
+        bool kept = m != NULL && value <= 255 &&
+                    module_sim_hit(m, now, (uint8_t)channel, MC_EVENT_HIT, (uint8_t)value);
+        out("LOG module %02x: hit %u %s", addr, value,
+            kept ? "felt" : "not kept (no such module, or the channel is not armed)");
+        return true;
+    }
+    bool unplug = sscanf(line, "unplug %x", &addr) == 1;
+    if (unplug || sscanf(line, "plug %x", &addr) == 1) {
+        if (addr < EXP_ADDR_FIRST || addr > EXP_ADDR_LAST ||
+            !module_present[addr - EXP_ADDR_FIRST]) {
+            out("LOG module %02x: none at that address", addr);
+            return true;
+        }
+        int i = (int)addr - EXP_ADDR_FIRST;
+        if (!unplug && !module_plugged[i]) {
+            module_sim_restart(&modules[i], now); /* power again: a fresh start */
+            module_shown[i] = 0;
+        }
+        if (unplug && module_plugged[i] && module_shown[i] != 0) {
+            module_shown[i] = 0; /* no power: its relays drop */
+            out("MODULE %02x outputs=0x00 t=%lu", addr, (unsigned long)now);
+        }
+        module_plugged[i] = !unplug;
+        out("LOG module %02x: %s", addr, unplug ? "unplugged" : "plugged in");
+        return true;
+    }
+    return false;
+}
+
+static node_runner_t runner; /* defined below, with the game */
+
+static void port_input(void *ctx, const char *type, const char *data_json)
+{
+    (void)ctx;
+    out("LOG input %s %s", type, data_json);
+    if (runner.running) node_runner_input(&runner, type, data_json);
+}
+
+static void port_event(void *ctx, const char *type, const char *data_json)
+{
+    (void)ctx;
+    out("LOG event %s %s", type, data_json);
+    box_game_output_event(&game, type, data_json);
+}
+
+static void port_log(void *ctx, const char *line)
+{
+    (void)ctx;
+    out("LOG %s", line);
 }
 
 /* ---- Adoption (adoption.h): the join key and the field's name in "NVS" ------------ */
@@ -916,8 +1085,10 @@ static event_log_t evlog;
 
 static void print_status(void)
 {
-    char outputs_json[OUTPUTS_MAX * 120 + 4];
+    char outputs_json[OUT_CHANNELS_MAX * 130 + 4];
     print_outputs(outputs_json, sizeof(outputs_json));
+    char modules_json[600];
+    expansion_box_status_json(&port, modules_json, sizeof(modules_json));
     char scores[96] = "";
     size_t o = 0;
     if (runner.node != NULL) {
@@ -936,7 +1107,7 @@ static void print_status(void)
         "\"times\":%lu,\"states\":%lu,\"rx_ok\":%lu,\"rx_rejected\":%lu,\"relayed\":%lu,"
         "\"have_key\":%s,\"device_id\":\"%s\",\"available\":%s,\"invites_accepted\":%lu,"
         "\"invites_refused\":%lu,\"last_game\":%u,\"lang\":\"%s\","
-        "\"lbt_cads\":%lu,\"lbt_deferrals\":%lu,\"lbt_gave_up\":%lu,\"outputs\":%s}",
+        "\"lbt_cads\":%lu,\"lbt_deferrals\":%lu,\"lbt_gave_up\":%lu,\"outputs\":%s,\"modules\":%s}",
         (int)game.phase, game.paused ? "true" : "false", game.join.game_id, game.join.node_id,
         game.link.proto.epoch, (unsigned long)runner.game_time_ms, game.owner_team, scores,
         (unsigned)field_link_pending(&game.link), game.link.leader, (unsigned long)game.link.term,
@@ -947,7 +1118,8 @@ static void print_status(void)
         box_lobby_available(&game) ? "true" : "false", (unsigned long)game.lobby.invites_accepted,
         (unsigned long)game.lobby.invites_refused, game.lobby.last_game,
         box_lang_given() ? box_lang_code(box_lang()) : "", (unsigned long)txs.stats.cads,
-        (unsigned long)txs.stats.deferrals, (unsigned long)txs.stats.gave_up, outputs_json);
+        (unsigned long)txs.stats.deferrals, (unsigned long)txs.stats.gave_up, outputs_json,
+        modules_json);
 }
 
 int main(int argc, char **argv)
@@ -1011,6 +1183,13 @@ int main(int argc, char **argv)
                 return 2;
             }
             simple_outs[simple_out_count++] = argv[++i];
+        } else if (strcmp(argv[i], "--module") == 0 && i + 1 < argc) {
+            if (module_count >= EXP_MODULES_MAX || !add_module(argv[++i])) {
+                fprintf(stderr,
+                        "box_host: --module NAME[@ADDR]: target or out4, at 58-5f, at most %d\n",
+                        EXP_MODULES_MAX);
+                return 2;
+            }
         } else if (strcmp(argv[i], "--no-wifi") == 0) {
             no_wifi = true;
         } else if (strcmp(argv[i], "--no-lbt") == 0) {
@@ -1093,6 +1272,37 @@ int main(int argc, char **argv)
         }
     }
     builtin_presets_seed(sources, BUILTIN_COUNT);
+    /* With a module on the port: Target Windows stored as a preset, as one put on a box by hand
+     * (the Field Box builds it in once it is bench-tested: draft RFC "The expansion port", row 8).
+     */
+    if (module_count > 0 && preset_store_find_mode("org.atalaia.target_windows") < 0) {
+        char p[300];
+        size_t len = 0;
+        snprintf(p, sizeof(p), "%s/target_windows/node.lua", modes);
+        char *src = slurp(p, &len);
+        int slot = 0;
+        preset_summary_t list[PRESET_MAX_SLOTS];
+        int used = preset_store_list(list, PRESET_MAX_SLOTS);
+        for (int k = 1; k <= PRESET_MAX_SLOTS && slot == 0; k++) {
+            bool taken = false;
+            for (int j = 0; j < used; j++) taken = taken || list[j].index == k;
+            if (!taken) slot = k;
+        }
+        memset(&preset, 0, sizeof(preset));
+        snprintf(preset.mode_id, sizeof(preset.mode_id), "org.atalaia.target_windows");
+        snprintf(preset.label, sizeof(preset.label), "Target Windows");
+        snprintf(preset.params_json, sizeof(preset.params_json), "{}");
+        if (src != NULL && len < sizeof(preset.source)) {
+            memcpy(preset.source, src, len);
+            preset.source_len = len;
+        }
+        if (src == NULL || preset.source_len == 0 || slot == 0 ||
+            !preset_store_save(slot, &preset)) {
+            fprintf(stderr, "box_host: cannot store Target Windows from %s\n", p);
+            return 1;
+        }
+        free(src);
+    }
 
     hal_stub_init(&hal);
     node_runner_init(&runner, &hal, 0);
@@ -1152,6 +1362,14 @@ int main(int argc, char **argv)
             }
         }
         box_game_set_outputs(&game, &outs);
+        /* The expansion port after the outputs, as on the box: ALL_OFF to every module first. */
+        exp_bus_t bus = {
+            .ctx = NULL, .probe = sim_probe, .write = sim_write, .write_read = sim_write_read};
+        xb_ops_t xops = {.ctx = NULL, .input = port_input, .event = port_event, .log = port_log};
+        expansion_box_init(&port, &bus, &outs, &xops);
+        host_now = mono_ms();
+        expansion_box_start(&port, host_now);
+        box_game_set_port(&game, &port);
     }
     if (announce_ms > 0) {
         game.lobby.first_min_ms = game.lobby.first_max_ms = (uint32_t)announce_ms;
@@ -1247,6 +1465,10 @@ int main(int argc, char **argv)
                                 out("LOG %s", reply);
                             }
                         }
+                    } else if (strcmp(command, "modules") == 0) {
+                        static char mods[600];
+                        expansion_box_status_json(&port, mods, sizeof(mods));
+                        out("LOG modules: %s", mods);
                     } else if (strcmp(command, "outputs") == 0 ||
                                outputs_admin_args(command) >= 0) {
                         static char line_out[200], reply_out[240];
@@ -1303,6 +1525,8 @@ int main(int argc, char **argv)
                         battery = b < 0 ? -1 : b > 100 ? 100 : b;
                     } else if (sscanf(line, "lbtbusy %d", &b) == 1) {
                         lbt_busy_left = b;
+                    } else if (module_command(line, now)) {
+                        /* hit, unplug, plug: the modules on the port */
                     } else if (strcmp(line, "status") == 0) {
                         print_status();
                     } else if (strcmp(line, "quit") == 0) {
@@ -1329,6 +1553,8 @@ int main(int argc, char **argv)
         box_game_tick(&game, delta, now);
         host_now = now;
         outputs_tick(&outs, box_game_output_state(&game), now);
+        expansion_box_tick(&port, box_game_output_state(&game), now);
+        modules_tick(now);
         pins_low(now);
         lbt_pump(now);
         adoption_tick(&adopt, now);

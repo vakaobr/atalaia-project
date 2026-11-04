@@ -142,11 +142,13 @@ static bool command(void *ctx, const atalaia_proxy_msg_t *m)
     (void)ctx;
     return pod_caps_command(&caps, m);
 }
-static void ident(void *ctx, atalaia_proxy_ident_t *out, bool compact)
+static int ident(void *ctx, atalaia_proxy_ident_t *out, pod_ident_level_t level, int trim)
 {
     (void)ctx;
+    (void)trim;
     snprintf(out->fw_version, sizeof(out->fw_version), "0.3.0");
-    pod_caps_descriptors(&caps, out->caps_json, sizeof(out->caps_json), !compact);
+    pod_caps_descriptors(&caps, out->caps_json, sizeof(out->caps_json), level == POD_IDENT_FULL);
+    return 0;
 }
 static bool emit(void *ctx, const char *cap, const char *event, const char *data)
 {
@@ -180,7 +182,7 @@ static void setup(bool encrypted)
     cfg.leds = true;
     cfg.led_count = 24;
     pod_caps_init(&caps, &cfg, &hal, NULL);
-    pod_io_t io = {link_write, now, command, ident, NULL, NULL, NULL, NULL};
+    pod_io_t io = {link_write, now, command, ident, NULL, NULL, NULL, NULL, NULL};
     modem_io_t rio = {.radio_send = radio_send, .now_ms = now};
     pod_init(&pod, &io, &rio, &atalaia_crypto_test_stub, "test", true, 16);
     pod_ble_stack_t stack = {stub_notify, NULL};

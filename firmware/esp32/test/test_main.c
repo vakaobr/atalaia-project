@@ -66,6 +66,7 @@ int main(void)
     run_status_hold_tests();
     run_tft_splash_tests();
     run_expansion_tests();
+    run_expansion_box_tests();
     run_sound_tests();
     run_outputs_tests();
     run_simple_out_tests();

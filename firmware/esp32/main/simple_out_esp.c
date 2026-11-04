@@ -9,6 +9,10 @@
  * deletes and re-creates the channel, the one way to drop transmissions already queued; the pin
  * is low in between (the gate input's 10 kohm pull-down). The LED ring has its own RMT channel;
  * the S3 has four for transmitting.
+ *
+ * On an I/O pod (CONFIG_ATALAIA_POD_MODE; increment 9, EXP-26) the same channels, with their
+ * settings from the build (ATALAIA_POD_OUT<n>_FUNCTION, _MAX_ON_S: a pod has no admin PIN and no
+ * settings store for them) and the pod's own pins checked instead of the display's.
  */
 
 #ifdef ESP_PLATFORM
@@ -18,9 +22,11 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "config_store.h"
 #include "esp_log.h"
 #include "sdkconfig.h"
+#if !CONFIG_ATALAIA_POD_MODE
+#include "config_store.h"
+#endif
 
 #if CONFIG_ATALAIA_SIMPLE_OUT
 
@@ -61,7 +67,12 @@
 #if SO_CLASH(CONFIG_ATALAIA_LED_PIN)
 #error "A simple output is on the LED ring's GPIO"
 #endif
-#if SO_CLASH(CONFIG_ATALAIA_DISP_MOSI_PIN) || SO_CLASH(CONFIG_ATALAIA_DISP_CLK_PIN) ||             \
+#if CONFIG_ATALAIA_POD_MODE
+/* A pod has no display (its pins 1, 3 and 33 are free), but its enclosure switch has a pin. */
+#if SO_CLASH(CONFIG_ATALAIA_POD_TAMPER_PIN)
+#error "A simple output is on the pod's enclosure switch GPIO"
+#endif
+#elif SO_CLASH(CONFIG_ATALAIA_DISP_MOSI_PIN) || SO_CLASH(CONFIG_ATALAIA_DISP_CLK_PIN) ||           \
     SO_CLASH(CONFIG_ATALAIA_DISP_CS_PIN) || SO_CLASH(CONFIG_ATALAIA_DISP_DC_PIN) ||                \
     SO_CLASH(CONFIG_ATALAIA_DISP_RST_PIN) || SO_CLASH(CONFIG_ATALAIA_DISP_BL_PIN)
 #error "A simple output is on one of the display's GPIOs"
@@ -101,12 +112,16 @@ static const so_pin_use_t pins_used[] = {
     {"button 3", CONFIG_ATALAIA_BTN3_PIN},
     {"button 4", CONFIG_ATALAIA_BTN4_PIN},
     {"the LED ring", CONFIG_ATALAIA_LED_PIN},
+#if CONFIG_ATALAIA_POD_MODE
+    {"the enclosure switch", CONFIG_ATALAIA_POD_TAMPER_PIN},
+#else
     {"the display", CONFIG_ATALAIA_DISP_MOSI_PIN},
     {"the display", CONFIG_ATALAIA_DISP_CLK_PIN},
     {"the display", CONFIG_ATALAIA_DISP_CS_PIN},
     {"the display", CONFIG_ATALAIA_DISP_DC_PIN},
     {"the display", CONFIG_ATALAIA_DISP_RST_PIN},
     {"the display", CONFIG_ATALAIA_DISP_BL_PIN},
+#endif
     {"the amplifier", CONFIG_ATALAIA_AUDIO_BCLK_PIN},
     {"the amplifier", CONFIG_ATALAIA_AUDIO_LRCLK_PIN},
     {"the amplifier", CONFIG_ATALAIA_AUDIO_DOUT_PIN},
@@ -171,7 +186,44 @@ static bool rmt_send(void *ctx, uint16_t width_us, uint16_t frames, bool flush)
 static so_rmt_t rmts[OUTPUTS_MAX];
 static simple_out_t outs[OUTPUTS_MAX];
 
-/* ---- Settings in NVS ------------------------------------------------------------------- */
+/* ---- Settings: in NVS on a box, from the build on a pod --------------------------------- */
+
+#if CONFIG_ATALAIA_POD_MODE
+
+/* Building an output into a pod enables it (EXP-28; a pod has no admin PIN, PODC-2), with the
+ * build's use and longest on; a use outputs.c does not take leaves it disabled. */
+static void load_settings(int index, out_settings_t *s)
+{
+    outputs_default_settings(index, s);
+    const char *fn = CONFIG_ATALAIA_POD_OUT1_FUNCTION;
+    uint32_t max_s = CONFIG_ATALAIA_POD_OUT1_MAX_ON_S;
+#if CONFIG_ATALAIA_SIMPLE_OUT2
+    if (index == 1) {
+        fn = CONFIG_ATALAIA_POD_OUT2_FUNCTION;
+        max_s = CONFIG_ATALAIA_POD_OUT2_MAX_ON_S;
+    }
+#endif
+    if (!outputs_function_ok(fn)) {
+        ESP_LOGE(TAG,
+                 "simple output %d: \"%s\" is not a use (siren, strobe, smoke, light, horn, "
+                 "out.1-out.9): left disabled",
+                 index + 1, fn);
+        return;
+    }
+    snprintf(s->function, sizeof(s->function), "%s", fn);
+    s->max_on_s = max_s;
+    s->enabled = true;
+}
+
+bool simple_out_esp_save(void *ctx, int index, const out_settings_t *s)
+{
+    (void)ctx;
+    (void)index;
+    (void)s;
+    return false; /* the build's: nothing to store */
+}
+
+#else
 
 /* NVS keys: "out1_en" ... (15 characters at most; index is 0 or 1). */
 static void load_settings(int index, out_settings_t *s)
@@ -202,6 +254,8 @@ bool simple_out_esp_save(void *ctx, int index, const out_settings_t *s)
     config_store_set_u32(key, s->max_on_s);
     return true;
 }
+
+#endif /* CONFIG_ATALAIA_POD_MODE */
 
 static int add(outputs_t *o, int index, int gpio)
 {

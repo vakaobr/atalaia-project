@@ -70,6 +70,7 @@ void run_box_pair_tests(void);
 void run_status_hold_tests(void);
 void run_tft_splash_tests(void);
 void run_expansion_tests(void);
+void run_expansion_box_tests(void);
 void run_sound_tests(void);
 void run_outputs_tests(void);
 void run_simple_out_tests(void);

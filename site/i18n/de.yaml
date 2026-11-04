@@ -50,8 +50,9 @@ meta:
   build:
     title: Bauanleitungen · Atalaia
     description: >-
-      Wie du Satelliten und I/O-Pod von Atalaia aus handelsüblichen Teilen baust, was für das
-      Ziel-Addon entschieden ist und wo die Bauanleitung der Field Box liegt.
+      Wie du Satellit, I/O-Pod, Erweiterungsanschluss und Ziel-Addon von Atalaia aus
+      handelsüblichen Teilen baust, wie eine Box eine Sirene oder eine Nebelmaschine schaltet und wo
+      die Bauanleitung der Field Box liegt.
   glossary:
     title: Glossar · Atalaia
     description: >-
@@ -404,7 +405,9 @@ modes:
     text: >-
       Eine Zielscheibe leuchtet ein paar Sekunden in der Farbe eines zufälligen Teams, und ein Treffer
       in dieser Zeit punktet für dieses Team. Das Spiel ist in Software geschrieben und getestet; das
-      nötige Ziel-Addon (eine Platte mit Treffersensor und Leuchtring) ist noch nicht gebaut.
+      nötige Ziel-Addon (eine Platte mit Treffersensor, die an eine Box gesteckt wird, deren eigene
+      Lichter das Fenster zeigen) hat eine Bauanleitung, aber seine Firmware kommt noch, und gebaut
+      wurde noch keins.
     meta: Eine Box mit dem Ziel-Addon · noch nicht verfügbar
   hacking_terminal:
     title: Hacking-Terminal
@@ -968,6 +971,12 @@ roadmap:
         - "Die GM-Konsole kann die Einstellungen eines I/O-Pods per Funk schicken: die Farben der vier Knöpfe, die Helligkeit des LED-Rings, die Lautstärke und ob der Gehäuseschalter meldet. Der Pod prüft den Befehl wie jeden anderen, speichert die Einstellungen in seinem Flash und antwortet; der Controller sendet ihn erneut, bis er eine Antwort hört. Vorher wurden sie beim Bauen der Firmware festgelegt. In Software und gegen den Code des Pods auf einem Computer, nicht mit einem echten Pod probiert."
         - "Das Koppeln eines Handys mit einem I/O-Pod per Bluetooth verlangt einen 6-stelligen Code, den der Pod auf seinem kleinen Display zeigt, damit sich niemand dazwischenschalten kann; ein auf die alte Art gekoppeltes Handy wird einmal gebeten, neu zu koppeln, und die PRG-Taste des Pods vergisst alle Handys. In Software und in Tests auf einem Computer, nicht mit einem echten Pod ausprobiert."
         - "Die Strafe einer Box eines Android-Props erreicht den Controller jetzt, über die WLAN-Verbindung und die Funkverbindung. In Software."
+        - "Der I/O-Pod leiht dem Handy seine einfachen Ausgänge (eine Sirene oder die Fernbedienung einer
+          Nebelmaschine über einen RC-Relaisschalter, an GPIO 33, dann 1) und seinen Erweiterungsanschluss:
+          die Treffer eines Ziel-Addons und die Relais eines I2C-Ausgangsmoduls an einem Pod, der dafür
+          gebaut ist. Das Spiel auf dem Handy schaltet sie mit den Regeln einer Box, der Pod schaltet sie ab,
+          wenn das Handy weg ist, und die GM-Konsole zeigt die Ausgänge und Module eines Props. In der
+          Firmware und gegen den Code des Pods auf einem Computer, nicht mit einem echten Pod probiert."
     g_controller:
       title: Das Handy als Feld-Controller
       items:
@@ -1283,8 +1292,9 @@ roadmap:
         Das Repository der Registry gibt es (angelegt am 26. Oktober 2026), und seine
         <a href="https://vakaobr.github.io/atalaia-modes/">Seite</a> listet die Modi, noch ohne Einträge.
       - >-
-        <a href="{{ page.to.build }}">Bauanleitungen</a> für Satellit, I/O-Pod und Ziel-Addon, als
-        Text. Noch keine Box wurde danach gebaut.
+        <a href="{{ page.to.build }}">Bauanleitungen</a> für Satellit, I/O-Pod,
+        Erweiterungsanschluss, Ziel-Addon und den einfachen Ausgang (Sirene oder Nebel über einen
+        RC-Relaisschalter), als Text. Noch keine Box wurde danach gebaut.
       - "<strong>Benutzerhandbücher</strong> für Spielende, Spielleitung, Marshals und Field-Box-Betreibende, auf Englisch und Portugiesisch."
       - "Bauanleitungen mit einer Pin-Tabelle für jede Platine, eine Firmware-Anleitung (eine veröffentlichte Version herunterladen oder selbst bauen) und eine Anleitung zum Einrichten des Controllers, auf Englisch und Portugiesisch."
       - "Die Web-Ansicht des Simulators hat jede Eingabe, die ein Modus nutzt: Tags, Tastenfeld, Treffer und GM-Befehle, mit Download des Ereignisprotokolls."
@@ -1305,7 +1315,7 @@ build:
   title: Bauanleitungen
   intro: >-
     Die Props von Atalaia werden aus handelsüblichen Teilen rund um ein ESP32-Board gebaut, ohne
-    eigens gefertigte Leiterplatte. Hier stehen die Pins und Schaltpläne der Field Box sowie die Anleitungen für den Satelliten, den I/O-Pod und
+    eigens gefertigte Leiterplatte. Hier stehen die Pins und Schaltpläne der Field Box, ihr einfacher Ausgang für eine Sirene oder eine Nebelmaschine sowie die Anleitungen für den Satelliten, den I/O-Pod, den Erweiterungsanschluss und
     das Ziel-Addon, gekürzt; die vollständigen Anleitungen mit allen Prüfungen und den Tabellen zur
     Fehlersuche liegen im Repository (auf Englisch und Portugiesisch).
     Um die Firmware auf eine Platine zu bringen, <a href="https://github.com/vakaobr/atalaia-project/releases">lade eine fertige Version herunter</a> oder baue sie selbst: die <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/firmware.md">Firmware-Anleitung</a> (Englisch) erklärt beides. Der Feld-Controller hat eine eigene <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/controller-setup.md">Einrichtungsanleitung</a> (Englisch). Das Modem hat eine eigene <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/modem.md">Modem-Anleitung</a> (Englisch).
@@ -1327,6 +1337,56 @@ build:
   steps: Schritte
   open: Noch nicht entschieden
   photo: "Foto folgt nach dem ersten Aufbau:"
+  coming: Kommt mit der Firmware (Inkrement 8)
+  simple_out:
+    title: "Der einfache Ausgang: Sirene, Blitzlicht oder Nebel-Fernbedienung"
+    what: >-
+      Eine Option für die Field Box und den Satelliten, und der bevorzugte Weg, mit dem eine Box etwas
+      schaltet: eine Sirene, ein Blitzlicht, eine Lampe oder die Fernbedienung einer Nebelmaschine,
+      über einen handelsüblichen <strong>RC-Relaisschalter</strong> (wie er für ferngesteuerte Modelle
+      verkauft wird). Ein GPIO schickt ein Servosignal über das freie Gatter des Pegelwandlers:
+      2,0&nbsp;ms heißt an, 1,0&nbsp;ms aus, in Halbsekunden-Paketen, die nur das laufende Spiel
+      erneuert. Hängt die Box, startet sie neu oder verliert sie den Strom, hören die Impulse
+      innerhalb von 0,5&nbsp;s auf und der Schalter öffnet sein Relais. Die Firmware kann das seit
+      Version 0.7.0, als Build-Option; in Hardware gebaut ist es noch nicht. Die Firmware des I/O-Pods
+      hat es auch, an GPIO&nbsp;33 (und 1): siehe <a href="#io-pod">I/O-Pod</a>.
+    needs:
+      switch: >-
+        <strong>Ein RC-Relaisschalter, der sein Relais öffnet, wenn das Signal ausbleibt</strong>: ein
+        dokumentierter mit Failsafe bei Signalverlust, oder ein No-Name-Schalter erst nach seiner
+        Prüfung auf dem Labortisch. Einer, der seinen letzten Zustand hält, wird nie benutzt. Die
+        Kontakte passend zur Last.
+      socket: >-
+        Eine <strong>3-polige M8-Buchse</strong> mit der Aufschrift „OUTPUT 1“ (Pin 1 unbeschaltet,
+        Pin 3 Masse, Pin 4 das Signal), ein 10-kΩ-Widerstand, der den Pin beim Start des Boards auf
+        Low hält, ein 330-Ω-Widerstand zur Buchse und ein 3-adriges Kabel bis 2&nbsp;m. Es ist nicht
+        die M12-Buchse des Erweiterungsanschlusses.
+      load: >-
+        <strong>Der eigene Akku der Last</strong>, mit einer Sicherung zum Relais und einem
+        5-V-Regler (einem „BEC“ aus dem Modellbau) für den Schalter: Die Box liefert nur das Signal und
+        Masse, nie Strom.
+      firmware: >-
+        <strong>Eine Firmware mit dem einfachen Ausgang</strong>
+        (<code>python tools/docker_fw.py build --simple-out=on</code>). Sein Pin hängt von der
+        Board-Revision ab: GPIO&nbsp;46 auf einem V4.3, GPIO&nbsp;5 auf einem V4.2. Ein zweiter
+        Ausgang an GPIO&nbsp;45 (<code>--simple-out=on2</code>) nur bei einer Box ohne Piezo-Summer.
+      enable: >-
+        Die Ausgänge bleiben aus, bis die Feld-Administration sie an der Box mit der Admin-PIN
+        freigibt und jedem seine Funktion (Sirene, Blitzlicht, Nebel, Licht, Horn) und seine längste
+        Einschaltzeit gibt. Die Box schaltet alle aus beim Start, bei einer Pause und am Spielende (ein
+        Horn zum Spielende darf noch bis zu 10&nbsp;s tönen).
+    safety: >-
+      <strong>Nur Kleinspannungs-Lasten</strong> (höchstens 24&nbsp;V DC, empfohlen 2&nbsp;A), egal was
+      auf dem Relais steht. <strong>Nie Netzspannung, nie Pyrotechnik</strong>; eine Nebelmaschine
+      nur über einen dokumentierten Kleinspannungs-Fernbedienungseingang. Gehörschutz in der Nähe von
+      Sirenen und Hörnern, Nebel nie in einem geschlossenen Raum ohne die Erlaubnis des Geländes, und
+      nichts, das wie ein Sprengsatz aussieht.
+    full: >-
+      Alle Schritte und Prüfungen: Abschnitt 9.10 der
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">Bauanleitung</a> der Field Box, und die Prüfung jedes
+      RC-Schalters vor seinem ersten Spiel in der
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/firmware/esp32/docs/BRING_UP.md#step-8b-simple-output-rc-relay-switch">Inbetriebnahme-Liste,
+      Schritt 8b</a> (auf Englisch).
   pin:
     btn1: Team-Taster 1 (das erste Team des Spiels)
     btn2: Team-Taster 2 (das zweite Team)
@@ -1345,6 +1405,8 @@ build:
     buzzer: >-
       Passiver Piezo-Summer, optional (ein Boot-Strapping-Pin: seine Schaltung hält ihn auf Low; Firmware-Option, noch nicht in Hardware gebaut)
     tamper: Gehäuseschalter, nach GND
+    pod_out1: Einfacher Ausgang 1, optional (über ein freies Gatter des 74AHCT125)
+    pod_out2: Einfacher Ausgang 2, optional (der Akkuspannungs-Pin des Boards, den der Pod nicht nutzt)
     log: >-
       Log-Ausgang (UART0 TX): nur an den RX eines USB-Seriell-Adapters mit 3,3&nbsp;V, auf der
       Werkbank
@@ -1381,8 +1443,10 @@ build:
       <strong>Nur 3,3-V-Signale</strong> ans Board: Der LED-Ring wird über einen Pegelwandler
       angesteuert, und jedes I2C-Modul muss seine Leitungen auf 3,3&nbsp;V ziehen, nie auf 5&nbsp;V.
     pins: >-
-      <strong>Schließ nie etwas an GPIO 5 oder 46 an</strong> (das Funk-Frontend) <strong>und nichts
-      an GPIO 34 oder 38–42</strong> (der GPS-Anschluss des Boards).
+      <strong>Schließ nie etwas an GPIO 5 oder 46 an</strong> (das Funk-Frontend; die einzige
+      Ausnahme ist der <a href="#field-box-simple-output">einfache Ausgang</a>, an dem Pin, den deine
+      Board-Revision frei lässt: 46 auf einem V4.3, 5 auf einem V4.2) <strong>und nichts an GPIO 34
+      oder 38–42</strong> (der GPS-Anschluss des Boards).
     power_check: >-
       <strong>Kein Spiel vor der Messung der Sendeleistung</strong> aus der Inbetriebnahme-Liste: Die
       Firmware hält den Funk mit einer Verstärkung, die noch nicht gemessen wurde, im gesetzlichen
@@ -1498,6 +1562,11 @@ build:
         Ton nach Wunsch: ein passiver Piezo-Summer (am günstigsten: er spielt die Töne der Spiele als
         kurze Tonfolgen, mit einer Firmware-Option; noch nicht in Hardware gebaut), der Verstärker
         MAX98357A der Field Box und ein kleiner Lautsprecher, oder beides.
+      simple_out: >-
+        Ein <a href="#field-box-simple-output">einfacher Ausgang</a> ist optional: eine Sirene, ein
+        Blitzlicht, eine Lampe oder die Fernbedienung einer Nebelmaschine, geschaltet über einen
+        RC-Relaisschalter, wie an der Field Box. Ein Master oder Satellit, der eine Sirene ertönen
+        lässt, braucht keine weitere Box. Noch nicht in Hardware gebaut.
       box: >-
         Ein IP65-Kunststoffgehäuse in einer kräftigen Farbe, mit Druckausgleich und
         Kabelverschraubungen, und „GAME PROP“-Aufkleber.
@@ -1523,6 +1592,11 @@ build:
       wiring: >-
         Schließ die Taster (beim Drücken nach GND), den Ring über den Pegelwandler, die Akkuanzeige
         und den optionalen Verstärker an, nach den Pins oben.
+      simple_out: >-
+        Wenn du den einfachen Ausgang einbaust: das freie Gatter des Pegelwandlers von GPIO&nbsp;46
+        (V4.3) oder 5 (V4.2), mit 10&nbsp;kΩ nach GND, über 330&nbsp;Ω an Pin 4 der M8-Buchse; den
+        Schalter aus dem Akku der Last versorgt, nie aus der Box. Der GPIO misst 10&nbsp;kΩ nach GND,
+        und nichts verbindet Pin 4 der Buchse mit 3V3 oder 5&nbsp;V.
       check: >-
         Prüf mit dem Multimeter, ohne Zelle: kein Kurzschluss zwischen den Schienen, jeder Taster nur
         beim Drücken, die Polung des Akkukabels zum Board.
@@ -1567,6 +1641,25 @@ build:
       Außer dem Board ist jedes Teil optional: Der Pod sagt dem Handy, was er hat, und das Handy
       nutzt nur das. Taster 1 ist das erste Team des Spiels, wie bei einer Field Box. Ein geöffnetes
       Gehäuse erreicht die GM-Konsole als Manipulationsalarm.
+    outputs: >-
+      <strong>Einfache Ausgänge</strong>, optional: eine Sirene, ein Blitzlicht, eine Lampe oder die
+      Fernbedienung einer Nebelmaschine über einen RC-Relaisschalter, verdrahtet wie der
+      <a href="#field-box-simple-output">einfache Ausgang</a> der Field Box, aber an GPIO&nbsp;33 (ein
+      zweiter an GPIO&nbsp;1, mit oder ohne Piezo-Summer). Ein Pod hat keine Admin-PIN, also schaltet
+      erst das Einbauen in die Firmware den Ausgang frei, mit seinem Zweck (Sirene, Blitzlicht, Nebel,
+      Lampe, Hupe) und seiner längsten Einschaltzeit. Das Spiel auf dem Handy schaltet ihn mit den
+      Regeln einer Box, und der Pod schaltet ihn selbst ab: sofort, wenn die Verbindung zum Handy
+      abreißt, und nach 1,5&nbsp;s, wenn das Handy nichts mehr sagt.
+    port: >-
+      <strong>Der Erweiterungsanschluss</strong>, optional: die M12-Buchse und die
+      <a href="#expansion-port">Anschlussplatine</a> der Field Box am I2C-Bus des Pods (GPIO&nbsp;17 und
+      18). Die Treffer eines <a href="#target-addon">Ziel-Addons</a> erreichen das Spiel auf dem Handy,
+      solange es läuft. Die Relais eines I2C-Ausgangsmoduls leiht nur ein Pod dem Spiel, der dafür gebaut
+      ist (standardmäßig aus), und der Pod schaltet sie ab, wenn das Handy weg ist. Ein Pod mit allen
+      Teilen hat wenig Platz, um sich dem Handy zu beschreiben: Er leiht so viele Ausgänge, wie passen,
+      die ersten, und hält die anderen aus. Die Ausgänge und der Anschluss sind in der Pod-Firmware und
+      nur auf einem Computer getestet: Noch kein Pod hat ein echtes Relais geschaltet oder eine echte
+      Platte gespürt.
     parts:
       same: >-
         Die Teile der Field Box ohne Display: das Board, die Taster (bis zu vier), das Tastenfeld mit
@@ -1581,9 +1674,17 @@ build:
         und ein USB-C-OTG-Kabel für das Handy.
       uart: >-
         Nur auf der Werkbank: ein USB-Seriell-Adapter mit 3,3&nbsp;V, um das Log des Pods zu lesen.
+      simple_out: >-
+        Optional, für jeden einfachen Ausgang: ein RC-Relaisschalter, der öffnet, wenn sein Signal
+        aufhört, ein freies Gatter des 74AHCT125, 10&nbsp;kΩ und 330&nbsp;Ω und eine M8-Buchse, wie bei der
+        Field Box.
+      port: >-
+        Optional: die M12-Buchse und die Anschlussplatine des Erweiterungsanschlusses, wie bei der
+        Field Box.
     free_pins: >-
-      Die übrigen Display-Pins der Field Box (GPIO 1, 3 und 33) nutzt der Pod nicht: Lass sie
-      unbeschaltet.
+      GPIO&nbsp;33 und 1, am Pod frei, tragen die optionalen einfachen Ausgänge; GPIO&nbsp;3 und ein
+      Ausgangspin, den du nicht nutzt, bleiben unbeschaltet. Der Erweiterungsanschluss belegt keinen
+      eigenen GPIO.
     diagram_ref: >-
       Die Verdrahtung des Pods ist die der Field Box ohne Display: Folge den <a href="#field-box-wiring">Schaltplänen der Field Box</a> und lass das Display samt seinen Leitungen weg. Ein eigener Schaltplan existiert noch nicht.
     steps:
@@ -1596,8 +1697,11 @@ build:
         zwischen GPIO 47 und GND an. Der Pod überwacht ihn erst, nachdem er ihn einmal geschlossen
         gelesen hat; ein Pod ohne Schalter schlägt also nie Alarm.
       flash: >-
-        Bau die Pod-Firmware (<code>python tools/docker_fw.py pod</code>) und flash sie aus dem
-        Ordner <code>build-pod</code>, wie die der Field Box.
+        Bau die Pod-Firmware (<code>python tools/docker_fw.py pod</code>; dazu
+        <code>--simple-out=on</code> für einen Ausgang, <code>on2</code> für zwei und
+        <code>--module-outputs=on</code>, um die Relais eines Ausgangsmoduls zu leihen) und flash sie aus dem
+        Ordner <code>build-pod</code>, wie die der Field Box. Das Boot-Log nennt jeden Ausgang, den er
+        leiht.
       log: >-
         Lies sein Log an GPIO 43 mit dem USB-Seriell-Adapter: Die USB-C-Buchse trägt die Verbindung
         des Pods zum Handy, nicht das Log.
@@ -1608,9 +1712,10 @@ build:
         Mach die Inbetriebnahme-Prüfungen des Pods, auch die Sendeleistung des Funks vor jedem Spiel.
     photo: der fertige Pod mit seinem Gehäuseschalter und dem verbundenen Handy.
     open:
-      siren: >-
-        <strong>Eine eigene Sirene oder ein Blitzlicht</strong>: Der Ton des Pods ist sein Verstärker;
-        andere Lasten zu schalten, kann seine Firmware nicht.
+      bench: >-
+        <strong>Ausgänge und Module an einem echten Pod</strong>: Die einfachen Ausgänge und der
+        Erweiterungsanschluss sind in der Pod-Firmware und auf einem Computer getestet, noch nicht mit einem
+        echten Relais, einer echten Platte oder einem echten Handy; als Nächstes kommt der Labortest.
       phone_power: >-
         <strong>Strom vom Handy</strong>: Am Kabel versorgt das Handy den Pod und lädt womöglich
         seine Zelle. Ob es das soll und wie viel Strom ein Handy liefert, wird beim ersten Aufbau
@@ -1618,8 +1723,9 @@ build:
       enclosure: >-
         <strong>Das Gehäuse</strong>, und wie Handy und Pod zusammen getragen werden.
       settings: >-
-        <strong>Einstellungen vom Handy aus</strong>: Tasterfarben, LED-Zahl und der Rest werden
-        vorerst beim Bauen der Firmware festgelegt.
+        <strong>Einstellungen</strong>: Die GM-Konsole kann per Funk die Farben der Taster, die Helligkeit
+        des Rings, die Lautstärke und ob der Gehäuseschalter meldet schicken; die LED-Zahl, die Pins und
+        die Ausgänge werden beim Bauen der Firmware festgelegt.
     full: >-
       Die vollständige Anleitung (auf Englisch und Portugiesisch):
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/io-pod/BUILD.md">Bauanleitung
@@ -1669,56 +1775,229 @@ build:
       ohne Daten, falscher Port, Port von einem anderen Programm belegt, <code>dialout</code>, andere Region,
       <code>LINK waiting</code> oder <code>DOWN</code>, <code>RADIO FAULT</code>, falsche Partitionstabelle):
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/modem.md">Set up the radio modem</a> (Englisch).
+  port:
+    title: Erweiterungsanschluss
+    status: >-
+      <strong>Entworfen, noch nicht gebaut und noch nicht von der Firmware der Box benutzt.</strong>
+      Ein Anschluss lässt sich jetzt bauen und mit dem Multimeter und den Teilen der Box prüfen; kein
+      Modul antwortet, bis der Anschlusstreiber der Box in ihrem Spiel läuft, mit Inkrement 8 des
+      Plans für den Erweiterungsanschluss, das noch kommt.
+    what: >-
+      Eine wasserdichte 5-polige M12-Buchse an der Box, in die Module von außen gesteckt werden: jetzt
+      das <a href="#target-addon">Ziel-Addon</a>, später Kontakte und andere Sensoren. Es ist der
+      I2C-Bus der Box selbst (der des Tastenfelds, des NFC-Lesers, der Akkuanzeige und des kleinen
+      Displays), aus dem Gehäuse geführt, hinter einer kleinen <strong>Anschlussplatine</strong>, die
+      verhindert, dass ein nasses, kurzgeschlossenes oder statisch geladenes Kabel die Box lahmlegt.
+      Er braucht keinen GPIO, also ändert sich keine Pin-Tabelle. Er ist optional an der Field Box,
+      am Satelliten und am I/O-Pod: Nur eine Box, die ein Ziel oder einen Sensor trägt, braucht ihn.
+      Etwa <span class="nowrap">6–14&nbsp;€</span> an Teilen (die Schätzung des Projekts).
+    not_outputs: >-
+      Nicht für Sirenen, Blitzlichter oder Nebel: Die kommen an den
+      <a href="#field-box-simple-output">einfachen Ausgang</a>. Der Anschluss ist für Eingänge, und
+      später für ein Ausgangsmodul an einer Box, die mehr Kanäle braucht.
+    parts:
+      socket: >-
+        Eine <strong>weibliche</strong> M12-Einbaubuchse, A-codiert, 5-polig (IP67; ihre Kontakte
+        liegen versenkt, weil Pin 1 Spannung führt), mit Schutzkappe, und ein fertiges
+        M12-Sensor-Verlängerungskabel, A-codiert, 5-polig, Stecker auf Buchse, bis 2&nbsp;m zum Modul.
+      buffer: >-
+        Ein <strong>Hot-Swap-Puffer TCA4307</strong> auf einem Breakout: Er verbindet den Anschluss
+        nur dann mit dem Bus der Box, wenn beide ruhen, und trennt ihn, wenn ein kurzgeschlossenes
+        oder nasses Kabel eine Leitung auf Low hält, damit Tastenfeld, NFC-Leser, Akkuanzeige und
+        Display weiterlaufen.
+      tvs: >-
+        Ein <strong>TVS-Array mit geringer Kapazität</strong> (Klasse USBLC6-2SC6, auf einem Adapter)
+        und zwei 100-Ω-Widerstände, gegen statische Entladung von einer Hand oder einem Kabel an der
+        Buchse.
+      fuse: >-
+        Eine <strong>rückstellbare Sicherung mit 50&nbsp;mA</strong> gegen einen Kurzschluss zwischen
+        Pin 1 und 3, und eine kleine <strong>Schottky-Diode</strong> (Klasse BAT85), damit nichts am
+        Kabel die 3,3&nbsp;V der Box rückwärts speist: Das Modul bekommt etwa 3,0&nbsp;V.
+      pullups: >-
+        Zwei Pull-up-Widerstände mit 2,2&nbsp;kΩ auf der Seite des Anschlusses (Module haben keine),
+        eine kleine Lochrasterplatine und Kabel zu den Schienen 3V3, GND, SDA und SCL der
+        Verteilerplatine.
+    pins_title: Die Pins des Anschlusses
+    pins_intro: >-
+      Die M12-Belegung, mit den üblichen Aderfarben des Kabels (prüf sie mit dem Multimeter). SDA und
+      SCL sind der I2C-Bus der Box, hinter dem Puffer.
+    pin_m12: M12-Pin
+    pin:
+      p1: >-
+        Braun: 3,3&nbsp;V (etwa 3,0&nbsp;V nach der Diode), höchstens 25&nbsp;mA, nur für die Logik
+        eines Moduls
+      p2: "Weiß: SDA, 100&nbsp;kHz"
+      p3: "Blau: Masse"
+      p4: "Schwarz: SCL"
+      p5: >-
+        Grau: an beiden Enden <strong>unbeschaltet</strong>, nie eine Versorgung oder ein Signal
+    addresses: >-
+      Module antworten auf den Adressen 0x58–0x5F, weit weg von jedem Teil der Box: Eingangsmodule ab
+      0x58 (das Ziel), Ausgangsmodule ab 0x5C. Eine Box nimmt höchstens vier, aber der Anschluss hat
+      eine Buchse und noch ist kein Verteiler entworfen, also baut die Anleitung ein Modul pro Box.
+    steps:
+      socket: >-
+        Bohr das Loch der Buchse an der Seite oder am Boden des Gehäuses, weg von den Antennen und der
+        Buchse des einfachen Ausgangs, wo ein Kabel vom Boden ohne scharfen Knick hereinkommt, und
+        nicht zu den Schießenden hin. Beschrifte sie mit „EXPANSION 3,3&nbsp;V“.
+      board: >-
+        Leg die Anschlussplatine auf einer Lochrasterplatine von etwa 3&nbsp;×&nbsp;4&nbsp;cm aus: die
+        Seite der Box an einem Rand, die der Buchse am anderen, der Puffer dazwischen und das TVS
+        neben der Stiftleiste der Buchse.
+      breakout: >-
+        Miss zuerst die eigenen Pull-up-Widerstände des Breakouts: Mit ihnen muss der Bus der Box
+        immer noch zwischen 1 und 3,9&nbsp;kΩ nach 3V3 messen, und die Seite des Anschlusses insgesamt
+        etwa 2,2&nbsp;kΩ.
+      wiring: >-
+        Verdrahte die Versorgung (3V3 der Verteilerplatine, die Diode, die Sicherung, die 3,3&nbsp;V
+        des Anschlusses), die Signale über den Puffer, die 100-Ω-Widerstände und das TVS, kurze
+        Masseleitungen, und die Litzen der Buchse in den Farben des Kabels, die von Pin 5 kurz
+        abgeschnitten und isoliert.
+      check: >-
+        Prüf mit dem Multimeter, ohne Akku und ohne USB: kein Kurzschluss zwischen Pin 1 und 3, Pin 5
+        offen, die Diode richtig herum, etwa 100&nbsp;Ω und 2,2&nbsp;kΩ, wo die Anleitung es sagt.
+      power: >-
+        Erstes Einschalten, nichts eingesteckt: etwa 3,0&nbsp;V an Pin 1, und Tastenfeld, NFC-Leser
+        und Akkuanzeige funktionieren weiter, auch mit dem 2-m-Kabel eingesteckt.
+      bench: >-
+        Die Tests, die du jetzt auf dem Labortisch machen kannst: die Anstiegszeit am fernen Ende des
+        Kabels (unter 1&nbsp;µs, mit einem Oszilloskop), ein kurzgeschlossenes SDA, während das
+        Tastenfeld weiterläuft, ein Kurzschluss zwischen Pin 1 und 3 ohne Neustart, und statische
+        Entladung an der Buchse. Bitte melde deine Messwerte in einem Issue.
+    rules_title: Regeln für den Anschluss
+    rules:
+      volts: >-
+        <strong>Nur 3,3&nbsp;V, an jedem Pin, immer</strong>: Weder 5&nbsp;V noch Akkuspannung
+        erreichen je den Anschluss, und Pin 5 bleibt unbeschaltet.
+      loads: >-
+        <strong>Versorg nie eine Last über den Anschluss</strong>: Seine 25&nbsp;mA sind für Prozessor
+        und Sensor eines Moduls. Schon eine einzige WS2812-LED zieht bis zu 60&nbsp;mA.
+      relays: >-
+        <strong>Steck nie eine nackte PCF8574- oder MCP23017-Relaisplatine an</strong>, oder irgendeine
+        I2C-Platine ohne eigenen Prozessor: Ihre Relais blieben an, wenn die Box abstürzt, und sie
+        antwortet dort, wo die Box ihr Tastenfeld sucht.
+      cap: >-
+        <strong>Schließ die Buchse mit der Kappe</strong>, wenn nichts eingesteckt ist, und leg das
+        Kabel auf den Boden, nie in die Schusslinie. Nichts auf beiden Seiten des Anschlusses berührt
+        je Netzspannung.
+    photo: die fertige Anschlussplatine, beide Seiten, und die Buchse an einer Box.
+    coming:
+      driver: >-
+        <strong>Die Box liest den Anschluss</strong>: Der Anschlusstreiber wird gerade geschrieben, und
+        das Spiel der Box ruft ihn ab Inkrement 8 auf. Mit ihm kommen die Log-Zeile der Box für ein
+        Modul, die Modulliste in ihrer Konsole und der Schritt des Anschlusses in der
+        Inbetriebnahme-Liste.
+      tests: >-
+        <strong>Die Tests, die ein Modul brauchen</strong>: 100-mal Ein- und Ausstecken während eines
+        Spiels, Störungen neben einer schaltenden Sirene und einem Blitzlicht, und der Strom des
+        Moduls.
+    open:
+      splitter: >-
+        <strong>Ein Verteiler</strong> für mehr als ein Modul an einer Box.
+      pcb: >-
+        <strong>Eine Träger-Platine</strong> mit der Anschlussplatine darauf (bis dahin
+        Lochraster), und ein Schaltplan des Anschlusses, der nach dem ersten Bau folgen kann.
+    full: >-
+      Die vollständige Anleitung, mit allen Teilen, dem Aufbau, den Adressen, den Prüfungen und der
+      Fehlersuche (auf Englisch und Portugiesisch):
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/expansion-port/BUILD.md">Bauanleitung für den Erweiterungsanschluss</a>.
+      Die Entscheidungen dahinter stehen im RFC-Entwurf
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/rfcs/0000-expansion-port.md">The expansion port</a> (auf Englisch).
   target:
     title: Ziel-Addon
     status: >-
-      Noch nicht baubar: Die Seite der Box ist entschieden, das Addon selbst noch nicht. Schließ nach
-      dieser Seite keine Zielplatte an eine Box an.
+      <strong>Baubar, aber noch nicht benutzbar.</strong> Die Hardware ist entschieden, ihre Firmware
+      noch nicht geschrieben. Platte, Sensorschaltung, Gehäuse und Kabel des Moduls und den Anschluss
+      der Box kannst du jetzt bauen und mit dem Multimeter prüfen; das Modul lässt sich nicht flashen,
+      und keine Box liest es, bis Inkrement 8 des Plans für den Erweiterungsanschluss. Noch wurde kein
+      Ziel nach der Anleitung gebaut.
     what: >-
-      Eine Platte, auf die geschossen wird, mit einem Sensor, der jeden Treffer spürt. Sie wird an
-      eine Box gesteckt und macht daraus ein punktendes Ziel für
-      <a href="{{ page.to.modes }}#target-windows">Zielfenster</a>, dessen Regeln geschrieben und im
-      Simulator getestet sind; das Fenster zeigt der Leuchtring der Box selbst.
-    decided_title: Was entschieden ist
-    decided:
-      parts: >-
-        Eine Platte aus Stahl oder Polycarbonat, ein Piezo-Sensor und ein eigener kleiner Prozessor
-        (Klasse RP2040 oder ATtiny), der Treffer erkennt. Etwa
-        <span class="nowrap">20–30&nbsp;€</span> an Teilen (die Schätzung des Projekts).
+      Eine Platte, auf die geschossen wird, mit einem Piezo-Sensor, der jeden Treffer spürt, und
+      einem eigenen kleinen RP2040-Board (dem <strong>Zielmodul</strong>). Es wird in den
+      <a href="#expansion-port">Erweiterungsanschluss</a> einer Box gesteckt und macht die Box zu
+      einem punktenden Ziel für <a href="{{ page.to.modes }}#target-windows">Zielfenster</a>, dessen
+      Regeln gebaut und im Simulator getestet sind; das Fenster zeigt der Leuchtring der Box selbst,
+      also braucht das Modul kein Licht. Jede Box mit Anschluss nimmt eins: eine Field Box, ein
+      Satellit oder ein I/O-Pod.
+    how: >-
+      Der Piezo, auf die Rückseite der Platte geklebt, macht aus einem Treffer eine kurze Spitze; das
+      Modul findet ihren Höchstwert, die Stärke von 0 bis 255, und hält bis zu 16 Treffer mit ihrem
+      Alter bereit, bis die Box sie abholt. Die Box liest es alle 20&nbsp;ms über den Anschluss, etwa
+      5&nbsp;% des Busses, so erreicht ein Treffer das Spiel nach etwa 21&nbsp;ms, und keiner zählt
+      doppelt. Die Skripte der Modi erhalten jeden Treffer mit seiner Stärke und können das Ziel scharf
+      machen und entschärfen. Etwa <span class="nowrap">10–15&nbsp;€</span> für das Modul, dazu
+      Platte, Kabel und der Anschluss der Box (die Schätzungen des Projekts).
+    parts:
+      board: >-
+        Ein <strong>RP2040-Board</strong>, Klasse RP2040-Zero oder ein Raspberry Pi Pico, mit
+        reduziertem Takt, damit es innerhalb der 25&nbsp;mA des Anschlusses bleibt.
+      piezo: >-
+        Eine <strong>Piezo-Scheibe</strong> mit 27–35&nbsp;mm (und Ersatz: sie brechen), ein
+        Gummipolster von 2–3&nbsp;mm und Kontaktkleber.
+      front_end: >-
+        Die Sensorschaltung: ein 1-MΩ-Entladewiderstand, zwei Spannungsteiler-Widerstände in Fassungen
+        (ihre Werte werden an echten Platten gewählt) und zwei Schottky-Dioden der Klasse BAT85, die
+        den Eingang des Prozessors zwischen Masse und 3,3&nbsp;V halten.
+      mosfet: >-
+        Ein <strong>P-Kanal-MOSFET</strong> (Klasse AO3401 oder SI2301) und ein 10-kΩ-Widerstand: der
+        Schutz des Moduls gegen ein selbst gebautes, verpolt verdrahtetes Kabel.
+      address: >-
+        Zwei Lötbrücken (oder ein 2-poliger DIP-Schalter) für die Adresse: 0x58 mit beiden offen,
+        0x59–0x5B für ein zweites Ziel an derselben Box.
+      connector: >-
+        Ein <strong>männlicher</strong> M12-Einbaustecker, A-codiert, 5-polig, das
+        M12-Verlängerungskabel (höchstens 2&nbsp;m), ein kleines IP65-Gehäuse, Lochraster und Kabel.
+      plate: Eine Stahlplatte oder eine Polycarbonat-Platte, und ein Ständer.
+    steps:
       port: >-
-        Es wird an einen wasserdichten 5-poligen M12-Stecker an der Box angeschlossen, der nur
-        3,3&nbsp;V führt: die 3,3&nbsp;V des Boards, Masse und die beiden I2C-Leitungen; keine
-        5&nbsp;V, und der fünfte Pin bleibt frei. Kabel bis 2&nbsp;m. Sein Prozessor sagt der Box, was
-        es ist, also braucht die Box keinen neuen Treiber pro Addon.
-      power: >-
-        Es darf der Box höchstens 25&nbsp;mA entnehmen, über eine rückstellbare Sicherung: genug für
-        Prozessor und Sensor, nicht für Licht. Zielfenster lässt den LED-Ring der Box selbst
-        leuchten; ein Addon mit eigenem Licht braucht einen eigenen Akku.
-      polling: >-
-        Keine Interrupt-Leitung: Die Box liest das Addon alle 20&nbsp;ms über I2C, etwa 3&nbsp;% des
-        Busses, so erreicht ein Treffer das Spiel nach höchstens etwa 21&nbsp;ms. Kein Pin der Box
-        ändert sich. Die Firmware der Box kann das schon, getestet, und wartet auf das Addon.
-      capability: >-
-        Die Skripte der Modi erhalten jeden Treffer mit seiner Stärke (0 bis 255) und können das Ziel
-        scharf machen und entschärfen. Dasselbe ist für den I/O-Pod eines Handys festgelegt.
+        Bau und prüf zuerst den <a href="#expansion-port">Erweiterungsanschluss</a> der Box.
+      supply: >-
+        Die Versorgung: M12-Pin 1 über den MOSFET an den 3V3-Pin des RP2040-Boards, nie an seinen 5-V-
+        oder USB-Pin; Pin 3 an Masse; Pin 5 kurz abgeschnitten und isoliert.
+      piezo: >-
+        Kleb den Piezo mit seinem Polster in die Mitte der Plattenrückseite; den Entladewiderstand über
+        seine Litzen, dann Spannungsteiler und Dioden auf dem Weg zu einem der Analog-Pins des RP2040
+        (GPIO&nbsp;26–28).
+      bus: >-
+        SDA (Pin 2) und SCL (Pin 4) an die I2C-Pins des RP2040, ohne Pull-up-Widerstände im Modul;
+        lass beide Adress-Lötbrücken offen für 0x58.
+      enclosure: >-
+        Das Gehäuse hinter der Platte, am Ständer befestigt statt an der Platte, sein Stecker von den
+        Schießenden weg, und das Kabel nach unten und am Boden entlang zur Box.
+      check: >-
+        Prüf mit dem Multimeter, das Modul stromlos: kein Kurzschluss zwischen Pin 1 und 3, Pin 5
+        offen, kein Pull-up an Pin 2 und 4, die Dioden messen sich als Dioden, etwa 1&nbsp;MΩ über dem
+        Piezo.
+    coming:
+      firmware: >-
+        <strong>Die Firmware des Moduls</strong> und ihre UF2-Datei aus der CI und den Releases, zum
+        Flashen, indem man die Datei auf das Laufwerk zieht, das das Board über USB zeigt.
+      pins: >-
+        <strong>Die Pin-Tabelle des Moduls</strong>: welche RP2040-Pins I2C, den Eingang des Piezos,
+        die Adress-Lötbrücken und seine LED tragen, und wie das gewählte Board 3,3&nbsp;V an seinem
+        3V3-Pin aufnimmt. Bis dahin lässt die Anleitung diese Leitungen für später.
+      box: >-
+        <strong>Die Box liest das Modul</strong>: ihr Anschlusstreiber vom Spiel aufgerufen, jeder
+        Treffer an das Skript des Modus weitergegeben, und das Modul im Log der Box und in der
+        Spielleitungskonsole.
+      tuning: >-
+        <strong>Messungen beim ersten Bau</strong>: der Strom des Moduls (unter 25&nbsp;mA), und der
+        Sensor, abgestimmt auf echten Platten aus Stahl und Polycarbonat, was die Schwelle und die
+        Spannungsteiler-Widerstände festlegt.
       mode: >-
-        Zielfenster lässt das Ziel ein paar Sekunden in der Farbe eines zufälligen Teams leuchten;
-        ein Treffer, der in diesem Fenster stark genug ist, punktet für dieses Team.
-      next: >-
-        Danach kommen die eigene Firmware des Addons, die Box, die ihren Anschluss damit ausliest, und
-        der Sensor, abgestimmt auf echten Platten aus Stahl und Polycarbonat; dann wird Zielfenster
-        ein Modus, den eine Box anbietet.
+        <strong>Zielfenster als Voreinstellung der Field Box</strong>, sobald das Ziel auf dem
+        Labortisch getestet ist, und später der I/O-Pod, der einem Handy ein Ziel leiht.
     open:
-      mcu: Der Prozessor (RP2040 oder ATtiny, innerhalb der 25&nbsp;mA) und seine Firmware.
-      protocol: >-
-        Die I2C-Adresse des Addons und wie es sagt, was es ist; wie ein Treffer gemeldet wird, gibt es
-        als Entwurf, der mit dem ersten Addon endgültig wird.
-      checks: >-
-        Die Prüfungen beim ersten Bau: die Pull-up-Widerstände des Busses mit 2&nbsp;m Kabel, die
-        Sicherung und der Schutz des Steckers gegen statische Entladung und Wasser.
-      sensor: Die Sensorschaltung und ihre Befestigung, und die Platte, ihr Ständer und ihr Winkel.
-    safety_title: Sicherheit, sobald es etwas zu bauen gibt
+      plate: >-
+        <strong>Die Platte</strong>: Materialsorte, Größe, Dicke, Ständer und Winkel, aus den ersten
+        Aufbauten.
+      pcb: >-
+        <strong>Eine Träger-Platine</strong> für das Modul; bis dahin Lochraster.
+    safety_title: Sicherheit, sobald jemand darauf schießt
     safety:
+      bench: >-
+        <strong>Auf dem Labortisch</strong>: Steck nie das USB-Kabel des Moduls und das Kabel des
+        Anschlusses gleichzeitig ein, und berühr die Masse der Box, bevor du ein Modul einsteckst.
       eyes: >-
         <strong>Augen- und Gesichtsschutz</strong> für alle in Reichweite, solange jemand darauf
         schießt, auch auf der Werkbank.
@@ -1733,9 +2012,9 @@ build:
         <strong>Die Energiegrenzen des Felds</strong> gelten beim Schießen auf Ziele wie auf Menschen.
     photo: das fertige Ziel, Platte und Sensor, und der Anschluss an einer Box.
     full: >-
-      Was entschieden ist, mit den Dokumenten hinter jeder Entscheidung (auf Englisch und Portugiesisch):
-      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/target-addon/BUILD.md">Anleitung
-      zum Ziel-Addon</a>.
+      Alle Schritte, Prüfungen und Entscheidungen, und die Liste dessen, was auf Inkrement 8 wartet
+      (auf Englisch und Portugiesisch):
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/target-addon/BUILD.md">Bauanleitung für das Ziel-Addon</a>.
 
 hub:
   title: Community-Hub
