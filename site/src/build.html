@@ -3,14 +3,23 @@ SPDX-FileCopyrightText: 2026 The Atalaia contributors
 SPDX-License-Identifier: CC-BY-SA-4.0
 
 The build guides page (phase 5 plan phase 12): the Satellite, the I/O pod, the
-expansion port and the target addon, shortened from hardware/<node>/BUILD.md, which
+expansion port, the target addon and the I2C output module, shortened from hardware/<node>/BUILD.md, which
 stay the full guides (in English and Portuguese), the simple output (in the Field
 Box's section, referred to by the Satellite and the pod), and a pointer to the
 Field Box's build manual. Built into site/montagem/, site/en/build-guides/,
-site/de/bauen/ and site/zh-tw/build-guides/. What waits for increment 8 of the
-draft RFC "The expansion port" (the module's firmware, its pin table, the UF2
-files, the box reading the port) is written as coming, never invented
-(decisions EXPI10-9, SITEB-1 to SITEB-9).
+site/de/bauen/ and site/zh-tw/build-guides/. Increment 8 of the draft RFC
+"The expansion port" built the target module's firmware, its pin table, its UF2
+files and the box reading the port; what still needs real hardware (the
+module's current and 3V3, the sensor's tuning and divider, the port's tests with
+a module, Target Windows as a preset) is listed "After the bench"
+(build.after_bench), never invented (decisions EXPI10-9, SITEB-1 to SITEB-9,
+SITE8-1 to SITE8-9). The target module's pin table holds the RP2040's GPIO
+numbers of firmware/target-module/src/main.c (EXPI8-9); they have no Kconfig
+symbol, so check_wiring.py does not check them: change them there, here and in
+hardware/target-addon/BUILD.md and BUILD.pt.md together. The I2C output
+module's section (increment 11, SITE8-10 to SITE8-12) holds the pins of
+firmware/output-module/src/board.h in the same way; tools/check_wiring.py checks
+them in hardware/output-module/BUILD.md and BUILD.pt.md, not here.
 
 The Field Box's wiring drawings (the two SVGs of hardware/field-box/wiring/) are copied into site/img/wiring/
 by tools/build_site.py (WIRING there), with --check; their labels stay in English (see site/README.md).
@@ -50,6 +59,7 @@ and 2026-11-01, #field-box-first-build). See site/README.md.
           <a href="#radio-modem">{{ build.modem.title }}</a>
           <a href="#expansion-port">{{ build.port.title }}</a>
           <a href="#target-addon">{{ build.target.title }}</a>
+          <a href="#output-module">{{ build.out_module.title }}</a>
         </nav>
 
         <section id="safety" aria-labelledby="safety-title">
@@ -341,10 +351,12 @@ and 2026-11-01, #field-box-first-build). See site/README.md.
           </ul>
           <figure class="photo"><figcaption>{{ build.photo }} {{ build.port.photo }}</figcaption></figure>
 
-          <h3>{{ build.coming }}</h3>
+          <h3>{{ build.port.box_title }}</h3>
+          <p>{{ build.port.box }}</p>
+
+          <h3>{{ build.after_bench }}</h3>
           <ul class="ways">
-            <li>{{ build.port.coming.driver }}</li>
-            <li>{{ build.port.coming.tests }}</li>
+            <li>{{ build.port.after.tests }}</li>
           </ul>
           <h3>{{ build.open }}</h3>
           <ul class="ways">
@@ -367,9 +379,29 @@ and 2026-11-01, #field-box-first-build). See site/README.md.
             <li>{{ build.target.parts.front_end }}</li>
             <li>{{ build.target.parts.mosfet }}</li>
             <li>{{ build.target.parts.address }}</li>
+            <li>{{ build.target.parts.led }}</li>
             <li>{{ build.target.parts.connector }}</li>
             <li>{{ build.target.parts.plate }}</li>
           </ul>
+
+          <h3>{{ build.target.pins_title }}</h3>
+          <p>{{ build.target.pins_intro }}</p>
+          <div class="table">
+            <table class="pins">
+              <thead><tr><th scope="col">{{ build.target.pin_rp2040 }}</th><th scope="col">{{ build.pin_what }}</th></tr></thead>
+              <tbody>
+                <tr><td>3V3</td><td>{{ build.target.pin.v3 }}</td></tr>
+                <tr><td>GND</td><td>{{ build.target.pin.gnd }}</td></tr>
+                <tr><td>GP4</td><td>{{ build.target.pin.sda }}</td></tr>
+                <tr><td>GP5</td><td>{{ build.target.pin.scl }}</td></tr>
+                <tr><td>GP26</td><td>{{ build.target.pin.adc0 }}</td></tr>
+                <tr><td>GP27</td><td>{{ build.target.pin.adc1 }}</td></tr>
+                <tr><td>GP2</td><td>{{ build.target.pin.a0 }}</td></tr>
+                <tr><td>GP3</td><td>{{ build.target.pin.a1 }}</td></tr>
+                <tr><td>GP14</td><td>{{ build.target.pin.led }}</td></tr>
+              </tbody>
+            </table>
+          </div>
 
           <h3>{{ build.steps }}</h3>
           <ol class="ways">
@@ -381,13 +413,22 @@ and 2026-11-01, #field-box-first-build). See site/README.md.
             <li>{{ build.target.steps.check }}</li>
           </ol>
 
-          <h3>{{ build.coming }}</h3>
+          <h3>{{ build.target.flash_title }}</h3>
+          <p>{{ build.target.flash_intro }}</p>
+          <ol class="ways">
+            <li>{{ build.target.flash.download }}</li>
+            <li>{{ build.target.flash.boot }}</li>
+            <li>{{ build.target.flash.found }}</li>
+            <li>{{ build.target.flash.armed }}</li>
+          </ol>
+
+          <h3>{{ build.after_bench }}</h3>
           <ul class="ways">
-            <li>{{ build.target.coming.firmware }}</li>
-            <li>{{ build.target.coming.pins }}</li>
-            <li>{{ build.target.coming.box }}</li>
-            <li>{{ build.target.coming.tuning }}</li>
-            <li>{{ build.target.coming.mode }}</li>
+            <li>{{ build.target.after.power }}</li>
+            <li>{{ build.target.after.tuning }}</li>
+            <li>{{ build.target.after.divider }}</li>
+            <li>{{ build.target.after.port }}</li>
+            <li>{{ build.target.after.preset }}</li>
           </ul>
           <h3>{{ build.open }}</h3>
           <ul class="ways">
@@ -405,6 +446,73 @@ and 2026-11-01, #field-box-first-build). See site/README.md.
           </ul>
           <figure class="photo"><figcaption>{{ build.photo }} {{ build.target.photo }}</figcaption></figure>
           <p class="more">{{ build.target.full }}</p>
+        </section>
+
+        <section id="output-module" aria-labelledby="output-module-title">
+          <h2 id="output-module-title">{{ build.out_module.title }}</h2>
+          <p class="warn">{{ build.out_module.status }}</p>
+          <p>{{ build.out_module.what }}</p>
+          <p>{{ build.out_module.how }}</p>
+          <p>{{ build.out_module.simple_first }}</p>
+
+          <h3>{{ build.out_module.rules_title }}</h3>
+          <ul class="ways">
+            <li>{{ build.out_module.rules.mains }}</li>
+            <li>{{ build.out_module.rules.smoke }}</li>
+            <li>{{ build.out_module.rules.pyro }}</li>
+            <li>{{ build.out_module.rules.bare }}</li>
+          </ul>
+
+          <h3>{{ build.parts }}</h3>
+          <ul class="ways">
+            <li>{{ build.out_module.parts.board }}</li>
+            <li>{{ build.out_module.parts.isolator }}</li>
+            <li>{{ build.out_module.parts.mosfet }}</li>
+            <li>{{ build.out_module.parts.relays }}</li>
+            <li>{{ build.out_module.parts.supply }}</li>
+            <li>{{ build.out_module.parts.loads }}</li>
+            <li>{{ build.out_module.parts.connector }}</li>
+          </ul>
+
+          <h3>{{ build.out_module.pins_title }}</h3>
+          <p>{{ build.out_module.pins_intro }}</p>
+          <div class="table">
+            <table class="pins">
+              <thead><tr><th scope="col">{{ build.target.pin_rp2040 }}</th><th scope="col">{{ build.pin_what }}</th></tr></thead>
+              <tbody>
+                <tr><td>GP4</td><td>{{ build.out_module.pin.sda }}</td></tr>
+                <tr><td>GP5</td><td>{{ build.out_module.pin.scl }}</td></tr>
+                <tr><td>GP6</td><td>{{ build.out_module.pin.ch1 }}</td></tr>
+                <tr><td>GP7</td><td>{{ build.out_module.pin.ch2 }}</td></tr>
+                <tr><td>GP8</td><td>{{ build.out_module.pin.ch3 }}</td></tr>
+                <tr><td>GP9</td><td>{{ build.out_module.pin.ch4 }}</td></tr>
+                <tr><td>GP2</td><td>{{ build.out_module.pin.a0 }}</td></tr>
+                <tr><td>GP3</td><td>{{ build.out_module.pin.a1 }}</td></tr>
+                <tr><td>GP14</td><td>{{ build.out_module.pin.led }}</td></tr>
+                <tr><td>GP26</td><td>{{ build.out_module.pin.sense }}</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>{{ build.out_module.pins_more }}</p>
+
+          <h3>{{ build.out_module.flash_title }}</h3>
+          <ol class="ways">
+            <li>{{ build.out_module.flash.download }}</li>
+            <li>{{ build.out_module.flash.boot }}</li>
+            <li>{{ build.out_module.flash.first }}</li>
+            <li>{{ build.out_module.flash.box }}</li>
+          </ol>
+
+          <h3>{{ build.after_bench }}</h3>
+          <ul class="ways">
+            <li>{{ build.out_module.after.lease }}</li>
+            <li>{{ build.out_module.after.isolator }}</li>
+            <li>{{ build.out_module.after.relays }}</li>
+            <li>{{ build.out_module.after.noise }}</li>
+            <li>{{ build.out_module.after.smoke }}</li>
+          </ul>
+          <figure class="photo"><figcaption>{{ build.photo }} {{ build.out_module.photo }}</figcaption></figure>
+          <p class="more">{{ build.out_module.full }}</p>
         </section>
       </div>
     </div>

@@ -414,6 +414,17 @@ A box can carry a **target** on its expansion port: a plate with a sensor that f
 
 Not yet tried on hardware: the target and its firmware are built and tested on a computer only.
 
+### Targets
+
+A box can carry a **target** on its expansion port: a plate with a sensor that feels each hit ([Field Box manual](field-box.md#a-target-on-the-expansion-port)). *Target Windows* is the mode for it (role **target**).
+
+- **Before the game**, plug the target into the box, then let the box join. The **Boxes** tab shows it as a chip under the box: **target 1.0.0: hit**. A box whose role needs a hit sensor and has none makes the start check say so (**A box lacks what its role needs: box-4 (target): hit**); look at the cable before you **Start anyway**.
+- **During the game** each hit reaches the mode: in *Target Windows*, a hit while the box shows a team's colour scores **Points for a hit in the window** for that team, and the **Log** says **A target was hit**. Hits count only while the game runs (not while it is paused). **Weakest hit that counts** (0-255) ignores light taps; the right value depends on the plate, set it at a test game.
+- **If a target goes** (a cable pulled, a broken connector), the **Log** says **box-4 lost a module: 58:target/1.0.0:hit (it stopped answering)** and its chip goes. Plugged in again, it counts at once.
+- A box with two targets names them **hit** and **hit.2**.
+
+Not yet tried on hardware: the target and its firmware are built and tested on a computer only.
+
 ### The Boxes tab
 
 Each box shows its **No.**, **Name** (with a chip for each module or output the box has, for example **siren · not checked**, and for each output fitted but not enabled, **horn · fitted, not enabled by the box's admin**), **Role**, **Owner** (team), **Tier**, **Battery** (with **low** below 20%), **Signal**, **Last heard**, **Firmware** and **Epoch**. A box that has not been heard shows **not heard**. You can change a box's owner team with the drop-down. Some modes add buttons, for example a medic kit's refill.
