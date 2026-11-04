@@ -332,8 +332,8 @@ interrupção. Não precisa de uma (P5J-18, EXP-8):
   desaparece, e o controlador é avisado (`node.module_lost` durante um jogo).
 
 O controlador da porta da caixa (`firmware/esp32/main/expansion.c`, que
-substitui o esqueleto `target_addon.c`) está a ser escrito (incremento 6), com
-testes no anfitrião contra os vetores partilhados do protocolo; é chamado pela
+substitui o esqueleto `target_addon.c`) está escrito (incremento 6, 2026-11-04),
+com testes no anfitrião contra os vetores partilhados do protocolo; é chamado pela
 tarefa de jogo, e os impactos chegam ao script, **depois do incremento 8**.
 
 ## 10. O que espera pelo incremento 8
