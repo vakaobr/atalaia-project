@@ -177,6 +177,10 @@ void main() {
         Uint8List.sublistView(hello.payload, 9, hello.payload.length - 4),
       );
       expect((h.nodeName, h.transports), ('phone-5', RfTransport.lora));
+      // Its capability types: the phone's (button, keypad, display, led,
+      // audio, NFC) and the host pod's parts, which add none (PROPC-1).
+      expect(h.capabilities, [1, 2, 3, 4, 5, 6]);
+      expect(h.capabilities, s.helloCapabilities);
 
       // The controller starts the game over the radio.
       controllerSends(RfType.cmd, const RfCmd(cmd: 0).encode());
