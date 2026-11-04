@@ -327,6 +327,124 @@ void main() {
     },
   );
 
+  // Decision ROB-9: the admin links the same pod again during a game.
+  group('restart, after the tries stopped', () {
+    test('after a wrong passkey: at once, the pairing again once more, then '
+        'linked', () async {
+      final (client, link) = await linked();
+      final bonds = ScriptedBonds([
+        PodPairError.wrongPasskey,
+        null, // the restart's first try: out of reach, no word
+        PodPairError.needsRepair, // then the pod refuses the bond: paired again
+      ]);
+      var repairs = 0;
+      PodClient? replaced;
+      final waits = <int>[];
+      var tries = 0;
+      final r = PodReconnector(
+        client: client,
+        backoff: (attempt) {
+          waits.add(attempt);
+          return const Duration(milliseconds: 10);
+        },
+        identTimeout: quick,
+        bonds: bonds,
+        onRepair: () => repairs++,
+        onReplaced: (old, next) => replaced = next,
+        reopen: (lost) async {
+          tries++;
+          if (tries <= 3) return null;
+          return PodClient(FakePodLink(kind: 'ble'), device: pod);
+        },
+      );
+      addTearDown(r.dispose);
+      await link.drop();
+      await until(() => r.phase == PodLinkPhase.relink);
+      expect((tries, r.relinkMessage), (1, 'pod.wrong_passkey'));
+      waits.clear();
+
+      expect(r.restart(), isTrue);
+      expect(r.phase, PodLinkPhase.reconnecting);
+      expect(r.relinkMessage, isNull);
+      await until(() => r.phase == PodLinkPhase.linked);
+      expect(tries, 4);
+      expect(repairs, 1);
+      // The first try at once, the one after the pairing again at once too.
+      expect(waits, [2]);
+      expect(replaced, same(r.client));
+      expect(r.client.device, same(pod));
+      await r.client.close();
+    });
+
+    test('a second "repair" after the restart stops again, with the new '
+        'reason', () async {
+      final (client, link) = await linked();
+      final bonds = ScriptedBonds([
+        PodPairError.timeout,
+        PodPairError.needsRepair,
+        PodPairError.needsRepair,
+      ]);
+      var repairs = 0;
+      final t = reconnector(
+        client,
+        failures: 99,
+        bonds: bonds,
+        onRepair: () => repairs++,
+      );
+      await link.drop();
+      await until(() => t.r.phase == PodLinkPhase.relink);
+      expect(t.r.relinkMessage, 'pod.pair_timeout');
+      expect(t.r.restart(), isTrue);
+      await until(() => t.r.phase == PodLinkPhase.relink);
+      expect(t.r.relinkMessage, 'pod.repair_manual');
+      // One pairing again by itself, not two.
+      expect(repairs, 1);
+      expect(t.tries, [1, 2, 3]);
+    });
+
+    test(
+      'after another pod answered: the same pod again, still checked',
+      () async {
+        final (client, link) = await linked();
+        var tries = 0;
+        final r = PodReconnector(
+          client: client,
+          backoff: (_) => const Duration(milliseconds: 10),
+          identTimeout: quick,
+          reopen: (lost) async {
+            tries++;
+            // The other pod first and after the first restart; then the right
+            // one.
+            return tries <= 2
+                ? PodClient(FakePodLink(kind: 'ble', ident: otherPodIdent))
+                : PodClient(FakePodLink(kind: 'ble'), device: pod);
+          },
+        );
+        addTearDown(r.dispose);
+        await link.drop();
+        await until(() => r.phase == PodLinkPhase.refused);
+        expect(r.restart(), isTrue);
+        await until(() => r.phase == PodLinkPhase.refused && tries == 2);
+        expect(r.restart(), isTrue);
+        await until(() => r.phase == PodLinkPhase.linked);
+        expect(tries, 3);
+        await r.client.close();
+      },
+    );
+
+    test('nothing in the other phases', () async {
+      final (client, link) = await linked();
+      final t = reconnector(client, failures: 99);
+      expect(t.r.restart(), isFalse); // linked
+      await link.drop();
+      await until(() => t.r.phase == PodLinkPhase.reconnecting);
+      expect(t.r.restart(), isFalse);
+      await t.r.unlink();
+      expect(t.r.restart(), isFalse);
+      expect(t.r.phase, PodLinkPhase.unlinked);
+    });
+  });
+
   test('the messages exist in every language', () {
     for (final lang in AppLanguage.values) {
       for (final key in [
@@ -335,6 +453,9 @@ void main() {
         'pod.wrong_passkey',
         'pod.pair_timeout',
         'pod.repair_manual',
+        'prop.pod_relink',
+        'prop.pod_refused',
+        'prop.pod_expected',
       ]) {
         expect(lang.table[key], isNotEmpty, reason: '$key in ${lang.code}');
       }

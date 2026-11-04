@@ -156,7 +156,12 @@ const Map<String, String> ptStrings = {
       'Alguém abriu o módulo de E/S durante o jogo. Avisa a organização.',
   'prop.pod_reconnecting':
       'A ligação ao módulo de E/S perdeu-se. A religar (tentativa {n})…',
-  'prop.pod_refused': 'Respondeu outro módulo, por isso o módulo de E/S deixou de estar ligado. Liga um módulo outra vez.',
+  'prop.pod_refused': 'Respondeu outro módulo, por isso o módulo de E/S deixou de estar ligado. Liga o módulo outra vez no menu da Organização, ou desliga-o.',
+  'prop.pod_expected':
+      'Este jogo espera o módulo {name}: firmware {fw}, {n} capacidades.',
+  'prop.pod_expected_one':
+      'Este jogo espera o módulo {name}: firmware {fw}, {n} capacidade.',
+  'prop.pod_relink': 'Ligar o módulo outra vez',
   'prop.pod_unlink': 'Desligar o módulo de E/S',
   'prop.hold': 'Manter premido\n{team}',
   'prop.nfc_hint': 'Encosta a etiqueta às costas do telemóvel.',

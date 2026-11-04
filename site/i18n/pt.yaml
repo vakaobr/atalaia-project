@@ -942,7 +942,7 @@ roadmap:
         - "O firmware do módulo empresta ao telemóvel os botões das equipas, o teclado, as luzes, a
           sirene, o leitor NFC, o sensor de abertura e o rádio LoRa de uma placa Heltec, por USB ou
           Bluetooth."
-        - "A app volta a ligar-se sozinha a um módulo de E/S perdido. Não experimentado com um módulo a sério."
+        - "A app volta a ligar-se sozinha a um módulo de E/S perdido; quando não consegue, ou responde outro módulo, a organização volta a ligar o mesmo módulo no menu do jogo, sem recomeçar o jogo. Não experimentado com um módulo a sério."
         - "Os props Android vão buscar pacotes de modo assinados ao seu controlador, como as caixas. Em software."
         - "A consola de GM pode enviar as definições de um módulo de E/S pelo rádio: as cores dos quatro botões, o brilho do anel de LEDs, o volume e se o interruptor da caixa avisa. O módulo autentica o comando como qualquer outro, guarda as definições na sua flash e responde; o controlador volta a enviá-lo até ouvir a resposta. Antes, eram definidas quando o firmware era compilado. Em software e contra o código do módulo num computador, não experimentado com um módulo a sério."
         - "Emparelhar um telemóvel com um módulo de E/S por Bluetooth pede um código de 6 dígitos que o módulo mostra no seu ecrã pequeno, para que ninguém se meta entre os dois; um telemóvel emparelhado à maneira antiga é chamado uma vez a emparelhar de novo, e o botão PRG do módulo esquece todos os telemóveis. Em software e em testes num computador, não experimentado com um módulo a sério."

@@ -526,8 +526,16 @@ with the board steps of BRING_UP.md that apply first (revision, antenna,
    pod that needs pairing again is paired once more, and the game screen says
    so (**This pod needs pairing again**, type the new code). If that does not
    work, a red banner says **The app could not link the pod again by itself**
-   and why. The game goes on without the pod; link it again from the prop's
-   home screen (*Prop > I/O pod*) once you have left the game.
+   and why; a red banner also says when a different pod answered, and names
+   the pod the game expects. The game goes on without the pod. To link the
+   same pod again without leaving the game, tap **Game master**, type the
+   admin PIN and tap **Link the pod again**: the app tries the pod again at
+   once, Android asks for the code on the pod's screen if it has to pair,
+   and a pod whose bond is refused is paired once more by itself. Once it is
+   linked, the banner goes and the game goes on with the pod (its buttons,
+   outputs and radio), not from the start. If it fails again, the red banner
+   comes back with the new reason. The pod can also be linked from the
+   prop's home screen (*Prop > I/O pod*) once you have left the game.
 
 ## 11. Troubleshooting
 

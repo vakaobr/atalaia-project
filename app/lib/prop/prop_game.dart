@@ -257,6 +257,15 @@ class _PropGameScreenState extends State<PropGameScreen> {
                 title: Text(s.t('prop.end')),
                 onTap: () => Navigator.pop(c, 'end'),
               ),
+            // The tries stopped or another pod answered: the same pod is
+            // linked again from here, without leaving the game (ROB-9).
+            if (session.canRelinkPod)
+              ListTile(
+                key: const Key('admin-relink-pod'),
+                leading: const Icon(Icons.link),
+                title: Text(s.t('prop.pod_relink')),
+                onTap: () => Navigator.pop(c, 'relink_pod'),
+              ),
             if (session.podPhase != null &&
                 session.podPhase != PodLinkPhase.unlinked)
               ListTile(
@@ -294,6 +303,8 @@ class _PropGameScreenState extends State<PropGameScreen> {
         )) {
           await session.end();
         }
+      case 'relink_pod':
+        session.relinkPod();
       case 'unlink_pod':
         await session.unlinkPod();
       case 'log':
@@ -320,6 +331,17 @@ class _PropGameScreenState extends State<PropGameScreen> {
     _left = true;
     await session.close();
     if (mounted) Navigator.pop(context);
+  }
+
+  /// Another pod answered: which one this game expects, so the person
+  /// brings that one (decision ROB-9).
+  String _podRefused(Strings s) {
+    final refused = s.t('prop.pod_refused');
+    final d = session.podDevice;
+    final ident = session.podExpected;
+    if (d == null || ident == null) return refused;
+    final name = d.kind == 'ble' ? '${d.name} (${d.id})' : d.name;
+    return '$refused ${s.t('prop.pod_expected', {'name': name, 'fw': ident.fwVersion, 'n': ident.capabilities.length})}';
   }
 
   Future<void> _showLog() => showDialog<void>(
@@ -471,7 +493,7 @@ class _PropGameScreenState extends State<PropGameScreen> {
             color: AtalaiaColors.danger,
             padding: const EdgeInsets.all(8),
             child: Text(
-              s.t('prop.pod_refused'),
+              _podRefused(s),
               key: const Key('prop-pod-refused'),
               style: const TextStyle(color: Colors.white),
             ),

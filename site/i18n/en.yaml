@@ -917,7 +917,7 @@ roadmap:
           radio through an I/O pod."
         - "The pod's firmware lends the phone a Heltec board's team buttons, keypad, lights, siren,
           NFC reader, enclosure switch and LoRa radio, over USB or Bluetooth."
-        - "The app reconnects to a lost I/O pod by itself. Not tried with a real pod."
+        - "The app reconnects to a lost I/O pod by itself; when it cannot, or a different pod answers, the prop's admin links the same pod again from the game's menu, without restarting the game. Not tried with a real pod."
         - "Android props fetch signed mode packages from their controller, as boxes do. In software."
         - "The GM console can push an I/O pod's settings over the radio: the four buttons' colours, the LED ring's brightness, the volume and whether the enclosure switch reports. The pod authenticates the command like any other, keeps the settings in its flash and answers; the controller sends it again until it hears back. Before, they were set when the firmware was built. In software and against the pod's code on a computer, not tried with a real pod."
         - "Pairing a phone with an I/O pod over Bluetooth asks for a 6-digit code that the pod shows on its small screen, so nobody can sit between the two; a phone paired the old way is asked once to pair again, and the pod's PRG button forgets every phone. In software and in tests on a computer, not tried with a real pod."

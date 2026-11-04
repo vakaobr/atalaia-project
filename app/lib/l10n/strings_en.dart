@@ -148,7 +148,12 @@ const Map<String, String> enStrings = {
   'prop.pod_opened':
       'Someone opened the I/O pod during the game. Tell the game master.',
   'prop.pod_reconnecting': 'The I/O pod link was lost. Reconnecting (try {n})…',
-  'prop.pod_refused': 'A different pod answered, so the I/O pod is not linked any more. Link a pod again.',
+  'prop.pod_refused': 'A different pod answered, so the I/O pod is not linked any more. Link the pod again from the Game master menu, or unlink it.',
+  'prop.pod_expected':
+      'This game expects the pod {name}: firmware {fw}, {n} capabilities.',
+  'prop.pod_expected_one':
+      'This game expects the pod {name}: firmware {fw}, {n} capability.',
+  'prop.pod_relink': 'Link the pod again',
   'prop.pod_unlink': 'Unlink the I/O pod',
   'prop.hold': 'Hold\n{team}',
   'prop.nfc_hint': 'Hold the tag to the back of the phone.',
