@@ -1611,6 +1611,9 @@ game events.
 (`app/lib/controller/mqtt_broker.dart`) uses the Pi controller's topics
 (`field/v1/{game}/...`) and supports retained messages, which the Pi's
 bridge relies on; the controller shell around it is not built yet (PE24).
+*(Built since, in software: the shell and its screens 2026-10-22, PE24 slice S6,
+`app/lib/controller/controller_shell.dart` and `controller_isolate.dart`; the
+rest of the role by 2026-10-23, b30a1a92; see `STATUS.md`.)*
 
 **Decision:** Use **HiveMQ MQTT Client for Dart** as an MQTT client
 library, combined with a **minimal embedded broker implemented in
@@ -1813,7 +1816,8 @@ the app makes a **field identity** on its first check-in there: a
 player token's and the player tag's id rules) and a 32-byte random
 `player_secret`, both kept in the app's private storage (PD6; the
 join key, marshal seed and read code are Keystore-sealed since
-2026-10-26, this secret is not yet).  The
+2026-10-26, this secret is not yet; sealed too since 2026-10-28, 39f55cba,
+PKA-4: `app/lib/storage/secret_vault.dart`).  The
 controller keeps the `player_id` and SHA-256 of the secret.  The next
 check-in at that field sends both, so the same player keeps the same
 id (and the same replica history) across game days, while two fields
