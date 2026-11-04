@@ -551,7 +551,14 @@ teclado, LED, áudio). Em resumo:
 3. **Um jogo.** Um jogo de dispositivo de jogo no telemóvel com o módulo
    ligado: os seus botões são as equipas do jogo, por número, o seu anel mostra
    a equipa, o seu leitor verifica as etiquetas de quem joga, e a ligação
-   rádio do telemóvel ao controlador de campo passa pelo módulo.
+   rádio do telemóvel ao controlador de campo passa pelo módulo. Se a ligação
+   cair durante o jogo, a app abre-a outra vez sozinha; um módulo que tenha de
+   ser emparelhado outra vez é emparelhado mais uma vez, e o ecrã do jogo diz
+   isso (**Este módulo tem de ser emparelhado outra vez**, escreve o código
+   novo). Se não resultar, uma faixa vermelha diz **A app não conseguiu voltar
+   a ligar o módulo sozinha** e porquê. O jogo continua sem o módulo; liga-o
+   outra vez no ecrã inicial do dispositivo de jogo (*Dispositivo de jogo >
+   Módulo de E/S*) depois de saíres do jogo.
 
 ## 11. Resolução de problemas
 
