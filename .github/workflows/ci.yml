@@ -42,6 +42,9 @@ jobs:
       registry: ${{ steps.filter.outputs.registry }}
       firmware_test: ${{ steps.filter.outputs.firmware_test }}
       esp32: ${{ steps.filter.outputs.esp32 }}
+      module_core: ${{ steps.filter.outputs.module_core }}
+      target_module: ${{ steps.filter.outputs.target_module }}
+      output_module: ${{ steps.filter.outputs.output_module }}
     steps:
       - name: Everything except on an ordinary pull request
         id: scope
@@ -145,6 +148,7 @@ jobs:
               - 'modes/**'
               - 'registry/apds/**'
               - 'tools/dev/server-browser/**'
+              - 'controller/console/src/lib/qrcode.module.js' # the web registration's copy is checked against it (WREG-8)
               - 'tools/docker_server.py'
               - 'tools/server_deploy.py'
               - 'tools/server_deploy_hosted.py'
@@ -225,6 +229,22 @@ jobs:
               - 'tools/firmware_release.py'
               - 'tools/gen_box_fonts.py'
               - 'tools/oled_logo.py'
+            module_core:
+              - *shared
+              - 'firmware/module-core/**'
+              - 'tools/protogen.py'
+              - 'tools/expansion_vectors.py'
+            target_module:
+              - *shared
+              - 'firmware/module-core/**'
+              - 'firmware/target-module/**'
+              - 'firmware/output-module/**'
+              - 'tools/docker_module.py'
+              - 'tools/dev/module/**'
+            output_module:
+              - *shared
+              - 'firmware/module-core/**'
+              - 'firmware/output-module/**'
       - name: Everything when the filter could not say
         id: gate
         env:
@@ -1026,6 +1046,81 @@ jobs:
         run: |
           python3 -m pip install --require-hashes --no-deps --only-binary ":all:" -r tools/ci-yaml-requirements.txt
           python3 tools/gen_mode_gifs.py --check --frames-exe /tmp/fw-test/mode_gif_frames
+
+  module-core:
+    # The expansion port's module core (firmware/module-core/, draft RFC "The expansion port",
+    # increment 7): every vector of protocol/vectors/expansion.json and the state machine's edges,
+    # built with warnings as errors, then again under AddressSanitizer and UBSan.
+    name: Expansion module core host tests
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.module_core == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and test
+        run: |
+          cmake -S firmware/module-core -B /tmp/module-core -DCMAKE_BUILD_TYPE=Debug
+          cmake --build /tmp/module-core
+          ctest --test-dir /tmp/module-core --output-on-failure
+      - name: Under AddressSanitizer and UBSan
+        run: |
+          cmake -S firmware/module-core -B /tmp/module-core-asan -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
+          cmake --build /tmp/module-core-asan
+          ctest --test-dir /tmp/module-core-asan --output-on-failure
+
+  output-module:
+    # The I2C output module's portable firmware (firmware/output-module/, draft RFC "The expansion
+    # port", increment 11) with the module core under it, built with warnings as errors, then again
+    # under AddressSanitizer and UBSan. Its UF2 is built by the target-module job below, in
+    # tools/docker_module.py's pico-sdk image.
+    name: Expansion output module host tests
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.output_module == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and test
+        run: |
+          cmake -S firmware/output-module -B /tmp/output-module -DOUTPUT_MODULE_HOST_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
+          cmake --build /tmp/output-module
+          ctest --test-dir /tmp/output-module --output-on-failure
+      - name: Under AddressSanitizer and UBSan
+        run: |
+          cmake -S firmware/output-module -B /tmp/output-module-asan -DOUTPUT_MODULE_HOST_TESTS=ON -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
+          cmake --build /tmp/output-module-asan
+          ctest --test-dir /tmp/output-module-asan --output-on-failure
+
+  target-module:
+    # The modules' firmware (firmware/target-module/ and firmware/output-module/, draft RFC "The
+    # expansion port", increments 8 and 11): their portable parts' host tests, then the UF2 files
+    # on pico-sdk, in tools/docker_module.py's pinned image, as a release builds them; the UF2 files
+    # kept as an artifact for a week.
+    name: Target and output modules (host tests and UF2)
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.target_module == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Host tests
+        run: python3 tools/docker_module.py test
+      - name: The UF2 files
+        run: python3 tools/docker_module.py build
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: module-uf2
+          path: |
+            firmware/target-module/build/*.uf2
+            firmware/output-module/build/*.uf2
+          if-no-files-found: error
+          retention-days: 7
 
   dco:
     name: Check DCO sign-off

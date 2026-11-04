@@ -1042,8 +1042,12 @@ static void update_start_confirm(const char *data)
         screen_json_int(data, "output", &n);
         screen_json_int(data, "gpio", &gpio);
         screen_json_int(data, "max_s", &max_s);
-        char head[48], fn[32], big[64], line[64];
-        snprintf(head, sizeof(head), box_text(TX_OUTPUT_UP), (int)n, (int)gpio);
+        char head[48], fn[32], big[64], line[64], module[8];
+        if (screen_json_str(data, "module", module, sizeof(module))) {
+            snprintf(head, sizeof(head), box_text(TX_OUTPUT_I2C_UP), (int)n, module);
+        } else {
+            snprintf(head, sizeof(head), box_text(TX_OUTPUT_UP), (int)n, (int)gpio);
+        }
         lv_label_set_text(slot[2], head);
         screen_json_str(data, "fn", fn, sizeof(fn));
         snprintf(big, sizeof(big), "%s  %s", fn,

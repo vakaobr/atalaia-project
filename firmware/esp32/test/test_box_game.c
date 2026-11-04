@@ -2401,8 +2401,12 @@ static void test_outputs_in_a_field_game(void)
     CHECK(last_event_data("node.modules", data, sizeof(data)));
     CHECK(strcmp(data, "{\"modules\":\"g46:servo:siren\"}") == 0);
     CHECK(events_named("node.modules") == 1);
+    /* Every output enabled: node.outputs_disabled says none is (EXPL-13). */
+    CHECK(last_event_data("node.outputs_disabled", data, sizeof(data)));
+    CHECK(strcmp(data, "{\"modules\":\"\"}") == 0);
     tick_outputs(&now, 100);
     CHECK(events_named("node.modules") == 1); /* once */
+    CHECK(events_named("node.outputs_disabled") == 1);
 
     /* Joined, not started: no game runs, a CMD 12 is refused. */
     CHECK(box_game_output_state(&game) == OUT_GAME_NONE);
@@ -2459,22 +2463,67 @@ static void test_outputs_in_a_field_game(void)
     CHECK(!bg_on && !bg_live && !bg_outs.grace);
     CHECK(game.phase == BOX_ENDED || game.phase == BOX_IDLE);
 
-    /* A box whose output its admin has not enabled: no `output` in HELLO, no node.modules. */
+    /* A box whose output its admin has not enabled: no `output` in HELLO, no node.modules, and
+     * node.outputs_disabled names it (EXPL-13). */
     join_with_output(NULL);
     CHECK(!hello_lists(ATALAIA_CAP_OUTPUT));
     now = 100;
+    tick_outputs(&now, 50);
+    CHECK(events_named("node.outputs_disabled") == 0); /* not before the HELLO is acknowledged */
     ack_all();
     tick_outputs(&now, 50);
     CHECK(events_named("node.modules") == 0);
+    CHECK(events_named("node.outputs_disabled") == 1);
+    CHECK(last_event_data("node.outputs_disabled", data, sizeof(data)));
+    CHECK(strcmp(data, "{\"modules\":\"g46:servo:out.1\"}") == 0);
     cmd(FIELD_CMD_START);
     cmd_params(FIELD_CMD_OUTPUT, pulse);
     tick_outputs(&now, 20);
     CHECK(!bg_on && !bg_live);
 }
 
+/* Two outputs, the second fitted but not enabled (EXPL-13): node.modules has the first,
+ * node.outputs_disabled the second; a box with no output sends neither. */
+static void test_outputs_disabled_in_a_field_game(void)
+{
+    join_with_output("siren");
+    out_settings_t s;
+    outputs_default_settings(1, &s);
+    snprintf(s.function, sizeof(s.function), "%s", "horn");
+    out_backend_t b = {.drive = bg_drive};
+    CHECK(outputs_add_simple(&bg_outs, 45, &b, &s) == 1);
+    uint32_t now = 100;
+    ack_all();
+    tick_outputs(&now, 50);
+    char data[128];
+    CHECK(last_event_data("node.modules", data, sizeof(data)));
+    CHECK(strcmp(data, "{\"modules\":\"g46:servo:siren\"}") == 0);
+    CHECK(last_event_data("node.outputs_disabled", data, sizeof(data)));
+    CHECK(strcmp(data, "{\"modules\":\"g45:servo:horn\"}") == 0);
+    /* A CMD 12 to the disabled one does nothing. */
+    cmd(FIELD_CMD_START);
+    cmd_params(FIELD_CMD_OUTPUT,
+               "{\"act\":\"pulse\",\"capability\":\"horn\",\"ms\":1000,\"src\":\"gm\"}");
+    tick_outputs(&now, 20);
+    CHECK(!bg_outs.ch[1].on && events_named("output.switched") == 0);
+
+    /* A box without outputs says nothing new. */
+    fixture(false);
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+    atalaia_join_t j;
+    make_join(&j);
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    ack_all();
+    now = 100;
+    tick_outputs(&now, 50);
+    CHECK(events_named("node.modules") == 0 && events_named("node.outputs_disabled") == 0);
+}
+
 void run_box_game_tests(void)
 {
     test_outputs_in_a_field_game();
+    test_outputs_disabled_in_a_field_game();
     test_lobby_nonces();
     test_lobby_answers_are_limited();
     test_lobby_refused_invite_keeps_the_ended_game();

@@ -172,8 +172,20 @@ O que a caixa faz:
 - Uma saída nunca fica ligada mais tempo do que o que definiste. Muda no máximo de meio em meio segundo.
 - Se a caixa deixar de funcionar, ficar sem energia ou reiniciar, o interruptor perde o sinal e desliga-se em cerca de um segundo.
 - A organização vê as saídas da caixa na consola (uma etiqueta debaixo da caixa, marcada **não verificado**, e a lista **Saídas** no separador **Jogo**) e pode ligar uma durante uns segundos no jogo, desligá-la ou desligar todas as saídas de uma vez ([manual de GM, Saídas](game-master.md#saídas)).
+- Quando se junta a um jogo, a caixa também diz à consola que saídas estão instaladas mas **não ativadas**. A organização vê então **horn · instalada, não ativada pela administração da caixa** debaixo da caixa, e uma nota antes de começar se o jogo usaria essa saída, e pode pedir-te que a ative aqui. Uma saída desativada continua a nunca ligar.
 
 **Segurança.** Só aparelhos de baixa tensão com bateria própria (no máximo 24 V). **Nunca** a rede elétrica. Uma máquina de fumo só pela sua entrada de comando de baixa tensão; nunca pirotecnia. Proteção auditiva perto de sirenes e buzinas. Fumo nunca numa sala fechada sem autorização do recinto. Antes do primeiro jogo, quem monta verifica cada interruptor: tem de desligar quando se tira o cabo ([manual de montagem, secção 9.10](../../../hardware/field-box/BUILD.pt.md#910-saída-simples-opcional)).
+
+### Um alvo na porta de expansão
+
+Uma caixa montada com uma **porta de expansão** (uma tomada M12, [guia da porta](../../../hardware/expansion-port/BUILD.pt.md)) aceita um **alvo**: uma placa para onde os jogadores disparam, com um sensor e uma pequena placa própria atrás, num cabo de até 2 m ([guia do alvo](../../../hardware/target-addon/BUILD.pt.md)). O jogo *Janelas de Alvo* usa-o: a caixa acende-se na cor de uma equipa durante uns segundos, e um impacto na placa de alvo nesse tempo pontua para essa equipa. Ainda não testado em hardware.
+
+1. **Liga o alvo antes de a caixa entrar no jogo** (com a caixa ligada ou desligada). A caixa encontra-o em 2 segundos; ligado mais tarde, a caixa encontra-o na mesma, e o jogo usa-o logo.
+2. A consola de GM mostra-o como uma etiqueta debaixo da caixa: **target 1.0.0: hit**.
+3. Em *Janelas de Alvo* o alvo só conta impactos enquanto o jogo decorre: nem antes de começar, nem em pausa, nem depois de acabar.
+4. Se o cabo sair durante o jogo, o registo de GM diz **box-4 perdeu um módulo: 58:target/1.0.0:hit (deixou de responder)**. Volta a ligá-lo: continua logo.
+
+**Segurança.** Proteção dos olhos e da cara para toda a gente ao alcance do alvo, a placa de alvo inclinada para baixo para as BB irem para o chão, e nunca disparar para a caixa, o cabo ou o invólucro do alvo: só para a placa. Os limites de potência do campo valem para os alvos como para os jogadores.
 
 As *Ligaduras* e o *Hackeia o terminal* não seguem a língua da caixa. Cada um usa a língua do ecrã da sua própria definição **Língua** no jogo; se estiver vazia, é a língua do jogo. O *VIP / Carga* segue a língua da caixa, como os outros modos (a sua antiga definição **Língua** já não é usada).
 
@@ -247,7 +259,7 @@ Um telemóvel Android também pode ser uma caixa. Na app escolhe **Dispositivo d
 | **PIN bloqueado · tente daqui a N min** | Espera. A contagem sobrevive a um reinício. Não continues a adivinhar. |
 | A caixa reiniciou num jogo | Volta no mesmo jogo. A organização vê **node.rebooted** no registo dela, com o motivo que a caixa indica (alimentação, queda de tensão, software, falha do programa, watchdog); o fluxo da consola diz **Uma caixa falhou e reiniciou** quando foi uma falha do programa ou um reinício do watchdog. Um fio solto no teclado ou no ecrã já não reinicia a caixa: a peça que falha é posta de lado por um tempo e o jogo continua (o teclado conta então como sem tecla). |
 | O ecrã pequeno está apagado | Fala com quem montou a caixa. O ecrã grande pode continuar a funcionar. |
-| A sirene (ou o estroboscópio, o fumo) nunca liga | Ativa a saída na caixa (PIN de administração, **Saídas**) e dá-lhe o uso que o jogo pede. Só funciona durante um jogo, ou com o teste de 1 segundo entre jogos. Verifica a bateria do próprio interruptor. |
+| A sirene (ou o estroboscópio, o fumo) nunca liga | Se a consola disser **instalada, não ativada pela administração da caixa**, ativa a saída na caixa (PIN de administração, **Saídas**). Dá-lhe o uso que o jogo pede. Só funciona durante um jogo, ou com o teste de 1 segundo entre jogos. Verifica a bateria do próprio interruptor. |
 | Um interruptor fica ligado com a caixa desligada | Deixa de usar esse interruptor: tem de desligar quando perde o sinal. Fala com quem montou a caixa. |
 
 Para avarias de montagem e de bancada, vê [a tabela de resolução de problemas do manual de montagem](../../../hardware/field-box/BUILD.pt.md#13-resolução-de-problemas).

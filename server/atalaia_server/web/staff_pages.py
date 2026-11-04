@@ -20,6 +20,10 @@
                                                        a hosted hub
     GET /staff/fields/<field>/history                  the field's games, filters, the history settings
     GET /staff/fields/<field>/games/<game>             one game: its score timeline, its event log, its boxes
+    GET /staff/fields/<field>/hub-history              a hosted hub's game history shared between fields (HUBH-*): the
+                                                       field's opt-in switch (its admin), what is shared, and the games
+                                                       of every field that shares (staff of a field that shares its own);
+                                                       in the navigation only on a hosted hub
     GET /staff/fields/<field>/schedule                 the field's scheduled games: create, edit, publish, cancel,
                                                        delete a draft (Phase 4 follow-up FU6)
     GET /staff/fields/<field>/schedule/<id>/registrations   who registered for a game: change a name, a team, a
@@ -151,9 +155,10 @@ class StaffPage:
     def languages(self) -> str:
         return switcher(self.lang, self.path)
 
-    def sections(self, field: Optional[uuid.UUID], current: str) -> str:
+    def sections(self, field: Optional[uuid.UUID], current: str, hosted: bool = False) -> str:
         """The navigation: every field, and on a field's pages that field's sections (the script hides those
-        the account's roles do not reach; the API refuses them anyway)."""
+        the account's roles do not reach; the API refuses them anyway). ``hosted``: a hosted hub, whose fields have the
+        page of the game history they share (HUBH-*); a single-field server has no other field to share with."""
         items = [("fields", "/staff/", "nav_fields")]
         if field is not None:
             base = f"/staff/fields/{field}"
@@ -164,6 +169,7 @@ class StaffPage:
                       ("roles", f"{base}/roles", "nav_roles"), ("synckeys", f"{base}/sync-keys", "nav_synckeys"),
                       ("branding", f"{base}/branding", "nav_branding"),
                       ("chrono", f"{base}/chrono", "nav_chrono"),
+                      *([("hubhistory", f"{base}/hub-history", "nav_hubhistory")] if hosted else []),
                       ("platforms", f"{base}/platforms", "nav_platforms"), ("data", f"{base}/data", "nav_data"),
                       ("settings", f"{base}/settings", "nav_fsettings")]
         # Not of one field: any account's clubs, the firmware list, the server administrator's page.
@@ -190,7 +196,7 @@ class StaffPage:
             html_lang=HTML_LANG[self.lang], title=esc(f"{title} · {self.t['site']}"), script=esc(f"{page}.js"),
             data_attrs=" ".join(f'data-{k}="{esc(v)}"' for k, v in attrs.items()),
             home=esc(self.link("/staff/")), account_href=esc(self.link("/staff/account")),
-            sections=self.sections(field, section),
+            sections=self.sections(field, section, hosted=bool(request.app.state.settings.hosted)),
             language_label=esc(i18n.STRINGS[self.lang]["language"]), languages=self.languages(),
             content=content, strings=strings_block(self.t))
         body = preview_texts.inject_banner(request, body, self.lang)  # a preview server's banner (PV-3)
@@ -291,6 +297,11 @@ async def history(field: str, request: Request) -> Response:
                                                                       max=MAX_RETENTION_DAYS)),
                        max_delay=str(MAX_DELAY_S), min_retention=str(MIN_RETENTION_DAYS),
                        max_retention=str(MAX_RETENTION_DAYS))
+
+
+@router.api_route("/staff/fields/{field}/hub-history", methods=GET_HEAD)
+async def hub_history(field: str, request: Request) -> Response:
+    return _field_page(request, field, "hubhistory", "hubhistory", "hh_title")
 
 
 @router.api_route("/staff/fields/{field}/games/{game}", methods=GET_HEAD)

@@ -141,6 +141,7 @@ each separate, granular and withdrawable.
 | **Registration (site server)**: your player identifier at the field, a display name for the game (your username by default), your team preference, your **association membership number** if the game asks for it, the replicas you declare, whether you came or not, whether you paid (the field notes it; no payment is processed) | To organise the game | (b) contract: the game you register for |
 | A **registration ticket**: a random secret shown once; only a hash is kept | To match your arrival to your registration | (b) contract |
 | **Check-in at the field (field controller)**: the name or callsign you type, your team preference, the replicas you declare, **the result of the association-card check** if the field asks for it (2.3; **nothing verifies the number with anyone**), the time. Your phone makes an identifier for this field; the controller keeps it and a hash of the secret that goes with it. **No email, phone number, date of birth, identity document or photo is asked for** | To run the game and to know who is on the field | (b) contract: the game you join; (f) the field's interest in safe games |
+| **[FIELD CHOICE: only if the field turns on `[sync] push_walkins`; otherwise delete this row.]** **Walk-in on the site server**: if you check in without a registration, after a game from the schedule the controller sends the site server your player identifier at the field, the display name you typed and the chronograph result of each replica you declared (type, class, passed or refused). Never your membership number, team, a replica's make and model or a ticket. It is a guest registration, with no account | To keep the field's record of who played and of the chronograph checks | **[LAWYER: the legal basis; not decided by the project]** |
 | **Association membership**: see 2.3 | | |
 | A marshal or the GM may confirm or check in a player by hand even if the membership check fails. This is logged with the player's identifier and the verdict, never the number | Staff decision | (f) |
 
@@ -309,6 +310,17 @@ after the game ended, on the controller and on the site server. Team and
 squad results without player ids (no member lists; a squad under 3 players
 is folded into its team) are kept **365 days** (section 7).
 
+**[FIELD CHOICE:] Sharing game results with other fields of a hosted hub**
+(off by default). If the field's administrator turns it on, the hub
+operator keeps, for the staff of the other fields of the same hub that also
+share theirs, a copy of each ended game's mode, start and end time, each
+team's final score, the winning team and the field's name. **No player
+identifier, name, account, event or member list is shared**, nor the names
+the field gives a game or a team. The copy is removed when the field turns
+sharing off, and never kept longer than the field keeps the game's results
+(365 days). [LAWYER: confirm whether this needs a basis or a mention beyond
+this paragraph, and whether the sharing fields need terms between them.]
+
 Basis: (f) running the games and keeping their history
 [LAWYER: confirm].
 
@@ -381,7 +393,10 @@ The field controller needs no internet. Check-in, the game, the chronograph
 and your position work on the field's own Wi-Fi. Your name, your team preference and your declared replicas (and, until the
 check-in is confirmed, your membership number) **stay on the controller and
 are never sent to the site server or anywhere else**
-(check-in names and numbers are never sent, even when the controller syncs).
+(check-in names and numbers are never sent, even when the controller syncs;
+**[FIELD CHOICE: if the field turns on `[sync] push_walkins`, say instead:
+"except the display name of a player who checked in without a registration,
+see 2.2"]**).
 
 ### 4.2 With the site server (optional)
 
@@ -389,7 +404,9 @@ When the controller has internet and the field uses the site server, the
 controller connects out to it (the site server never connects in) and
 sends: the games and their events and scores, the chronograph readings (each
 as signed), the replicas, the outcome of each registration (came or did not
-come), the number of walk-ins as a count, and the marshals' public keys. It
+come), the number of walk-ins as a count **[FIELD CHOICE: with `[sync]
+push_walkins`, "and each walk-in as a guest registration (2.2)"]**, and the
+marshals' public keys. It
 receives the schedule, the roster of registrations for the next game, the
 field's settings and branding, scenarios, and, for players who consented,
 other fields' chronograph records. The data travels over HTTPS.
@@ -460,6 +477,7 @@ CHOICE]** is one the field can change; the others are fixed in the code.
 | The host's own logs (see 2.11) | the host | **[HOST CHOICE]** |
 | What is left of an erased account (an empty row under a random `deleted-...` name: no name, email, password or roles) | site server | Until the last security log entry that names it is deleted, at most 36 months after you used the account; then the row itself is deleted |
 | Registration data of people without an account (imported guests) | site server | 30 days after the game |
+| **[FIELD CHOICE: with `[sync] push_walkins`]** Walk-ins sent as guest registrations (2.2) | site server | 30 days after the game, or at once when the controller erases you on request |
 | A registration's membership number | site server | Erased when the check-in is confirmed; at the latest 30 days after the game |
 | Claims of a phone's player identifier | site server | 30 days after they were made |
 | Scheduled games and their registrations | site server | 24 months after the game ended |
@@ -546,6 +564,21 @@ app deletes all of it (on an iPhone, iOS may keep that key, which contains
 no personal data and opens nothing once the app's data is gone). The app has
 no analytics, advertising or crash-reporting library.
 
+**In a browser, instead of the app** [DRAFT: pending a lawyer]. You can also
+register for a game on the field's web pages (decisions WREG-*). The page
+then keeps, in your browser: the short-lived login token (15 minutes) in that
+tab only, gone when the tab closes; a cookie with the login's refresh token,
+which scripts cannot read and which goes only to the server's login address,
+until you log out or the login ends (a week without use, 30 days at most);
+during a Google, Microsoft or Apple sign-in, a cookie of at most 10 minutes
+that ties the sign-in to this browser; and, if the field set its pages to
+remember a language you pick, a cookie with that language only. Your
+check-in ticket is shown once and is not stored by the page: a printout or
+a screenshot you make is yours to keep safe. The pages load nothing from
+other sites and have no analytics. [LAWYER: these are needed for the service
+the person asks for; whether they need no consent (ePrivacy Directive,
+Art. 5(3), as transposed), and whether this paragraph is needed at all.]
+
 ## 10. Security
 
 HTTPS between all parts; passwords as Argon2id hashes; TOTP secrets
@@ -598,6 +631,11 @@ version).
 Short text for the app's *create account* screen (decision S17-16). It must be shown **before** the account is made, link to the full
 notice (Part A), and the person must choose to continue. Version it like
 Part A. Keep it to about this length. Pt-PT in `privacy-notice-pt.md`.
+[LAWYER: an account can now also be made on the field's web registration
+page (WREG-*), with a Google, Microsoft or Apple sign-in. That page links to
+the full notice (Part A), which must be opened before its box can be ticked,
+and has the same two boxes; it does not show this short text. Whether it
+should.]
 
 > **Your account at [FIELD NAME]**
 >
@@ -747,3 +785,16 @@ Decided by the maintainer on 2026-10-30, consistent with the approved brief:
    optional contact for 90 days and the message for 12 months, no account, no
    address) has a notice of its own, in the project's name. It is not part of
    this field notice.
+5. **Registering on the field's web pages** (WREG-11, 2026-11-04): the
+   paragraph "In a browser, instead of the app" in section 9 (the browser's
+   storage and whether it needs consent) and whether Part B is shown on the web
+   sign-up too. Nothing else changes: the data, the purposes, the bases and
+   the periods of a registration are the same as in the app.
+6. **Walk-ins as guests** (2.2, decisions PWI-*, added 2026-11-04): the
+   optional `[sync] push_walkins` sends a walk-in's player identifier,
+   display name and chronograph results to the site server, kept 30 days
+   after the game. The legal basis, whether the check-in
+   notice at the field must say so before the player checks in (the
+   controller's default check-in notice says the name is never sent; a field
+   that turns this on gives its own, `[checkin] notice_pt`/`notice_en`), and
+   the wording are for the lawyer.

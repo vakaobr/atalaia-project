@@ -435,6 +435,9 @@ class ControllerEngine {
   // The live game's boxes' modules, from their last node.modules
   // (controller_outputs.dart, EXP-21), and the CMD 12 rate limit (EXP-30).
   final _modules = <int, List<Map<String, Object?>>>{};
+  // Their outputs fitted but not enabled, from their last
+  // node.outputs_disabled (EXPL-13).
+  final _outputsDisabled = <int, List<Map<String, Object?>>>{};
   final _outputRate = OutputRateLimit();
   Uint8List _key = Uint8List(0);
   Map<String, Map<String, int>> _fieldScores = {};
@@ -1032,6 +1035,7 @@ class ControllerEngine {
     _fieldScores = {};
     _boxEnd = null;
     _modules.clear();
+    _outputsDisabled.clear();
     _outputRate.clear();
     _radio?.flush(); // frames still waiting for their gap go now: the key goes next
     modem?.clear(); // the modem forgets the key
@@ -1099,6 +1103,13 @@ class ControllerEngine {
       if (mods is List) {
         _modules[nodeId] = [
           for (final m in mods)
+            if (m is Map) m.cast<String, Object?>(),
+        ];
+      }
+      final off = node['outputs_disabled'];
+      if (off is List) {
+        _outputsDisabled[nodeId] = [
+          for (final m in off)
             if (m is Map) m.cast<String, Object?>(),
         ];
       }
@@ -1338,6 +1349,7 @@ class ControllerEngine {
       'missing_caps': caps['missing_caps'],
       'warnings': warnings,
       'not_checked': caps['not_checked'],
+      'outputs_disabled': caps['outputs_disabled'],
       'ok': missing.isEmpty && caps['missing_caps']!.isEmpty,
     };
   }
@@ -1352,6 +1364,12 @@ class ControllerEngine {
         n['node_id']! as int: n,
     };
     final mode = _mode(_game!['mode_id']);
+    // A scenario's game: the outputs its triggers switch on each box, by the
+    // name the GM gave it (engine.py `_capability_check`).
+    final meta = scenarioMeta(_game!['mode_id']);
+    final names = meta == null
+        ? const <int, String>{}
+        : scenarios?.nodeNames(_game!['id']! as int) ?? const <int, String>{};
     return checkNodes([
       for (final (id, role) in nodes)
         () {
@@ -1365,6 +1383,8 @@ class ControllerEngine {
                 ? live!.hello!.capabilities
                 : row['capabilities'],
             'modules': _modules[id] ?? row['modules'],
+            'outputs_disabled': _outputsDisabled[id] ?? row['outputs_disabled'],
+            if (meta != null) 'outputs': meta.nodeOutputs(names[id]),
           };
         }(),
     ], (role) => mode?.roles[role]);
@@ -1637,6 +1657,9 @@ class ControllerEngine {
       // Its modules and simple outputs, from its last node.modules; null
       // until it says (EXP-21).
       'modules': _modules[node.nodeId],
+      // Its outputs fitted but not enabled by its admin, from its last
+      // node.outputs_disabled; null until it says (EXPL-13).
+      'outputs_disabled': _outputsDisabled[node.nodeId],
       'device_id': device
           ?.map((b) => b.toRadixString(16).padLeft(2, '0'))
           .join(),
@@ -1722,9 +1745,16 @@ class ControllerEngine {
         );
       }
       final caps = node.hello?.capabilities;
+      // Fitted but not enabled (EXPL-13): the refusal says so.
+      final off = outputCaps(_outputsDisabled[nodeId])
+          .contains(params['capability']);
+      final admin = off
+          ? "; its ${params['capability']} is fitted, not enabled by the "
+                "box's admin"
+          : '';
       if (typesOf(caps).isNotEmpty && !caps!.contains(outputTypeId)) {
         throw ControllerError.conflict(
-          '${node.name} has no output enabled (its HELLO lists none)',
+          '${node.name} has no output enabled (its HELLO lists none)$admin',
         );
       }
       final known = _modules[nodeId];
@@ -1732,7 +1762,7 @@ class ControllerEngine {
         final have = outputCaps(known).toList()..sort();
         throw ControllerError.conflict(
           '${node.name} has no output ${params['capability']} (it has: '
-          '${have.isEmpty ? 'none' : have.join(', ')})',
+          '${have.isEmpty ? 'none' : have.join(', ')})$admin',
         );
       }
     }
@@ -1812,13 +1842,24 @@ class ControllerEngine {
     return true;
   }
 
-  /// A box's node.modules or node.module_lost: the node list's `modules`,
-  /// stored with the node and told to the consoles (engine.py `_on_modules`).
+  /// A box's node.modules or node.module_lost: the node list's `modules`;
+  /// its node.outputs_disabled: the node list's `outputs_disabled` (EXPL-13).
+  /// Stored with the node and told to the consoles (engine.py `_on_modules`).
   void _onModules(Map<String, Object?> record) {
     final game = _game;
     final node = _fc?.nodes[record['node']];
     if (game == null || node == null) return;
     final text = (record['data'] as Map?)?['modules'];
+    if (record['type'] == 'node.outputs_disabled') {
+      final disabled = modulesOf(text);
+      if (disabled == null) return;
+      _outputsDisabled[node.nodeId] = disabled;
+      _onNode(node, 'modules');
+      if (game['state'] == 'ready' && game['joined'] != true) {
+        _emit({'type': 'game', 'game': publicGame(game)});
+      }
+      return;
+    }
     final List<Map<String, Object?>>? modules;
     if (record['type'] == 'node.modules') {
       modules = modulesOf(text);
@@ -2803,7 +2844,8 @@ class ControllerEngine {
     }
     positions?.onEvent(id, record);
     if ((record['type'] == 'node.modules' ||
-            record['type'] == 'node.module_lost') &&
+            record['type'] == 'node.module_lost' ||
+            record['type'] == 'node.outputs_disabled') &&
         record['node'] != nodeId &&
         record['origin'] != 'controller') {
       _onModules(record);

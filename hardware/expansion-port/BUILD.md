@@ -21,12 +21,12 @@ this guide follows and refers to for every step the builds share.
 > decisions EXP-1 to EXP-15, approved by the maintainer on 2026-11-03); the
 > register protocol modules speak is
 > [`protocol/expansion-port.md`](../../protocol/expansion-port.md). **No port
-> has been built from this guide**, and **the box's firmware does not use the
-> port yet**: the port driver is being written (`firmware/esp32/main/expansion.c`,
-> increment 6 of the RFC's plan) and is called from the box's game task only
-> from **increment 8**. Until then a port can be built and checked with a
-> meter and the box's own parts ([section 8](#8-checks-and-tests)), but no
-> module answers. The pin table is checked automatically against the
+> has been built from this guide**. The box's firmware uses the port since
+> increment 8 of the RFC's plan: the port driver (`firmware/esp32/main/expansion.c`,
+> increment 6) runs in the box's game task, finds modules at 0x58-0x5F within
+> 2 s of being plugged in and reads them; the target module's firmware is
+> built too ([target addon guide](../target-addon/BUILD.md)). Both are tested
+> on a computer only, not yet on a real port ([section 8](#8-checks-and-tests)). The pin table is checked automatically against the
 > firmware's defaults (`python3 tools/check_wiring.py`). Steps marked
 > **Verify at the first build** are open questions; please report what you
 > find in an issue. Photos will be added after the first build (plan phase
@@ -35,8 +35,9 @@ this guide follows and refers to for every step the builds share.
 **Not for outputs, as a rule.** A siren, a strobe or a smoke machine's remote
 takes the **simple output** (one GPIO, an RC relay switch, an M8 socket:
 [Field Box manual, section 9.10](../field-box/BUILD.md#910-simple-output-optional)),
-the preferred output path (EXP-31). The port is for **inputs**, and later for
-an I2C output module on a box that needs more channels or feedback.
+the preferred output path (EXP-31). The port is for **inputs**, and for the
+optional [I2C output module](../output-module/BUILD.md) on a box that needs
+more channels or feedback.
 
 ## Contents
 
@@ -101,9 +102,9 @@ Decided (with where each decision comes from):
 
 Not decided, or not built yet:
 
-- **The box's firmware for the port** (increments 6 and 8 of the RFC's plan):
-  until increment 8 the box does not look for modules, so nothing a builder
-  plugs in is read.
+- **The box's firmware for the port on real hardware** (increments 6 and 8 of
+  the RFC's plan): built and tested on a computer, not yet against a real port
+  and module.
 - **A carrier PCB** with the port board on it (phase 5's later carrier board);
   until then, perfboard.
 - **The bench results** of [section 8](#8-checks-and-tests): rise times, the
@@ -208,7 +209,7 @@ of every address the box uses or looks at:
 | 0x36 | MAX17048 battery gauge | |
 | 0x3C | The board's OLED | |
 | **0x58-0x5B** | **Input modules**: the target module at **0x58**; its two solder jumpers add 1-3 for a second, third or fourth | |
-| **0x5C-0x5F** | **Output modules** (the later I2C output module) at **0x5C**, jumpers 0x5D-0x5F | |
+| **0x5C-0x5F** | **Output modules** (the [I2C output module](../output-module/BUILD.md)) at **0x5C**, jumpers 0x5D-0x5F | |
 
 **At most 4 modules on one box**: the bus's time (each input module's poll is
 about 5 % of the bus) and the 25 mA each takes from the same 3.3 V rail are
@@ -305,16 +306,27 @@ issue: they settle the **Verify at the first build** items.
 
 | RFC test | What | Needs | When |
 | --- | --- | --- | --- |
-| 1 | Rise time of SDA and SCL at the cable's far end, 2 m of cable, 100 kHz: **under 1 µs** (a scope). The estimate: 2.2 kohm and about 250 pF give about 0.5 µs. The keypad, NFC reader and gauge still work with a module plugged in | Scope; a module for the second part | Rise time: now. With a module: **after increment 8** |
-| 2 | Short SDA to GND at the cable's far end: the box's keypad keeps working; the port is back within a second of removing the short | The box's firmware (the keypad) | Now (the keypad); the module coming back: **after increment 8** |
-| 4 | Short pins 1 and 3 at the cable's far end: the box does not reset; the fuse warms and recovers when the short goes. The target module's current under 25 mA | A module for the current | The short: now. The module's current: **after increment 8** |
+| 1 | Rise time of SDA and SCL at the cable's far end, 2 m of cable, 100 kHz: **under 1 µs** (a scope). The estimate: 2.2 kohm and about 250 pF give about 0.5 µs. The keypad, NFC reader and gauge still work with a module plugged in | Scope; a target module | Now |
+| 2 | Short SDA to GND at the cable's far end: the box's keypad keeps working; the port is back within a second of removing the short, and the module with it | The box's firmware (the keypad); a target module | Now |
+| 4 | Short pins 1 and 3 at the cable's far end: the box does not reset; the fuse warms and recovers when the short goes. The target module's current under 25 mA | A target module for the current | Now |
 | 9 | Touch the socket's pins and the cable's shell after walking on a carpet or a dry field: the box carries on | -- | Now |
-| 3 | 100 plug and unplug cycles during a running game: no box reset, no stuck bus, each plug-in found within 2 s | A module and the box's port driver | **After increment 8** |
-| 6 | Noise: a target module next to a switching 12 V siren and strobe for 30 minutes; count CRC errors and missed polls | A module | **After increment 8** |
+| 3 | 100 plug and unplug cycles during a running game: no box reset, no stuck bus, each plug-in found within 2 s | A target module | Now (the log line below for each plug-in) |
+| 6 | Noise: a target module next to a switching 12 V siren and strobe for 30 minutes; count CRC errors and missed polls | A target module | Now (`@modules` before and after: its `polls`, and the log's lost and found lines) |
 
-The box's log line for a module found on the port, its serial console's view
-of the modules, and BRING_UP's own step for the port come with the port driver
-(**after increment 8**).
+What the box says about the port, on its serial log (USB, 115200 baud;
+[BRING_UP.md](../../firmware/esp32/docs/BRING_UP.md), the port's step):
+
+| Line | When |
+| --- | --- |
+| `expansion: 0x58 added: 58:target/1.0.0:hit` | A module found, at boot or within 2 s of being plugged in |
+| `expansion: 0x58 lost (no_answer)` | A module that stopped answering (25 failed reads: 0.5 s for a target) |
+| `expansion: 0x58 lost (bad_ident)` | Another module plugged in at the same address |
+| `expansion: hit hit, strength 180` | A hit taken during a game (the plate armed by the mode) |
+| `expansion: 0x58 dropped events (its queue was full)` | The module held more than 16 hits before the box read them |
+
+`@modules` on the serial console lists the modules
+(`[{"address":"58","model":"target","fw":"1.0.0","caps":["hit"],"armed":0,"events":0,"polls":1234}]`),
+and in a game the GM console shows each module as a chip under its box.
 
 ## 9. Troubleshooting
 
@@ -325,7 +337,8 @@ of the modules, and BRING_UP's own step for the port come with the port driver
 | Pin 1 reads 3.3 V or more | The diode is bridged or missing | Fix the supply path: pin 1 must come through the diode |
 | SDA or SCL read 0 V at the socket with nothing plugged in | A short to GND at the socket or the TVS; or the buffer is holding the port off because a line is low | Check for a solder bridge at the TVS adapter and the socket's cups |
 | The box resets when a cable is plugged in | A short between pins 1 and 3 in the cable, too much capacitance on pin 1, or the fuse missing | Check the cable pin to pin; there must be no capacitor larger than 100 nF on the port's 3.3 V |
-| A module is not found | **Expected until increment 8**: the box does not look for modules yet. After that: its address (0x58-0x5F), its cable, its supply (about 3.0 V at its end) | -- |
+| A module is not found (no `expansion: ... added` line within 2 s) | Its address (0x58-0x5F; the keypad's own expander sits at 0x20-0x27), its cable, its supply (about 3.0 V at its end), its firmware (flashed?) | Measure pin 1 at the module's end; reflash the module; `@modules` on the box's console |
+| A module comes and goes (`added`, `lost (no_answer)` again and again) | A loose connector, a long or unshielded cable, the fuse tripping | Check the cable pin to pin, and pin 1's voltage while it happens |
 
 ---
 
