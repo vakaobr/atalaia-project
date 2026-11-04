@@ -142,11 +142,11 @@ static bool command(void *ctx, const atalaia_proxy_msg_t *m)
     (void)ctx;
     return pod_caps_command(&caps, m);
 }
-static void ident(void *ctx, atalaia_proxy_ident_t *out, bool compact)
+static void ident(void *ctx, atalaia_proxy_ident_t *out, pod_ident_level_t level)
 {
     (void)ctx;
     snprintf(out->fw_version, sizeof(out->fw_version), "0.3.0");
-    pod_caps_descriptors(&caps, out->caps_json, sizeof(out->caps_json), !compact);
+    pod_caps_descriptors(&caps, out->caps_json, sizeof(out->caps_json), level == POD_IDENT_FULL);
 }
 static bool emit(void *ctx, const char *cap, const char *event, const char *data)
 {

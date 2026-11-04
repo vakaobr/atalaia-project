@@ -17,7 +17,8 @@
 #
 # Board pins the Field Box shares on purpose (tools/check_wiring.py allows
 # only these uses; decisions PIN-3 to PIN-5):
-#   1  -- the battery-voltage ADC input (VBAT_Read). Display CS: an output
+#   1  -- the battery-voltage ADC input (VBAT_Read). Display CS, or an I/O
+#         pod's second simple output (ATALAIA_SIMPLE_OUT2_PIN): an output
 #         only. The board's divider leaves 100 kohm to GND on it, which an
 #         output does not mind; the firmware never reads the battery there
 #         (the MAX17048 gauge does).
@@ -410,7 +411,7 @@ menu "Atalaia Field Box Configuration"
 
     # ---- Simple output (optional; draft RFC "The expansion port", EXP-31 to EXP-37) ----
     menu "Simple output (RC relay switch)"
-        depends on ATALAIA_NODE_MODE
+        depends on ATALAIA_NODE_MODE || ATALAIA_POD_MODE
 
         config ATALAIA_SIMPLE_OUT
             bool "A simple output is fitted (RC relay switch on a spare gate)"
@@ -430,10 +431,16 @@ menu "Atalaia Field Box Configuration"
                 with the admin PIN (decision EXP-28). Off by default: a build
                 without it has no RMT code for it. Not yet tried on
                 hardware. Wiring: hardware/field-box/BUILD.md, section 9.8.
+                On an I/O pod (increment 9, EXP-26) the phone's mode and the
+                field switch it through the pod; the pod runs the bursts and
+                turns it off when the phone's link goes or falls silent, and
+                building it in is what enables it (a pod has no admin PIN:
+                its use and longest on are the options below).
 
         config ATALAIA_SIMPLE_OUT_PIN
             int "Simple output GPIO (-1 = none)"
             depends on ATALAIA_SIMPLE_OUT
+            default 33 if ATALAIA_POD_MODE
             default 46 if ATALAIA_BOARD_HELTEC_V4_3
             default 5 if ATALAIA_BOARD_HELTEC_V4_2
             default -1
@@ -447,26 +454,71 @@ menu "Atalaia Field Box Configuration"
                 (board 5: GPIO 15, with I2S off). The build refuses a pin
                 another part uses, a board-internal pin and the other
                 revision's front-end line. tools/check_wiring.py allows 46 for
-                this pin on a V4.3 build and 5 on a V4.2 build only.
+                this pin on a V4.3 build and 5 on a V4.2 build only. An I/O
+                pod takes GPIO 33 (EXP-34): its guide leaves the display's
+                pins 1, 3 and 33 free, and 33 has no role at reset.
 
         config ATALAIA_SIMPLE_OUT2
-            bool "A second simple output on GPIO 45 (no piezo buzzer)"
-            depends on ATALAIA_SIMPLE_OUT && !ATALAIA_BUZZER
+            bool "A second simple output (GPIO 45 without a piezo buzzer; GPIO 1 on a pod)"
+            depends on ATALAIA_SIMPLE_OUT && (!ATALAIA_BUZZER || ATALAIA_POD_MODE)
             default n
             help
-                GPIO 45 is the piezo buzzer's or a second simple output's,
-                never both: the option is offered only without the buzzer
-                (and the build refuses the two on one pin).
+                On a Field Box or a Satellite, GPIO 45 is the piezo buzzer's
+                or a second simple output's, never both: the option is
+                offered only without the buzzer (and the build refuses the
+                two on one pin). An I/O pod puts its second output on GPIO 1
+                instead (EXP-34), so it may have the buzzer too.
 
         config ATALAIA_SIMPLE_OUT2_PIN
             int "Second simple output GPIO"
             depends on ATALAIA_SIMPLE_OUT2
+            default 1 if ATALAIA_POD_MODE
             default 45
             help
                 GPIO 45, the VDD_SPI strap: it must be low at reset, which
                 the 10 kohm pull-down at the 74AHCT125's input ensures (gate
                 3 for this channel). tools/check_wiring.py allows GPIO 45 for
-                this pin and the buzzer's only.
+                this pin and the buzzer's only. On an I/O pod: GPIO 1, the
+                board's battery-voltage input (100 kohm to GND, which holds
+                it low at reset; the firmware reads the battery from the
+                gauge, never there); GPIO 3 is free too.
+
+        config ATALAIA_POD_OUT1_FUNCTION
+            string "The pod's output 1: its use"
+            depends on ATALAIA_SIMPLE_OUT && ATALAIA_POD_MODE
+            default "out.1"
+            help
+                The capability id the phone's mode and the field call it by
+                (decision EXP-19): siren, strobe, smoke, light, horn, or
+                out.1 to out.9. A Field Box's admin sets this at the box; a
+                pod has no admin PIN (PODC-2), so it is set here, and a pod
+                built with the output lends it to the phone (EXP-28: building
+                it in is a person at the pod enabling it). Any other text
+                leaves the output disabled (the boot log says why).
+
+        config ATALAIA_POD_OUT1_MAX_ON_S
+            int "The pod's output 1: longest on (seconds)"
+            depends on ATALAIA_SIMPLE_OUT && ATALAIA_POD_MODE
+            range 1 600
+            default 30
+            help
+                The pod never keeps the output on longer than this, whatever
+                the phone asks. The phone's app applies 30 s too, so a longer
+                time is cut there until the app learns the pod's.
+
+        config ATALAIA_POD_OUT2_FUNCTION
+            string "The pod's output 2: its use"
+            depends on ATALAIA_SIMPLE_OUT2 && ATALAIA_POD_MODE
+            default "out.2"
+            help
+                As output 1's. Two outputs with the same use are named
+                siren and siren.2.
+
+        config ATALAIA_POD_OUT2_MAX_ON_S
+            int "The pod's output 2: longest on (seconds)"
+            depends on ATALAIA_SIMPLE_OUT2 && ATALAIA_POD_MODE
+            range 1 600
+            default 30
     endmenu
 
     # ---- Battery gauge (MAX17048 over I2C, shared bus with NFC and OLED) ----

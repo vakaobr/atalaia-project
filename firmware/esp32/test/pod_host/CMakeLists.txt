@@ -33,6 +33,10 @@ add_executable(pod_host
     ${MAIN_DIR}/pod/pod_json.c
     ${MAIN_DIR}/pod/pod_settings.c
     ${MAIN_DIR}/pod/pod_ble.c
+    ${MAIN_DIR}/pod/pod_outputs.c
+    ${MAIN_DIR}/outputs.c
+    ${MAIN_DIR}/simple_out.c
+    ${MAIN_DIR}/screen_json.c
     ${MAIN_DIR}/key_filter.c
     ${MAIN_DIR}/modem/modem.c
     ${MAIN_DIR}/modem/modem_framing.c
@@ -59,6 +63,11 @@ target_include_directories(pod_host PRIVATE
     ${CORE_DIR}/include ${CORE_DIR}/src ${MAIN_DIR} ${MBEDTLS_INCLUDE_DIR})
 target_compile_definitions(pod_host PRIVATE ATALAIA_HAVE_MBEDTLS)
 target_link_libraries(pod_host PRIVATE ${MBEDCRYPTO_LIB})
+# floor() in the output layer (main/outputs.c, main/pod/pod_outputs.c).
+find_library(MATH_LIBRARY m)
+if(MATH_LIBRARY)
+    target_link_libraries(pod_host PRIVATE ${MATH_LIBRARY})
+endif()
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(pod_host PRIVATE -Wall -Wextra -Wpedantic)
     # Not an error on macOS: Apple's Clang is not a compiler CI builds with

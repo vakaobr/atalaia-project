@@ -455,6 +455,7 @@ What it lends (only what is fitted is in IDENT; decision PF6):
 | `audio` (MAX98357A and/or the piezo buzzer) | | `tone` {"freq","ms"}, `play` (the mode's clips as tones, `sound.c`'s patterns), `stop`, `set_volume` |
 | `nfc` (PN532) | `tag` {"uid", "tag"}: a player tag's record; join cards are not forwarded | |
 | `case` (tamper) | `opened`, `closed` | |
+| `<use>` (output: a simple output, optional) | | `on` {"ms"}, `off`, `pulse` {"ms"}, `pattern` {"on_ms","off_ms","ms"} |
 
 Button N stands for the game's N-th team, as on a Field Box; a colour set
 in Kconfig goes into its descriptor. The enclosure switch (GPIO 47 by
@@ -462,6 +463,25 @@ default, to GND, closed while the lid is shut) is armed once it has read
 closed, so a pod without one never alarms; the phone reports an opening as
 `node.tamper` (reason `pod_opened`). The battery gauge's level is in IDENT
 and in Pod Status.
+
+**Simple outputs** (optional, `CONFIG_ATALAIA_SIMPLE_OUT`; draft RFC "The expansion port",
+increment 9, EXP-26; `main/pod/pod_outputs.c`): the Field Box's output layer (`outputs.c`) and RMT
+bursts (`simple_out.c`, `simple_out_esp.c`) on **GPIO 33** (a second on **GPIO 1**,
+`ATALAIA_SIMPLE_OUT2`, with or without the buzzer), lent as `{"id":"siren","type":"output",
+"feedback":false}` after the other parts. A pod has no admin PIN (PODC-2), so building the output in
+enables it (EXP-28), with its use and longest on from the build (`ATALAIA_POD_OUT1_FUNCTION`,
+`ATALAIA_POD_OUT1_MAX_ON_S`, and `_OUT2_` for the second; `out.1` and 30 s by default). The phone
+runs the game's rules (`app/lib/prop/prop_outputs.dart`); the pod keeps the output layer's own
+limits (ms 1-600000, the build's longest on, a change at most every 500 ms; a refused CMD is still
+acknowledged), switches only while a phone is on a link, and turns every output off **at once when
+its last link goes** and **after 1.5 s without a frame from the phone while one is on** (the phone
+sends RADIO_CMD PING twice a second then; `POD_OUT_QUIET_MS`). The bursts are renewed by the pod's
+loop, so a hung pod stops them within 0.5 s. IDENT still fits in 256 bytes: with every part, the
+longest version and an output, the pod leaves out the buttons' colours and the `feedback` flags,
+then the version's build metadata, then the outputs (`pod_ident_level_t`). Size (ESP-IDF 5.3.2,
+2026-11-04): the pod image was 689,888 bytes before; 694,704 with the option off (the output layer is
+always built in), 697,808 with one output, 704,336 with two and the buzzer (17 % of the 4 MB slot);
+0 warnings.
 
 The radio is the USB modem's own code (`main/modem/modem.c`, frames
 shifted by 3): the phone sends plaintext packets with RADIO_TX, the pod
@@ -507,6 +527,8 @@ lists the checks that need the board and a phone. Code:
   too), Pod Status (plain C);
 - `main/pod/pod_caps.c` -- the capabilities on the HAL ops (plain C);
 - `main/pod/pod_settings.c` -- the settings pushed over the radio: parse, merge, stored form, apply (plain C);
+- `main/pod/pod_outputs.c` -- the simple outputs lent to the phone: descriptors, CMDs, the link and
+  lease rules, on the box's output layer (plain C);
 - `main/pod/pod_ble.c` -- the GATT service's logic, UUIDs and advertising
   data (plain C); `pod_ble_nimble.c` puts it on NimBLE;
 - `main/pod/pod_task.c`, `pod_main.c` -- the ESP-IDF task, USB, audio queue,
@@ -515,10 +537,15 @@ lists the checks that need the board and a phone. Code:
 Tests: `test/test_pod.c` (the proxy and the capabilities, against the
 shared vectors; a box's update offer through the pod, opened with the game key, its duty-cycle refusal, the box's `node.update_failed` coming back; CMD pod over the radio: taken and not passed on, a repeat, a stale rev, another node, another key), `test/test_pod_settings.c` (the shared vectors `protocol/vectors/pod_config.json` through the core's CMD decoder, the strict parser's limits, the stored form read back, what the settings do to the capabilities), `test/test_ble_gatt_stub.c` (`ctest -R ble_gatt_stub`: the
 GATT service with the Bluetooth stack stubbed), `test/test_proxy_codec.c`
-(the frames). `test/pod_host/` builds the pod's code with real AES-CCM into
+(the frames); the simple outputs in `test/test_pod.c` too (`test_outputs_*`: the IDENT vector
+`pod_simple_output`, IDENT's room with every part, the CMDs and their limits against a fake RMT, the
+boot's end of signal, a live off while linked, off when USB goes, after 1.5 s of silence and not
+while the phone pings). `test/pod_host/` builds the pod's code with real AES-CCM into
 a Linux program (USB and Bluetooth links as TCP sockets, the radio as UDP,
-the hardware on stdin) that the app's Dart tests
-(`app/test/pod/pod_host_test.dart`, `app/test/radio/pod_radio_link_test.dart`)
+the hardware on stdin; `--simple-out siren[@GPIO]`, twice at most, prints `OUTPUT siren on|off`
+and `PIN g33 low`, and `status` adds `outputs`) that the app's Dart tests
+(`app/test/pod/pod_host_test.dart`, `app/test/radio/pod_radio_link_test.dart`,
+`app/test/prop/prop_pod_outputs_test.dart`)
 and the controller's end-to-end test (`controller/tests/test_pod_e2e.py`)
 drive.
 
@@ -583,11 +610,13 @@ Piezo buzzer options (under "Piezo buzzer", the Field Box and the pod; decisions
 `ATALAIA_BUZZER` (default **off**: a passive piezo is fitted) and `ATALAIA_BUZZER_PIN` (default 45).
 See "Sound: the speaker and the piezo buzzer" below.
 
-Simple output options (under "Simple output (RC relay switch)", the Field Box; draft RFC "The expansion port",
-EXP-31 to EXP-37): `ATALAIA_SIMPLE_OUT` (default **off**), `ATALAIA_SIMPLE_OUT_PIN` (46 on a V4.3, 5 on a V4.2,
-following `ATALAIA_BOARD_REV`), `ATALAIA_SIMPLE_OUT2` (a second one, offered only without the buzzer) and
-`ATALAIA_SIMPLE_OUT2_PIN` (45). `python3 tools/docker_fw.py build|bench --simple-out=on|on2|<GPIO>` and
-`--buzzer=on` set them for that build folder. See "Outputs: the simple output" below.
+Simple output options (under "Simple output (RC relay switch)", the Field Box and the pod; draft RFC "The
+expansion port", EXP-31 to EXP-37): `ATALAIA_SIMPLE_OUT` (default **off**), `ATALAIA_SIMPLE_OUT_PIN` (46 on a
+V4.3, 5 on a V4.2, following `ATALAIA_BOARD_REV`; 33 on a pod), `ATALAIA_SIMPLE_OUT2` (a second one, offered
+only without the buzzer, except on a pod) and `ATALAIA_SIMPLE_OUT2_PIN` (45; 1 on a pod); on a pod also
+`ATALAIA_POD_OUT1_FUNCTION`, `ATALAIA_POD_OUT1_MAX_ON_S` (and `_OUT2_`). `python3 tools/docker_fw.py
+build|bench|pod --simple-out=on|on2|<GPIO>` and `--buzzer=on` set them for that build folder. See "Outputs: the
+simple output" below and "The I/O pod" above.
 
 GNSS options (under "GNSS"): `ATALAIA_GNSS_PWR_PIN` (34, VGNSS_Ctrl,
 active low; driven high, module off, at boot), `ATALAIA_GNSS_POWER_ON`
@@ -723,7 +752,8 @@ per burst and `PIN g46 low t=<ms>` when the last one has gone out; `status` adds
 **Not in this increment** (the RFC's later ones): the controllers sending CMD 12, their output API,
 `modules` in the node list and the capability start check, the console's outputs panel (3); modes
 using outputs (4); scenario triggers (5); the I2C port and its modules (6-8, 11); the I/O pod's
-simple outputs (9). **Not yet tried on hardware.**
+simple outputs (9: built on 2026-11-04, "The I/O pod" above; its port driver comes after 8). **Not yet
+tried on hardware.**
 
 **Size** (ESP-IDF 5.3.2, 2026-11-03, against the commit before this change): the Field Box image grew from
 2,163,296 to 2,174,736 bytes with the simple output off (+11,440: the output layer, its admin screen and
