@@ -318,10 +318,12 @@ timer, so the output ends on time even between polls.
   output-only one) is **gone**: its capabilities leave the box's list, the
   controller is told (section 5), and its outputs count as off (its lease has
   long run out by then).
-- **Hot-plug:** the buffer connects a module only when the bus is idle. Every
-  2 s the box probes one empty address of 0x58-0x5F with a one-byte address
-  write; a module that answers is read (`IDENT`, `CHANNEL`s), sent `ALL_OFF`
-  and `CLEAR_FRESH`, and added. A module plugged in during a game is usable at
+- **Hot-plug:** the buffer connects a module only when the bus is idle. The
+  box probes each empty address of 0x58-0x5F every 2 s with a one-byte address
+  write, one address every 250 ms in turn (an address with a module is
+  skipped), so a module plugged in is found within 2 s (bench test 3; the
+  maintainer's answer to EXPI6-4, 2026-11-04); a module that answers is read
+  (`IDENT`, `CHANNEL`s), sent `ALL_OFF` and `CLEAR_FRESH`, and added. A module plugged in during a game is usable at
   once by a mode that already calls its capability (calls before that were
   ignored).
 - The box sends `ALL_OFF` to every module it finds at boot, before anything
@@ -1021,7 +1023,7 @@ where a recommendation changes, it says so.
 | EXP-11 | Every output leased: 1.5 s, refreshed every 500 ms, at most 5 s |
 | EXP-12 | Desired state on the box, reconciled with each `STATUS` |
 | EXP-13 | Hard limits in the module, the box and the call; the lowest wins |
-| EXP-14 | Errors, gone after 25 failed reads, hot-plug by probing one empty address every 2 s, `ALL_OFF` at discovery and boot |
+| EXP-14 | Errors, gone after 25 failed reads, hot-plug by probing each empty address every 2 s (one every 250 ms in turn), `ALL_OFF` at discovery and boot |
 | EXP-15 | RP2040 reference processor, portable protocol core; bare PCF8574/MCP23017 relay boards not supported |
 | EXP-16 | I2C output module (later, optional since EXP-31): I2C isolator, own supply, RP2040, off-the-shelf opto-isolated relay board |
 | EXP-17 | SELV loads only; mains out of scope; smoke machines only through documented low-voltage inputs; no pyrotechnics |
