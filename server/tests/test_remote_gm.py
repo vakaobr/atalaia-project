@@ -148,12 +148,29 @@ class CommandTests(RemoteCase):
         self.assertEqual((details["command"], details["result"], details["controller_id"], details["game_id"]),
                          ("start", "done", CONTROLLER["id"], 4242))
         for what, params in (("pause", {"reason": "medic"}), ("resume", {}), ("message", {"text": "5 min"}),
-                             ("mode", {"name": "refill", "node": 7}), ("end", {})):
+                             ("mode", {"name": "refill", "node": 7}), ("outputs_off", {}), ("end", {})):
             with self.subTest(what):
                 r, cmd = await self.answered(stream, {"game": GAME, "command": what, "params": params})
                 self.assertEqual(r.status_code, 200, r.text)
                 self.assertEqual(cmd["params"], sync_format.check_command_params(what, dict(params)))
-        self.assertEqual(len(await self.audit()), 6)
+        self.assertEqual(len(await self.audit()), 7)
+
+    async def test_outputs_off_takes_no_params_and_there_is_no_outputs_on(self) -> None:
+        """A remote GM may only switch outputs off, never on (draft RFC "The expansion port", EXP-27)."""
+        stream = await self.controller()
+        r, cmd = await self.answered(stream, {"game": GAME, "command": "outputs_off"}, detail="every output off (seq 9)")
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual((cmd["command"], cmd["params"]), ("outputs_off", {}))
+        for body, error, path in (({"game": GAME, "command": "outputs_off", "params": {"capability": "siren"}},
+                                   "unknown_field", "params.capability"),
+                                  ({"game": GAME, "command": "output", "params": {"capability": "siren", "act": "on"}},
+                                   "not_allowed", "command"),
+                                  ({"game": GAME, "command": "outputs_on"}, "not_allowed", "command")):
+            with self.subTest(body=body):
+                r = await self.post(body)
+                self.assertEqual(r.status_code, 400, r.text)
+                self.assertEqual(r.json(), {"detail": "invalid_command", "error": error, "path": path})
+        self.assertEqual(stream.pending(), 0)
 
     async def test_refused_while_remote_gm_is_off(self) -> None:
         stream = await self.controller(remote_gm=False)
@@ -202,8 +219,9 @@ class CommandTests(RemoteCase):
         for who, headers in (("admin", admin), ("marshal", marshal), ("gm elsewhere", elsewhere),
                              ("server admin", server), ("no role", player)):
             with self.subTest(who):
-                r = await self.post({"game": GAME, "command": "end"}, headers=headers)
-                self.assertEqual((r.status_code, r.json()["detail"]), (403, "role_required"))
+                for command in ("end", "outputs_off"):
+                    r = await self.post({"game": GAME, "command": command}, headers=headers)
+                    self.assertEqual((r.status_code, r.json()["detail"]), (403, "role_required"))
                 r = await self.client.get(self.url(), headers=headers)
                 self.assertEqual(r.status_code, 403)
         r = await self.client.post(self.url("/commands"), json={"game": GAME, "command": "end"})
@@ -213,7 +231,7 @@ class CommandTests(RemoteCase):
         self.assertEqual((r.status_code, r.json()["detail"]), (409, "controller_offline"))
         self.assertEqual(stream.pending(), 0)
         rows = await self.audit()
-        self.assertEqual([json.loads(r["details"])["reason"] for r in rows], ["role_required"] * 5
+        self.assertEqual([json.loads(r["details"])["reason"] for r in rows], ["role_required"] * 10
                          + ["controller_offline"])
 
     async def test_the_controller_refuses_or_does_not_answer(self) -> None:

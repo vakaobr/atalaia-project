@@ -524,6 +524,32 @@ class RemoteGmTests(BrowserCase):
         await expect(page.locator("#remote-log tbody tr").first).to_contain_text("conflict")
         await self.check_page(page)
 
+    async def test_all_outputs_off(self) -> None:
+        """Draft RFC "The expansion port", EXP-27: the remote GM may only switch outputs off, in any state of
+        a live game, without a confirm (the console's "All outputs off"); the page has no way to turn one on."""
+        stream = await self.controller(LIVE)
+        name, secret = await self.staff("gm")
+        page = await self.new_page()
+        await self.login(page, name, secret, self.field_path("/remote-gm"))
+        card = page.locator("article.controller")
+        off = card.get_by_role("button", name="Desligar todas as saídas")
+        await expect(off).to_be_enabled()  # a game being prepared, too
+        await expect(card).to_contain_text("À distância só se pode desligar, nunca ligar.")
+        await off.click()
+        cmd = await self.answer(stream, detail="every output off (seq 12)")
+        self.assertEqual((cmd["command"], cmd["params"], cmd["game"]), ("outputs_off", {}, GAME))
+        await expect(page.locator("#command-result")).to_have_text("Feito: Desligar todas as saídas.")
+        self.assertEqual(self.dialogs, [])
+        await stream.send({"type": "live", "sync_version": 1, "controller": CTRL,
+                           "live": {**LIVE, "state": "ended"}})
+        await expect(off).to_be_disabled(timeout=15000)
+        await stream.send({"type": "live", "sync_version": 1, "controller": CTRL, "live": None})
+        await expect(off).to_be_disabled(timeout=15000)
+        await page.click("#log-refresh")
+        await expect(page.locator("#remote-log tbody tr")).to_have_count(1)
+        await expect(page.locator("#remote-log tbody tr").first).to_contain_text("outputs_off")
+        await self.check_page(page)
+
     async def test_the_view_is_pushed_and_not_polled(self) -> None:
         """S19-11: a stream delivers the view; the page's polling (GET .../remote-gm) stays silent meanwhile."""
         stream = await self.controller(LIVE)
@@ -585,6 +611,7 @@ class RemoteGmTests(BrowserCase):
         await expect(page.locator("#status")).to_contain_text("This part needs the GM role on this field")
         await expect(page.locator("article.controller")).to_have_count(0)
         await expect(page.locator("#remote-log-none")).to_be_visible()
+        await expect(page.get_by_role("button", name="All outputs off")).to_have_count(0)
 
 
 class AtakTests(BrowserCase):

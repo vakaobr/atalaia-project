@@ -1352,6 +1352,12 @@ class ControllerEngine {
         n['node_id']! as int: n,
     };
     final mode = _mode(_game!['mode_id']);
+    // A scenario's game: the outputs its triggers switch on each box, by the
+    // name the GM gave it (engine.py `_capability_check`).
+    final meta = scenarioMeta(_game!['mode_id']);
+    final names = meta == null
+        ? const <int, String>{}
+        : scenarios?.nodeNames(_game!['id']! as int) ?? const <int, String>{};
     return checkNodes([
       for (final (id, role) in nodes)
         () {
@@ -1365,6 +1371,7 @@ class ControllerEngine {
                 ? live!.hello!.capabilities
                 : row['capabilities'],
             'modules': _modules[id] ?? row['modules'],
+            if (meta != null) 'outputs': meta.nodeOutputs(names[id]),
           };
         }(),
     ], (role) => mode?.roles[role]);
