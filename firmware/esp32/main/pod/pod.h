@@ -50,6 +50,30 @@ typedef enum {
 #define POD_RETRIES  3   /* ... up to 3 times */
 #define POD_SEEN     16  /* CMD seqs remembered per link */
 
+/*
+ * How much IDENT leaves out to fit in 256 bytes (pod_send_ident tries each in turn, until one
+ * fits; decision PF6, increment 9 of the expansion port):
+ *   POD_IDENT_FULL        everything;
+ *   POD_IDENT_COMPACT     the buttons' colours, the outputs' "feedback" flags and the port's hit
+ *                         sensors' "channel" left out (all optional to the phone);
+ *   POD_IDENT_SHORT_FW    and fw_version cut to its release (0.8.0-dev.412+g8560d54: 0.8.0);
+ *   POD_IDENT_TRIM        and the outputs left out one at a time, the last first (trim 1, 2 ...:
+ *                         a pod with every part, a long version and two outputs, or every part
+ *                         and an output module), until the rest fit or none is left (logged,
+ *                         with the ones left out; decision EXPI9-27);
+ *   POD_IDENT_NO_PORT     and every output and the expansion port's hit sensors left out (logged).
+ * After the last, the capabilities are left out altogether. An output the IDENT sent left out is
+ * not lent: it is off and refused until an IDENT lists it (ident_sent, pod_port_ident_sent).
+ */
+typedef enum {
+    POD_IDENT_FULL = 0,
+    POD_IDENT_COMPACT = 1,
+    POD_IDENT_SHORT_FW = 2,
+    POD_IDENT_TRIM = 3,
+    POD_IDENT_NO_PORT = 4,
+    POD_IDENT_LEVELS = 5, /* ident_sent's level for an IDENT sent without capabilities */
+} pod_ident_level_t;
+
 /* What the pod's settings made of a CMD pod (pod_settings.h). */
 typedef enum {
     POD_CONFIG_APPLIED = 0, /* new settings taken: the pod acknowledges */
@@ -67,9 +91,12 @@ typedef struct {
      * capability or method (the CMD was acknowledged all the same). */
     bool (*command)(void *ctx, const atalaia_proxy_msg_t *cmd);
     /* The IDENT's fw_version, caps_json and battery; the pod fills has_radio,
-     * protocol_version, measure, field_frames and pair_frames. compact: the first try did not fit
-     * in 256 bytes; leave out what is optional (the buttons' colours). */
-    void (*ident)(void *ctx, atalaia_proxy_ident_t *out, bool compact);
+     * protocol_version, measure, field_frames and pair_frames. level: what to leave out
+     * (pod_ident_level_t; the pod itself cuts fw_version from POD_IDENT_SHORT_FW on); trim: at
+     * POD_IDENT_TRIM, how many outputs to leave out, the last first (0 at the other levels).
+     * Returns how many outputs caps_json lists (the pod trims while there are some). Called once
+     * per try: what it writes is only a proposal until ident_sent. */
+    int (*ident)(void *ctx, atalaia_proxy_ident_t *out, pod_ident_level_t level, int trim);
     /* A link became active (may be NULL): the capabilities may report their
      * state again (an open case). */
     void (*link_active)(void *ctx, pod_link_t link);
@@ -82,6 +109,10 @@ typedef struct {
      * {"rev"}; on APPLIED it also sends its IDENT again (the buttons' colours). May be NULL:
      * the CMD is then passed to the phone like any other packet. */
     pod_config_result_t (*config)(void *ctx, const char *params_json, uint32_t *rev);
+    /* The IDENT that goes out was the last ident call's (level and trim), or, at
+     * POD_IDENT_LEVELS, one without capabilities: what it did not list is not lent
+     * (pod_port_ident_sent). May be NULL. */
+    void (*ident_sent)(void *ctx, pod_ident_level_t level, int trim);
 } pod_io_t;
 
 typedef struct {
@@ -129,7 +160,8 @@ typedef struct {
     int replying;    /* the link of the frame being handled, or -1 */
     bool muted;      /* drop the modem's frames (an internal CLEAR) */
     uint16_t evt_seq;
-    int8_t last_rssi; /* RSSI of the last packet heard; INT8_MIN for none */
+    int8_t last_rssi;  /* RSSI of the last packet heard; INT8_MIN for none */
+    uint32_t heard_ms; /* when the phone's last valid frame came, on any link */
     pod_pending_t outbox[POD_OUTBOX];
     pod_counters_t count;
 } pod_t;
@@ -164,11 +196,20 @@ void pod_set_link_active(pod_t *p, pod_link_t link);
 
 bool pod_link_active(const pod_t *p, pod_link_t link);
 
+/* A phone is on a link (one is active), and when its last valid frame came: the outputs' lease
+ * (pod_outputs.h). */
+bool pod_phone_on(const pod_t *p);
+uint32_t pod_heard_ms(const pod_t *p);
+
 /* Bytes received on a link: complete frames are handled at once. */
 void pod_feed(pod_t *p, pod_link_t link, const uint8_t *data, size_t len);
 
 /* Sends an IDENT frame on a link. */
 void pod_send_ident(pod_t *p, pod_link_t link);
+
+/* Sends IDENT again on every active link (the capabilities changed: a module on the expansion
+ * port found or lost, pod_port.h). */
+void pod_send_ident_all(pod_t *p);
 
 /*
  * A capability's event, as an EVT on every active link (data_json: a JSON

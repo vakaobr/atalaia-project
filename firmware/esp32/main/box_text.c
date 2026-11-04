@@ -243,6 +243,8 @@ static const char *const texts[TX_COUNT][BOX_LANG_COUNT] = {
     [TX_OUTPUTS_ITEM] = {"Outputs", "Saídas", "Ausgänge", "電控"},
     [TX_OUTPUT_UP] = {"OUTPUT %d  GPIO %d", "SAÍDA %d  GPIO %d", "AUSGANG %d  GPIO %d",
                       "電控 %d  GPIO %d"},
+    [TX_OUTPUT_I2C_UP] = {"OUTPUT %d  I2C %s", "SAÍDA %d  I2C %s", "AUSGANG %d  I2C %s",
+                          "電控 %d  I2C %s"},
     [TX_OUT_ENABLED] = {"enabled", "ativada", "aktiv", "啟用"},
     [TX_OUT_DISABLED] = {"disabled", "desativada", "aus", "停用"},
     [TX_OUT_MAX_S] = {"on for %lu s at most", "ligada %lu s no máximo", "höchstens %lu s an",

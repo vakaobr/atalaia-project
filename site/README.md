@@ -26,7 +26,7 @@ which keeps English's ASCII folders (Han letters in an address are percent-encod
 | Game modes | `/modos/` | `/en/modes/` | `/de/modi/` | `/zh-tw/modes/` | `src/modes.html` | Every mode (each with its animation), the Codes modifier, the Medic Kit, "your mode" and the box's step-by-step screenshots |
 | Radio | `/radio/` | `/en/radio/` | `/de/funk/` | `/zh-tw/radio/` | `src/radio.html` | How the radio works: both diagrams with their lead-ins, and the channel |
 | Roadmap | `/roadmap/` | `/en/roadmap/` | `/de/roadmap/` | `/zh-tw/roadmap/` | `src/roadmap.html` | The six phases, each as a one-line summary, bullets of what is done (the long lists fold into a `<details>`), bullets of what is next or waiting, and its gate, with a link to the phase's `STATUS.md`. "Roadmap" stays in English in Portuguese too |
-| Build guides | `/montagem/` | `/en/build-guides/` | `/de/bauen/` | `/zh-tw/build-guides/` | `src/build.html` | Safety rules for every build; the Satellite, the I/O pod and the target addon shortened from `hardware/<node>/BUILD.md` (the full guides, in English), with their pin tables and photo placeholders; the Field Box's first bench build, with its photo and clip; a pointer to the Field Box's build manual (phase 5 plan phase 12, decisions P5J-1 to P5J-13) |
+| Build guides | `/montagem/` | `/en/build-guides/` | `/de/bauen/` | `/zh-tw/build-guides/` | `src/build.html` | Safety rules for every build; the Satellite, the I/O pod, the expansion port and the target addon shortened from `hardware/<node>/BUILD.md` (the full guides, in English and Portuguese), with their pin tables and photo placeholders; the Field Box's first bench build, with its photo and clip, and its simple output (an RC relay switch for a siren, strobe or smoke remote), which the Satellite and the pod refer to; a pointer to the Field Box's build manual (phase 5 plan phase 12, decisions P5J-1 to P5J-13, SITEB-1 to SITEB-9) |
 | How it fits together | `/como-se-liga/` | `/en/how-it-fits/` | `/de/zusammenspiel/` | `/zh-tw/how-it-fits/` | `src/architecture.html` | The seven architecture diagrams of `docs/architecture.md` as SVG, each with a short "what flows / what does not" text and a link to the doc (decision SITEARCH-1). Linked from the navigation, the roadmap and the build guides |
 | Glossary | `/glossario/` | `/en/glossary/` | `/de/glossar/` | `/zh-tw/glossary/` | `src/glossary.html` | Every glossary entry; the glossary links of every page lead here |
 
@@ -244,12 +244,20 @@ test reads `site/` as it is.
 every language: each GPIO cell names its Kconfig symbol (`<td data-kconfig="ATALAIA_BTN1_PIN">4</td>`),
 and `tools/check_wiring.py` (in `tools/check.sh`) fails if a number is not that symbol's default
 in `firmware/esp32/main/Kconfig.projbuild`. When a pin default changes, change the number here,
-in `hardware/satellite/BUILD.md` and in `hardware/io-pod/BUILD.md` together. The dashed
+in `hardware/satellite/BUILD.md` and in `hardware/io-pod/BUILD.md` together (the expansion port's
+table holds only SDA and SCL: `hardware/expansion-port/BUILD.md`). The simple output's pin follows the
+board revision (GPIO 46 on a V4.3, 5 on a V4.2), so it is written in the text, not in a pin table; the I/O
+pod's two simple outputs (GPIO 33 and 1, the pod build's defaults) are rows of its table without `data-kconfig`,
+since the check reads the Field Box's defaults (decision SITE9-2). The dashed
 `figure.photo` boxes mark where the first builds' photos go (plan phase HW2) for the Satellite, the
-I/O pod and the target addon; never a mock-up or generated picture. The Field Box's section no
+I/O pod, the expansion port and the target addon; never a mock-up or generated picture. The Field Box's section no
 longer has one: it opens with its first real photo and clip, the bench build of 2026-10-31
 (`#field-box-first-build`, see [Field Box photo and clip](#field-box-photo-and-clip)). Portuguese words: guia de montagem, caixa satélite, módulo de E/S, módulo de
-alvo; German: Bauanleitung, Satellit, I/O-Pod, Ziel-Addon.
+alvo, porta de expansão, saída simples; German: Bauanleitung, Satellit, I/O-Pod, Ziel-Addon,
+Erweiterungsanschluss, einfacher Ausgang; Chinese: 組裝指南, 衛星盒, I/O 模組, 標靶擴充模組, 擴充埠,
+簡易輸出. What waits for increment 8 of the draft RFC "The expansion port" (the target module's
+firmware, its pin table and UF2 files, the box reading the port) goes under "Coming with the
+firmware" (`build.coming`) and is never filled in before the firmware fixes it.
 
 The Field Box's section has a pin table of the same kind and its two WireViz wiring drawings
 (2026-10-26, the maintainer's request). The SVGs have one source, `hardware/field-box/wiring/*.svg`

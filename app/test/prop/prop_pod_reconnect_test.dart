@@ -13,7 +13,9 @@ import 'package:atalaia_app/core/node_types.dart';
 import 'package:atalaia_app/modes/mode_catalog.dart';
 import 'package:atalaia_app/pod/pod_client.dart';
 import 'package:atalaia_app/pod/pod_codec.dart';
+import 'package:atalaia_app/pod/pod_pairing.dart';
 import 'package:atalaia_app/pod/pod_reconnect.dart';
+import 'package:atalaia_app/pod/pod_transports.dart';
 import 'package:atalaia_app/prop/prop_game.dart';
 import 'package:atalaia_app/prop/prop_session.dart';
 import 'package:atalaia_app/protocol/join_payload.dart';
@@ -68,6 +70,44 @@ bool pressed(FakeRunningNode node, String team) =>
     node.inputs.any((i) => i.$1 == 'team_input.press' && i.$2?['team'] == team);
 
 void main() {
+  test('over Bluetooth, a pod that refuses the bond pairs again once; a wrong '
+      'passkey then stops the tries and says to link it again', () async {
+    const device = PodDevice(
+      kind: 'ble',
+      id: 'AA:BB',
+      name: 'atalaia-pod-AABB',
+    );
+    final node = FakeRunningNode();
+    final bonds = ScriptedBonds([
+      PodPairError.needsRepair,
+      PodPairError.wrongPasskey,
+    ]);
+    var tries = 0;
+    final s = session(
+      node,
+      reopen: (lost) async {
+        tries++;
+        return null;
+      },
+    );
+    await s.open();
+    final first = FakeBleLink(bonds);
+    await s.attachPod(PodClient(first, device: device));
+    await until(() => s.pod != null);
+    final repairing = <bool>[];
+    s.addListener(() => repairing.add(s.podRepairing));
+    await first.drop();
+    await until(() => s.podPhase == PodLinkPhase.relink);
+    expect(tries, 2);
+    expect(repairing, contains(true));
+    expect(s.podRepairing, isFalse);
+    expect(s.podRelinkMessage, 'pod.wrong_passkey');
+    expect(bonds.log, contains('forget AA:BB'));
+    expect(s.log, contains('pod: its bond was refused, pairing again'));
+    expect(s.log, contains('pod: link it again (pod.wrong_passkey)'));
+    await s.close();
+  });
+
   test('the pod comes back by itself and its buttons work again', () async {
     final node = FakeRunningNode();
     final links = <FakePodLink>[];

@@ -50,6 +50,16 @@ elseif(CONFIG_ATALAIA_POD_MODE)
         "pod/pod_json.c"
         "pod/pod_settings.c"
         "pod/pod_ble.c"
+        "pod/pod_pair.c"
+        "pod/pod_outputs.c"
+        "pod/pod_port.c"
+        "expansion.c"
+        "expansion_box.c"
+        "expansion_esp.c"
+        "outputs.c"
+        "simple_out.c"
+        "simple_out_esp.c"
+        "screen_json.c"
         "sound.c"
         "sound_esp.c"
         "modem/modem.c"
@@ -77,6 +87,20 @@ elseif(CONFIG_ATALAIA_POD_MODE)
     )
     if(CONFIG_ATALAIA_POD_BLE)
         list(APPEND ATALAIA_SRCS "pod/pod_ble_nimble.c")
+    endif()
+    # The OLED, dark but for the Bluetooth passkey (decision PODPK-2): the OLED view's layout.
+    if(CONFIG_ATALAIA_POD_BLE AND CONFIG_ATALAIA_OLED_STATUS)
+        list(APPEND ATALAIA_SRCS
+            "pod/pod_display.c"
+            "oled_view.c"
+            "oled_logo.c"
+            "box_text.c"
+            "screen_json.c"
+            "fonts/lv_font_atalaia_14.c"
+            "fonts/lv_font_atalaia_20.c"
+            "fonts/lv_font_atalaia_28.c"
+            "hal/esp/hal_esp_oled.c"
+        )
     endif()
     if(CONFIG_ATALAIA_BUZZER)
         list(APPEND ATALAIA_SRCS "hal/esp/hal_esp_buzzer.c")
@@ -162,6 +186,7 @@ else()
         "reset_reason_esp.c"
         "expansion.c"
         "expansion_esp.c"
+        "expansion_box.c"
         "sound.c"
         "sound_esp.c"
         "outputs.c"

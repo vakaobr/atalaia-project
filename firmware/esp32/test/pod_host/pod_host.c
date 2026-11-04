@@ -26,7 +26,22 @@
  *   pod_host [--usb-port N] [--ble-port N] [--ble-mtu N] [--air-port N]
  *            [--air-peer N] [--no-radio] [--buttons N] [--colour N=NAME]...
  *            [--no-keypad] [--no-nfc] [--no-leds] [--no-audio] [--no-case]
- *            [--led-count N]
+ *            [--led-count N] [--simple-out FUNCTION[@GPIO]]... [--module NAME[@ADDR]]...
+ *            [--module-outputs] [--module-max-on S]
+ *
+ * --simple-out (up to twice; draft RFC "The expansion port", increment 9): a simple output (an
+ * RC relay switch, main/pod/pod_outputs.c with the firmware's output layer and burst scheduler)
+ * with that use (siren, strobe, smoke, light, horn, out.1-out.9), enabled as a pod build enables
+ * it, on GPIO 33 (the second: GPIO 1) or the GPIO given; its longest on is 30 s.
+ *
+ * --module NAME[@ADDR] (up to four; the port half of increment 9, main/pod/pod_port.c): a module
+ * on the pod's expansion port, simulated on the real module core (firmware/module-core/, through
+ * test/module_sim.c) behind a fake I2C bus that the firmware's own port driver reads, as the host
+ * box's --module: NAME target (one hit channel, at 0x58) or out4 (four relay outputs: siren,
+ * strobe, smoke, out.4; at 0x5C), ADDR 58-5f in hex. Its hit sensors are lent as hit (hit.2), its
+ * output channels only with --module-outputs (as a pod built with
+ * CONFIG_ATALAIA_POD_MODULE_OUTPUTS), each at most --module-max-on seconds (30 by default) and
+ * the module's own longest on. The EVT pod.modules follows every IDENT and every change.
  *
  * stdin, one command per line:
  *   press <1-4> | release <1-4>    a team button goes down or up
@@ -38,6 +53,9 @@
  *   case open | case closed        the enclosure switch
  *   battery <0-100>                the battery gauge's reading
  *   settings                       the settings pushed over the radio (a POD settings line)
+ *   hit <addr> <0-255> [<channel>]  a hit on a module's plate, as its firmware feels it
+ *   unplug <addr> | plug <addr>    a module's cable pulled out or plugged in again (a restart)
+ *   @modules                       one "LOG modules: [...]" line: the port's modules
  *   status                         one STATUS line (JSON)
  *   quit
  * stdout: "READY usb=<port> ble=<port> air=<port>", then
@@ -45,6 +63,9 @@
  *   TONE <hz> <ms> | AUDIO stop | AUDIO volume <pct>
  *   TX <hex>        a packet the pod's radio put on air
  *   POD settings <json>  new settings taken from a CMD pod (opcode 10; main/pod/pod_settings.h)
+ *   OUTPUT <id> on|off t=<ms>  what a simple output shows changed (2.0 ms pulses or not)
+ *   PIN g<gpio> low t=<ms>     a simple output's last burst has gone out: no signal at all
+ *   MODULE <addr> outputs=0x<bitmap> t=<ms>  a module's relays changed
  *   LOG <text>      the pod's log
  *   STATUS {...}
  * Port 0 picks a free port. It serves one client per link and runs until
@@ -70,7 +91,11 @@
 #include "pod/pod.h"
 #include "pod/pod_ble.h"
 #include "pod/pod_caps.h"
+#include "module_sim.h"
+#include "pod/pod_outputs.h"
+#include "pod/pod_port.h"
 #include "pod/pod_settings.h"
+#include "simple_out.h"
 #include "radio/noise_stats.h"
 #include "radio/radio_limits.h"
 
@@ -282,21 +307,252 @@ static uint32_t now(void *ctx)
     return mono_ms();
 }
 
+/* ---- Simple outputs (--simple-out): the RMT a fake that remembers when its bursts end ---- */
+
+static pod_outputs_t outs;
+static simple_out_t simple[OUTPUTS_MAX];
+static uint32_t pin_low_at[OUTPUTS_MAX]; /* when the last burst ends; 0: told already */
+static bool shown[OUTPUTS_MAX];          /* what OUTPUT said last */
+static uint32_t host_now;
+/* The simple outputs added (their own count: outputs_t's may one day hold module channels too). */
+static int simple_count;
+static int channel_of[OUTPUTS_MAX]; /* simple output i's index in the output layer */
+
+static bool fake_rmt_send(void *ctx, uint16_t width_us, uint16_t frames, bool flush)
+{
+    simple_out_t *so = (simple_out_t *)ctx;
+    int i = (int)(so - simple);
+    (void)width_us;
+    uint32_t start = flush || !simple_out_pulsing(so, host_now) ? host_now : so->horizon_ms;
+    pin_low_at[i] = start + (uint32_t)frames * SO_FRAME_MS;
+    if (pin_low_at[i] == 0) pin_low_at[i] = 1;
+    return true;
+}
+
+static void outputs_log(void *ctx, const char *line)
+{
+    (void)ctx;
+    out("LOG output: %s", line);
+}
+
+/* "FUNCTION[@GPIO]": false for a bad use or GPIO. */
+static bool add_simple_out(const char *arg)
+{
+    int i = simple_count;
+    if (i >= OUTPUTS_MAX) return false;
+    char fn[OUT_ID_MAX + 1];
+    int gpio = i == 0 ? 33 : 1;
+    const char *at = strchr(arg, '@');
+    size_t n = at ? (size_t)(at - arg) : strlen(arg);
+    if (n == 0 || n > OUT_ID_MAX) return false;
+    memcpy(fn, arg, n);
+    fn[n] = '\0';
+    if (at != NULL) gpio = atoi(at + 1);
+    if (!outputs_function_ok(fn) || simple_out_pin_problem(gpio, SO_BOARD_V4_3, -1, NULL, 0)) {
+        return false;
+    }
+    for (int j = 0; j < i; j++) {
+        if (simple[j].gpio == gpio) return false;
+    }
+    out_settings_t s;
+    outputs_default_settings(i, &s);
+    s.enabled = true; /* as a pod build with the output enables it */
+    snprintf(s.function, sizeof(s.function), "%s", fn);
+    simple_out_rmt_t rmt = {.ctx = &simple[i], .send = fake_rmt_send};
+    simple_out_init(&simple[i], gpio, &rmt);
+    out_backend_t be = {.ctx = &simple[i], .drive = simple_out_backend_drive};
+    int ch = outputs_add_simple(&outs.out, gpio, &be, &s);
+    if (ch < 0) return false;
+    channel_of[i] = ch;
+    simple_count++;
+    return true;
+}
+
+/* The outputs' tick, and what changed as OUTPUT and PIN lines. */
+static void outputs_turn(uint32_t t)
+{
+    host_now = t;
+    pod_outputs_tick(&outs, pod_phone_on(&pod), pod_heard_ms(&pod), t);
+    for (int i = 0; i < simple_count; i++) {
+        bool level = outputs_level(&outs.out, channel_of[i]);
+        if (level != shown[i]) {
+            shown[i] = level;
+            out("OUTPUT %s %s t=%lu", outs.out.ch[channel_of[i]].id, level ? "on" : "off",
+                (unsigned long)t);
+        }
+        if (pin_low_at[i] != 0 && (int32_t)(t - pin_low_at[i]) >= 0 &&
+            !simple_out_pulsing(&simple[i], t)) {
+            out("PIN g%d low t=%lu", simple[i].gpio, (unsigned long)pin_low_at[i]);
+            pin_low_at[i] = 0;
+        }
+    }
+}
+
+static void print_outputs(char *buf, size_t cap)
+{
+    size_t len = (size_t)snprintf(buf, cap, "[");
+    for (int i = 0; i < simple_count && len + 2 < cap; i++) {
+        const out_channel_t *c = &outs.out.ch[channel_of[i]];
+        len += (size_t)snprintf(buf + len, cap - len,
+                                "%s{\"id\":\"%s\",\"gpio\":%d,\"on\":%s,\"pulsing\":%s,"
+                                "\"bursts\":%lu}",
+                                i ? "," : "", c->id, c->gpio, c->level ? "true" : "false",
+                                simple_out_pulsing(&simple[i], host_now) ? "true" : "false",
+                                (unsigned long)simple[i].bursts);
+    }
+    if (len + 2 <= cap) snprintf(buf + len, cap - len, "]");
+}
+
+/* ---- Modules on the expansion port (--module): the module core behind a fake I2C bus ---- */
+
+static pod_port_t port;
+static pod_port_config_t port_cfg = {.module_outputs = false,
+                                     .module_max_on_s = OUT_MAX_ON_DEFAULT_S};
+static module_sim_t modules[EXP_ADDR_COUNT];
+static bool module_present[EXP_ADDR_COUNT]; /* a module at that address (plugged in or not) */
+static bool module_plugged[EXP_ADDR_COUNT];
+static uint8_t module_shown[EXP_ADDR_COUNT]; /* its outputs as last printed */
+static int module_count;
+
+static module_sim_t *module_at(uint8_t addr)
+{
+    if (addr < EXP_ADDR_FIRST || addr > EXP_ADDR_LAST) return NULL;
+    int i = addr - EXP_ADDR_FIRST;
+    return module_present[i] && module_plugged[i] ? &modules[i] : NULL;
+}
+
+static bool sim_probe(void *ctx, uint8_t addr)
+{
+    (void)ctx;
+    return module_at(addr) != NULL;
+}
+
+static int sim_write(void *ctx, uint8_t addr, const uint8_t *data, size_t len)
+{
+    (void)ctx;
+    module_sim_t *m = module_at(addr);
+    if (m == NULL) return EXP_BUS_FAIL;
+    module_sim_write(m, host_now, data, len);
+    return EXP_BUS_OK;
+}
+
+static int sim_write_read(void *ctx, uint8_t addr, const uint8_t *o, size_t olen, uint8_t *in,
+                          size_t ilen)
+{
+    (void)ctx;
+    module_sim_t *m = module_at(addr);
+    if (m == NULL) return EXP_BUS_FAIL;
+    module_sim_write(m, host_now, o, olen);
+    module_sim_read(m, host_now, in, ilen);
+    return EXP_BUS_OK;
+}
+
+/* "--module NAME[@ADDR]": false for an unknown NAME, a bad or taken address. */
+static bool add_module(const char *arg)
+{
+    char name[16];
+    unsigned addr = 0;
+    const char *at = strchr(arg, '@');
+    size_t n = at ? (size_t)(at - arg) : strlen(arg);
+    if (n == 0 || n >= sizeof(name) || module_count >= EXP_MODULES_MAX) return false;
+    memcpy(name, arg, n);
+    name[n] = '\0';
+    if (at != NULL &&
+        (sscanf(at + 1, "%x", &addr) != 1 || addr < EXP_ADDR_FIRST || addr > EXP_ADDR_LAST)) {
+        return false;
+    }
+    module_sim_t probe;
+    if (!module_sim_named(&probe, name, (uint8_t)addr, 0)) return false;
+    int i = probe.cfg.address - EXP_ADDR_FIRST;
+    if (module_present[i]) return false;
+    modules[i] = probe;
+    /* the core keeps a pointer to the module for its outputs: start it where it stays */
+    module_sim_restart(&modules[i], 0);
+    module_present[i] = module_plugged[i] = true;
+    module_count++;
+    return true;
+}
+
+/* Every turn: the modules' own timers, and their outputs printed when they change. */
+static void modules_tick(uint32_t t)
+{
+    for (int i = 0; i < EXP_ADDR_COUNT; i++) {
+        if (!module_present[i] || !module_plugged[i]) continue;
+        uint8_t bits = 0;
+        module_sim_state(&modules[i], t, &bits, NULL);
+        if (bits != module_shown[i]) {
+            module_shown[i] = bits;
+            out("MODULE %02x outputs=0x%02x t=%lu", EXP_ADDR_FIRST + i, (unsigned)bits,
+                (unsigned long)t);
+        }
+    }
+}
+
+/* "hit <addr> <strength> [<channel>]", "unplug <addr>", "plug <addr>", "@modules". */
+static bool module_command(const char *line, uint32_t t)
+{
+    unsigned addr = 0, value = 0, channel = 0;
+    if (strcmp(line, "@modules") == 0) {
+        char mods[512];
+        pod_port_status_json(&port, mods, sizeof(mods));
+        out("LOG modules: %s", mods);
+        return true;
+    }
+    if (sscanf(line, "hit %x %u %u", &addr, &value, &channel) >= 2) {
+        module_sim_t *m = module_at((uint8_t)addr);
+        bool kept = m != NULL && value <= 255 &&
+                    module_sim_hit(m, t, (uint8_t)channel, MC_EVENT_HIT, (uint8_t)value);
+        out("LOG module %02x: hit %u %s", addr, value,
+            kept ? "felt" : "not kept (no such module, or the channel is not armed)");
+        return true;
+    }
+    bool unplug = sscanf(line, "unplug %x", &addr) == 1;
+    if (unplug || sscanf(line, "plug %x", &addr) == 1) {
+        if (addr < EXP_ADDR_FIRST || addr > EXP_ADDR_LAST ||
+            !module_present[addr - EXP_ADDR_FIRST]) {
+            out("LOG module %02x: none at that address", addr);
+            return true;
+        }
+        int i = (int)addr - EXP_ADDR_FIRST;
+        if (!unplug && !module_plugged[i]) {
+            module_sim_restart(&modules[i], t); /* power again: a fresh start */
+            module_shown[i] = 0;
+        }
+        if (unplug && module_plugged[i] && module_shown[i] != 0) {
+            module_shown[i] = 0; /* no power: its relays drop */
+            out("MODULE %02x outputs=0x00 t=%lu", addr, (unsigned long)t);
+        }
+        module_plugged[i] = !unplug;
+        out("LOG module %02x: %s", addr, unplug ? "unplugged" : "plugged in");
+        return true;
+    }
+    return false;
+}
+
 static bool command(void *ctx, const atalaia_proxy_msg_t *m)
 {
     (void)ctx;
+    if (pod_outputs_owns(&outs, m->cap_id)) return pod_outputs_command(&outs, m);
+    if (pod_port_owns(&port, m->cap_id)) return pod_port_command(&port, m);
     return pod_caps_command(&caps, m);
 }
 
-static void ident(void *ctx, atalaia_proxy_ident_t *id, bool compact)
+static int ident(void *ctx, atalaia_proxy_ident_t *id, pod_ident_level_t level, int trim)
 {
     (void)ctx;
     snprintf(id->fw_version, sizeof(id->fw_version), "host-pod");
-    if (pod_caps_descriptors(&caps, id->caps_json, sizeof(id->caps_json), !compact) == 0) {
-        snprintf(id->caps_json, sizeof(id->caps_json), "[]");
-    }
+    int listed =
+        pod_port_ident_caps(&port, &caps, level, trim, id->caps_json, sizeof(id->caps_json));
     id->has_battery = battery >= 0;
     id->battery_pct = battery >= 0 ? (uint8_t)battery : 0;
+    return listed;
+}
+
+static void ident_sent(void *ctx, pod_ident_level_t level, int trim)
+{
+    (void)ctx;
+    (void)trim;
+    pod_port_ident_sent(&port, level);
 }
 
 static bool emit(void *ctx, const char *cap, const char *event, const char *data)
@@ -327,6 +583,12 @@ static void log_line(void *ctx, const char *line)
 {
     (void)ctx;
     out("LOG %s", line);
+}
+
+static void port_ident_changed(void *ctx)
+{
+    (void)ctx;
+    pod_send_ident_all(&pod);
 }
 
 /* The radio, as the host modem simulates it: the duty cycle per sub-band, the air as UDP. */
@@ -420,10 +682,13 @@ static void put_card(const char *uid_hex, const uint8_t *mem, size_t mem_len)
 
 static void print_status(void)
 {
+    char outputs[512];
+    print_outputs(outputs, sizeof(outputs));
     out("STATUS {\"usb\":%s,\"ble\":%s,\"radio_configured\":%s,\"radio_owner\":%d,\"pending\":%u,"
         "\"evt_sent\":%lu,\"evt_acked\":%lu,\"evt_lost\":%lu,\"cmds\":%lu,\"cmd_repeats\":%lu,"
         "\"cmd_unknown\":%lu,\"bad_payloads\":%lu,\"ignored\":%lu,\"links_broken\":%lu,"
-        "\"field_tx\":%lu,\"field_rx\":%lu}",
+        "\"field_tx\":%lu,\"field_rx\":%lu,\"outputs\":%s,\"output_quiet_offs\":%lu,"
+        "\"output_link_offs\":%lu,\"output_refused\":%lu}",
         pod_link_active(&pod, POD_LINK_USB) ? "true" : "false",
         pod_link_active(&pod, POD_LINK_BLE) ? "true" : "false",
         pod.radio.configured ? "true" : "false", pod.radio_owner, (unsigned)pod_pending(&pod),
@@ -432,7 +697,8 @@ static void print_status(void)
         (unsigned long)pod.count.cmd_repeats, (unsigned long)pod.count.cmd_unknown,
         (unsigned long)pod.count.bad_payloads, (unsigned long)pod.count.ignored,
         (unsigned long)pod.count.links_broken, (unsigned long)pod.radio.count.field_tx,
-        (unsigned long)pod.radio.count.field_rx);
+        (unsigned long)pod.radio.count.field_rx, outputs, (unsigned long)outs.quiet_offs,
+        (unsigned long)outs.link_offs, (unsigned long)outs.refused);
 }
 
 /* Returns false on "quit". */
@@ -476,6 +742,8 @@ static bool control(char *line)
         if (pod_settings_to_json(&settings, json, sizeof(json)) > 0) out("POD settings %s", json);
     } else if (strcmp(line, "status") == 0) {
         print_status();
+    } else if (module_command(line, mono_ms())) {
+        /* a module's hit, cable or status */
     } else if (strcmp(line, "quit") == 0) {
         return false;
     } else if (line[0]) {
@@ -535,6 +803,8 @@ int main(int argc, char **argv)
     static char colours[POD_BUTTONS][24];
     int nbuttons = POD_BUTTONS;
     cfg.keypad = cfg.nfc = cfg.leds = cfg.audio = cfg.tamper = true;
+    outputs_ops_t out_ops = {.log = outputs_log};
+    pod_outputs_init(&outs, &out_ops);
     radio_limits_init(&limits, 14, 2);
     radio_limits_set_channel(&limits, radio_region_default_channel_hz(RADIO_REGION));
     for (int i = 1; i < argc; i++) {
@@ -573,6 +843,27 @@ int main(int argc, char **argv)
             cfg.audio = false;
         } else if (strcmp(argv[i], "--no-case") == 0) {
             cfg.tamper = false;
+        } else if (strcmp(argv[i], "--module") == 0 && i + 1 < argc) {
+            if (!add_module(argv[++i])) {
+                fprintf(stderr,
+                        "pod_host: --module %s: NAME[@ADDR] (target or out4; ADDR 58-5f in hex, "
+                        "one module per address, at most %d)\n",
+                        argv[i], EXP_MODULES_MAX);
+                return 2;
+            }
+        } else if (strcmp(argv[i], "--module-outputs") == 0) {
+            port_cfg.module_outputs = true;
+        } else if (strcmp(argv[i], "--module-max-on") == 0) {
+            long sec = arg_value(argc, argv, &i);
+            port_cfg.module_max_on_s = (uint32_t)(sec < 1 ? 1 : sec > 600 ? 600 : sec);
+        } else if (strcmp(argv[i], "--simple-out") == 0 && i + 1 < argc) {
+            if (!add_simple_out(argv[++i])) {
+                fprintf(stderr,
+                        "pod_host: --simple-out %s: FUNCTION[@GPIO] (siren, strobe, smoke, light, "
+                        "horn, out.1-out.9; at most %d, each on its own free GPIO)\n",
+                        argv[i], OUTPUTS_MAX);
+                return 2;
+            }
         } else {
             fprintf(stderr, "pod_host: unknown option %s\n", argv[i]);
             return 2;
@@ -605,7 +896,8 @@ int main(int argc, char **argv)
     pod_audio_t audio = {hw_tone, hw_stop, hw_volume, NULL};
     pod_caps_init(&caps, &cfg, &hal, &audio);
     build_cfg = caps.cfg;
-    pod_io_t io = {link_write, now, command, ident, link_active, log_line, NULL, config_cmd};
+    pod_io_t io = {link_write, now,  command,    ident,     link_active,
+                   log_line,   NULL, config_cmd, ident_sent};
     modem_io_t rio = {
         .radio_send = radio_send,
         .set_channel = set_channel,
@@ -614,6 +906,15 @@ int main(int argc, char **argv)
         .measure_start = measure_start,
     };
     pod_init(&pod, &io, &rio, &atalaia_crypto_mbedtls, "host-pod", radio, 16);
+    /* The expansion port after the outputs (EXP-29): with --module, the simulated modules' bus;
+     * without, no port (the simple outputs are still told). */
+    static exp_bus_t bus = {
+        .ctx = NULL, .probe = sim_probe, .write = sim_write, .write_read = sim_write_read};
+    pod_port_ops_t port_ops = {
+        .ctx = NULL, .emit = emit, .ident_changed = port_ident_changed, .log = log_line};
+    pod_port_init(&port, module_count > 0 ? &bus : NULL, &outs, &port_cfg, &port_ops);
+    host_now = mono_ms();
+    pod_port_start(&port, host_now);
     pod_ble_stack_t stack = {ble_notify, NULL};
     pod_ble_init(&ble, &pod, &stack, true);
 
@@ -710,6 +1011,9 @@ int main(int argc, char **argv)
         if (measure_pending && (int32_t)(t - measure_done_at) >= 0) finish_measure();
         pod_tick(&pod);
         pod_ble_flush(&ble);
+        outputs_turn(t);
+        pod_port_tick(&port, pod_phone_on(&pod), t);
+        modules_tick(t);
     }
     return 0;
 }
