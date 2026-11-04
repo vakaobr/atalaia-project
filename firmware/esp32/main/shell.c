@@ -63,6 +63,8 @@
 #endif
 #include "serial_console.h"
 #include "simple_out_esp.h"
+#include "expansion_box.h"
+#include "expansion_esp.h"
 #include "sound_esp.h"
 #include "wifi_setup.h"
 
@@ -168,6 +170,10 @@ static admin_pin_t admin_guard;
  * cap(fn) calls, the admin's settings (outputs_admin.h). */
 static outputs_t outs;
 static outputs_admin_t outs_admin;
+/* The expansion port (expansion_box.h; draft RFC "The expansion port", increment 8): modules on
+ * the M12 socket, started at boot after the outputs and ticked by the game task. */
+static expansion_box_t port;
+static bool port_on; /* the bus is installed */
 /* HELLO's capability type ids for the parts hal_start found (protocol/schema/capabilities.yaml). */
 static uint8_t hal_caps[16];
 static uint8_t hal_caps_count;
@@ -425,6 +431,17 @@ static void serial_command(const char *cmd)
         return;
     }
 #endif
+    /* "@modules": the expansion port's modules (address, model, firmware, capabilities, armed). */
+    if (strcmp(cmd, "modules") == 0) {
+        static char mods[512];
+        if (!port_on) {
+            ESP_LOGI(TAG, "modules: the expansion port's bus is not installed");
+        } else {
+            expansion_box_status_json(&port, mods, sizeof(mods));
+            ESP_LOGI(TAG, "modules: %s", mods);
+        }
+        return;
+    }
     /* "@outputs" and "@output <n> ..." (outputs_admin.h): a change wants the admin PIN as its last
      * word in a release build, as "@joinkey" (decision EXP-28); a bench build takes it without. */
     if (strcmp(cmd, "outputs") == 0 || outputs_admin_args(cmd) >= 0) {
@@ -655,6 +672,27 @@ static void outputs_event(void *ctx, const char *type, const char *data_json)
 }
 
 static void outputs_log(void *ctx, const char *line)
+{
+    (void)ctx;
+    ESP_LOGI(TAG, "%s", line);
+}
+
+/* ---- The expansion port's shell ops (expansion_box.h) ---- */
+
+static void port_input(void *ctx, const char *type, const char *data_json)
+{
+    (void)ctx;
+    if (runner.running) node_runner_input(&runner, type, data_json);
+}
+
+static void port_event(void *ctx, const char *type, const char *data_json)
+{
+    (void)ctx;
+    ESP_LOGW(TAG, "event %s %s", type, data_json);
+    box_game_output_event(&box, type, data_json); /* a field game's controller hears it */
+}
+
+static void port_log(void *ctx, const char *line)
 {
     (void)ctx;
     ESP_LOGI(TAG, "%s", line);
@@ -975,6 +1013,7 @@ static void box_start(const char *tier)
     box_game_init(&box, &runner, &game_preset, nvs ? atalaia_box_store_esp() : &no_store, &ops,
                   &atalaia_crypto_mbedtls, nvs, &game_log, &hello);
     box_game_set_outputs(&box, &outs);
+    if (port_on) box_game_set_port(&box, &port);
     box.state_interval_ms = (uint32_t)CONFIG_ATALAIA_STATE_INTERVAL_S * 1000u;
     box.has_picker = true; /* "ready" says a key brings the game picker */
     /* battery.low below this level, only with a MAX17048 (box_battery() is -1 without one). */
@@ -1257,6 +1296,8 @@ static void task_game(void *arg)
         /* The outputs: the game's state and the clock; each simple output's burst is renewed here,
          * so if this task stops, the pulses stop within 0.5 s (EXP-32). */
         outputs_tick(&outs, box_game_output_state(&box), now);
+        /* The expansion port: hot-plug, polls, hits to the mode, the modules' outputs' lease. */
+        if (port_on) expansion_box_tick(&port, box_game_output_state(&box), now);
         if (runner.running || runner.queues.screen_count || runner.queues.audio_count) {
             /* Forward screen updates to the LVGL queue. */
             for (int i = 0; i < runner.queues.screen_count; i++) {
@@ -1614,6 +1655,20 @@ void app_main(void)
         outputs_init(&outs, &oops);
         simple_out_esp_init(&outs);
         outputs_tick(&outs, OUT_GAME_NONE, (uint32_t)(esp_timer_get_time() / 1000));
+    }
+    /* The expansion port next (EXP-29): ALL_OFF to every module on the socket before anything
+     * else, then each one read and added; the game task probes for more every 2 s. */
+    {
+        exp_bus_t bus;
+        if (expansion_esp_bus(&bus)) {
+            xb_ops_t xops = {
+                .ctx = NULL, .input = port_input, .event = port_event, .log = port_log};
+            expansion_box_init(&port, &bus, &outs, &xops);
+            expansion_box_start(&port, (uint32_t)(esp_timer_get_time() / 1000));
+            port_on = true;
+        } else {
+            ESP_LOGW(TAG, "expansion port: the I2C bus could not be installed; no modules");
+        }
     }
     key_filter_init(&key_filter);
 #if SERIAL_INPUT

@@ -41,8 +41,9 @@
  *
  * Platform-free: the bus is a small interface (exp_bus_t; expansion_esp.c on the ESP32, the
  * host tests' simulated modules on the module core in test/module_sim.c), the clock is the
- * caller's, and what the driver learns goes to callbacks. Nothing calls it yet: the game task,
- * hits to the script, node.modules and node.module_lost come with increment 8.
+ * caller's, and what the driver learns goes to callbacks. The game task runs it through
+ * expansion_box.h (increment 8): hits to the script, node.modules and node.module_lost, and a
+ * module's output channels in the output layer.
  */
 #ifndef ATALAIA_EXPANSION_H
 #define ATALAIA_EXPANSION_H
@@ -322,6 +323,10 @@ exp_result_t expansion_output(expansion_t *e, uint8_t addr, uint8_t channel,
 /* Every output of every module off now (ALL_OFF at the next tick): boot, pause, end, halt. */
 void expansion_all_off(expansion_t *e);
 
+/* Renames a usable channel of the module at addr (the output layer names a module's outputs
+ * beside the simple outputs: expansion_box.c); true when it changed. */
+bool expansion_set_cap(expansion_t *e, uint8_t addr, uint8_t channel, const char *id);
+
 /* The module and channel whose capability id is cap: true when found. */
 bool expansion_find(const expansion_t *e, const char *cap, uint8_t *addr, uint8_t *channel);
 
@@ -336,7 +341,8 @@ size_t expansion_module_text(const exp_module_t *m, char *out, size_t cap);
 
 /* An out_backend_t's ctx for a module's output channel: outputs.c's drive(on, live) becomes the
  * channel's desired state (on until off, bounded by the module's max on and the lease; off).
- * Increment 8 adds such channels to the output layer. */
+ * The box's output layer uses expansion_box_backend_set instead (expansion_box.h), which passes
+ * a duration and a pattern through. */
 typedef struct {
     expansion_t *exp;
     uint8_t addr;

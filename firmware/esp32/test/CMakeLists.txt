@@ -193,6 +193,7 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/status_hold.c
     ${SHELL_DIR}/tft_splash.c
     ${SHELL_DIR}/expansion.c
+    ${SHELL_DIR}/expansion_box.c
     ${MODULE_CORE_DIR}/src/module_core.c
     ${SHELL_DIR}/sound.c
     ${SHELL_DIR}/outputs.c
@@ -266,6 +267,7 @@ set(TEST_SOURCES
     test_status_hold.c
     test_tft_splash.c
     test_expansion.c
+    test_expansion_box.c
     module_sim.c
     test_sound.c
     test_outputs.c
