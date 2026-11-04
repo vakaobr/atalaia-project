@@ -245,6 +245,11 @@ typedef struct {
      * link_up adds `output` while an output is enabled. */
     uint8_t base_caps[16];
     uint8_t base_caps_count;
+    /* The expansion port (expansion_box.h; box_game_set_port): HELLO's `hit`, the modules' entries
+     * in node.modules. NULL: none. */
+    expansion_box_t *port;
+    /* node.modules' text as last told in this link (a change is told again, even to nothing). */
+    char modules_sent[OUT_MODULES_MAX + 1];
 } box_game_t;
 
 void box_game_init(box_game_t *g, node_runner_t *runner, preset_t *preset_buf,
@@ -325,6 +330,16 @@ bool box_game_fetching(const box_game_t *g);
  * each game's HELLO lists `output` while one is enabled; after the HELLO is acknowledged the box
  * sends node.modules with its enabled simple outputs. NULL: none. */
 void box_game_set_outputs(box_game_t *g, outputs_t *o);
+
+/* The expansion port (draft RFC "The expansion port", increment 8): the runner's scripts arm its
+ * hit channels (runner->port), each game's HELLO lists `hit` while a module has a hit channel, and
+ * node.modules carries the modules' entries after the simple outputs', told again whenever they
+ * change. NULL: none. */
+void box_game_set_port(box_game_t *g, expansion_box_t *xb);
+
+/* node.modules' text: the enabled simple outputs, then the modules in address order, whole
+ * entries within 100 bytes; its length. */
+size_t box_game_modules_text(const box_game_t *g, char *out, size_t cap);
 
 /* The game as the output layer sees it, for outputs_tick: a field game (running, paused, its
  * mode's script halted, ended) or a game picked on the box; OUT_GAME_NONE otherwise. */
