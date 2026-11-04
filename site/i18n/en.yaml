@@ -986,8 +986,8 @@ roadmap:
         site server, for staff away from it."
       - "<strong>The site server</strong>: accounts with two-factor codes, personal data rights,
         controller sync, the chrono registry, game history and the scenario library."
-      - "<strong>Game scheduling and registration</strong>, with public field pages, calendar feeds
-        and club profiles."
+      - "<strong>Game scheduling and registration</strong>, in the app or on the field's web pages
+        with no app, with public field pages, calendar feeds and club profiles."
       - "<strong>Hosted mode</strong>: many fields on one server, each kept apart, with its
         deployment."
     g_modes:
@@ -1029,7 +1029,7 @@ roadmap:
           place's name and traces its outline on OpenStreetMap, and the browser draws the field
           image from OpenStreetMap's data over the country's open aerial imagery (mainland
           Portugal, Spain, France with its overseas territories, the Netherlands, Belgium,
-          Luxembourg, Switzerland, Liechtenstein, eleven German states, Poland and Czechia). The
+          Luxembourg, Switzerland, Liechtenstein, eleven German states, Poland, Czechia and Austria). The
           outline becomes the field boundary, the outside dimmed."
         - "Players' phones warn them with a banner and a vibration when they leave the boundary,
           from their own GPS, sending nothing."

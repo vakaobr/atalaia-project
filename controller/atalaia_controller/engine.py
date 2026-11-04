@@ -1624,14 +1624,18 @@ class Controller:
         """The start check's capability part for these joined nodes (outputs.check_nodes)."""
         assert self.game is not None
         stored = {n["node_id"]: n for n in self.store.nodes(self.game["id"])}
+        # A scenario's game: the outputs its triggers switch on each box, by the name the GM gave it.
+        meta = self.scenario_meta(self.game.get("mode_id"))
         info = []
         for node_id, role in nodes:
             row = stored.get(node_id, {})
             live = self.fc.nodes.get(node_id) if self.fc is not None else None
             caps = live.hello.get("capabilities") if live is not None and live.hello else row.get("capabilities")
-            info.append({"node": node_id, "name": live.name if live is not None else row.get("name", str(node_id)),
-                         "role": role, "capabilities": caps,
-                         "modules": self._modules.get(node_id, row.get("modules"))})
+            entry = {"node": node_id, "name": live.name if live is not None else row.get("name", str(node_id)),
+                     "role": role, "capabilities": caps, "modules": self._modules.get(node_id, row.get("modules"))}
+            if meta is not None:
+                entry["outputs"] = meta.node_outputs(self.scenario_names.get(node_id))
+            info.append(entry)
         return outputs.check_nodes(info, self._role_spec)
 
     def start_check(self) -> dict[str, Any]:

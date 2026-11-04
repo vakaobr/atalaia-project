@@ -18,7 +18,10 @@
   increment 4: Bomb's ``[smoke, siren]``) names the functions its mode switches: a box of that role
   that has outputs (its HELLO lists ``output`` and its ``node.modules`` came) but none of those
   functions is a warning, ``outputs`` (the mode would switch nothing on it). A box with no output
-  at all is already ``optional_caps`` (or ``missing_caps``) for ``output``.
+  at all is already ``optional_caps`` (or ``missing_caps``) for ``output``. A scenario's box
+  (increment 5's ``triggers:``) runs the objectives package's roles, which list no output: the
+  functions the triggers switch on it (the compiled ``scenario.outputs``, by the box's scenario name)
+  count as its role's ``outputs:`` with ``output`` optional (``with_outputs``).
 - **CMD 12** (EXP-23, EXP-27, EXP-30): the params a GM's request or a field script's
   ``field.send(node, "output", {...})`` become, checked as the box checks them
   (``atalaia_sim.expansion.output_params_problem``), with ``src`` set here (``gm`` or ``field``,
@@ -91,9 +94,26 @@ def output_caps(modules: Optional[list[dict[str, Any]]]) -> set[str]:
     return {c for m in modules or [] if not m.get("lost") for c in m.get("caps", [])}
 
 
+def with_outputs(spec: Any, extra: Any) -> Any:
+    """A role's manifest entry with the output functions a scenario's triggers switch on one box added
+    to its ``outputs:`` (each once, the role's first), and ``output`` optional unless the role
+    already lists it; the entry as it is without any."""
+    fns = _names(extra)
+    if not fns:
+        return spec
+    base = spec if isinstance(spec, dict) else {}
+    outputs = _names(base.get("outputs"))
+    outputs += [f for i, f in enumerate(fns) if f not in outputs and f not in fns[:i]]
+    optional = _names(base.get("optional"))
+    if "output" not in optional and "output" not in _names(base.get("requires")):
+        optional.append("output")
+    return {**base, "optional": optional, "outputs": outputs}
+
+
 def check_nodes(nodes: Iterable[dict[str, Any]], role_spec: Any) -> dict[str, list[dict[str, Any]]]:
     """The capability part of the start check for the joined nodes, each ``{node, name, role,
-    capabilities (HELLO), modules}``; ``role_spec(role)`` gives the role's manifest entry (or None).
+    capabilities (HELLO), modules}`` and, for a scenario's box, the ``outputs`` its triggers switch;
+    ``role_spec(role)`` gives the role's manifest entry (or None).
 
     ``missing_caps``: ``{node, name, role, capability}`` for each required one a node lacks;
     ``warnings``: one ``{code: "optional_caps", node, name, role, capabilities}`` per node lacking
@@ -109,7 +129,7 @@ def check_nodes(nodes: Iterable[dict[str, Any]], role_spec: Any) -> dict[str, li
             unchecked.append({**who, "capability": fn,
                               "text": f"{fn} on {n['name']}: not checked (simple output)"})
         types = types_of(n.get("capabilities"))
-        spec = role_spec(n["role"])
+        spec = with_outputs(role_spec(n["role"]), n.get("outputs"))
         if not types or not isinstance(spec, dict):
             continue  # it reports no capability (older firmware, a phone): not checked
         for name in _names(spec.get("requires")):

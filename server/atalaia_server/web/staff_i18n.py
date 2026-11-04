@@ -290,6 +290,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "cmd_end": "Terminar",
         "cmd_message": "Enviar mensagem",
         "cmd_mode": "Enviar comando do modo",
+        "cmd_outputs_off": "Desligar todas as saídas",
+        "outputs_off_hint": "Desliga já todas as saídas (sirenes, luzes, fumo) das caixas do jogo. À distância só se pode desligar, nunca ligar.",
         "reason": "Motivo (opcional)",
         "message_text": "Mensagem para as caixas (até 100 caracteres)",
         "mode_command": "Comando do modo",
@@ -1068,6 +1070,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "cmd_end": "End",
         "cmd_message": "Send message",
         "cmd_mode": "Send mode command",
+        "cmd_outputs_off": "All outputs off",
+        "outputs_off_hint": "Turns every output (sirens, lights, smoke) of the game's boxes off now. From afar outputs can only be turned off, never on.",
         "reason": "Reason (optional)",
         "message_text": "Message for the boxes (up to 100 characters)",
         "mode_command": "Mode command",
@@ -1848,6 +1852,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "cmd_end": "Beenden",
         "cmd_message": "Nachricht senden",
         "cmd_mode": "Modus-Befehl senden",
+        "cmd_outputs_off": "Alle Ausgänge aus",
+        "outputs_off_hint": "Schaltet sofort alle Ausgänge (Sirenen, Lichter, Rauch) der Boxen des Spiels aus. Aus der Ferne lassen sich Ausgänge nur aus-, nie einschalten.",
         "reason": "Grund (optional)",
         "message_text": "Nachricht an die Boxen (bis zu 100 Zeichen)",
         "mode_command": "Modus-Befehl",
@@ -2614,6 +2620,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "cmd_end": "結束",
         "cmd_message": "傳送訊息",
         "cmd_mode": "傳送模式指令",
+        "cmd_outputs_off": "全部輸出關閉",
+        "outputs_off_hint": "立即關閉本場遊戲所有盒子的輸出（警報器、燈光、煙霧）。遠端只能關閉輸出，不能開啟。",
         "reason": "原因（選填）",
         "message_text": "給盒子的訊息（最多 100 個字元）",
         "mode_command": "模式指令",
@@ -3323,6 +3331,15 @@ _NO_NOTICE: dict[str, dict[str, str]] = {
     },
 }
 for _lang, _texts in _NO_NOTICE.items():
+    _clash = set(STRINGS[_lang]) & set(_texts)
+    assert not _clash, sorted(_clash)
+    STRINGS[_lang].update(_texts)
+
+# HUBH-*: the page for the game history shared between a hosted hub's fields (``/staff/fields/<field>/hub-history``);
+# every key is new.
+from .staff_i18n_hubhistory import STAFF as _HUB_HISTORY  # noqa: E402
+
+for _lang, _texts in _HUB_HISTORY.items():
     _clash = set(STRINGS[_lang]) & set(_texts)
     assert not _clash, sorted(_clash)
     STRINGS[_lang].update(_texts)

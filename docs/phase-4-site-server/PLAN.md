@@ -1446,7 +1446,8 @@ The player's account API is `api/registrations.py` (`/api/v1/fields/{field}/
 scheduled-games/{id}/registrations`, `/api/v1/me/registrations`,
 `/api/v1/me/player-ids`); the public game page has *Register* only while the
 window is open and places are left, leading to a page that says how to register
-in the app (no form on the pages, S16-9); the pages and feeds answer `HEAD`
+in the app (no form on the pages, S16-9; since 2026-11-04 also on a web
+registration page, WREG-*); the pages and feeds answer `HEAD`
 (S16-10). The console has *From the schedule*, expected rows with *Arrived*, a
 ticket box and the registered and walk-in counts. Not built here: the app's
 screens (account login, the field's games, registering, keeping and sending the

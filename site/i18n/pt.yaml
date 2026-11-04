@@ -1017,8 +1017,8 @@ roadmap:
       - "<strong>O servidor do site</strong>: contas com códigos de dois fatores, direitos sobre os
         dados pessoais, sincronização, registo de cronógrafo, histórico dos jogos e biblioteca de
         cenários."
-      - "<strong>Marcação de jogos e inscrições</strong>, com páginas públicas por campo, feeds de
-        calendário e perfis de clube."
+      - "<strong>Marcação de jogos e inscrições</strong>, na app ou nas páginas web do campo sem a
+        app, com páginas públicas por campo, feeds de calendário e perfis de clube."
       - "<strong>Modo alojado</strong>: vários campos num só servidor, cada um separado dos outros,
         com a sua instalação."
     g_modes:
@@ -1060,7 +1060,7 @@ roadmap:
           de um sítio e desenha o seu limite no OpenStreetMap, e o navegador desenha a imagem do
           campo com os dados do OpenStreetMap, sobre a fotografia aérea aberta do país (Portugal
           continental, Espanha, França e ultramar, Países Baixos, Bélgica, Luxemburgo, Suíça,
-          Liechtenstein, onze estados alemães, Polónia e Chéquia). O desenho passa a ser o limite do
+          Liechtenstein, onze estados alemães, Polónia, Chéquia e Áustria). O desenho passa a ser o limite do
           campo, ficando escurecido o que está fora."
         - "O telemóvel de quem joga avisa com uma faixa e vibração quando sai do limite, com o seu
           próprio GPS, sem enviar nada."

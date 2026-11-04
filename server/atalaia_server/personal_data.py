@@ -106,7 +106,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from . import chrono_registry, erasure_ledger, hub_share, tenancy
+from . import chrono_registry, erasure_ledger, history_share, hub_share, tenancy
 from .config import RetentionPolicy
 from .atak_models import AtakCert
 from .preview_models import CONTACT_RETENTION, RETENTION as FEEDBACK_RETENTION, PreviewFeedback
@@ -572,6 +572,7 @@ async def purge(db: AsyncSession, now: Optional[datetime] = None, dry_run: bool 
               "game_results": results, "game_results_expired": results_gone.rowcount or 0}
     counts.update(await _purge_chrono(db, now))
     await hub_share.sync_all(db)  # a hosted hub's copies follow what the purge removed (SVX-2)
+    await history_share.sync_field(db, now)  # and its shared game history (HUBH-*): gone at the field, gone there
     # The schedule (plan phase 15): a scheduled game is game history once it has ended.
     scheduled = await db.execute(delete(ScheduledGame).where(ScheduledGame.ends_at < now - GAME_RETENTION))
     counts["scheduled_games"] = scheduled.rowcount or 0

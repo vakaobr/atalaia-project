@@ -26,8 +26,9 @@ static const char *TAG = "hal_i2c";
 /* Pulses shorter than this many I2C clock cycles on SDA/SCL are ignored (the driver's typical
  * value): noise on a poor joint is filtered by the hardware, not seen as a start/stop. */
 #define GLITCH_CYCLES 7
-/* The most parts on the bus: OLED, keypad (any of 16 addresses, one used), NFC, gauge. */
-#define MAX_DEVICES 8
+/* The most parts on the bus: OLED, keypad (any of 16 addresses, one used), NFC, gauge, and the
+ * expansion port's modules (at most 4 at a time, at any of 0x58-0x5F over a box's uptime). */
+#define MAX_DEVICES 16
 
 typedef struct {
     uint8_t addr;

@@ -314,8 +314,8 @@ interrupt line. It does not need one (P5J-18, EXP-8):
   controller is told (`node.module_lost` during a game).
 
 The box's port driver (`firmware/esp32/main/expansion.c`, replacing the stub
-`target_addon.c`) is being written (increment 6), with host tests against the
-protocol's shared vectors; it is called from the game task, and hits reach the
+`target_addon.c`) is written (increment 6, 2026-11-04), with host tests against
+the protocol's shared vectors; it is called from the game task, and hits reach the
 script, **after increment 8**.
 
 ## 10. What waits for increment 8
