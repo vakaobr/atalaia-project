@@ -43,6 +43,7 @@ REGIONS: dict[str, tuple[str, list]] = {
     "CHE": ("Switzerland and Liechtenstein", [("CHE", None), ("LIE", None)]),
     "DE_BE": ("Berlin", [("DE-BE", None)]),
     "DE_BB": ("Brandenburg", [("DE-BB", None)]),
+    "DE_BW": ("Baden-Württemberg", [("DE-BW", None)]),
     "DE_BY": ("Bayern", [("DE-BY", None)]),
     "DE_HB": ("Bremen (the city and Bremerhaven)", [("DE-HB", None)]),
     "DE_HE": ("Hessen", [("DE-HE", None)]),

@@ -24,7 +24,8 @@ from typing import Any, Optional
 
 from atalaia_controller import checkin_ticket, sync_format
 
-from atalaia_server import personal_data
+from atalaia_server import personal_data, quotas
+from atalaia_server.services import registration
 from atalaia_server.models import ScheduledGame
 
 from .base import PASSWORD
@@ -387,7 +388,8 @@ class GameDaySyncTests(RegistrationCase):
             {"registration_id": third["id"], "player_id": "p-zzzzzzzzzzzz", "outcome": "checked_in",
              "ticket_sha256": hashlib.sha256(third_secret).hexdigest(), "declarations": []}])
         answer = await self.post("checkins", body)
-        self.assertEqual(answer, {"linked": True, "applied": 2, "ignored": 1, "declarations": 1})
+        self.assertEqual(answer, {"linked": True, "applied": 2, "ignored": 1, "declarations": 1, "guests": 0,
+                                  "guests_ignored": 0})
         rows = {r["id"]: r for r in await self.fetch("SELECT id, status, outcome_at FROM game_registrations")}
         self.assertEqual([rows[uuid.UUID(x["id"])]["status"] for x in (first, second, third)],
                          ["checked_in", "registered", "checked_in"])
@@ -429,6 +431,138 @@ class GameDaySyncTests(RegistrationCase):
         self.assertEqual((got[first["id"]], got[second["id"]]), (None, "FPA-2"))
         await self.post("games", envelope(meta={**meta, "state": "ended", "ended_at": 1792003700.0}))
         self.assertEqual(set((await numbers()).values()), {None})
+
+
+class WalkinGuestTests(RegistrationCase):
+    """Decisions PWI-*: the walk-ins a controller pushes with [sync] push_walkins are guest registrations, kept 30
+    days after the game (ADR-P4-8's guest rule) and erased with the controller's erasure of the player."""
+
+    def guest(self, pid: str, name: str, decls: int = 0, state: str = "passed") -> dict[str, Any]:
+        return {"player_id": pid, "display_name": name, "declarations": [
+            {"declaration_id": str(uuid.uuid4()), "type": "aeg", "class": "rifle", "state": state,
+             "reading_id": str(uuid.uuid4()) if state == "passed" else None} for _ in range(decls)]}
+
+    async def ended_game(self, starts: float = -6) -> ScheduledGame:
+        game = await self.game(starts=starts, window=False)
+        meta = {**META, "state": "ended", "started_at": 1792000100.0, "ended_at": 1792003700.0,
+                "scheduled_game_id": str(game.id)}
+        await self.post("games", envelope(meta=meta))
+        return game
+
+    async def test_guests_are_stored_and_updated(self) -> None:
+        game = await self.ended_game()
+        rita, ze = self.guest("p-cccccccccccc", "Rita Falcão", decls=2), self.guest("p-dddddddddddd", "Zé")
+        body = envelope(scheduled_game_id=str(game.id), walkins=3, registrations=[], guests=[rita, ze])
+        answer = await self.post("checkins", body)
+        self.assertEqual((answer["guests"], answer["guests_ignored"], answer["applied"]), (2, 0, 0))
+        rows = {r["player_id"]: r for r in await self.fetch(
+            "SELECT id, player_id, display_name, status, source, user_id, ticket_hash, federation_number, "
+            "team_preference, outcome_at FROM game_registrations")}
+        self.assertEqual(set(rows), {"p-cccccccccccc", "p-dddddddddddd"})
+        for row in rows.values():
+            self.assertEqual((row["status"], row["source"], row["user_id"], row["ticket_hash"],
+                              row["federation_number"], row["team_preference"]),
+                             ("checked_in", "walkin", None, None, None, None))
+            self.assertIsNotNone(row["outcome_at"])
+        replicas = await self.fetch("SELECT declaration_id, replica_type, replica_class, state, position, make_model "
+                                    "FROM registration_replicas ORDER BY position")
+        self.assertEqual([(str(r[0]), r[1], r[2], r[3], r[4], r[5]) for r in replicas],
+                         [(d["declaration_id"], "aeg", "rifle", "passed", i, None)
+                          for i, d in enumerate(rita["declarations"])])
+        self.assertEqual((await self.fetch("SELECT walkins FROM scheduled_games"))[0][0], 3)
+        # Pushed again (the outcomes changed): the same guest updated, its replicas replaced, nothing doubled.
+        rita["display_name"] = "Rita"
+        rita["declarations"] = rita["declarations"][:1]
+        rita["declarations"][0]["state"] = "refused"
+        rita["declarations"][0]["reading_id"] = None
+        self.assertEqual((await self.post("checkins", body))["guests"], 2)
+        self.assertEqual(await self.count("game_registrations"), 2)
+        self.assertEqual([tuple(r) for r in await self.fetch("SELECT state FROM registration_replicas")],
+                         [("refused",)])
+        name = await self.fetch("SELECT display_name FROM game_registrations WHERE player_id = 'p-cccccccccccc'")
+        self.assertEqual(name[0][0], "Rita")
+        # The staff see them in the game's list, as every registration.
+        staff = await self.staff("gm")
+        listed = (await self.client.get(f"/api/v1/fields/{self.field_id}/scheduled-games/{game.id}/registrations",
+                                        headers=staff)).json()
+        self.assertIn("Rita", json.dumps(listed, ensure_ascii=False))
+        # Never in anyone's personal data: they belong to no account.
+        mine = (await self.client.get("/api/v1/me/registrations", headers=self.player)).json()
+        self.assertEqual(mine, [])
+
+    async def test_a_registered_player_or_a_taken_declaration_is_not_a_guest(self) -> None:
+        game = await self.game(starts=1, registration_closes_at=hour(0.5))
+        reg = await self.register(game, replicas=[{"type": "aeg", "class": "rifle"}])
+        meta = {**META, "state": "ended", "started_at": 1792000100.0, "ended_at": 1792003700.0,
+                "scheduled_game_id": str(game.id)}
+        await self.post("games", envelope(meta=meta))
+        taken = reg["replicas"][0]["declaration_id"]
+        stranger = self.guest("p-cccccccccccc", "Outro", decls=1)
+        stranger["declarations"][0]["declaration_id"] = taken
+        body = envelope(scheduled_game_id=str(game.id), walkins=2, registrations=[],
+                        guests=[self.guest(reg["player_id"], "Joana"), stranger])
+        answer = await self.post("checkins", body)
+        self.assertEqual((answer["guests"], answer["guests_ignored"]), (1, 1))
+        rows = {r[0]: (r[1], r[2]) for r in await self.fetch(
+            "SELECT player_id, source, status FROM game_registrations")}
+        self.assertEqual(rows, {reg["player_id"]: ("site", "registered"), "p-cccccccccccc": ("walkin", "checked_in")})
+        self.assertEqual(await self.count("registration_replicas"), 1)  # the registration's own, untouched
+        other = envelope(scheduled_game_id=str(uuid.uuid4()), walkins=1, registrations=[],
+                         guests=[self.guest("p-eeeeeeeeeeee", "Ninguém")])
+        self.assertEqual(await self.post("checkins", other), {"linked": False, "applied": 0, "ignored": 0,
+                                                              "guests": 0, "guests_ignored": 1})
+
+    async def test_new_guests_past_the_hosted_quota_are_skipped(self) -> None:
+        game = await self.ended_game()
+        await self.post("checkins", envelope(scheduled_game_id=str(game.id), walkins=1, registrations=[],
+                                             guests=[self.guest("p-cccccccccccc", "Rita")]))
+        guests = [self.guest("p-cccccccccccc", "Rita B"), self.guest("p-dddddddddddd", "Zé"),
+                  self.guest("p-eeeeeeeeeeee", "Ana")]
+        async with self.app.state.sessionmaker() as db:
+            sched = await db.get(ScheduledGame, game.id)
+            with quotas.use({"registrations": 2}):  # one there: the update fits, one new one fits, not two
+                out = await registration.apply_guests(db, self.field_id, sched, guests, datetime.now(UTC))
+            await db.commit()
+        self.assertEqual(out, (2, 1))
+        names = sorted(r[0] for r in await self.fetch("SELECT display_name FROM game_registrations"))
+        self.assertEqual(names, ["Rita B", "Zé"])
+
+    async def test_refused_as_the_shared_check_refuses(self) -> None:
+        game = await self.ended_game()
+        body = envelope(scheduled_game_id=str(game.id), walkins=0, registrations=[],
+                        guests=[self.guest("p-cccccccccccc", "Rita")])
+        r = await self.client.post("/api/v1/sync/checkins", json=body, headers=self.headers())
+        self.assertEqual((r.status_code, r.json()["error"], r.json()["path"]), (400, "too_many_guests", "guests"))
+        body["walkins"] = 1
+        body["guests"][0]["federation_number"] = "FPA-1"
+        r = await self.client.post("/api/v1/sync/checkins", json=body, headers=self.headers())
+        self.assertEqual((r.status_code, r.json()["error"]), (400, "unknown_field"))
+
+    async def test_purged_30_days_after_the_game_and_erased_with_the_player(self) -> None:
+        old = await self.ended_game(starts=-24 * 40)
+        await self.post("checkins", envelope(scheduled_game_id=str(old.id), walkins=1, registrations=[],
+                                             guests=[self.guest("p-cccccccccccc", "Velha", decls=1)]))
+        recent = await self.game(starts=-24 * 10, window=False)
+        game2 = {"game_id": 4243, "game_seed": GAME["game_seed"]}
+        await self.post("games", envelope(game=game2, meta={**META, "state": "ended", "started_at": 1792000100.0,
+                                                             "ended_at": 1792003700.0,
+                                                             "scheduled_game_id": str(recent.id)}))
+        await self.post("checkins", envelope(game=game2, scheduled_game_id=str(recent.id), walkins=2,
+                                             registrations=[], guests=[self.guest("p-cccccccccccc", "Recente"),
+                                                                       self.guest("p-dddddddddddd", "Outra")]))
+        async with self.app.state.sessionmaker() as db:
+            counts = await personal_data.purge(db)
+            await db.commit()
+        self.assertEqual(counts["walkin_guests"], 1)
+        self.assertEqual(await self.count("registration_replicas"), 0)  # the purged one's went with it
+        left = {(r[0], r[1]) for r in await self.fetch("SELECT scheduled_game, display_name FROM game_registrations")}
+        self.assertEqual(left, {(recent.id, "Recente"), (recent.id, "Outra")})
+        # The controller erased the player on request: its guests at this field go too, nobody else's.
+        erased = await self.post("erasures", {"sync_version": 1, "controller": envelope()["controller"],
+                                              "erasures": [{"player_id": "p-cccccccccccc", "chrono": False,
+                                                            "identity": True, "erased_at": 1792000000.0}]})
+        self.assertEqual(erased["guests"], 1)
+        self.assertEqual([r[0] for r in await self.fetch("SELECT display_name FROM game_registrations")], ["Outra"])
 
 
 class RegistrationPersonalDataTests(RegistrationCase):

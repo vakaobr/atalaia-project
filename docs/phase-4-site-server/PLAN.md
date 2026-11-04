@@ -1464,7 +1464,9 @@ then TOTP; the refresh token rotated), lists the field's games through a new
 the phone (QR and text) and can send it with the app's check-in, changes and
 cancels, and claims the phone's player id; the public register page links to it
 with `atalaia://register?site=&field=&game=` (or its address pasted). Still not
-built: making an account in the app (S17-16), `[sync] push_walkins`.
+built: making an account in the app (S17-16). *`[sync] push_walkins` built
+2026-11-04 (decisions PWI-1 to PWI-10):* the walk-ins as guest registrations,
+opt-in on both controllers, kept 30 days after the game.
 
 ---
 

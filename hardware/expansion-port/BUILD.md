@@ -35,8 +35,9 @@ this guide follows and refers to for every step the builds share.
 **Not for outputs, as a rule.** A siren, a strobe or a smoke machine's remote
 takes the **simple output** (one GPIO, an RC relay switch, an M8 socket:
 [Field Box manual, section 9.10](../field-box/BUILD.md#910-simple-output-optional)),
-the preferred output path (EXP-31). The port is for **inputs**, and later for
-an I2C output module on a box that needs more channels or feedback.
+the preferred output path (EXP-31). The port is for **inputs**, and for the
+optional [I2C output module](../output-module/BUILD.md) on a box that needs
+more channels or feedback.
 
 ## Contents
 
@@ -208,7 +209,7 @@ of every address the box uses or looks at:
 | 0x36 | MAX17048 battery gauge | |
 | 0x3C | The board's OLED | |
 | **0x58-0x5B** | **Input modules**: the target module at **0x58**; its two solder jumpers add 1-3 for a second, third or fourth | |
-| **0x5C-0x5F** | **Output modules** (the later I2C output module) at **0x5C**, jumpers 0x5D-0x5F | |
+| **0x5C-0x5F** | **Output modules** (the [I2C output module](../output-module/BUILD.md)) at **0x5C**, jumpers 0x5D-0x5F | |
 
 **At most 4 modules on one box**: the bus's time (each input module's poll is
 about 5 % of the bus) and the 25 mA each takes from the same 3.3 V rail are

@@ -383,6 +383,7 @@ export function StartCheck({ game }) {
     if (!check) return null;
     const caps = check.missing_caps || [];
     const unchecked = check.not_checked || [];
+    const disabled = check.outputs_disabled || []; // notes: fitted, not enabled by the box's admin (EXPL-13)
     return html`${check.missing.length > 0 && html`<p class="warning" data-testid="start-missing">${t('game.missing_roles',
         { roles: check.missing.join(', ') })}</p>`}
         ${caps.length > 0 && html`<p class="warning" data-testid="start-missing-caps">${t('game.missing_caps',
@@ -391,7 +392,9 @@ export function StartCheck({ game }) {
             t(`game.start_warnings.${w.code}`, { role: w.role, have: w.have, value: w.value, param: w.param,
                                                  name: w.name, caps: (w.capabilities || []).join(', ') })}</li>`)}</ul>`}
         ${unchecked.length > 0 && html`<ul class="notice small" data-testid="start-not-checked">${unchecked.map((u) => html`<li>${
-            t('game.not_checked', { capability: u.capability, name: u.name })}</li>`)}</ul>`}`;
+            t('game.not_checked', { capability: u.capability, name: u.name })}</li>`)}</ul>`}
+        ${disabled.length > 0 && html`<ul class="notice small" data-testid="start-outputs-disabled">${disabled.map((d) => html`<li>${
+            t('game.outputs_disabled', { name: d.name, role: d.role, caps: (d.capabilities || []).join(', ') })}</li>`)}</ul>`}`;
 }
 
 /** Asks the free boxes to announce themselves; quietly does nothing without a radio. Gives the

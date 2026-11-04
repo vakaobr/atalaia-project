@@ -1105,6 +1105,8 @@ const Map<String, String> enStrings = {
       'The field\'s scenarios and game presets from the site server',
   'ctl_site.remote_gm': 'Remote GM',
   'ctl_site.remote_gm_hint': 'The field\'s GMs on the site server may start, pause and end the live game. Off by default.',
+  'ctl_site.push_walkins': 'Send walk-ins to the site server as guests',
+  'ctl_site.push_walkins_hint': 'After a game from the schedule, players without a registration go to the site server with their name and replicas\' chrono results; it deletes them 30 days after the game. Off by default: a count only.',
   'ctl_site.atak': 'ATAK feed (Cursor on Target)',
   'ctl_site.atak_hint':
       'The boxes and zones on ATAK maps, over the field\'s Wi-Fi.',

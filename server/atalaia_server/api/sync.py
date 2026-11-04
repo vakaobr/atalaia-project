@@ -12,6 +12,7 @@
                                verified, the ones that fail kept apart and named in the answer
     POST /api/v1/sync/checkins after a game made from a scheduled game: each registration's outcome and
                                its declarations' final states, the walk-ins as a count (plan phase 16)
+                               and, with the controller's [sync] push_walkins, as guests (PWI-*)
     POST /api/v1/sync/claims   the controller's verdicts on accounts' claims of its player ids
     POST /api/v1/sync/erasures the players whose data the controller erased on request: their chrono records
                                and account links here go too (S14-10, decision RET-4)

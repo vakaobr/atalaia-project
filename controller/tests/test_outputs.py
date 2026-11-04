@@ -64,7 +64,7 @@ class StartCheckTests(unittest.TestCase):
         """A box from before the RFC (an empty HELLO list), a phone, ids this controller does not know."""
         out = self.check(node(4, "zone", []), node(5, "zone", None), node(6, "target", [0, 99]),
                          node(7, "nosuchrole", [3]))
-        self.assertEqual(out, {"missing_caps": [], "warnings": [], "not_checked": []})
+        self.assertEqual(out, {"missing_caps": [], "warnings": [], "not_checked": [], "outputs_disabled": []})
 
     def test_a_simple_output_counts_and_is_not_checked(self):
         mods = outputs.modules_of("g46:servo:siren;5c:out4/1.0.0:strobe,smoke")
@@ -132,6 +132,41 @@ class StartCheckTests(unittest.TestCase):
                          "box-4 (objective) has none of the outputs the mode would switch: siren, horn")
         out = check(scenario_node(4, [b, k, d, o], outputs.modules_of("g46:servo:horn"), ["siren", "horn"]))
         self.assertEqual(out["warnings"], [])
+
+
+    def test_outputs_fitted_but_not_enabled_are_a_note(self):
+        """EXPL-12, EXPL-13: a box's node.outputs_disabled names outputs its admin has not enabled; when its
+        role's outputs: (or its scenario's) would switch one, the start check gives a note, never a
+        refusal or a warning of its own; outputs no role would switch, or a box that never said, give none."""
+        ids = {k: v.id for k, v in CAPABILITY_TYPES.items()}
+        b, o = ids["button"], ids["output"]
+
+        def with_off(n, role, caps, mods, off, **extra):
+            return {**node(n, role, caps, mods), "outputs_disabled": outputs.modules_of(off), **extra}
+
+        out = self.check(with_off(4, "bomb", [b, o], outputs.modules_of("g46:servo:smoke"), "g45:servo:siren"),
+                         with_off(5, "bomb", [b], None, "g46:servo:horn;g45:servo:smoke"),
+                         with_off(6, "bomb", [b], None, "g46:servo:horn"),
+                         with_off(7, "alarm", [b], None, "g46:servo:siren"),
+                         with_off(8, "zone", [b], None, "g46:servo:siren"),
+                         node(9, "bomb", [b]))
+        self.assertEqual([(d["node"], d["capabilities"]) for d in out["outputs_disabled"]],
+                         [(4, ["siren"]), (5, ["smoke"]), (7, ["siren"])])
+        self.assertEqual(out["outputs_disabled"][0], {
+            "node": 4, "name": "box-4", "role": "bomb", "capabilities": ["siren"],
+            "text": "box-4 (bomb): siren fitted, not enabled by the box's admin (enable at the box with the admin PIN)"})
+        # A note only: what the box lacks right now is still missing_caps or a warning, as before.
+        self.assertEqual(out["missing_caps"], [{"node": 7, "name": "box-7", "role": "alarm", "capability": "output"}])
+        self.assertNotIn("outputs_disabled", {w["code"] for w in out["warnings"]})
+        # Every output enabled: the empty text, no note.
+        out = self.check(with_off(4, "bomb", [b, o], outputs.modules_of("g46:servo:siren"), ""))
+        self.assertEqual(out["outputs_disabled"], [])
+        # A scenario's box: the functions its triggers switch count as its role's outputs:.
+        objective = {"requires": ["team_input"], "optional": ["keypad", "display"]}
+        out = outputs.check_nodes([with_off(4, "objective", [b], None, "g46:servo:horn;g45:servo:strobe",
+                                            outputs=["strobe", "siren"])], {"objective": objective}.get)
+        self.assertEqual([(d["node"], d["capabilities"]) for d in out["outputs_disabled"]], [(4, ["strobe"])])
+        self.assertEqual(outputs.modules_of(""), [])
 
 
 class ScenarioOutputsTests(unittest.TestCase):

@@ -41,9 +41,9 @@ segue e para o qual remete em todos os passos que as montagens partilham.
 de uma máquina de fumo usam a **saída simples** (um GPIO, um interruptor de
 relé RC, uma tomada M8:
 [manual da Field Box, secção 9.10](../field-box/BUILD.pt.md#910-saída-simples-opcional)),
-o caminho preferido para saídas (EXP-31). A porta é para **entradas** e, mais
-tarde, para um módulo de saídas I2C numa caixa que precise de mais canais ou
-de confirmação.
+o caminho preferido para saídas (EXP-31). A porta é para **entradas** e para o
+[módulo de saídas I2C](../output-module/BUILD.pt.md), opcional, numa caixa que
+precise de mais canais ou de confirmação.
 
 ## Índice
 
@@ -220,7 +220,7 @@ todos os endereços que a caixa usa ou procura:
 | 0x36 | Medidor de bateria MAX17048 | |
 | 0x3C | O OLED da placa | |
 | **0x58-0x5B** | **Módulos de entrada**: o módulo de alvo em **0x58**; os seus dois jumpers de solda somam 1-3 para um segundo, terceiro ou quarto | |
-| **0x5C-0x5F** | **Módulos de saída** (o futuro módulo de saídas I2C) em **0x5C**, jumpers 0x5D-0x5F | |
+| **0x5C-0x5F** | **Módulos de saída** (o [módulo de saídas I2C](../output-module/BUILD.pt.md)) em **0x5C**, jumpers 0x5D-0x5F | |
 
 **No máximo 4 módulos numa caixa**: o tempo do barramento (a consulta de cada
 módulo de entrada ocupa cerca de 5 % do barramento) e os 25 mA que cada um

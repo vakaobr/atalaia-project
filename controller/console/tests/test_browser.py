@@ -96,7 +96,8 @@ ORTHO_WMS_ORIGINS = (
     "https://geoservices.bayern.de", "https://geodienste.bremen.de", "https://www.gds-srv.hessen.de",
     "https://www.geodaten-mv.de", "https://www.wms.nrw.de", "https://geo4.service24.rlp.de",
     "https://geoportal.saarland.de", "https://geodienste.sachsen.de", "https://www.geoproxy.geoportal-th.de",
-    "https://mapy.geoportal.gov.pl", "https://ags.cuzk.gov.cz", "https://mapsneu.wien.gv.at")
+    "https://mapy.geoportal.gov.pl", "https://ags.cuzk.gov.cz", "https://mapsneu.wien.gv.at",
+    "https://owsproxy.lgl-bw.de")
 ORTHO_TILE_ORIGINS = ("https://wmts1.geoportail.lu", "https://wmts.geo.admin.ch", "https://www.wmts.nrw.de")
 ORTHO_ORIGINS = ORTHO_WMS_ORIGINS + ORTHO_TILE_ORIGINS
 
@@ -1299,6 +1300,50 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("lang").select_option("pt")
         expect(page.get_by_test_id("start-warnings")).to_contain_text(
             "box-7 (bomb) não tem nenhuma das saídas que o modo acionaria (smoke, siren)")
+
+    def test_outputs_fitted_but_not_enabled(self):
+        """EXPL-12, EXPL-13: a bomb box with its smoke enabled and its siren fitted but not enabled by its
+        admin (node.outputs_disabled "g45:servo:siren"): the start panel's note and the Boxes tab's chip say
+        so in four languages, and the feed says it in words; Start is not held back."""
+        self.field.create_game(mode_id="org.atalaia.bomb", assignments={str(BOX): "bomb"}, params={"smoke_s": 5})
+        self.field.box_hello(caps=[1, 2, 3, 4, 5, 11])
+        for seq, kind, text in ((1, "node.modules", "g46:servo:smoke"), (2, "node.outputs_disabled", "g45:servo:siren")):
+            ev = codec.encode_event({"node": BOX, "seq": seq, "t": 0, "type": kind, "data": {"modules": text}})
+            self.field.box("EVENT", ev, ack=True)
+        page = self.console()
+        page.get_by_test_id("lang").select_option("en")
+        note = page.get_by_test_id("start-outputs-disabled")
+        expect(note).to_contain_text("box-7 (bomb): siren fitted, not enabled by the box's admin. "
+                                     "The mode would switch it: enable it at the box with the admin PIN")
+        expect(page.get_by_test_id("start-warnings")).to_have_count(0)
+        for lang, words in (("pt", "box-7 (bomb): siren instalada, mas não ativada pela administração da caixa"),
+                            ("de", "box-7 (bomb): siren eingebaut, aber vom Admin der Box nicht freigegeben"),
+                            ("zh-tw", "box-7（bomb）：已安裝 siren，但盒子的管理員尚未啟用")):
+            page.get_by_test_id("lang").first.select_option(lang)
+            expect(note).to_contain_text(words)
+        page.get_by_test_id("lang").first.select_option("en")
+        page.get_by_test_id("tab-nodes").click()
+        chip = page.get_by_test_id(f"node-output-disabled-{BOX}-g45")
+        expect(chip).to_have_text("siren · fitted, not enabled by the box's admin")
+        expect(page.get_by_test_id(f"node-module-{BOX}-g46")).to_have_text("smoke · not checked")
+        for lang, words in (("pt", "siren · instalada, não ativada pela administração da caixa"),
+                            ("de", "siren · eingebaut, vom Admin der Box nicht freigegeben"),
+                            ("zh-tw", "siren · 已安裝，盒子的管理員尚未啟用")):
+            page.get_by_test_id("lang").first.select_option(lang)
+            expect(chip).to_have_text(words)
+        page.get_by_test_id("lang").first.select_option("en")
+        page.get_by_test_id("tab-feed").click()
+        expect(page.locator('[data-testid=feed] [data-type="node.outputs_disabled"]')).to_contain_text(
+            "box 7: fitted, not enabled by the box's admin: g45:servo:siren")
+        # The admin enabled it and the box joined again: the note and the chip go.
+        ev = codec.encode_event({"node": BOX, "seq": 3, "t": 0, "type": "node.outputs_disabled", "data": {"modules": ""}})
+        self.field.box("EVENT", ev, ack=True)
+        expect(page.locator('[data-testid=feed] [data-type="node.outputs_disabled"]',
+                            has_text="box 7: every output fitted is enabled")).to_have_count(1)
+        page.get_by_test_id("tab-nodes").click()
+        expect(chip).to_have_count(0)
+        page.get_by_test_id("tab-game").click()
+        expect(note).to_have_count(0)
 
     def test_a_scenarios_outputs_in_the_form_and_the_start_check(self):
         """Increment 5's leftover: a scenario's triggers name output functions on its boxes; the game form
@@ -3981,7 +4026,7 @@ class ConsoleBrowserTests(unittest.TestCase):
             "em Portugal continental, Espanha, França (com a Córsega e os territórios ultramarinos), nos Países "
             "Baixos, na Bélgica, no Luxemburgo, na Suíça e no Liechtenstein, na Polónia, na Chéquia, na Áustria e na "
             "Alemanha "
-            "menos Baden-Württemberg, Baixa Saxónia, Hamburgo, Saxónia-Anhalt e Schleswig-Holstein.")
+            "menos Baixa Saxónia, Hamburgo, Saxónia-Anhalt e Schleswig-Holstein.")
         expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"^https://tile\.openstreetmap\.org/"))
         for origin in ORTHO_ORIGINS:
             expect(page.locator(f".tm-tile[src^='{origin}']")).to_have_count(0)
@@ -4059,8 +4104,9 @@ class ConsoleBrowserTests(unittest.TestCase):
             "gugik": [(52.2297, 21.0122), (50.0647, 19.945), (54.352, 18.6466)],
             "cuzk": [(50.0875, 14.4213), (49.1951, 16.6068)],
             "basemap-at": [(48.2082, 16.3738), (47.2692, 11.4041), (47.0707, 15.4395), (47.5031, 9.7471)],
+            "de-bw": [(48.7758, 9.1829), (47.999, 7.842), (49.0069, 8.4037)],
             "": [(51.5072, -0.1276), (37.7412, -25.6756), (32.65, -16.9083), (39.5, -11.5), (46.0569, 14.5058),
-                 (47.4979, 19.0402), (41.9028, 12.4964), (55.6761, 12.5683), (42.5063, 1.5218), (48.7758, 9.1829),
+                 (47.4979, 19.0402), (41.9028, 12.4964), (55.6761, 12.5683), (42.5063, 1.5218),
                  (52.3759, 9.732), (53.5511, 9.9937), (52.1205, 11.6276), (54.3233, 10.1228)],
         }
         for want, pts in points.items():
@@ -4237,6 +4283,7 @@ class ConsoleBrowserTests(unittest.TestCase):
             ["swisstopo", "https://wms.geo.admin.ch/", "ch.swisstopo.swissimage", 2048],
             ["de-be", "https://gdi.berlin.de/services/wms/truedop_2025_sommer", "truedop_2025_sommer_rgb", 4096],
             ["de-bb", "https://isk.geobasis-bb.de/mapproxy/dop20c/service/wms", "bebb_dop20c", 4096],
+            ["de-bw", None, None, 4096],
             ["de-by", "https://geoservices.bayern.de/od/wms/dop/v1/dop20", "by_dop20c", 4096],
             ["de-hb", "https://geodienste.bremen.de/wms_dop_lb", "dop10_2025_HB,dop10_2025_BHV", 4096],
             ["de-he", "https://www.gds-srv.hessen.de/cgi-bin/lika-services/ogc-free-images.ows", "he_dop_rgb", 3000],
@@ -4462,6 +4509,98 @@ class ConsoleBrowserTests(unittest.TestCase):
         # are basemap.at's only).
         self.assertTrue(all(self.BASEMAP_AT in e for e in self.errors if e.startswith("HTTP ")), self.errors)
         self.drop_errors(self.BASEMAP_AT, "Failed to load resource")
+
+    LGL_BW = "https://owsproxy.lgl-bw.de/owsproxy/ows/WMTS_LGL-BW_ATKIS_DOP_20_C?"
+
+    @staticmethod
+    def kvp(url: str) -> dict:
+        return {k: v[0] for k, v in parse_qs(urlsplit(url).query, keep_blank_values=True).items()}
+
+    def test_field_map_in_baden_wuerttemberg_from_wmts_tiles(self):
+        """MF-100 to MF-104: in Baden-Württemberg the orthophoto is LGL's DOP 20 cm from its WMTS (KVP GetTile,
+        GoogleMapsCompatible, levels "GoogleMapsCompatible:<zoom>"). The *Ortofoto* layer shows its tiles with
+        its credit, linked to the licence; the drawn image is stitched from its tiles over the area (fetched
+        with CORS, at the zoom nearest the image's scale, each once), with the credit and "Daten geändert"
+        burned in. No real network: the tile server is stubbed."""
+        page, seen = self.field_map()
+        page.get_by_test_id("fm-go").fill("48.7758, 9.1829")
+        page.get_by_test_id("fm-go-button").click()
+        self.check_tiles(page, seen, self.LGL_BW, "Ortofoto (LGL Baden-Württemberg)",
+                         f"LGL-BW ({self.YEAR}) dl-de/by-2-0, www.lgl-bw.de")
+        expect(page.get_by_test_id("tm-credit").locator("a")).to_have_attribute(
+            "href", "https://www.govdata.de/dl-de/by-2-0")
+        q = self.kvp(seen["wms_tiles"][0])
+        self.assertEqual({k: v for k, v in q.items() if k not in ("TILEROW", "TILECOL")}, {
+            "SERVICE": "WMTS", "REQUEST": "GetTile", "VERSION": "1.0.0", "LAYER": "DOP_20_C", "STYLE": "default",
+            "TILEMATRIXSET": "GoogleMapsCompatible", "TILEMATRIX": "GoogleMapsCompatible:17",
+            "FORMAT": "image/jpeg"})
+        outline = self.outline_at(48.7758, 9.1829)
+        plan = page.evaluate(self.PLAN_JS, [{"lat": a, "lon": b} for a, b in outline])
+        # The image's 0.5 m a pixel at 48.8° N: zoom 18 (0.39 m), its tiles over the area, each asked once.
+        self.assertEqual(plan["z"], 18)
+        want = {(plan["x0"] + i, plan["y0"] + j) for i in range(plan["cols"]) for j in range(plan["rows"])}
+        seen["wmts"].clear()
+        self.trace(page, outline)
+        expect(page.locator("label.fm-ortho")).to_have_text("Ortofoto (LGL Baden-Württemberg) como base")
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-preview")).to_be_visible()
+        self.assertEqual(seen["wms"], [])
+        self.assertTrue(all(u.startswith(self.LGL_BW) for u in seen["wmts"]), seen["wmts"])
+        got = [self.kvp(u) for u in seen["wmts"]]
+        self.assertEqual({q["TILEMATRIX"] for q in got}, {"GoogleMapsCompatible:18"})
+        self.assertEqual(sorted((int(q["TILECOL"]), int(q["TILEROW"])) for q in got), sorted(want))
+        size = page.get_by_test_id("fm-image").evaluate("(i) => [i.naturalWidth, i.naturalHeight]")
+        self.assertEqual(size, [plan["width"], plan["height"]])
+        expect(page.get_by_test_id("fm-size")).to_contain_text("A ortofoto (LGL Baden-Württemberg) com os caminhos")
+        expect(page.get_by_test_id("fm-image-credit")).to_have_text(
+            f"Créditos na imagem: LGL-BW ({self.YEAR}) dl-de/by-2-0, www.lgl-bw.de (Daten geändert) · "
+            "© OpenStreetMap contributors")
+        expect(page.get_by_test_id("fm-notice")).to_have_count(0)
+        self.assertEqual(seen["other"], [])
+
+    BOX_JS = """async (pts) => {
+        const r = await import('./components/field-render.js');
+        const { ORTHO_SOURCES } = await import('./components/ortho-sources.js');
+        const lgl = ORTHO_SOURCES.find((s) => s.id === 'de-bw');
+        const b = r.areaFor(pts);
+        const frame = r.frameFor(b);
+        const plan = r.wmtsPlan(b, frame, lgl.wmtsMax);
+        const asked = [];
+        const fetcher = async (url) => {
+            asked.push(url);
+            const c = new OffscreenCanvas(256, 256);
+            const g = c.getContext('2d');
+            g.fillStyle = '#336633';
+            g.fillRect(0, 0, 256, 256);
+            return new Response(await c.convertToBlob({ type: 'image/png' }), { headers: { 'content-type': 'image/png' } });
+        };
+        // The box's west edge through the area's middle: the tiles wholly west of it are not asked.
+        const box = [(b.west + b.east) / 2, lgl.wmtsBox[1], lgl.wmtsBox[2], lgl.wmtsBox[3]];
+        const report = {};
+        const bitmap = await r.fetchOrthophoto(b, frame, { ...lgl, wmtsBox: box }, fetcher, report);
+        const cols = asked.map((u) => Number(new URL(u).searchParams.get('TILECOL')));
+        const west = Math.floor(((box[0] + 180) / 360) * 2 ** plan.z);
+        return { plan, report, asked: asked.length, minCol: Math.min(...cols), west, drawn: bitmap !== null,
+                 box: lgl.wmtsBox };
+    }"""
+
+    def test_field_map_wmts_tiles_outside_the_box_are_not_asked(self):
+        """MF-101: LGL's WMTS answers 400 for a tile outside its capabilities' limits (the Land's box), which
+        would fail the picture; a source's wmtsBox keeps those tiles white and unasked, counted as missing, and
+        the box sits inside the capabilities' WGS84BoundingBox (7.49431099600789 47.4685671818621,
+        10.66599079533 49.8045457845908)."""
+        page, _ = self.field_map()
+        got = page.evaluate(self.BOX_JS, [{"lat": a, "lon": b} for a, b in self.outline_at(48.7758, 9.1829)])
+        west, south, east, north = got["box"]
+        self.assertTrue(7.49431099600789 <= west < east <= 10.66599079533, got["box"])
+        self.assertTrue(47.4685671818621 <= south < north <= 49.8045457845908, got["box"])
+        plan = got["plan"]
+        skipped = (got["west"] - plan["x0"]) * plan["rows"]
+        self.assertGreater(skipped, 0)
+        self.assertEqual(got["minCol"], got["west"])
+        self.assertEqual(got["asked"], plan["tiles"] - skipped)
+        self.assertEqual(got["report"], {"tiles": plan["tiles"], "missing": skipped, "zoom": plan["z"]})
+        self.assertTrue(got["drawn"])
 
     GEOMETRY_JS = """async (pts) => {
         const r = await import('./components/field-render.js');
