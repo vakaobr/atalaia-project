@@ -280,6 +280,15 @@ class PropSession extends ChangeNotifier {
   int get podAttempt => _podLink?.attempt ?? 0;
   DateTime? get podRetryAt => _podLink?.retryAt;
 
+  /// Over Bluetooth, while the pod pairs anew by itself (the phone's bond
+  /// was removed: Android asks for the passkey on the pod's screen).
+  bool get podRepairing => _podLink?.repairing ?? false;
+
+  /// Why the pod has to be linked again by hand ([PodLinkPhase.relink]): a
+  /// message key ("pod.wrong_passkey", "pod.pair_timeout",
+  /// "pod.repair_manual"), else null.
+  String? get podRelinkMessage => _podLink?.relinkMessage;
+
   int? get remainingMs => timer.remainingMs(gameTimeMs);
 
   bool get running => phase == PropPhase.running || phase == PropPhase.paused;
@@ -429,10 +438,22 @@ class PropSession extends ChangeNotifier {
         backoff: podBackoff,
         identTimeout: podIdentWait,
         onReplaced: _podReplaced,
-      )..addListener(notifyListeners);
+        onRepair: () => _log('pod: its bond was refused, pairing again'),
+      )..addListener(_podLinkChanged);
     }
     await client.start();
   }
+
+  void _podLinkChanged() {
+    final why = _podLink?.relinkMessage;
+    if (why != null && why != _podRelinkLogged) {
+      _podRelinkLogged = why;
+      _log('pod: link it again ($why)');
+    }
+    notifyListeners();
+  }
+
+  String? _podRelinkLogged;
 
   /// The person unlinks the pod: it is closed and not opened again.
   Future<void> unlinkPod() async {

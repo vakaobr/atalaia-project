@@ -205,6 +205,7 @@ const Map<String, String> zhTwStrings = {
   'pod.repair_manual': '這個模組需要重新配對。請在 Android 的藍牙設定中移除它，再重新連結並輸入它螢幕上的代碼。',
   'pod.reconnecting': '與模組的連線中斷，正在重新連線（第 {n} 次）…',
   'pod.refused': '回應的是另一個模組，所以沒有重新連上。請重新連結模組。',
+  'pod.relink': 'App 無法自動重新連上模組。{why}',
   'pod.unlink': '解除模組連結',
 
   // Capabilities

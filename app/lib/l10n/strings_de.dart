@@ -250,6 +250,8 @@ const Map<String, String> deStrings = {
   'pod.refused':
       'Ein anderer Pod hat geantwortet, die Verbindung wurde daher nicht wiederhergestellt. '
       'Verbinde einen Pod erneut.',
+  'pod.relink':
+      'Die App konnte den Pod nicht von selbst wieder verbinden. {why}',
   'pod.unlink': 'Pod trennen',
 
   // Capabilities

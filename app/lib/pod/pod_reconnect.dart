@@ -21,7 +21,17 @@
 ///   - the old link is closed before the new one is opened (both links of a
 ///     kind share one platform channel);
 ///   - [unlink] (the person's choice), [suspend] and [dispose] stop it:
-///     nothing is opened after them, also not by a try already waiting.
+///     nothing is opened after them, also not by a try already waiting;
+///   - over Bluetooth, a try that fails is explained by the pairing, as
+///     [linkPod] explains the first link (decisions PODPK-4, PODPK-8 and
+///     ROB-1 to ROB-4): a pod that says the phone's bond is no good (HCI
+///     0x05, "repair") is paired again once by itself (the phone's bond
+///     removed, [onRepair] called, the next try at once, without a wait);
+///     a wrong passkey, a cancelled or too slow pairing, a second "repair"
+///     or an Android that refuses to remove the bond stop the tries
+///     ([PodLinkPhase.relink], with [relinkMessage]): the person links the
+///     pod again by hand, so a pairing dialog is never asked for twice
+///     unasked.
 library;
 
 import 'dart:async';
@@ -30,6 +40,7 @@ import 'package:flutter/foundation.dart';
 
 import 'pod_client.dart';
 import 'pod_codec.dart';
+import 'pod_pairing.dart';
 
 enum PodLinkPhase {
   /// The link is up.
@@ -43,6 +54,11 @@ enum PodLinkPhase {
 
   /// The pod that answered is not the one that was linked: not tried again.
   refused,
+
+  /// The pairing went wrong while the link was opened again (a wrong or no
+  /// passkey, too slow, or a bond the pod still refuses): not tried again,
+  /// the person links the pod again ([PodReconnector.relinkMessage] says why).
+  relink,
 }
 
 /// Opens the link to the pod again; the client it returns is open and not
@@ -69,9 +85,18 @@ class PodReconnector extends ChangeNotifier {
     this.onReplaced,
     this.backoff = defaultPodBackoff,
     this.identTimeout = podIdentTimeout,
-  }) {
+    PodBonds? bonds,
+    this.onRepair,
+  }) : bonds = bonds ?? _bondsOf(client) {
     _client = client;
     _watch();
+  }
+
+  /// The plugin's side of the bonds: given, or the link's own transport
+  /// when it keeps them (ChannelPodTransport over Bluetooth).
+  static PodBonds? _bondsOf(PodClient c) {
+    final t = c.transport;
+    return t is PodBonds ? t as PodBonds : null;
   }
 
   final PodReopen reopen;
@@ -81,6 +106,29 @@ class PodReconnector extends ChangeNotifier {
   final void Function(PodClient old, PodClient next)? onReplaced;
   final PodBackoff backoff;
   final Duration Function(PodClient) identTimeout;
+
+  /// How a Bluetooth try's pairing ended (null: not asked, as over USB).
+  final PodBonds? bonds;
+
+  /// Called when the phone's bond was removed for the pod to pair anew: a
+  /// new passkey is on the pod's screen and Android asks for it.
+  final void Function()? onRepair;
+
+  /// Why the tries stopped in [PodLinkPhase.relink]: a message key of
+  /// lib/l10n/strings_*.dart ("pod.wrong_passkey", "pod.pair_timeout",
+  /// "pod.repair_manual"); null in the other phases.
+  String? relinkMessage;
+
+  /// The phone's bond was removed and the pod is pairing anew (Android's
+  /// dialog asks for the passkey), until the link is up or the tries stop.
+  bool repairing = false;
+
+  /// Paired again once by itself since the link broke: a second "repair"
+  /// stops.
+  var _repaired = false;
+
+  /// The next try starts at once (after the bond was removed).
+  var _now = false;
 
   late PodClient _client;
   PodLinkPhase phase = PodLinkPhase.linked;
@@ -102,7 +150,9 @@ class PodReconnector extends ChangeNotifier {
   PodClient get client => _client;
 
   bool get stopped =>
-      phase == PodLinkPhase.unlinked || phase == PodLinkPhase.refused;
+      phase == PodLinkPhase.unlinked ||
+      phase == PodLinkPhase.refused ||
+      phase == PodLinkPhase.relink;
 
   bool get _halt => _disposed || stopped || _suspended;
 
@@ -119,6 +169,8 @@ class PodReconnector extends ChangeNotifier {
     if (_halt || _running) return;
     phase = PodLinkPhase.reconnecting;
     attempt = 0;
+    _repaired = false;
+    repairing = false;
     notifyListeners();
     unawaited(_loop());
   }
@@ -131,12 +183,16 @@ class PodReconnector extends ChangeNotifier {
       await _client.close();
       while (!_halt) {
         attempt++;
-        final wait = backoff(attempt);
-        retryAt = DateTime.now().add(wait);
-        notifyListeners();
-        await _sleep(wait);
-        if (_halt) return;
-        retryAt = null;
+        if (_now) {
+          _now = false;
+        } else {
+          final wait = backoff(attempt);
+          retryAt = DateTime.now().add(wait);
+          notifyListeners();
+          await _sleep(wait);
+          if (_halt) return;
+          retryAt = null;
+        }
         notifyListeners();
         if (await _try()) return;
       }
@@ -167,9 +223,9 @@ class PodReconnector extends ChangeNotifier {
     try {
       next = await reopen(old);
     } on Object {
-      return false;
+      return _failed(old);
     }
-    if (next == null) return false;
+    if (next == null) return _failed(old);
     if (_halt) {
       await next.close();
       return true;
@@ -192,7 +248,7 @@ class PodReconnector extends ChangeNotifier {
     await sub.cancel();
     if (!ok || _halt) {
       await next.close();
-      return _halt;
+      return _halt || await _failed(old);
     }
     if (!_samePod(old.ident, next.ident)) {
       await next.close();
@@ -203,9 +259,56 @@ class PodReconnector extends ChangeNotifier {
     _client = next;
     phase = PodLinkPhase.linked;
     attempt = 0;
+    repairing = false;
     _watch();
     notifyListeners();
     onReplaced?.call(old, next);
+    return true;
+  }
+
+  /// After a try that did not link [old]'s pod again: what its pairing said
+  /// (over Bluetooth). True when the tries stop ([PodLinkPhase.relink]);
+  /// false to try again, at once after the bond was removed. As [linkPod].
+  Future<bool> _failed(PodClient old) async {
+    final b = bonds;
+    final device = old.device;
+    if (b == null || old.transport.kind != 'ble') return false;
+    final PodPairError? error;
+    try {
+      error = await b.lastPairError();
+    } on Object {
+      return false;
+    }
+    if (_halt) return true;
+    // Out of reach, or a link that ended without a word on the pairing.
+    if (error == null) return false;
+    if (error != PodPairError.needsRepair || _repaired) {
+      return _stop(podPairMessage(error));
+    }
+    var forgot = false;
+    if (device != null) {
+      try {
+        forgot = await b.forgetBond(device);
+      } on Object {
+        forgot = false;
+      }
+    }
+    if (_halt) return true;
+    if (!forgot) return _stop('pod.repair_manual');
+    _repaired = true;
+    repairing = true;
+    _now = true;
+    notifyListeners();
+    onRepair?.call();
+    return false;
+  }
+
+  bool _stop(String messageKey) {
+    phase = PodLinkPhase.relink;
+    relinkMessage = messageKey;
+    repairing = false;
+    retryAt = null;
+    notifyListeners();
     return true;
   }
 

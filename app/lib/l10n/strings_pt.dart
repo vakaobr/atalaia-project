@@ -242,6 +242,7 @@ const Map<String, String> ptStrings = {
   'pod.reconnecting':
       'A ligação ao módulo perdeu-se. A religar (tentativa {n})…',
   'pod.refused': 'Respondeu outro módulo, por isso a ligação não foi retomada. Liga um módulo outra vez.',
+  'pod.relink': 'A app não conseguiu voltar a ligar o módulo sozinha. {why}',
   'pod.unlink': 'Desligar o módulo',
 
   // Capacidades

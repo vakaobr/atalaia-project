@@ -231,6 +231,7 @@ const Map<String, String> enStrings = {
   'pod.repair_manual': "This pod needs pairing again. Forget it in Android's Bluetooth settings, then link it again and type the code from its screen.",
   'pod.reconnecting': 'The link to the pod was lost. Reconnecting (try {n})…',
   'pod.refused': 'A different pod answered, so the link was not restored. Link a pod again.',
+  'pod.relink': 'The app could not link the pod again by itself. {why}',
   'pod.unlink': 'Unlink the pod',
 
   // Capabilities
