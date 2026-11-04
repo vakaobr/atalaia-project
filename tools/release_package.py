@@ -151,7 +151,7 @@ PRE-ALPHA, NOT FIELD-TESTED. Heltec WiFi LoRa 32 V4 only (ESP32-S3, 16 MB flash)
 Fit the LoRa antenna before you power the board.
 
 This folder is a build of the project's own source at tag v{version}, made by the
-release workflow, with the project's two mode keys and three release keys built in.
+release workflow, with the project's two mode keys and two release keys built in.
 
 Files and where they go (flash_args lists them for esptool):
 {listing}
@@ -252,11 +252,12 @@ what you downloaded against `SHA256SUMS`.
 
 **USB flash required once** when you come from v0.4.0 or earlier: the Field Box, modem and pod images of this release have a new partition table (4 MB OTA slots instead of 2 MB), and an update over the air cannot change the partition table. Flash the `-usb.zip` over USB once (write, no erase: the settings and the adoption stay; the cached game modes and the field's logo are fetched again). A box still on the old table refuses to run the new firmware and shows "Flash over USB" on its screen; one that gets it over the air from an older firmware goes back to the old one by itself. Later updates over the air work as before.
 
-**Signed with a CI release key.** The firmware trusts the project's release keys: root `424d053af5cdbc35`
-(held offline by the maintainer), CI `32b3c815ac30ad43` and the next CI key `a4f6002b0122b131`, which
-takes over from it. The `.release.json` names the key that signed this release (`key_id`). A controller
-whose `[firmware] release_keys` lists keys by hand needs the next CI key,
-`76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=`, before the releases it signs ([Release signing]({base}/blob/{args.tag}/firmware/esp32/docs/RELEASE_SIGNING.md#rotating-the-ci-key-2026-11)).
+**Signed with the CI release key.** The firmware trusts the project's release keys: root `424d053af5cdbc35`
+(held offline by the maintainer) and CI `a4f6002b0122b131` (`76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=`).
+The `.release.json` names the key that signed this release (`key_id`). The first CI key, `32b3c815ac30ad43`,
+is retired: a box on v0.7.0 takes this release over the air, a box on v0.6.1 or older needs v0.7.0 first,
+and a controller whose `[firmware] release_keys` lists keys by hand should drop
+`rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw=` ([Release signing]({base}/blob/{args.tag}/firmware/esp32/docs/RELEASE_SIGNING.md#rotating-the-ci-key-2026-11)).
 
 Guides: [Firmware guide]({base}/blob/{args.tag}/docs/manuals/en/firmware.md) (download, flash, build it yourself) ·
 [Release signing]({base}/blob/{args.tag}/firmware/esp32/docs/RELEASE_SIGNING.md) ·

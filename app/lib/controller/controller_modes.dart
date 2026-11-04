@@ -599,7 +599,17 @@ final class ModePackage {
   }
 
   /// GET /api/v1/modes' form (modes.py `to_api`).
-  Map<String, Object?> toApi() => {
+  Map<String, Object?> toApi() {
+    final out = _api();
+    // A compiled scenario with triggers: the output functions they switch on
+    // each box (box name to functions), which the console shows (EXP-25).
+    final block = mode.kind == 'scenario' ? manifest['scenario'] : null;
+    final outputs = block is Map ? block['outputs'] : null;
+    if (outputs is Map && outputs.isNotEmpty) out['outputs'] = outputs;
+    return out;
+  }
+
+  Map<String, Object?> _api() => {
     'id': mode.id,
     'kind': mode.kind,
     'name': mode.name,

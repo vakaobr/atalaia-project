@@ -72,6 +72,9 @@ class Meta:
     objectives: dict[str, dict[str, Any]] = field(default_factory=dict)  # by id, in the manifest's order
     reveal: Optional[str] = None  # the manifest's own: "active": a dependent objective is known only when it opens (SQ-1); None: the game decides (RVL-1)
     disclosure: str = "members"  # "leader": only the assignee squad's leaders get the details (SQ-3)
+    # The output functions its triggers switch on each box (box name -> functions), as the compiler
+    # writes them: a role's `outputs:` for the start check and the console (EXP-22, EXP-25).
+    outputs: dict[str, list[str]] = field(default_factory=dict)
 
     @staticmethod
     def parse(mode_yaml: str) -> Optional["Meta"]:
@@ -91,7 +94,12 @@ class Meta:
                     lang=str(block.get("lang", "pt")), teams=list(block.get("teams") or []),
                     squads=int(block.get("squads") or 0), nodes=nodes, objectives=objectives,
                     reveal=block.get("reveal") if block.get("reveal") in REVEALS else None,
-                    disclosure="leader" if block.get("disclosure") == "leader" else "members")
+                    disclosure="leader" if block.get("disclosure") == "leader" else "members",
+                    outputs=box_outputs(block.get("outputs")))
+
+    def node_outputs(self, name: Any) -> list[str]:
+        """The output functions the triggers switch on the box of that scenario name ([] for none)."""
+        return list(self.outputs.get(name, [])) if isinstance(name, str) else []
 
     def box_nodes(self) -> dict[str, str]:
         """The boxes the GM names in the Join tab: name -> role (objective or bomb_site)."""
@@ -136,6 +144,15 @@ class Meta:
                       if visibility.objective_visible(viewer, o, game, disclosure)
                       and (staff or o.get("visibility") != "hidden" or o["id"] in revealed)]
         return {**self.header(), "objectives": objectives}
+
+
+def box_outputs(value: Any) -> dict[str, list[str]]:
+    """A compiled scenario's ``scenario.outputs`` (box name -> the output functions its triggers switch),
+    only well-formed entries kept; {} for a package compiled before triggers or without them."""
+    if not isinstance(value, dict):
+        return {}
+    return {str(k): [f for f in v if isinstance(f, str)] for k, v in value.items()
+            if isinstance(v, list) and any(isinstance(f, str) for f in v)}
 
 
 class Refused(Exception):

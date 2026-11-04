@@ -309,6 +309,17 @@ after the game ended, on the controller and on the site server. Team and
 squad results without player ids (no member lists; a squad under 3 players
 is folded into its team) are kept **365 days** (section 7).
 
+**[FIELD CHOICE:] Sharing game results with other fields of a hosted hub**
+(off by default). If the field's administrator turns it on, the hub
+operator keeps, for the staff of the other fields of the same hub that also
+share theirs, a copy of each ended game's mode, start and end time, each
+team's final score, the winning team and the field's name. **No player
+identifier, name, account, event or member list is shared**, nor the names
+the field gives a game or a team. The copy is removed when the field turns
+sharing off, and never kept longer than the field keeps the game's results
+(365 days). [LAWYER: confirm whether this needs a basis or a mention beyond
+this paragraph, and whether the sharing fields need terms between them.]
+
 Basis: (f) running the games and keeping their history
 [LAWYER: confirm].
 
@@ -546,6 +557,21 @@ app deletes all of it (on an iPhone, iOS may keep that key, which contains
 no personal data and opens nothing once the app's data is gone). The app has
 no analytics, advertising or crash-reporting library.
 
+**In a browser, instead of the app** [DRAFT: pending a lawyer]. You can also
+register for a game on the field's web pages (decisions WREG-*). The page
+then keeps, in your browser: the short-lived login token (15 minutes) in that
+tab only, gone when the tab closes; a cookie with the login's refresh token,
+which scripts cannot read and which goes only to the server's login address,
+until you log out or the login ends (a week without use, 30 days at most);
+during a Google, Microsoft or Apple sign-in, a cookie of at most 10 minutes
+that ties the sign-in to this browser; and, if the field set its pages to
+remember a language you pick, a cookie with that language only. Your
+check-in ticket is shown once and is not stored by the page: a printout or
+a screenshot you make is yours to keep safe. The pages load nothing from
+other sites and have no analytics. [LAWYER: these are needed for the service
+the person asks for; whether they need no consent (ePrivacy Directive,
+Art. 5(3), as transposed), and whether this paragraph is needed at all.]
+
 ## 10. Security
 
 HTTPS between all parts; passwords as Argon2id hashes; TOTP secrets
@@ -598,6 +624,11 @@ version).
 Short text for the app's *create account* screen (decision S17-16). It must be shown **before** the account is made, link to the full
 notice (Part A), and the person must choose to continue. Version it like
 Part A. Keep it to about this length. Pt-PT in `privacy-notice-pt.md`.
+[LAWYER: an account can now also be made on the field's web registration
+page (WREG-*), with a Google, Microsoft or Apple sign-in. That page links to
+the full notice (Part A), which must be opened before its box can be ticked,
+and has the same two boxes; it does not show this short text. Whether it
+should.]
 
 > **Your account at [FIELD NAME]**
 >
@@ -747,3 +778,8 @@ Decided by the maintainer on 2026-10-30, consistent with the approved brief:
    optional contact for 90 days and the message for 12 months, no account, no
    address) has a notice of its own, in the project's name. It is not part of
    this field notice.
+5. **Registering on the field's web pages** (WREG-11, 2026-11-04): the
+   paragraph "In a browser, instead of the app" in section 9 (the browser's
+   storage and whether it needs consent) and whether Part B is shown on the web
+   sign-up too. Nothing else changes: the data, the purposes, the bases and
+   the periods of a registration are the same as in the app.

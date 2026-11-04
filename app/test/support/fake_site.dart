@@ -295,6 +295,372 @@ class FakeSite {
   /// The code another field made, which `link` takes (once).
   var otherFieldCode = 'ABCD-EFGH-JKLM';
 
+  // --- the player's chrono history and sharing consents (api/me.py) -------------
+  /// `GET /me/chrono`'s fields: Campo Norte with two readings, a replica and
+  /// a violation; Campo Sul with nothing but the player id.
+  final chronoFields = <Map<String, Object?>>[
+    {
+      'field_id': '0192f3a0-0000-7000-8000-00000000f1e1',
+      'field': 'Campo Norte',
+      'player_id': 'p-sitemade2345',
+      'readings': [
+        {
+          'reading_id': 'r-1',
+          'replica_id': 'rep-1',
+          'type': 'checkin',
+          'velocity_mps': 98.5,
+          'bb_weight_g': 0.25,
+          'energy_j': 1.21,
+          'outcome': 'pass',
+          'timestamp': '2026-10-10T09:00:00+00:00',
+        },
+        {
+          'reading_id': 'r-2',
+          'replica_id': 'rep-1',
+          'type': 'spotcheck',
+          'velocity_mps': 110.0,
+          'bb_weight_g': 0.25,
+          'energy_j': 1.51,
+          'outcome': 'fail',
+          'timestamp': '2026-10-10T11:30:00+00:00',
+        },
+      ],
+      'replicas': [
+        {
+          'replica_id': 'rep-1',
+          'type': 'aeg',
+          'class': 'rifle',
+          'make_model': 'Tokyo Marui M4',
+        },
+      ],
+      'violations': [
+        {
+          'id': 'v-1',
+          'violation_type': 'over_limit',
+          'energy_j': 1.51,
+          'limit_j': 1.49,
+          'outcome': 'warning',
+          'ban_active': false,
+          'ban_expires_at': null,
+          'created_at': '2026-10-10T11:31:00+00:00',
+        },
+      ],
+      'refused_readings': [
+        {'reason': 'bad_signature', 'times': 2},
+      ],
+    },
+    {
+      'field_id': '0192f3a0-0000-7000-8000-00000000f2e2',
+      'field': 'Campo Sul',
+      'player_id': 'p-south000001',
+      'readings': <Object?>[],
+      'replicas': <Object?>[],
+      'violations': <Object?>[],
+      'refused_readings': <Object?>[],
+    },
+  ];
+
+  /// Every consent record, as `consents` in `GET /me/data` lists them.
+  final consentRecords = <Map<String, Object?>>[];
+
+  /// Fields `PUT /me/consents/chrono-sharing/{field}` knows (else 404).
+  late final knownFields = <String>{
+    fieldId,
+    '0192f3a0-0000-7000-8000-00000000f2e2',
+  };
+
+  Set<String> get liveConsents => {
+    for (final c in consentRecords)
+      if (c['purpose'] == 'chrono_sharing' && c['withdrawn_at'] == null)
+        '${c['field_id']}',
+  };
+
+  SiteResponse? _chrono(String method, String path) {
+    if (method == 'GET' && path == '/me/chrono') {
+      return SiteResponse(200, {'fields': chronoFields});
+    }
+    final m = RegExp(r'^/me/consents/chrono-sharing/([0-9a-f-]+)$')
+        .firstMatch(path);
+    if (m == null) return null;
+    final field = m.group(1)!;
+    final live = consentRecords.where(
+      (c) =>
+          c['purpose'] == 'chrono_sharing' &&
+          c['field_id'] == field &&
+          c['withdrawn_at'] == null,
+    );
+    if (method == 'PUT') {
+      if (!knownFields.contains(field)) {
+        return const SiteResponse(404, {'detail': 'field_not_found'});
+      }
+      final fresh = live.isEmpty;
+      if (fresh) {
+        consentRecords.add({
+          'purpose': 'chrono_sharing',
+          'field_id': field,
+          'notice_version': '2026-11',
+          'given_at': '2026-11-04T10:00:00+00:00',
+          'withdrawn_at': null,
+        });
+      }
+      return SiteResponse(fresh ? 201 : 200, {
+        'purpose': 'chrono_sharing',
+        'field_id': field,
+        'given': true,
+      });
+    }
+    if (method == 'DELETE') {
+      if (live.isEmpty) {
+        return const SiteResponse(404, {'detail': 'consent_not_found'});
+      }
+      live.first['withdrawn_at'] = '2026-11-04T11:00:00+00:00';
+      return const SiteResponse(204, null);
+    }
+    return null;
+  }
+
+  // --- clubs (api/clubs.py) ------------------------------------------------------
+  final myUserId = '0192f3a0-0000-7000-8000-0000000000u1';
+
+  /// Club id -> the club (club_json without my_role).
+  final clubs = <String, Map<String, Object?>>{
+    'club-a': {
+      'id': 'club-a',
+      'name': 'Corvos da Serra',
+      'short_name': 'Corvos',
+      'slug': 'corvos-da-serra',
+      'description': 'Airsoft ao domingo de manhã.',
+      'colour': '#2e7d32',
+      'logo': null,
+      'crest': null,
+      'public_page': true,
+      'hidden': false,
+      'hidden_reason': null,
+      'created_at': '2026-10-01T10:00:00+00:00',
+    },
+    'club-b': {
+      'id': 'club-b',
+      'name': 'Lobos do Norte',
+      'short_name': 'Lobos',
+      'slug': 'lobos-do-norte',
+      'description': null,
+      'colour': null,
+      'logo': null,
+      'crest': null,
+      'public_page': false,
+      'hidden': false,
+      'hidden_reason': null,
+      'created_at': '2026-10-02T10:00:00+00:00',
+    },
+  };
+
+  /// Club id -> its members (member_json, by username).
+  late final clubMembers = <String, List<Map<String, Object?>>>{
+    'club-a': [
+      _member(myUserId, username, 'admin', accepted: true),
+      _member('u-2', 'rita', 'member', accepted: true),
+      _member('u-3', 'tiago', 'member', accepted: false),
+    ],
+    'club-b': [
+      _member('u-4', 'ana', 'admin', accepted: true),
+      _member(myUserId, username, 'member', accepted: false),
+    ],
+  };
+
+  /// Club id -> the fields where it plays.
+  final clubFields = <String, List<Map<String, Object?>>>{
+    'club-a': [
+      {
+        'id': '0192f3a0-0000-7000-8000-00000000f1e1',
+        'name': 'Campo Norte',
+        'slug': 'campo-norte',
+        'public_page': true,
+      },
+    ],
+  };
+
+  /// Usernames `PUT .../members` can invite.
+  final accounts = <String, String>{'joana': 'u-5', 'rita': 'u-2'};
+  var _clubN = 0;
+
+  Map<String, Object?> _member(
+    String id,
+    String name,
+    String role, {
+    required bool accepted,
+  }) => {
+    'user_id': id,
+    'username': name,
+    'role': role,
+    'accepted': accepted,
+    'accepted_at': accepted ? '2026-10-05T10:00:00+00:00' : null,
+    'invited_at': '2026-10-04T10:00:00+00:00',
+  };
+
+  Map<String, Object?>? _mine(String clubId) =>
+      clubMembers[clubId]?.where((m) => m['user_id'] == myUserId).firstOrNull;
+
+  SiteResponse? _clubs(String method, String path, Map<String, Object?> b) {
+    SiteResponse err(int status, String detail) =>
+        SiteResponse(status, {'detail': detail});
+    String? role(String id) {
+      final m = _mine(id);
+      return m != null && m['accepted'] == true ? '${m['role']}' : null;
+    }
+
+    Map<String, Object?> json(String id) => {
+      ...clubs[id]!,
+      if (role(id) != null) 'my_role': role(id),
+    };
+    if (path == '/clubs' && method == 'GET') {
+      final ids =
+          [
+            for (final id in clubs.keys)
+              if (role(id) != null) id,
+          ]..sort(
+            (a, b) => '${clubs[a]!['slug']}'.compareTo('${clubs[b]!['slug']}'),
+          );
+      return SiteResponse(200, [for (final id in ids) json(id)]);
+    }
+    if (path == '/clubs' && method == 'POST') {
+      final slug = '${b['slug']}';
+      if (!RegExp(r'^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$').hasMatch(slug)) {
+        return err(400, 'slug_invalid');
+      }
+      if (clubs.values.any((c) => c['slug'] == slug)) {
+        return err(409, 'slug_taken');
+      }
+      final id = 'club-n${++_clubN}';
+      clubs[id] = {
+        'id': id,
+        'name': '${b['name']}'.trim(),
+        'short_name': '${b['short_name']}'.trim(),
+        'slug': slug,
+        'description': b['description'],
+        'colour': b['colour'],
+        'logo': null,
+        'crest': null,
+        'public_page': false,
+        'hidden': false,
+        'hidden_reason': null,
+        'created_at': '2026-11-04T10:00:00+00:00',
+      };
+      clubMembers[id] = [_member(myUserId, username, 'admin', accepted: true)];
+      return SiteResponse(201, json(id));
+    }
+    if (path == '/me/clubs' && method == 'GET') {
+      final out = <Map<String, Object?>>[];
+      for (final id in clubs.keys) {
+        final m = _mine(id);
+        if (m == null) continue;
+        out.add({
+          'club_id': id,
+          'slug': clubs[id]!['slug'],
+          'name': clubs[id]!['name'],
+          ...m,
+        });
+      }
+      return SiteResponse(200, out);
+    }
+    final accept = RegExp(r'^/me/clubs/([^/]+)/accept$').firstMatch(path);
+    if (accept != null && method == 'POST') {
+      final m = _mine(accept.group(1)!);
+      if (m == null) return err(404, 'invitation_not_found');
+      m['accepted'] = true;
+      m['accepted_at'] = '2026-11-04T10:00:00+00:00';
+      return SiteResponse(200, m);
+    }
+    final one = RegExp(r'^/clubs/([^/]+)(/members(?:/([^/]+))?)?$')
+        .firstMatch(path);
+    if (one == null) return null;
+    final id = one.group(1)!;
+    if (!clubs.containsKey(id)) return err(404, 'club_not_found');
+    final r = role(id);
+    final visible = clubs[id]!['public_page'] == true;
+    if (one.group(2) == null) {
+      if (method == 'GET') {
+        if (r == null && !visible) return err(404, 'club_not_found');
+        return SiteResponse(200, {
+          ...json(id),
+          'fields': clubFields[id] ?? const [],
+        });
+      }
+      if (r == null && !visible) return err(404, 'club_not_found');
+      if (r != 'admin') return err(403, 'club_admin_required');
+      if (method == 'PATCH') {
+        final colour = b['colour'];
+        if (colour is String &&
+            colour.isNotEmpty &&
+            !RegExp(r'^#[0-9a-f]{6}$').hasMatch(colour.toLowerCase())) {
+          return err(400, 'colour_invalid');
+        }
+        for (final k in ['name', 'short_name', 'description', 'public_page']) {
+          if (b.containsKey(k)) clubs[id]![k] = b[k];
+        }
+        if (b.containsKey('colour')) {
+          clubs[id]!['colour'] = colour == '' ? null : colour;
+        }
+        return SiteResponse(200, json(id));
+      }
+      if (method == 'DELETE') {
+        clubs.remove(id);
+        clubMembers.remove(id);
+        return const SiteResponse(204, null);
+      }
+      return null;
+    }
+    final members = clubMembers[id]!;
+    int admins(String without) => members
+        .where(
+          (m) =>
+              m['role'] == 'admin' &&
+              m['accepted'] == true &&
+              m['user_id'] != without,
+        )
+        .length;
+    if (one.group(3) == null) {
+      if (method == 'GET') {
+        if (r == null) return err(404, 'club_not_found');
+        return SiteResponse(200, [
+          for (final m in members)
+            if (r == 'admin' || m['accepted'] == true) m,
+        ]);
+      }
+      if (method == 'PUT') {
+        if (r != 'admin') return err(403, 'club_admin_required');
+        final name = '${b['username']}'.trim().toLowerCase();
+        final existing = members
+            .where((m) => m['username'] == name)
+            .firstOrNull;
+        if (existing != null) {
+          if (existing['role'] == 'admin' &&
+              existing['accepted'] == true &&
+              admins('${existing['user_id']}') == 0) {
+            return err(409, 'last_admin');
+          }
+          existing['role'] = b['role'];
+          return SiteResponse(200, existing);
+        }
+        final uid = accounts[name];
+        if (uid == null) return err(404, 'user_not_found');
+        final m = _member(uid, name, '${b['role']}', accepted: false);
+        members.add(m);
+        return SiteResponse(201, m);
+      }
+      return null;
+    }
+    if (method != 'DELETE') return null;
+    final uid = one.group(3)!;
+    if (uid != myUserId && r != 'admin') return err(403, 'club_admin_required');
+    final m = members.where((x) => x['user_id'] == uid).firstOrNull;
+    if (m == null) return err(404, 'member_not_found');
+    if (m['role'] == 'admin' && m['accepted'] == true && admins(uid) == 0) {
+      return err(409, 'last_admin');
+    }
+    members.remove(m);
+    return const SiteResponse(204, null);
+  }
+
   SiteResponse? _noticeAndHub(
     String method,
     String path,
@@ -704,6 +1070,10 @@ class FakeSite {
     if (login != null) return login;
     final own = _noticeAndHub(method, path, b);
     if (own != null) return own;
+    final chrono = _chrono(method, path);
+    if (chrono != null) return chrono;
+    final club = _clubs(method, path, b);
+    if (club != null) return club;
     final regPath = RegExp(
       r'^/fields/([0-9a-f-]+)/scheduled-games/([0-9a-f-]+)/registrations$',
     ).firstMatch(path);
@@ -787,9 +1157,13 @@ class FakeSite {
       case 'GET /fields-by-slug/campo-norte':
         return SiteResponse(200, {'field': _field(), 'games': games});
       case 'GET /me/data':
-        // Only the part the app reads: the player's own game history
-        // (services/history.player_history), oldest first.
-        return SiteResponse(200, {'game_history': history});
+        // Only the parts the app reads: the player's own game history
+        // (services/history.player_history), oldest first, and the consents
+        // (withdrawn ones stay, with their withdrawn_at).
+        return SiteResponse(200, {
+          'game_history': history,
+          'consents': consentRecords,
+        });
       case 'GET /me/registrations':
         return SiteResponse(200, [for (final r in regs.values) _regJson(r)]);
       case 'GET /me/player-ids':

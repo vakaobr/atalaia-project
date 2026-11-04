@@ -99,6 +99,57 @@ class StartCheckTests(unittest.TestCase):
         out = self.check(node(5, "alarm", [b, o], lost))
         self.assertEqual([(w["code"], w["node"]) for w in out["warnings"]], [("outputs", 5)])
 
+    def test_a_scenarios_triggers_count_as_the_roles_outputs(self):
+        """A scenario's box runs the objectives package's role, which lists no output: the functions its
+        triggers switch on that box (the node's ``outputs``) count as the role's outputs: with output
+        optional (increment 5's leftover)."""
+        objective = {"requires": ["team_input"], "optional": ["keypad", "display"]}
+        ids = {k: v.id for k, v in CAPABILITY_TYPES.items()}
+        b, o = ids["button"], ids["output"]
+        spec = outputs.with_outputs(objective, ["siren", "horn", "siren"])
+        self.assertEqual(spec, {"requires": ["team_input"], "optional": ["keypad", "display", "output"],
+                                "outputs": ["siren", "horn"]})
+        self.assertIs(outputs.with_outputs(objective, []), objective)
+        self.assertIs(outputs.with_outputs(objective, None), objective)
+        self.assertEqual(outputs.with_outputs(BOMB, ["horn", "smoke"])["outputs"], ["smoke", "siren", "horn"])
+        self.assertEqual(outputs.with_outputs(ALARM, ["horn"])["optional"], [])  # output already required
+        self.assertEqual(outputs.with_outputs(None, ["horn"]), {"optional": ["output"], "outputs": ["horn"]})
+
+        def check(*nodes):
+            return outputs.check_nodes(nodes, {"objective": objective}.get)
+
+        def scenario_node(n, caps, mods, fns):
+            return {**node(n, "objective", caps, mods), "outputs": fns}
+
+        k, d = ids["keypad"], ids["display"]
+        strobe = outputs.modules_of("g46:servo:strobe")
+        out = check(scenario_node(4, [b, k, d, o], strobe, ["siren", "horn"]),
+                    scenario_node(5, [b, k, d], None, ["horn"]), scenario_node(6, [b, k, d, o], strobe, []))
+        self.assertEqual(out["missing_caps"], [])
+        self.assertEqual([(w["code"], w["node"], w["capabilities"]) for w in out["warnings"]],
+                         [("outputs", 4, ["siren", "horn"]), ("optional_caps", 5, ["output"])])
+        self.assertEqual(out["warnings"][0]["text"],
+                         "box-4 (objective) has none of the outputs the mode would switch: siren, horn")
+        out = check(scenario_node(4, [b, k, d, o], outputs.modules_of("g46:servo:horn"), ["siren", "horn"]))
+        self.assertEqual(out["warnings"], [])
+
+
+class ScenarioOutputsTests(unittest.TestCase):
+    def test_the_compiled_outputs_in_the_meta(self):
+        from atalaia_controller.scenario_service import Meta, box_outputs
+        self.assertEqual(box_outputs({"alpha": ["siren", "horn"], "bravo": [], "c": "x", "d": [1, "light"]}),
+                         {"alpha": ["siren", "horn"], "d": ["light"]})
+        self.assertEqual(box_outputs(None), {})
+        text = ("id: org.club.s\nversion: '1'\nkind: scenario\nname: S\nscenario:\n  nodes: {alpha: {role: objective}}\n"
+                "  objectives: []\n  outputs: {alpha: [siren, horn]}\n")
+        meta = Meta.parse(text)
+        assert meta is not None
+        self.assertEqual(meta.node_outputs("alpha"), ["siren", "horn"])
+        self.assertEqual((meta.node_outputs("bravo"), meta.node_outputs(None)), ([], []))
+        before = Meta.parse(text.replace("  outputs: {alpha: [siren, horn]}\n", ""))
+        assert before is not None
+        self.assertEqual(before.outputs, {})
+
 
 class ModulesTests(unittest.TestCase):
     def test_modules_and_a_lost_one(self):
