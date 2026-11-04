@@ -67,6 +67,12 @@ bool outputs_admin_key(outputs_admin_t *a, char key)
         break;
     case '3':
         s.max_on_s = outputs_admin_next_max(s.max_on_s);
+        /* A module's channel: never above the module's own max on (then round again). */
+        if (o->ch[a->index].module && s.max_on_s > o->ch[a->index].module_max_s) {
+            s.max_on_s = o->ch[a->index].set.max_on_s < o->ch[a->index].module_max_s
+                             ? o->ch[a->index].module_max_s
+                             : outputs_admin_next_max(0);
+        }
         outputs_configure(o, a->index, &s);
         break;
     case '5': a->testing = outputs_test(o, a->index) == OUT_OK; break;
@@ -80,11 +86,16 @@ bool outputs_admin_screen(const outputs_admin_t *a, screen_update_t *out)
     if (!a->open) return false;
     const out_channel_t *c = &a->outputs->ch[a->index];
     snprintf(out->template_name, sizeof(out->template_name), "start_confirm");
+    char module[24] = "";
+    if (c->module) {
+        snprintf(module, sizeof(module), ",\"module\":\"%02x/%u\"", c->addr, (unsigned)c->mch + 1u);
+    }
     snprintf(out->data_json, sizeof(out->data_json),
-             "{\"output\":%d,\"of\":%d,\"gpio\":%d,\"fn\":\"%s\",\"enabled\":%s,\"max_s\":%lu,"
-             "\"testing\":%s}",
-             a->index + 1, a->outputs->count, c->gpio, c->id, c->set.enabled ? "true" : "false",
-             (unsigned long)c->set.max_on_s, a->testing ? "true" : "false");
+             "{\"output\":%d,\"of\":%d,\"gpio\":%d%s,\"fn\":\"%s\",\"enabled\":%s,"
+             "\"max_s\":%lu,\"testing\":%s}",
+             a->index + 1, a->outputs->count, c->gpio, module, c->id,
+             c->set.enabled ? "true" : "false", (unsigned long)c->set.max_on_s,
+             a->testing ? "true" : "false");
     return true;
 }
 
@@ -107,7 +118,13 @@ int outputs_admin_args(const char *cmd)
 static void describe(const outputs_t *o, int i, char *out, size_t cap)
 {
     const out_channel_t *c = &o->ch[i];
-    snprintf(out, cap, "output %d GPIO %d: %s, %s, at most %lu s, %s", i + 1, c->gpio, c->id,
+    char at[32];
+    if (c->module) {
+        snprintf(at, sizeof(at), "module %02x channel %u", c->addr, (unsigned)c->mch + 1u);
+    } else {
+        snprintf(at, sizeof(at), "GPIO %d", c->gpio);
+    }
+    snprintf(out, cap, "output %d %s: %s, %s, at most %lu s, %s", i + 1, at, c->id,
              c->set.enabled ? "enabled" : "disabled", (unsigned long)c->set.max_on_s,
              c->level ? "on" : "off");
 }
@@ -117,7 +134,8 @@ bool outputs_admin_command(outputs_t *o, const char *cmd, bool busy, char *reply
     if (cmd == NULL) return false;
     if (strcmp(cmd, "outputs") == 0) {
         if (o == NULL || o->count == 0) {
-            snprintf(reply, cap, "outputs: none (a build without CONFIG_ATALAIA_SIMPLE_OUT)");
+            snprintf(reply, cap,
+                     "outputs: none (no simple output built in, no output module plugged in)");
             return true;
         }
         size_t len = 0;

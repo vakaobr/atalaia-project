@@ -42,6 +42,8 @@ static void on_command(void *user, const char *target, const char *method, const
     node_runner_t *r = (node_runner_t *)user;
     /* An output's capability id first (cap("siren"):pulse(ms)); everything else as before. */
     if (command_dispatch_output(r->outputs, target, method, args_json)) return;
+    /* A hit capability's arm and disarm (the expansion port's hit channels). */
+    if (r->port != NULL && expansion_box_command(r->port, target, method)) return;
     command_dispatch(target, method, args_json, r->hal, &r->queues);
 }
 
