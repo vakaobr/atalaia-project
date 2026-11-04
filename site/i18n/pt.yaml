@@ -945,6 +945,7 @@ roadmap:
         - "A app volta a ligar-se sozinha a um módulo de E/S perdido. Não experimentado com um módulo a sério."
         - "Os props Android vão buscar pacotes de modo assinados ao seu controlador, como as caixas. Em software."
         - "A consola de GM pode enviar as definições de um módulo de E/S pelo rádio: as cores dos quatro botões, o brilho do anel de LEDs, o volume e se o interruptor da caixa avisa. O módulo autentica o comando como qualquer outro, guarda as definições na sua flash e responde; o controlador volta a enviá-lo até ouvir a resposta. Antes, eram definidas quando o firmware era compilado. Em software e contra o código do módulo num computador, não experimentado com um módulo a sério."
+        - "Emparelhar um telemóvel com um módulo de E/S por Bluetooth pede um código de 6 dígitos que o módulo mostra no seu ecrã pequeno, para que ninguém se meta entre os dois; um telemóvel emparelhado à maneira antiga é chamado uma vez a emparelhar de novo, e o botão PRG do módulo esquece todos os telemóveis. Em software e em testes num computador, não experimentado com um módulo a sério."
         - "A penalização de uma caixa de um dispositivo Android passa a chegar ao controlador, pela ligação Wi-Fi e pela ligação de rádio. Em software."
     g_controller:
       title: O telemóvel como controlador de campo
@@ -1017,8 +1018,8 @@ roadmap:
       - "<strong>O servidor do site</strong>: contas com códigos de dois fatores, direitos sobre os
         dados pessoais, sincronização, registo de cronógrafo, histórico dos jogos e biblioteca de
         cenários."
-      - "<strong>Marcação de jogos e inscrições</strong>, com páginas públicas por campo, feeds de
-        calendário e perfis de clube."
+      - "<strong>Marcação de jogos e inscrições</strong>, na app ou nas páginas web do campo sem a
+        app, com páginas públicas por campo, feeds de calendário e perfis de clube."
       - "<strong>Modo alojado</strong>: vários campos num só servidor, cada um separado dos outros,
         com a sua instalação."
     g_modes:
@@ -1061,7 +1062,7 @@ roadmap:
           de um sítio e desenha o seu limite no OpenStreetMap, e o navegador desenha a imagem do
           campo com os dados do OpenStreetMap, sobre a fotografia aérea aberta do país (Portugal
           continental, Espanha, França e ultramar, Países Baixos, Bélgica, Luxemburgo, Suíça,
-          Liechtenstein, onze estados alemães, Polónia e Chéquia). O desenho passa a ser o limite do
+          Liechtenstein, doze estados alemães, Polónia, Chéquia e Áustria). O desenho passa a ser o limite do
           campo, ficando escurecido o que está fora."
         - "O telemóvel de quem joga avisa com uma faixa e vibração quando sai do limite, com o seu
           próprio GPS, sem enviar nada."

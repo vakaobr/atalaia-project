@@ -165,14 +165,17 @@ class ConsoleFilesTests(unittest.TestCase):
         self.assertEqual(csp["style-src"], "'self'")
         self.assertEqual(csp["default-src"], "'self'")
         # MF-65 to MF-80: the open orthophotos, each WMS origin as images (the map's tiles) and as a connection
-        # (the drawn image's one picture); a WMTS on an origin of its own as images only (MF-79); nothing else.
+        # (the drawn image's one picture); a WMTS on an origin of its own as images only (MF-79), except a source
+        # with only a WMTS, whose tiles are also fetched for the image (basemap.at, MF-97; LGL
+        # Baden-Württemberg, MF-103); nothing else.
         ortho = ("https://ortos.dgterritorio.gov.pt https://www.ign.es https://data.geopf.fr https://service.pdok.nl "
                  "https://wms.ngi.be https://geo.api.vlaanderen.be https://geoservices.wallonie.be "
                  "https://wms.geoportail.lu https://wms.geo.admin.ch https://gdi.berlin.de https://isk.geobasis-bb.de "
                  "https://geoservices.bayern.de https://geodienste.bremen.de https://www.gds-srv.hessen.de "
                  "https://www.geodaten-mv.de https://www.wms.nrw.de https://geo4.service24.rlp.de "
                  "https://geoportal.saarland.de https://geodienste.sachsen.de https://www.geoproxy.geoportal-th.de "
-                 "https://mapy.geoportal.gov.pl https://ags.cuzk.gov.cz")
+                 "https://mapy.geoportal.gov.pl https://ags.cuzk.gov.cz https://mapsneu.wien.gv.at "
+                 "https://owsproxy.lgl-bw.de")
         tiles = "https://wmts1.geoportail.lu https://wmts.geo.admin.ch https://www.wmts.nrw.de"
         self.assertEqual(csp["img-src"], f"'self' blob: data: https://tile.openstreetmap.org {ortho} {tiles}")
         self.assertEqual(csp["connect-src"], "'self' https://overpass-api.de https://overpass.private.coffee "
@@ -200,16 +203,17 @@ class ConsoleFilesTests(unittest.TestCase):
                  "https://cartes.gouv.fr", "https://www.beeldmateriaal.nl", "https://ngi.be", "https://www.vlaanderen.be",
                  "https://geodata.wallonie.be", "https://data.public.lu", "https://www.swisstopo.admin.ch",
                  "https://www.govdata.de", "https://www.geodaten.bayern.de", "https://creativecommons.org",
-                 "https://www.geoportal.gov.pl", "https://www.cuzk.gov.cz"]
+                 "https://www.geoportal.gov.pl", "https://www.cuzk.gov.cz", "https://basemap.at"]
         for url in set(re.findall(r"https://[a-z0-9.-]+", code)):
             self.assertIn(url, [*FIELD_MAP_ORIGINS.values(), *links], url)
-        # Each orthophoto's WMS (its image, and its tiles where it has no WMTS) is on an origin the policy names
-        # as images and connections, each WMTS on one it names as images, and every origin of the policy is used.
+        # Each orthophoto's WMS (its image, and its tiles where it has no WMTS), or its WMTS where it has only
+        # that (its image stitched from the tiles, MF-97), is on an origin the policy names as images and
+        # connections, each other WMTS on one it names as images, and every origin of the policy is used.
         sources = (SRC / "components/ortho-sources.js").read_text(encoding="utf-8")
 
         def origins(pattern: str) -> set:
             return {re.match(r"https://[a-z0-9.-]+", u).group(0) for u in re.findall(pattern, sources)}
-        wms = origins(r"(?:wms: |_WMS = )'(https://[^']+)")
+        wms = origins(r"(?:wms: |_WMS = |_WMTS = )'(https://[^']+)")
         tiled = origins(r"(?:wmtsTile\(|=> `)'?(https://[^'`]+)")
         self.assertEqual(wms, set(FIELD_MAP_ORTHOPHOTOS))
         self.assertEqual(tiled - wms, set(FIELD_MAP_ORTHO_TILES))

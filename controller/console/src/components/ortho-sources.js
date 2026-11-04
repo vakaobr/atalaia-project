@@ -3,10 +3,14 @@
 //
 // The open orthophotos of the field-map page (decisions MF-25 and MF-54 for Portugal, MF-65 to MF-72 for
 // Spain, France and the Netherlands, after the maintainer's answer to MF-57: "open source would be nice",
-// MF-73 to MF-80 for the others). One row per orthophoto, national or regional (Belgium's regions,
-// Germany's Länder): who makes it, where it has pictures (its coverage, ortho-coverage.js), its WMS for the
-// drawn image (a GetMap in EPSG:4326 at the image's size, at most maxSide on a side, fetched so the canvas
-// stays exportable: every one sends Access-Control-Allow-Origin, * or the page's own origin), the map's
+// MF-73 to MF-80 for the others, MF-94 to MF-99 for those with only a WMTS). One row per orthophoto, national
+// or regional (Belgium's regions, Germany's Länder): who makes it, where it has pictures (its coverage,
+// ortho-coverage.js), its WMS for the drawn image (a GetMap in EPSG:4326 at the image's size, at most maxSide
+// on a side, fetched so the canvas stays exportable: every one sends Access-Control-Allow-Origin, * or the
+// page's own origin), or, where it has no WMS that may be used, its WMTS (wmts: the GetTile URL of a
+// 256-pixel GoogleMapsCompatible tile z/x/y, down to wmtsMax, and optionally wmtsBox, the box [west, south,
+// east, north] outside which it has no tiles; field-render.js stitches the tiles over the image and crops them
+// to it, MF-94, MF-101), the map's
 // *Ortofoto* tiles (its WMTS in Web Mercator where it has one, else a WMS GetMap per 256-pixel tile in
 // EPSG:3857), and its credit, shown in the map's corner and burned into the image. The page's
 // Content-Security-Policy names each origin (api.py FIELD_MAP_ORIGINS); test_console.py checks the two lists
@@ -55,6 +59,10 @@ const NRW_WMS = 'https://www.wms.nrw.de/geobasis/wms_nw_dop';
 const CUZK_WMS = 'https://ags.cuzk.gov.cz/arcgis1/services/ORTOFOTO/MapServer/WMSServer';
 const DL_BY = 'https://www.govdata.de/dl-de/by-2-0';
 const DL_ZERO = 'https://www.govdata.de/dl-de/zero-2-0';
+// MF-95: basemap.at's orthophoto, the host its own capabilities document is served from (CORS *).
+const BASEMAP_AT_WMTS = 'https://mapsneu.wien.gv.at/basemap/bmaporthofoto30cm/normal/google3857';
+// MF-101: LGL Baden-Württemberg's DOP 20 cm WMTS (KVP GetTile only; CORS *).
+const LGL_BW_WMTS = 'https://owsproxy.lgl-bw.de/owsproxy/ows/WMTS_LGL-BW_ATKIS_DOP_20_C';
 
 /** The sources, in the order a tie is decided: a region inside another's outer ring (Berlin in
  * Brandenburg, Brussels in Flemish Brabant) comes first; no other two overlap. */
@@ -154,6 +162,20 @@ export const ORTHO_SOURCES = [
         href: DL_BY,
     },
     {
+        // MF-101: Baden-Württemberg, LGL's DOP 20 cm; dl-de/by-2-0, its capabilities' credit with the year
+        // obtained ("LGL-BW (2024) Datenlizenz Deutschland - Namensnennung - Version 2.0, www.lgl-bw.de").
+        // Its WMS failed every GetMap on 2026-10-23 (MF-80): the drawn image is stitched from its WMTS (set
+        // GoogleMapsCompatible, levels "GoogleMapsCompatible:<zoom>", 0 to 20; 19 is the photo's 20 cm), which
+        // also gives the map's tiles. A tile outside its capabilities' limits (the Land's box) answers 400, so
+        // those are not asked (wmtsBox, inside the capabilities' WGS84BoundingBox).
+        id: 'de-bw', name: 'LGL Baden-Württemberg', coverage: COVERAGE.DE_BW,
+        wmts: wmtsTile(LGL_BW_WMTS, 'DOP_20_C', 'GoogleMapsCompatible', 'default',
+                       { matrix: (z) => `GoogleMapsCompatible:${z}` }),
+        wmtsMax: 19, wmtsBox: [7.494311, 47.468568, 10.66599, 49.804545], maxSide: 4096,
+        credit: `LGL-BW (${YEAR}) dl-de/by-2-0, www.lgl-bw.de`,
+        imageCredit: `LGL-BW (${YEAR}) dl-de/by-2-0, www.lgl-bw.de (Daten geändert)`, href: DL_BY,
+    },
+    {
         // MF-76: Bayern, DOP20; CC BY 4.0, "Bayerische Vermessungsverwaltung – www.geodaten.bayern.de". Its WMTS
         // is on other hosts (bayernwolke.de) with a longer credit (Sentinel-2 at small scales): WMS tiles.
         id: 'de-by', name: 'LDBV Bayern', coverage: COVERAGE.DE_BY,
@@ -248,23 +270,40 @@ export const ORTHO_SOURCES = [
         credit: `Ortofoto: ČÚZK, ${YEAR} (CC BY 4.0)`, imageCredit: `Ortofoto: ČÚZK, ${YEAR} (CC BY 4.0)`,
         href: 'https://www.cuzk.gov.cz/Predpisy/Podminky-poskytovani-prostor-dat-a-sitovych-sluzeb/Podminky-poskytovani-prostorovych-dat-CUZK.aspx',
     },
+    {
+        // MF-95: Austria, basemap.at's orthophoto (the Länder's aerial photographs, 15-30 cm; geoland.at and the
+        // City of Vienna); CC BY 4.0, "Datenquelle: basemap.at". No WMS: the drawn image is stitched from its
+        // WMTS (its capabilities' google3857 set, GoogleMapsCompatible, zooms 0 to 20; 20 has gaps, so up to
+        // 19), which also gives the map's tiles. Its tiles are addressed z/row/column.
+        id: 'basemap-at', name: 'basemap.at', coverage: COVERAGE.AUT,
+        wmts: (z, x, y) => `${BASEMAP_AT_WMTS}/${z}/${y}/${x}.jpeg`, wmtsMax: 19, maxSide: 4096,
+        credit: 'Datenquelle: basemap.at (CC BY 4.0)', imageCredit: 'Datenquelle: basemap.at (CC BY 4.0)',
+        href: 'https://basemap.at/',
+    },
 ];
+
+/** Where a source's drawn image comes from: its WMS, or its WMTS (MF-94). */
+function imageBase(s) {
+    return s.wms || s.wmts(0, 0, 0);
+}
 
 /** The origins the page fetches a source's image from (connect-src: api.py FIELD_MAP_ORTHOPHOTOS). */
 export function imageOrigins() {
-    return [...new Set(ORTHO_SOURCES.map((s) => new URL(s.wms).origin))];
+    return [...new Set(ORTHO_SOURCES.map((s) => new URL(imageBase(s)).origin))];
 }
 
 /** The origins the page reaches for a source's tiles and its image (img-src: api.py FIELD_MAP_ORTHOPHOTOS
  * and FIELD_MAP_ORTHO_TILES). */
 export function sourceOrigins() {
-    return [...new Set(ORTHO_SOURCES.flatMap((s) => [s.wms, ...(s.tile ? [s.tile(17, 0, 0), s.tile(2, 0, 0)] : [])])
+    return [...new Set(ORTHO_SOURCES.flatMap((s) => [imageBase(s),
+                                                     ...(s.tile ? [s.tile(17, 0, 0), s.tile(2, 0, 0)] : [])])
         .map((u) => new URL(u).origin))];
 }
 
-/** The map's tiles of a source, as tile-map.js takes them (MF-54). */
+/** The map's tiles of a source, as tile-map.js takes them (MF-54): its own tiles, else its WMTS (MF-94),
+ * else its WMS per tile. */
 export function tileSource(s) {
-    return { id: `ortho-${s.id}`, url: s.tile || wmsTile(s.wms, s.layer), credit: s.credit, href: s.href,
+    return { id: `ortho-${s.id}`, url: s.tile || s.wmts || wmsTile(s.wms, s.layer), credit: s.credit, href: s.href,
              referrer: 'no-referrer' };
 }
 

@@ -56,18 +56,63 @@
  * 200; over HTTPS then "REPORT taken=yes|no", the controller's 200 or not) and
  * "FETCH result=<code> part=<id>", then joins the game, or says why over LoRa
  * (node.modes_failed) and is free again.
- * --simple-out FUNCTION[@GPIO] (up to twice; draft RFC "The expansion port", increment 2): a
- * simple output (an RC relay switch on a GPIO, main/simple_out.c) on GPIO 46 (the second: 45)
- * unless @GPIO says another, run by the firmware's own output layer (main/outputs.c). FUNCTION
- * (siren, strobe, smoke, light, horn, out.N) is what its admin set at the box, enabled; "-"
- * leaves it as a new box has it (disabled, out.N) for "@output" to enable. Settings the box
+ * --simple-out FUNCTION[@GPIO][,disabled] (up to twice; draft RFC "The expansion port",
+ * increment 2): a simple output (an RC relay switch on a GPIO, main/simple_out.c) on GPIO 46 (the
+ * second: 45) unless @GPIO says another, run by the firmware's own output layer
+ * (main/outputs.c). FUNCTION (siren, strobe, smoke, light, horn, out.N) is what its admin set at
+ * the box, enabled; ",disabled" leaves it with that function but not enabled (EXPL-13: it is
+ * then in node.outputs_disabled, not node.modules); "-" leaves it as a new box has it (disabled,
+ * out.N) for "@output" to enable. Settings the box
  * stored (the file outputs in --state-dir) win over it, as after a reboot. The pulse train is
  * printed: "PULSE g<gpio> t=<ms> width=<1000|2000> frames=<n> until=<ms>[ flush]" for each burst
  * the RMT would send (frames of 20 ms; flush: what was queued is dropped), and "PIN g<gpio> low
  * t=<ms>" once the last burst has gone out, so a test can tell when the switch's signal stops.
  * HELLO then lists `output` (capability type 11) while one is enabled, a CMD 12 switches it, the
  * mode's cap(fn) calls reach it, and once the HELLO is acknowledged the box sends node.modules
- * ("g46:servo:siren").
+ * ("g46:servo:siren") and node.outputs_disabled (the ones not enabled: "g45:servo:horn", or "").
+ *
+ * --module NAME[@ADDR] (up to four; draft RFC "The expansion port", increment 8): a module on
+ * the expansion port, simulated on the real module core (firmware/module-core/, through
+ * test/module_sim.c) behind a fake I2C bus that the firmware's own port driver (main/expansion.c,
+ * main/expansion_box.c) reads and writes as on the box: NAME is target (one hit channel, 0x58 by
+ * default) or out4 (four relay outputs, siren, strobe, smoke and a generic one, 0x5C by default),
+ * ADDR 58-5f in hex. HELLO then lists `hit` (capability type 10) with a target, node.modules
+ * carries the module's entry ("58:target/1.0.0:hit") after the simple outputs', hits reach the
+ * mode's script as hit.hit while it has armed the channel and a game runs, a module that stops
+ * answering during a game is node.module_lost, and a module's outputs join the output layer
+ * (disabled until "@output <n> enable", and in node.outputs_disabled until then: EXPL-20).
+ * "MODULE <addr> outputs=<bitmap> t=<ms>" is printed each time the module's outputs change (as
+ * its relays would). With a module, Target Windows is stored as a preset too (as one put on a
+ * box by hand: the Field Box does not build it in until it is bench-tested), so a join can name
+ * it.
+ *
+ * --module NAME[@ADDR] (up to four; draft RFC "The expansion port", increment 8): a module on
+ * the expansion port, simulated on the real module core (firmware/module-core/, through
+ * test/module_sim.c) behind a fake I2C bus that the firmware's own port driver (main/expansion.c,
+ * main/expansion_box.c) reads and writes as on the box: NAME is target (one hit channel, 0x58 by
+ * default) or out4 (four relay outputs, siren, strobe, smoke and a generic one, 0x5C by default),
+ * ADDR 58-5f in hex. HELLO then lists `hit` (capability type 10) with a target, node.modules
+ * carries the module's entry ("58:target/1.0.0:hit") after the simple outputs', hits reach the
+ * mode's script as hit.hit while it has armed the channel and a game runs, a module that stops
+ * answering during a game is node.module_lost, and a module's outputs join the output layer
+ * (disabled until "@output <n> enable"). "MODULE <addr> outputs=<bitmap> t=<ms>" is printed each
+ * time the module's outputs change (as its relays would). With a module, Target Windows is stored
+ * as a preset too (as one put on a box by hand: the Field Box does not build it in until it is
+ * bench-tested), so a join can name it.
+ *
+ * --module NAME[@ADDR] (up to four; draft RFC "The expansion port", increment 8): a module on
+ * the expansion port, simulated on the real module core (firmware/module-core/, through
+ * test/module_sim.c) behind a fake I2C bus that the firmware's own port driver (main/expansion.c,
+ * main/expansion_box.c) reads and writes as on the box: NAME is target (one hit channel, 0x58 by
+ * default) or out4 (four relay outputs, siren, strobe, smoke and a generic one, 0x5C by default),
+ * ADDR 58-5f in hex. HELLO then lists `hit` (capability type 10) with a target, node.modules
+ * carries the module's entry ("58:target/1.0.0:hit") after the simple outputs', hits reach the
+ * mode's script as hit.hit while it has armed the channel and a game runs, a module that stops
+ * answering during a game is node.module_lost, and a module's outputs join the output layer
+ * (disabled until "@output <n> enable"). "MODULE <addr> outputs=<bitmap> t=<ms>" is printed each
+ * time the module's outputs change (as its relays would). With a module, Target Windows is stored
+ * as a preset too (as one put on a box by hand: the Field Box does not build it in until it is
+ * bench-tested), so a join can name it.
  *
  * --module NAME[@ADDR] (up to four; draft RFC "The expansion port", increment 8): a module on
  * the expansion port, simulated on the real module core (firmware/module-core/, through
@@ -616,16 +661,25 @@ static bool outputs_load(int index, out_settings_t *s)
     return false;
 }
 
-/* "--simple-out FUNCTION[@GPIO]": a simple output, its settings from the state dir or from
- * FUNCTION ("-": a new box's, disabled). False for a bad FUNCTION or GPIO. */
+/* "--simple-out FUNCTION[@GPIO][,disabled]": a simple output, its settings from the state dir or
+ * from FUNCTION ("-": a new box's, disabled; ",disabled": that function, not enabled). False for a
+ * bad FUNCTION or GPIO. */
 static bool add_simple_out(const char *arg, uint32_t now)
 {
     int i = outs.simple;
     if (i >= OUTPUTS_MAX) return false;
     char fn[OUT_ID_MAX + 1];
     int gpio = i == 0 ? 46 : 45;
+    const char *comma = strchr(arg, ',');
+    bool disabled = false;
+    if (comma != NULL) {
+        if (strcmp(comma, ",disabled") != 0) return false;
+        disabled = true;
+    }
     const char *at = strchr(arg, '@');
-    size_t n = at ? (size_t)(at - arg) : strlen(arg);
+    if (at != NULL && comma != NULL && at > comma) return false;
+    const char *end = at ? at : comma ? comma : arg + strlen(arg);
+    size_t n = (size_t)(end - arg);
     if (n == 0 || n > OUT_ID_MAX) return false;
     memcpy(fn, arg, n);
     fn[n] = '\0';
@@ -639,7 +693,7 @@ static bool add_simple_out(const char *arg, uint32_t now)
         outputs_default_settings(i, &s);
         if (strcmp(fn, "-") != 0) {
             if (!outputs_function_ok(fn)) return false;
-            s.enabled = true;
+            s.enabled = !disabled;
             snprintf(s.function, sizeof(s.function), "%s", fn);
         }
     }
@@ -1355,8 +1409,8 @@ int main(int argc, char **argv)
         for (int i = 0; i < simple_out_count; i++) {
             if (!add_simple_out(simple_outs[i], mono_ms())) {
                 fprintf(stderr,
-                        "box_host: --simple-out %s: FUNCTION[@GPIO] (siren, strobe, smoke, "
-                        "light, horn, out.N or -; a free GPIO)\n",
+                        "box_host: --simple-out %s: FUNCTION[@GPIO][,disabled] (siren, strobe, "
+                        "smoke, light, horn, out.N or -; a free GPIO)\n",
                         simple_outs[i]);
                 return 2;
             }

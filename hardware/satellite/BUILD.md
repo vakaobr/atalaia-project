@@ -159,7 +159,10 @@ ones that matter most here:
 5. **3.3 V signals only** into the board: the ring is driven through the level
    shifter, and the gauge must pull SDA and SCL up to 3.3 V, never 5 V.
 6. **Never wire GPIO 5 or 46** (the radio's front-end module), **nor GPIO 34 or
-   38-42** (the board's GNSS connector).
+   38-42** (the board's GNSS connector). The one exception is the simple
+   output's own circuit (46 on a V4.3, 5 on a V4.2), through the 74AHCT125
+   with its 10 kohm to GND, and only in a build with
+   `CONFIG_ATALAIA_SIMPLE_OUT=y` (section 3, row 16).
 7. **No game before the transmit-power check** (BRING_UP.md step 10): the
    firmware caps the power with an assumed amplifier gain that has not been
    measured yet.

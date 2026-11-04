@@ -35,8 +35,9 @@ const fieldMapPage = '/console/field-map.html';
 
 /// The origins of the field-map page's policy, the Pi's FIELD_MAP_* in api.py:
 /// OSM's tiles (images), Overpass and its second instance and Nominatim
-/// (connections), each open orthophoto's WMS (images and connections) and the
-/// WMTS origins of their own (images only).
+/// (connections), each open orthophoto's WMS, or its WMTS where it has only
+/// one (images and connections), and the WMTS origins of their own (images
+/// only).
 const _fieldMapOrthophotos =
     'https://ortos.dgterritorio.gov.pt https://www.ign.es '
     'https://data.geopf.fr https://service.pdok.nl '
@@ -48,7 +49,8 @@ const _fieldMapOrthophotos =
     'https://www.geodaten-mv.de https://www.wms.nrw.de '
     'https://geo4.service24.rlp.de https://geoportal.saarland.de '
     'https://geodienste.sachsen.de https://www.geoproxy.geoportal-th.de '
-    'https://mapy.geoportal.gov.pl https://ags.cuzk.gov.cz';
+    'https://mapy.geoportal.gov.pl https://ags.cuzk.gov.cz '
+    'https://mapsneu.wien.gv.at https://owsproxy.lgl-bw.de';
 const _fieldMapOrthoTiles =
     'https://wmts1.geoportail.lu https://wmts.geo.admin.ch '
     'https://www.wmts.nrw.de';

@@ -5,12 +5,22 @@
  * The I/O pod's GATT service on NimBLE (see pod_ble_nimble.h). Written for
  * this project against the NimBLE host API of ESP-IDF v5.3 (its headers and
  * the ESP-IDF programming guide); no example code is copied.
+ *
+ * Pairing (decisions PODPK-1 to PODPK-11): LE Secure Connections, passkey
+ * entry, bonded. The pod is DisplayOnly: NimBLE asks it to show a passkey
+ * (BLE_SM_IOACT_DISP), the pod draws one at random, gives it to the stack and
+ * to the OLED (pod_display.c) and the log, and the phone types it. pod_pair.c
+ * decides on the pod task what the OLED shows and when a link goes; the
+ * actions (drop a link, forget a bond, clear them all) are carried out here.
  */
 #include "pod_ble_nimble.h"
 
 #include <string.h>
 
+#include "driver/gpio.h"
 #include "esp_log.h"
+#include "esp_random.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "host/ble_hs.h"
@@ -19,6 +29,11 @@
 #include "nimble/nimble_port_freertos.h"
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
+#include "pod_config.h"
+#include "pod_pair.h"
+#if CONFIG_ATALAIA_OLED_STATUS
+#include "pod_display.h"
+#endif
 
 /* NimBLE's NVS-backed store of bonds (ESP-IDF, CONFIG_BT_NIMBLE_NVS_PERSIST). */
 void ble_store_config_init(void);
@@ -34,15 +49,18 @@ typedef enum {
     EV_SUBSCRIBE,
     EV_MTU,
     EV_WRITE,
+    EV_PASSKEY,
 } ev_kind_t;
 
 typedef struct {
     uint8_t kind;
-    uint8_t chr; /* EV_SUBSCRIBE: pod_ble_chr_t */
-    bool flag;   /* EV_ENCRYPTION: encrypted; EV_SUBSCRIBE: notify */
+    uint8_t chr;        /* EV_SUBSCRIBE: pod_ble_chr_t; EV_ENCRYPTION: pod_pair_result_t */
+    bool flag;          /* EV_ENCRYPTION: encrypted; EV_SUBSCRIBE: notify */
+    bool authenticated; /* EV_ENCRYPTION: the key is MITM-protected */
     uint16_t conn;
-    uint16_t value; /* EV_MTU */
-    uint16_t len;   /* EV_WRITE */
+    uint16_t value;   /* EV_MTU */
+    uint16_t len;     /* EV_WRITE */
+    uint32_t passkey; /* EV_PASSKEY */
     uint8_t data[POD_BLE_MTU_WANTED];
 } ev_t;
 
@@ -52,9 +70,27 @@ static QueueHandle_t events;
 static uint16_t tx_handle, status_handle;
 static uint8_t own_addr_type;
 static bool want_encryption;
+static bool want_passkey;
 static char name[POD_BLE_NAME_SIZE];
 static portMUX_TYPE status_lock = portMUX_INITIALIZER_UNLOCKED;
 static uint8_t status_copy[3] = {0xFF, 0x80, 0x00};
+
+/* The pairing: driven on the pod task (pod_ble_nimble_poll); the OLED task reads a copy. */
+static pod_pair_t pair;
+static uint16_t pair_conn;
+static portMUX_TYPE view_lock = portMUX_INITIALIZER_UNLOCKED;
+static oled_pair_view_t view_copy;
+
+static uint32_t now_ms(void)
+{
+    return (uint32_t)(esp_timer_get_time() / 1000);
+}
+
+static uint32_t random_word(void *ctx)
+{
+    (void)ctx;
+    return esp_random(); /* the RF subsystem is on: true random numbers */
+}
 
 static void post(const ev_t *e)
 {
@@ -151,12 +187,47 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         post(&e);
         advertise();
         return 0;
-    case BLE_GAP_EVENT_ENC_CHANGE:
+    case BLE_GAP_EVENT_ENC_CHANGE: {
+        struct ble_gap_conn_desc desc;
         e.kind = EV_ENCRYPTION;
         e.conn = event->enc_change.conn_handle;
-        e.flag = event->enc_change.status == 0;
+        int status = event->enc_change.status;
+        if (status == 0 && ble_gap_conn_find(e.conn, &desc) == 0) {
+            e.flag = desc.sec_state.encrypted;
+            e.authenticated = desc.sec_state.authenticated;
+        }
+        /* BLE_HS_ENOENT: the phone asked to encrypt with a bond the pod does not have. */
+        e.chr = status == 0                 ? POD_PAIR_RESULT_OK
+                : status == BLE_HS_ETIMEOUT ? POD_PAIR_RESULT_TIMEOUT
+                : status == BLE_HS_ENOENT   ? POD_PAIR_RESULT_NO_KEY
+                                            : POD_PAIR_RESULT_FAILED;
+        if (status != 0) ESP_LOGW(TAG, "pairing or encryption failed (%d)", status);
         post(&e);
         return 0;
+    }
+    case BLE_GAP_EVENT_PASSKEY_ACTION: {
+        if (event->passkey.params.action != BLE_SM_IOACT_DISP) {
+            /* DisplayOnly: the stack asks for nothing else. */
+            ESP_LOGW(TAG, "pairing action %d not supported", event->passkey.params.action);
+            return 0;
+        }
+        struct ble_sm_io io;
+        memset(&io, 0, sizeof(io));
+        io.action = BLE_SM_IOACT_DISP;
+        io.passkey = pod_pair_passkey(random_word, NULL);
+        int rc = ble_sm_inject_io(event->passkey.conn_handle, &io);
+        if (rc != 0) {
+            ESP_LOGE(TAG, "passkey refused by the stack (%d)", rc);
+            return 0;
+        }
+        /* In the log too: a pod whose OLED is broken can still be paired on the bench. */
+        ESP_LOGI(TAG, "pairing passkey %06lu", (unsigned long)io.passkey);
+        e.kind = EV_PASSKEY;
+        e.conn = event->passkey.conn_handle;
+        e.passkey = io.passkey;
+        post(&e);
+        return 0;
+    }
     case BLE_GAP_EVENT_SUBSCRIBE:
         if (event->subscribe.attr_handle != tx_handle &&
             event->subscribe.attr_handle != status_handle) {
@@ -175,7 +246,8 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         post(&e);
         return 0;
     case BLE_GAP_EVENT_REPEAT_PAIRING: {
-        /* A phone that lost its bond pairs again: forget the old one. */
+        /* A phone that lost its bond, or that pairs again because the pod asked for a passkey
+         * and its bond has none (PODPK-4), pairs again: forget the old one. */
         struct ble_gap_conn_desc desc;
         if (ble_gap_conn_find(event->repeat_pairing.conn_handle, &desc) == 0) {
             ble_store_util_delete_peer(&desc.peer_id_addr);
@@ -197,6 +269,7 @@ static void on_sync(void)
     ble_hs_id_copy_addr(own_addr_type, addr, NULL);
     pod_ble_device_name(addr, name);
     ble_svc_gap_device_name_set(name);
+    pod_pair_set_name(&pair, name);
 
     uint8_t data[31];
     size_t n = pod_ble_adv_data(data, sizeof(data));
@@ -240,9 +313,72 @@ const pod_ble_stack_t pod_ble_nimble_stack = {.notify = notify, .ctx = NULL};
 
 /* ---- Start and poll -------------------------------------------------------------- */
 
+/* ---- Pairing: what the OLED shows, and the actions ------------------------------- */
+
+static void read_view(oled_pair_view_t *out)
+{
+    taskENTER_CRITICAL(&view_lock);
+    *out = view_copy;
+    taskEXIT_CRITICAL(&view_lock);
+}
+
+static bool clear_button_down(void)
+{
+#if POD_BOND_CLEAR_PIN >= 0
+    return gpio_get_level(POD_BOND_CLEAR_PIN) == 0;
+#else
+    return false;
+#endif
+}
+
+static void clear_button_start(void)
+{
+#if POD_BOND_CLEAR_PIN >= 0
+    gpio_config_t cfg = {
+        .pin_bit_mask = 1ULL << POD_BOND_CLEAR_PIN,
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&cfg);
+#endif
+}
+
+static void act(pod_ble_t *b, pod_pair_action_t a)
+{
+    struct ble_gap_conn_desc desc;
+    switch (a) {
+    case POD_PAIR_ACT_DROP:
+        ESP_LOGW(TAG, "pairing failed, or none within %d s: link dropped",
+                 POD_PAIR_TIMEOUT_MS / 1000);
+        ble_gap_terminate(pair_conn, BLE_ERR_REM_USER_CONN_TERM);
+        break;
+    case POD_PAIR_ACT_DROP_STALE:
+        /* The pod's side of the bond goes; Authentication Failure tells the app to forget its
+         * side and pair again (PODPK-4). */
+        ESP_LOGW(TAG, "a bond without a passkey (or unknown): forgotten, the phone pairs again");
+        if (ble_gap_conn_find(pair_conn, &desc) == 0)
+            ble_store_util_delete_peer(&desc.peer_id_addr);
+        ble_gap_terminate(pair_conn, BLE_ERR_AUTH_FAIL);
+        break;
+    case POD_PAIR_ACT_CLEAR_BONDS: {
+        int n = 0;
+        ble_store_util_count(BLE_STORE_OBJ_TYPE_OUR_SEC, &n);
+        int rc = ble_store_clear();
+        ESP_LOGW(TAG, "Bluetooth bonds cleared with the PRG button (%d bond(s), rc %d)", n, rc);
+        if (b->connected) ble_gap_terminate(pair_conn, BLE_ERR_AUTH_FAIL);
+        break;
+    }
+    default: break;
+    }
+}
+
 bool pod_ble_nimble_start(bool encrypted)
 {
     want_encryption = encrypted;
+    want_passkey = encrypted && POD_BLE_PASSKEY;
+    pod_pair_init(&pair, want_passkey);
     events = xQueueCreate(EV_QUEUE_LEN, sizeof(ev_t));
     if (events == NULL) return false;
     uuid_from(&uuid_service, pod_ble_uuid_service);
@@ -250,6 +386,8 @@ bool pod_ble_nimble_start(bool encrypted)
     uuid_from(&uuid_rx, pod_ble_uuid_rx);
     uuid_from(&uuid_status, pod_ble_uuid_status);
     if (encrypted) chrs[1].flags |= BLE_GATT_CHR_F_WRITE_ENC;
+    /* And with a key made by passkey entry (MITM-protected). */
+    if (want_passkey) chrs[1].flags |= BLE_GATT_CHR_F_WRITE_AUTHEN;
 
     esp_err_t err = nimble_port_init();
     if (err != ESP_OK) {
@@ -259,10 +397,12 @@ bool pod_ble_nimble_start(bool encrypted)
     ble_hs_cfg.sync_cb = on_sync;
     ble_hs_cfg.reset_cb = on_reset;
     ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
-    /* LE Secure Connections, Just Works (the pod has no display), bonded. */
-    ble_hs_cfg.sm_io_cap = BLE_SM_IO_CAP_NO_IO;
+    /* LE Secure Connections, bonded; passkey entry with the pod's OLED (DisplayOnly) and MITM
+     * protection asked for (PODPK-1), else Just Works. The phone, a keyboard and a display,
+     * types the passkey. */
+    ble_hs_cfg.sm_io_cap = want_passkey ? BLE_SM_IO_CAP_DISP_ONLY : BLE_SM_IO_CAP_NO_IO;
     ble_hs_cfg.sm_bonding = 1;
-    ble_hs_cfg.sm_mitm = 0;
+    ble_hs_cfg.sm_mitm = want_passkey ? 1 : 0;
     ble_hs_cfg.sm_sc = 1;
     ble_hs_cfg.sm_our_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
     ble_hs_cfg.sm_their_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
@@ -276,7 +416,18 @@ bool pod_ble_nimble_start(bool encrypted)
         return false;
     }
     ble_store_config_init();
+    if (want_encryption) {
+        int n = 0;
+        ble_store_util_count(BLE_STORE_OBJ_TYPE_OUR_SEC, &n);
+        ESP_LOGI(TAG, "%d phone(s) paired; %s", n,
+                 want_passkey ? "pairing with a passkey on the OLED" : "pairing: Just Works");
+        clear_button_start();
+    }
     nimble_port_freertos_init(host_task);
+#if CONFIG_ATALAIA_OLED_STATUS
+    extern const hal_oled_ops_t hal_esp_oled_ops;
+    if (want_passkey) pod_display_start(&hal_esp_oled_ops, read_view);
+#endif
     return true;
 }
 
@@ -285,15 +436,37 @@ void pod_ble_nimble_poll(pod_ble_t *b)
     ev_t e;
     while (events != NULL && xQueueReceive(events, &e, 0) == pdTRUE) {
         switch (e.kind) {
-        case EV_CONNECT: pod_ble_on_connect(b, e.conn); break;
-        case EV_DISCONNECT: pod_ble_on_disconnect(b); break;
-        case EV_ENCRYPTION: pod_ble_on_encryption(b, e.flag); break;
+        case EV_CONNECT:
+            pair_conn = e.conn;
+            pod_ble_on_connect(b, e.conn);
+            pod_pair_on_connect(&pair, now_ms());
+            break;
+        case EV_DISCONNECT:
+            pod_ble_on_disconnect(b);
+            pod_pair_on_disconnect(&pair, now_ms());
+            break;
+        case EV_ENCRYPTION:
+            pod_ble_on_security(b, e.flag, e.authenticated);
+            if (want_encryption) {
+                act(b, pod_pair_on_encryption(&pair, (pod_pair_result_t)e.chr, e.flag,
+                                              e.authenticated, now_ms()));
+            }
+            break;
+        case EV_PASSKEY: pod_pair_on_passkey(&pair, e.passkey, now_ms()); break;
         case EV_SUBSCRIBE: pod_ble_on_subscribe(b, (pod_ble_chr_t)e.chr, e.flag); break;
         case EV_MTU: pod_ble_on_mtu(b, e.value); break;
         case EV_WRITE: pod_ble_on_write(b, e.data, e.len); break;
         default: break;
         }
     }
+    if (!want_encryption) return;
+    uint32_t t = now_ms();
+    act(b, pod_pair_tick(&pair, t, clear_button_down()));
+    oled_pair_view_t v;
+    pod_pair_view(&pair, t, &v);
+    taskENTER_CRITICAL(&view_lock);
+    view_copy = v;
+    taskEXIT_CRITICAL(&view_lock);
 }
 
 void pod_ble_nimble_set_status(const uint8_t status[3])

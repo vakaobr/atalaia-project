@@ -88,7 +88,8 @@
             "node.setup_applied",
             "node.modules",
             "node.module_lost",
-            "output.switched"
+            "output.switched",
+            "node.outputs_disabled"
           ]
         },
         {
@@ -1822,6 +1823,34 @@
               },
               "source": {
                 "$ref": "#/$defs/data/source"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "node.outputs_disabled"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "modules": {
+                "$ref": "#/$defs/data/modules"
               }
             },
             "additionalProperties": false

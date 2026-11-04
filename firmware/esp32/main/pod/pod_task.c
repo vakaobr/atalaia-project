@@ -9,6 +9,10 @@
  * serial device (as the USB radio modem does, protocol/usb-modem.md). The
  * log console stays on UART0 (sdkconfig.pod), so log text never mixes with
  * frames; the boot ROM's text on the port is skipped by the framing.
+ *
+ * The simple outputs (CONFIG_ATALAIA_SIMPLE_OUT; pod_outputs.h, increment 9 of the expansion
+ * port): their RMT bursts are renewed by this task's loop, so a hung loop stops them within
+ * 0.5 s (and the task watchdog reboots the pod).
  */
 #include "pod_task.h"
 
@@ -30,8 +34,10 @@
 #include "pod_ble.h"
 #include "nvs.h"
 #include "pod_config.h"
+#include "pod_outputs.h"
 #include "pod_settings.h"
 #include "radio/radio_task.h"
+#include "simple_out_esp.h"
 #include "sound_esp.h"
 
 #if POD_BLE_ENABLED
@@ -62,6 +68,7 @@ static pod_t pod;
 static pod_caps_t caps;
 static pod_caps_config_t build_cfg; /* what the Kconfig and the boot gave (pod_settings_apply) */
 static pod_settings_t settings;     /* what the field controller pushed (NVS "pod"/"settings") */
+static pod_outputs_t outs; /* the simple outputs (none without CONFIG_ATALAIA_SIMPLE_OUT) */
 static pod_ble_t ble;
 static bool ble_on;
 static QueueHandle_t audio_q;
@@ -146,6 +153,7 @@ static uint32_t io_now(void *ctx)
 static bool io_command(void *ctx, const atalaia_proxy_msg_t *cmd)
 {
     (void)ctx;
+    if (pod_outputs_owns(&outs, cmd->cap_id)) return pod_outputs_command(&outs, cmd);
     return pod_caps_command(&caps, cmd);
 }
 
@@ -191,12 +199,19 @@ static int battery_pct(void)
     return b.voltage_mv > 0 ? (int)b.percent : -1;
 }
 
-static void io_ident(void *ctx, atalaia_proxy_ident_t *out, bool compact)
+static void io_ident(void *ctx, atalaia_proxy_ident_t *out, pod_ident_level_t level)
 {
     (void)ctx;
     memcpy(out->fw_version, fw_version, sizeof(out->fw_version));
-    if (pod_caps_descriptors(&caps, out->caps_json, sizeof(out->caps_json), !compact) == 0) {
+    size_t n = pod_caps_descriptors(&caps, out->caps_json, sizeof(out->caps_json),
+                                    level == POD_IDENT_FULL);
+    if (n == 0) {
         snprintf(out->caps_json, sizeof(out->caps_json), "[]");
+        n = 2;
+    }
+    if (level < POD_IDENT_NO_OUTPUTS) {
+        pod_outputs_append(&outs, out->caps_json, n, sizeof(out->caps_json),
+                           level == POD_IDENT_FULL);
     }
     int pct = battery_pct();
     out->has_battery = pct >= 0;
@@ -220,6 +235,12 @@ static void io_log(void *ctx, const char *line)
 {
     (void)ctx;
     ESP_LOGI(TAG, "%s", line);
+}
+
+static void outputs_log(void *ctx, const char *line)
+{
+    (void)ctx;
+    ESP_LOGI(TAG, "output: %s", line);
 }
 
 /* ---- The radio through the radio task ------------------------------------------------ */
@@ -316,6 +337,8 @@ static void pod_loop(void *arg)
 
         pod_tick(&pod);
         if (ble_on) pod_ble_flush(&ble);
+        /* The outputs' link and lease rules, and their bursts renewed (every 200 ms). */
+        pod_outputs_tick(&outs, pod_phone_on(&pod), pod_heard_ms(&pod), now_ms());
 
         bool usb_host = usb_serial_jtag_is_connected();
         if (t - last_usb_check >= 100) {
@@ -367,6 +390,10 @@ void pod_task_start(const hal_t *hal, const pod_caps_config_t *cfg)
     settings_load();
     pod_settings_apply(&settings, &caps, &build_cfg);
     tamper_start();
+    /* The simple outputs, off: the loop's first tick ends their signal (the pins low). */
+    outputs_ops_t out_ops = {.log = outputs_log};
+    pod_outputs_init(&outs, &out_ops);
+    int n_outs = simple_out_esp_init(&outs.out);
 
     pod_io_t io = {
         .link_write = link_write,
@@ -390,13 +417,20 @@ void pod_task_start(const hal_t *hal, const pod_caps_config_t *cfg)
              CONFIG_ATALAIA_MODEM_EPOCH_WINDOW);
 
     pod_ble_init(&ble, &pod, &pod_ble_nimble_stack, POD_BLE_ENCRYPTED);
+    pod_ble_require_mitm(&ble, POD_BLE_PASSKEY); /* a passkey's key only (PODPK-3) */
 #if POD_BLE_ENABLED
     ble_on = pod_ble_nimble_start(POD_BLE_ENCRYPTED);
 #endif
 
     char json[ATALAIA_PROXY_JSON_MAX];
-    pod_caps_descriptors(&caps, json, sizeof(json), true);
-    ESP_LOGI(TAG, "I/O pod %s, core %s: radio %s, Bluetooth %s, capabilities %s", fw_version,
-             atalaia_version(), hal->radio != NULL ? "on" : "absent", ble_on ? "on" : "off", json);
+    if (pod_caps_descriptors(&caps, json, sizeof(json), true) == 0) {
+        snprintf(json, sizeof(json), "[]");
+    }
+    size_t json_len = strlen(json);
+    if (json_len >= 2) pod_outputs_append(&outs, json, json_len, sizeof(json), true);
+    ESP_LOGI(TAG,
+             "I/O pod %s, core %s: radio %s, Bluetooth %s, %d simple output(s), capabilities %s",
+             fw_version, atalaia_version(), hal->radio != NULL ? "on" : "absent",
+             ble_on ? "on" : "off", n_outs, json);
     xTaskCreatePinnedToCore(pod_loop, "pod", POD_TASK_STACK, NULL, POD_TASK_PRIO, NULL, 1);
 }

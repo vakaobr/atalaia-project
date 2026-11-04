@@ -9,7 +9,11 @@
 //   the Netherlands, and since MF-73 those of Belgium, Luxembourg, Switzerland, Germany, Poland and
 //   Czechia; EPSG:4326, so the picture is already in the image's frame), fetched with fetch() so the canvas
 //   can still be exported (each WMS sends Access-Control-Allow-Origin, * or the page's origin); a white picture
-//   (outside its coverage) is dropped and OpenStreetMap drawn alone;
+//   (outside its coverage) is dropped and OpenStreetMap drawn alone; a source with only a WMTS (basemap.at in
+//   Austria, MF-94 to MF-99; LGL's in Baden-Württemberg, MF-100 to MF-105) has its Web Mercator tiles over
+//   the area fetched the same way (at the zoom nearest the image's scale, at most WMTS_MAX_TILES of them, a
+//   few at a time), stitched on a canvas and reprojected row by row into the image's frame; a tile it has no
+//   picture for (404) stays white;
 // - OpenStreetMap's data for the area from the Overpass API, one query with a size cap (MF-50 to MF-53:
 //   when the main instance is busy, retried with exponential backoff and jitter, and asked of one other
 //   public instance, within about a minute, cancellable), drawn on a canvas: woods, scrub, grass, farmland, water, bare ground, buildings, fences, walls and hedges,
@@ -24,6 +28,7 @@
 // area's middle latitude (off by under 0.05 % at its top and bottom edges for an area of 4 km).
 
 import { imageUrl } from './ortho-sources.js';
+import { project } from './tile-map.js';
 
 export const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 // MF-50, MF-51: the public Overpass instances asked, in this order, when the one before is busy or
@@ -37,6 +42,12 @@ export const AREA_MAX_M = 4000;           // the outline's box, on its longer si
 export const SIDE_MAX_PX = 4096;          // the image's longer side (an orthophoto asked at most its maxSide)
 export const METRES_PER_PX = 0.5;         // the finest the image is drawn at
 export const IMAGE_MAX = 4 * 1024 * 1024; // the controller's field image limit (store.FIELD_IMAGE_MAX)
+// MF-96: a WMTS-only orthophoto (its tiles stitched into the picture): at most this many tiles for one
+// image, a canvas of at most WMTS_MAX_SIDE pixels on a side, asked WMTS_PARALLEL at a time.
+export const WMTS_MAX_TILES = 256;
+const WMTS_MAX_SIDE = 16384;
+const WMTS_PARALLEL = 6;
+const TILE_PX = 256;
 const OVERPASS_MAX_BYTES = 32 * 1024 * 1024;
 const OVERPASS_TIMEOUT_S = 25;
 const MARGIN = 0.1;
@@ -228,7 +239,8 @@ export async function fetchOsm(b, opts = {}) {
 /** An orthophoto (a row of ortho-sources.js) for the area, as an ImageBitmap, or null where it has no
  * picture (all white: outside its coverage). Asked at the image's size, or smaller in proportion when that
  * is more than the WMS draws (its maxSide, MF-70); the canvas then stretches it to the image. */
-export async function fetchOrthophoto(b, frame, source, fetcher = fetch) {
+export async function fetchOrthophoto(b, frame, source, fetcher = fetch, report = {}) {
+    if (!source.wms) return fetchWmtsPhoto(b, frame, source, fetcher, report);
     const k = Math.min(1, source.maxSide / Math.max(frame.width, frame.height));
     const width = Math.max(1, Math.round(frame.width * k));
     const height = Math.max(1, Math.round(frame.height * k));
@@ -242,6 +254,116 @@ export async function fetchOrthophoto(b, frame, source, fetcher = fetch) {
         throw new MapError('ortho_failed', `HTTP ${r.status}`);
     }
     const bitmap = await createImageBitmap(await r.blob());
+    return mostlyWhite(bitmap) ? null : bitmap;
+}
+
+/** MF-96: the tiles of a WMTS (256-pixel GoogleMapsCompatible, Web Mercator) over the area (b) for an image
+ * of frame's size: the zoom whose pixels on the ground are as fine as the image's (frame.mpp) or finer, at
+ * most zmax, one coarser at a time while that needs more than WMTS_MAX_TILES tiles (or a canvas over
+ * WMTS_MAX_SIDE); {z, x0, y0, cols, rows, tiles}, or null when even zoom 0 cannot (never for an area the page
+ * draws). */
+export function wmtsPlan(b, frame, zmax) {
+    const lat = (b.north + b.south) / 2;
+    const ground0 = (2 * Math.PI * 6378137 * Math.cos(lat * DEG)) / TILE_PX; // metres per pixel at zoom 0
+    let z = Math.max(0, Math.min(zmax, Math.ceil(Math.log2(ground0 / frame.mpp))));
+    for (; z >= 0; z -= 1) {
+        const tl = project(b.north, b.west, z);
+        const br = project(b.south, b.east, z);
+        const x0 = Math.floor(tl.x / TILE_PX);
+        const y0 = Math.floor(tl.y / TILE_PX);
+        const cols = Math.floor((br.x - 1e-9) / TILE_PX) - x0 + 1;
+        const rows = Math.floor((br.y - 1e-9) / TILE_PX) - y0 + 1;
+        if (cols * rows <= WMTS_MAX_TILES && Math.max(cols, rows) * TILE_PX <= WMTS_MAX_SIDE) {
+            return { z, x0, y0, cols, rows, tiles: cols * rows };
+        }
+    }
+    return null;
+}
+
+/** MF-101: whether the WMTS tile (z, x, y) has any part inside box ([west, south, east, north], degrees). */
+function tileInBox(box, z, x, y) {
+    const [west, south, east, north] = box;
+    const tl = project(north, west, z);
+    const br = project(south, east, z);
+    return x >= Math.floor(tl.x / TILE_PX) && x <= Math.floor(br.x / TILE_PX)
+        && y >= Math.floor(tl.y / TILE_PX) && y <= Math.floor(br.y / TILE_PX);
+}
+
+/** One tile: an ImageBitmap, 'missing' (the server has no picture there: 404, 204, 410) or 'failed'. */
+async function fetchTile(url, fetcher) {
+    let r;
+    try {
+        r = await fetcher(url, { referrerPolicy: 'no-referrer' });
+    } catch (e) {
+        return 'failed';
+    }
+    if ([204, 404, 410].includes(r.status)) return 'missing';
+    if (!r.ok || !(r.headers.get('content-type') || '').startsWith('image/')) return 'failed';
+    try {
+        return await createImageBitmap(await r.blob());
+    } catch (e) {
+        return 'failed';
+    }
+}
+
+/** MF-94, MF-96: a WMTS-only orthophoto for the area, as fetchOrthophoto's: its tiles (wmtsPlan) fetched
+ * with CORS, WMTS_PARALLEL at a time, stitched on a white canvas, then drawn into the image's frame (latitude
+ * linear down the image, as the WMS pictures in EPSG:4326) one row at a time from the Mercator rows; at most
+ * maxSide pixels on a side, as a WMS's. A tile the server has no picture for stays white (the coverage's
+ * edge, or outside the source's wmtsBox, not asked: report.missing counts them, of report.tiles); one it
+ * could not send (a network error, another HTTP error, not an image) fails the whole picture with
+ * MapError('ortho_tiles', '<failed>/<tiles>'), so the GM never gets a picture with holes in it; none at all:
+ * null, as a white WMS picture. */
+async function fetchWmtsPhoto(b, frame, source, fetcher, report) {
+    const plan = wmtsPlan(b, frame, source.wmtsMax);
+    if (!plan) throw new MapError('too_big', `${frame.width} × ${frame.height}`);
+    const { z, x0, y0, cols, rows } = plan;
+    const stitched = document.createElement('canvas');
+    stitched.width = cols * TILE_PX;
+    stitched.height = rows * TILE_PX;
+    const g = stitched.getContext('2d');
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, stitched.width, stitched.height);
+    const todo = [];
+    for (let j = 0; j < rows; j += 1) for (let i = 0; i < cols; i += 1) todo.push([i, j]);
+    let missing = 0;
+    let failed = 0;
+    const worker = async () => {
+        while (todo.length && !failed) {
+            const [i, j] = todo.shift();
+            // MF-101: a tile outside the source's box is not asked (its server answers 400): white, as a 404.
+            const tile = source.wmtsBox && !tileInBox(source.wmtsBox, z, x0 + i, y0 + j) ? 'missing'
+                : await fetchTile(source.wmts(z, x0 + i, y0 + j), fetcher);
+            if (tile === 'missing') missing += 1;
+            else if (tile === 'failed') failed += 1;
+            else {
+                g.drawImage(tile, i * TILE_PX, j * TILE_PX, TILE_PX, TILE_PX);
+                if (tile.close) tile.close();
+            }
+        }
+    };
+    if (navigator.onLine === false) throw new MapError('offline');
+    await Promise.all(Array.from({ length: Math.min(WMTS_PARALLEL, todo.length) }, worker));
+    Object.assign(report, { tiles: plan.tiles, missing, zoom: z });
+    if (failed) throw new MapError('ortho_tiles', `${failed}/${plan.tiles}`);
+    if (missing === plan.tiles) return null;
+    // Into the image's frame, at most maxSide on a side: x is linear in longitude in both; each of the
+    // frame's rows is its latitude's Mercator row of the stitched tiles.
+    const k = Math.min(1, source.maxSide / Math.max(frame.width, frame.height));
+    const out = document.createElement('canvas');
+    out.width = Math.max(1, Math.round(frame.width * k));
+    out.height = Math.max(1, Math.round(frame.height * k));
+    const o = out.getContext('2d');
+    o.imageSmoothingQuality = 'high';
+    const left = project(b.north, b.west, z).x - x0 * TILE_PX;
+    const right = project(b.north, b.east, z).x - x0 * TILE_PX;
+    const yAt = (lat) => project(lat, b.west, z).y - y0 * TILE_PX;
+    for (let r = 0; r < out.height; r += 1) {
+        const top = yAt(b.north - (r / out.height) * (b.north - b.south));
+        const bottom = yAt(b.north - ((r + 1) / out.height) * (b.north - b.south));
+        o.drawImage(stitched, left, top, right - left, Math.max(bottom - top, 1e-3), 0, r, out.width, 1);
+    }
+    const bitmap = await createImageBitmap(out);
     return mostlyWhite(bitmap) ? null : bitmap;
 }
 

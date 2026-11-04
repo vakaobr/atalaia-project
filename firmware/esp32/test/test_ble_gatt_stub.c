@@ -8,7 +8,8 @@
  * that moment, frames cut to the MTU (and joined again by the phone's
  * framing), a CMD written in two pieces reaching the hardware stub and its
  * ACK coming back, a button press on the hardware stub reaching the phone as
- * an EVT, a busy stack, Pod Status, unencrypted writes refused, and the
+ * an EVT, a busy stack, Pod Status, unencrypted writes refused, a link
+ * without a passkey's key (MITM protection, PODPK-3) not ready, and the
  * radio forgotten when the phone goes.
  *
  * Its own executable, so that `ctest -R ble_gatt_stub` runs it alone.
@@ -141,11 +142,11 @@ static bool command(void *ctx, const atalaia_proxy_msg_t *m)
     (void)ctx;
     return pod_caps_command(&caps, m);
 }
-static void ident(void *ctx, atalaia_proxy_ident_t *out, bool compact)
+static void ident(void *ctx, atalaia_proxy_ident_t *out, pod_ident_level_t level)
 {
     (void)ctx;
     snprintf(out->fw_version, sizeof(out->fw_version), "0.3.0");
-    pod_caps_descriptors(&caps, out->caps_json, sizeof(out->caps_json), !compact);
+    pod_caps_descriptors(&caps, out->caps_json, sizeof(out->caps_json), level == POD_IDENT_FULL);
 }
 static bool emit(void *ctx, const char *cap, const char *event, const char *data)
 {
@@ -271,6 +272,45 @@ static void test_ready_and_ident(void)
     CHECK(ble.ready && phone_frames == 1);
 }
 
+/* An encrypted link whose key is not MITM-protected (a Just Works bond, decision PODPK-3) is not
+ * enough: no IDENT, writes refused, until the link has a passkey's key. */
+static void test_mitm_required(void)
+{
+    setup(true);
+    CHECK(ble.require_mitm);
+    pod_ble_on_connect(&ble, 7);
+    pod_ble_on_subscribe(&ble, POD_BLE_TX, true);
+    pod_ble_on_security(&ble, true, false);
+    CHECK(ble.encrypted && !ble.authenticated && !ble.ready && phone_frames == 0);
+    const proxy_frame_vector_t *v = vector("cmd_ident");
+    pod_ble_on_write(&ble, v->frame, v->frame_len);
+    CHECK(ble.count.writes_refused == 1 && ble.count.writes == 0 && phone_frames == 0);
+    /* Paired again with the passkey on the same link: ready, IDENT. */
+    pod_ble_on_security(&ble, true, true);
+    CHECK(ble.ready && phone_frames == 1 && phone_type[0] == ATALAIA_PROXY_IDENT);
+    /* A new connection forgets the old link's security. */
+    pod_ble_on_disconnect(&ble);
+    CHECK(!ble.encrypted && !ble.authenticated && !ble.ready);
+    pod_ble_on_connect(&ble, 8);
+    CHECK(!ble.authenticated);
+    /* "authenticated" without encryption means nothing. */
+    pod_ble_on_subscribe(&ble, POD_BLE_TX, true);
+    pod_ble_on_security(&ble, false, true);
+    CHECK(!ble.authenticated && !ble.ready);
+
+    /* A Just Works build (CONFIG_ATALAIA_POD_BLE_PASSKEY off): encryption is enough. */
+    setup(true);
+    pod_ble_require_mitm(&ble, false);
+    pod_ble_on_connect(&ble, 7);
+    pod_ble_on_subscribe(&ble, POD_BLE_TX, true);
+    pod_ble_on_security(&ble, true, false);
+    CHECK(ble.ready && phone_frames == 1);
+    /* Without encryption, no MITM requirement either. */
+    setup(false);
+    pod_ble_require_mitm(&ble, true);
+    CHECK(!ble.require_mitm);
+}
+
 static void test_mtu_pieces(void)
 {
     setup(true);
@@ -384,6 +424,7 @@ int main(void)
 {
     test_uuids_and_advertising();
     test_ready_and_ident();
+    test_mitm_required();
     test_mtu_pieces();
     test_cmd_and_evt();
     test_status();

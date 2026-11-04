@@ -75,6 +75,7 @@ What the pod lends, from the pod firmware
 | Enclosure switch | opened, closed: the phone reports an opening to the GM console as `node.tamper` |
 | LoRa radio | the field's radio: the phone talks to the field controller through it, encrypted by the pod with the game key |
 | Battery gauge (MAX17048) | the pod's battery level |
+| Simple outputs (optional, one or two RC relay switches) | a siren, a strobe, a light or a smoke machine's remote, switched by the mode and the field; off when the phone's link goes ([section 8.1](#81-simple-outputs-optional)) |
 
 ## 2. What is decided and what is not
 
@@ -89,21 +90,26 @@ Decided (in the firmware and the design documents):
 - **Two links to the phone at once**: USB (the board's USB-C port, which the
   phone sees as a serial device) and Bluetooth LE (`atalaia-pod-XXXX`, one
   phone at a time, paired and encrypted; decisions PF3, PF4).
+- **Pairing with a passkey**: the board's own 0.96" OLED stays dark, except
+  while a phone pairs over Bluetooth: it shows a 6-digit code, and the phone
+  asks for it, so nobody can sit between the phone and the pod while they pair
+  (decisions PODPK-1 to PODPK-11; [section 10](#10-linking-it-to-a-phone)). The
+  board's **PRG** button, held 5 seconds, makes the pod forget every phone.
 - **The log** goes to UART0's transmit pin, GPIO 43, not to the USB-C port,
   which carries the pod's frames.
+- **Simple outputs** (optional, since 2026-11-04; draft RFC "The expansion
+  port", increment 9, EXP-26): a siren, a strobe, a light or a smoke
+  machine's remote through an RC relay switch on the level shifter's spare
+  gate, as on a Field Box, on **GPIO 33** (a second on **GPIO 1**). The pod
+  runs the pulses and turns the output off by itself when the phone's link
+  goes or the phone stops talking ([section 8.1](#81-simple-outputs-optional)).
+  In the firmware and tested on a computer only: no pod has switched a real
+  relay yet.
 
 Not decided, or not supported yet:
 
-- **The siren** in the design specification: the pod's sound is the amplifier
-  and speaker. A separate siren, relay or strobe (the specification's `output`
-  capability) is not in the pod firmware yet (decision P5J-7). The draft RFC
-  "The expansion port" plans it as a **simple output** (an RC relay switch on
-  the level shifter's spare gate, wired as the
-  [Field Box's section 9.10](../field-box/BUILD.md#910-simple-output-optional)
-  says) on the pod's free **GPIO 33** (then 1 and 3), with the pod holding the
-  bursts so that a lost phone link turns it off; the Field Box and the Satellite
-  have it since 2026-11-03, the pod firmware gets it in a later increment
-  (EXP-26). Do not wire one to a pod yet.
+- **The expansion port** (a target plate's hits, the I2C output module) on a
+  pod: after the Field Box's port driver (the RFC's increments 6 to 8).
 - **Power from the phone.** On USB, the phone powers the board; with the pod's
   main switch on, the board's charger may then charge the pod's cell from the
   phone, as a Field Box charges from any USB charger. Whether a pod should do
@@ -191,6 +197,8 @@ if this table does.
 | I2S LRCLK | 15 | `ATALAIA_AUDIO_LRCLK_PIN` | pink | amplifier LRC | 3.3 V | |
 | I2S DOUT | 16 | `ATALAIA_AUDIO_DOUT_PIN` | brown | amplifier DIN | 3.3 V | |
 | Enclosure switch | 47 | `ATALAIA_POD_TAMPER_PIN` | any (not in the Field Box diagram) | microswitch COM to GND, NO to the pin | 3.3 V, internal pull-up | Closed while the lid is shut |
+| Simple output 1 (optional) | 33 | `ATALAIA_SIMPLE_OUT_PIN` | any (not in the Field Box diagram) | 74AHCT125 gate 2 input (pin 5), 10 kohm to GND | 3.3 V in, 5 V out | Only in a build with the simple output ([8.1](#81-simple-outputs-optional)) |
+| Simple output 2 (optional) | 1 | `ATALAIA_SIMPLE_OUT2_PIN` | any | 74AHCT125 gate 3 input (pin 9), 10 kohm to GND | 3.3 V in, 5 V out | The board's battery-voltage input, unused by the pod: fine for an output |
 | Log (UART0 TX) | 43 | -- | any | A 3.3 V USB-UART adapter's RX, with its GND | 3.3 V | Board-internal: only while you read the log |
 
 Rails, not GPIOs: 3V3 (violet) to the I2C parts and the keypad expander; GND
@@ -198,8 +206,9 @@ Rails, not GPIOs: 3V3 (violet) to the I2C parts and the keypad expander; GND
 LEDs. The full list of pins you must never wire is in the
 [Field Box pin reference](../field-box/BUILD.md#15-pin-reference).
 
-The display's other pins on a Field Box (GPIO 1, 3, 33) are not used by the pod:
-leave them unconnected. GPIO 0, 45 and 46 are boot straps; the board-internal
+The display's other pins on a Field Box (GPIO 1, 3, 33) are not used by the pod's
+parts: GPIO 33 and 1 carry the optional simple outputs; without them, leave
+all three unconnected. GPIO 0, 45 and 46 are boot straps; the board-internal
 pins are listed in the [Field Box pin map](../field-box/README.md#pin-assignments-default-kconfig----heltec-v43).
 
 ## 6. Enclosure and the enclosure switch
@@ -286,6 +295,47 @@ display** ([9.4](../field-box/BUILD.md#94-display)) and its wires to GPIO 1, 3,
 Then the Field Box's [final inspection](../field-box/BUILD.md#99-final-inspection-before-any-power),
 less its display line.
 
+### 8.1 Simple outputs (optional)
+
+**Not yet built on hardware.** A siren, a strobe, a light or a smoke machine's
+remote switched by the game on the phone (draft RFC "The expansion port",
+increment 9, decision EXP-26). The wiring is the Field Box's
+[section 9.10](../field-box/BUILD.md#910-simple-output-optional): an RC relay
+switch that **opens when its signal stops**, powered from the load's own
+battery, the signal through the 74AHCT125's spare gate to an M8 socket, with
+the same rules: **low-voltage loads only (at most 24 V DC), never mains, a
+smoke machine only through its low-voltage remote input, never pyrotechnics.**
+What differs on a pod:
+
+1. **The pins:** output 1 on **GPIO 33** (gate 2: pin 5 from GPIO 33, 10 kohm
+   from pin 5 to GND, pin 6 through 330 ohm to the socket "OUTPUT 1"); output 2
+   on **GPIO 1** (gate 3: pin 9, pin 8 to "OUTPUT 2"). A pod may have the piezo
+   buzzer on GPIO 45 **and** two outputs.
+2. **The firmware:** build with `python tools/docker_fw.py pod --simple-out=on`
+   (`on2` for two). A pod has no admin PIN, so **building the output in is what
+   enables it**, and its use (the name the games call it by: `siren`, `strobe`,
+   `smoke`, `light`, `horn`, `out.1`) and its longest on are lines in
+   `build-pod\sdkconfig` ([section 9](#9-first-flash), the settings table).
+   The boot log says `output 1 on GPIO 33: siren, enabled, at most 30 s`.
+3. **What switches it:** the mode running on the phone (Bomb's smoke and siren
+   when the bomb explodes, say) and the field (scenario triggers, the GM's
+   outputs panel), with a box's rules: only while the game runs (and up to
+   10 s after its end, for an end-of-game horn), off at the start, a pause and
+   the end, never longer than its longest on, at most one change every half
+   second.
+4. **When the phone goes, the output goes off**, by the pod itself: at once
+   when the USB cable is unplugged or the Bluetooth link drops, and after
+   1.5 s when the phone stops talking (an app that hung keeps its USB link up;
+   while an output is on, the app speaks to the pod twice a second). If the
+   pod itself hangs or loses power, its pulses stop within half a second and
+   the switch opens on the lost signal.
+5. **Checks:** as the Field Box's step 7, on GPIO 33 (and 1): 10 kohm to GND,
+   330 ohm from the gate to the socket's pin 4, nothing on its pin 1. Before
+   its first game each RC switch gets its bench check
+   ([BRING_UP.md, step 8b](../../firmware/esp32/docs/BRING_UP.md#step-8b-simple-output-rc-relay-switch)).
+   Then, with a phone linked and a game running, pull the USB cable with the
+   output on: the relay opens within about a second.
+
 ## 9. First flash
 
 The pod firmware is flashed from your computer, like the Field Box's
@@ -344,11 +394,18 @@ the Kconfig menu "I/O pod", listed in firmware/esp32/README.md):
 | No enclosure switch | `CONFIG_ATALAIA_POD_TAMPER_PIN=-1` (optional: an unwired switch never reports) |
 | Switch open while the lid is shut | `# CONFIG_ATALAIA_POD_TAMPER_OPEN_HIGH is not set` |
 | USB only, no Bluetooth | `# CONFIG_ATALAIA_POD_BLE is not set` |
+| The OLED is broken: pair without a code (Just Works) | `# CONFIG_ATALAIA_POD_BLE_PASSKEY is not set` |
+| No button to forget the phones | `CONFIG_ATALAIA_POD_BOND_CLEAR_PIN=-1` (default 0: the PRG button) |
 | 12- or 16-LED ring | `CONFIG_ATALAIA_LED_COUNT=12` (or 16) |
 | Antenna with more than 2 dBi | `CONFIG_ATALAIA_RADIO_ANTENNA_GAIN_DBI=` its gain, rounded up |
+| A simple output's use ([8.1](#81-simple-outputs-optional)) | `CONFIG_ATALAIA_POD_OUT1_FUNCTION="siren"` (`strobe`, `smoke`, `light`, `horn`, `out.1`; output 2: `POD_OUT2_FUNCTION`) |
+| Its longest on | `CONFIG_ATALAIA_POD_OUT1_MAX_ON_S=10` (1-600 s, 30 by default; the app stops at 30 s for now) |
 
-Leave `CONFIG_ATALAIA_POD_BLE_ENCRYPTED` on: it keeps the game key off an
-unencrypted Bluetooth link.
+Leave `CONFIG_ATALAIA_POD_BLE_ENCRYPTED` and `CONFIG_ATALAIA_POD_BLE_PASSKEY`
+on: the first keeps the game key off an unencrypted Bluetooth link, the second
+makes sure the phone that pairs is the one you hold (a code on the pod's OLED).
+Without the passkey, the pod's log on GPIO 43 still shows `pairing passkey
+123456` when the OLED is missing.
 
 ### Settings over the radio
 
@@ -394,8 +451,26 @@ with the board steps of BRING_UP.md that apply first (revision, antenna,
 
 1. **USB.** A USB-C OTG cable from the phone to the pod. In the app:
    *Prop > I/O pod > Find pods*, open it, allow USB access: "Pod linked over USB".
-2. **Bluetooth.** Unplugged: *Find pods* lists `atalaia-pod-XXXX`; open it and
-   confirm Android's pairing question once: "Pod linked over BLE".
+2. **Bluetooth.** Unplugged: *Find pods* lists `atalaia-pod-XXXX`; open it.
+   The pod's OLED shows **PAIR**, the seconds left and a 6-digit code (`123
+   456`), with the pod's name below; Android's pairing dialog asks for it: type
+   the 6 digits within 30 seconds. The OLED shows **PAIRED** and the app "Pod
+   linked over BLE". Only once: the phone and the pod keep the pairing.
+   - **A wrong code** (or *Cancel*): the OLED shows **FAILED**, the app says the
+     code did not match. Open the pod again: a new code.
+   - **Too slow**: **TOO SLOW** on the OLED, and a message in the app. A phone
+     that connects and never pairs is let go after 60 seconds.
+   - **"This pod needs pairing again"**: the phone was paired with this pod
+     before it had the code (a pod firmware before 0.8), or the pod forgot its
+     phones. The OLED shows **PAIR AGAIN**; the app forgets its old pairing
+     and opens the pod again by itself, once: type the new code. If Android
+     does not let the app forget it, the app says so: forget
+     `atalaia-pod-XXXX` in Android's Bluetooth settings, then link it again.
+   - **Forget every phone**: open the lid and hold the board's **PRG** button
+     for 5 seconds. The OLED shows **FORGET ALL** with a bar, then
+     **CLEARED**; a phone that is linked is dropped. Every phone pairs again
+     with a code. (Opening the lid reports a tamper if the enclosure switch is
+     on: do it between games.)
 3. **A game.** A prop game on the phone with the pod linked: its buttons are the
    game's teams by number, its ring shows the team, its reader checks player
    tags, and the phone's radio link to the field controller goes through the
@@ -413,9 +488,13 @@ amplifier and the power. For a pod in particular:
 | The phone does not find the pod over USB | A charge-only cable or panel extension; the phone has no USB host (OTG) |
 | Opening the USB port resets the pod | The app sets DTR and RTS together; another serial app may not: use the Atalaia app |
 | `atalaia-pod-XXXX` not listed | The 2.4 GHz antenna missing or on the wrong connector; another phone is linked (one at a time); Bluetooth turned off in the build |
+| Android asks for a code but the OLED stays dark | The OLED was not found at boot (the log says `SSD1306 OLED not found`): the code is in the log on GPIO 43 (`pairing passkey 123456`); check the board's OLED, or build without the passkey (section 9) |
+| "This pod needs pairing again" every time | Android did not forget its pairing: forget `atalaia-pod-XXXX` in the Bluetooth settings, then link it again |
 | The phone never shows "Someone opened the I/O pod" | No switch on GPIO 47, or it never read closed (the lid does not press it); a switch wired the other way round needs `POD_TAMPER_OPEN_HIGH` off |
 | The pod reports an opening by itself | The switch lets go when the box is knocked: mount it firmer, or use a lever switch |
 | Button 4 never registers | It is on the PCF8574's P7: the expander must be fitted and found at boot |
+| The siren (or strobe, smoke) never comes on | A build without `--simple-out`; its use in `build-pod\sdkconfig` is not the one the game asks for (the boot log lists it); no game running; the switch's own battery |
+| The output goes off by itself after a second or two | The phone stopped talking to the pod (the app in the background or killed: see the app's battery settings) or the link dropped: the pod turns it off on purpose |
 | Anything hot, a smell, smoke | Unplug the phone, switch off, take the fuse out, take the cells out into a fire-safe bag |
 
 If you find a fault that is not here, or a step that is wrong, please open an

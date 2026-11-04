@@ -432,9 +432,18 @@ on two links at once:
   `4174616c-6169-6100-0000-000000000000` with Pod TX (notify), Pod RX
   (write without response) and Pod Status (read, notify), advertised as
   `atalaia-pod-XXXX`, one phone at a time, a 247-byte MTU. The pod asks the
-  phone to pair (LE Secure Connections, Just Works, bonded): frames go out
-  and Pod RX writes are taken only on an encrypted link, so the game key
-  in RADIO_CMD CONFIGURE never crosses the air in the clear (decision PF4).
+  phone to pair (LE Secure Connections, bonded): frames go out and Pod RX
+  writes are taken only on an encrypted link, so the game key in RADIO_CMD
+  CONFIGURE never crosses the air in the clear (decision PF4). Pairing is by
+  passkey entry (decisions PODPK-1 to PODPK-11, `pod_pair.c`): the pod is
+  DisplayOnly and shows a random 6-digit passkey on the board's OLED
+  (`pod_display.c`, the OLED view's layout; dark otherwise) and in the log;
+  only a key made so (MITM-protected) carries frames. A bond without MITM
+  protection (Just Works, an older pod) or unknown to the pod is forgotten
+  and the link dropped with HCI reason 0x05, so the app pairs again. Holding
+  the PRG button (`CONFIG_ATALAIA_POD_BOND_CLEAR_PIN`, GPIO 0) for 5 s
+  clears every bond; `CONFIG_ATALAIA_POD_BLE_PASSKEY` off goes back to Just
+  Works, for a pod whose OLED is broken.
 
 What it lends (only what is fitted is in IDENT; decision PF6):
 
@@ -446,6 +455,7 @@ What it lends (only what is fitted is in IDENT; decision PF6):
 | `audio` (MAX98357A and/or the piezo buzzer) | | `tone` {"freq","ms"}, `play` (the mode's clips as tones, `sound.c`'s patterns), `stop`, `set_volume` |
 | `nfc` (PN532) | `tag` {"uid", "tag"}: a player tag's record; join cards are not forwarded | |
 | `case` (tamper) | `opened`, `closed` | |
+| `<use>` (output: a simple output, optional) | | `on` {"ms"}, `off`, `pulse` {"ms"}, `pattern` {"on_ms","off_ms","ms"} |
 
 Button N stands for the game's N-th team, as on a Field Box; a colour set
 in Kconfig goes into its descriptor. The enclosure switch (GPIO 47 by
@@ -453,6 +463,25 @@ default, to GND, closed while the lid is shut) is armed once it has read
 closed, so a pod without one never alarms; the phone reports an opening as
 `node.tamper` (reason `pod_opened`). The battery gauge's level is in IDENT
 and in Pod Status.
+
+**Simple outputs** (optional, `CONFIG_ATALAIA_SIMPLE_OUT`; draft RFC "The expansion port",
+increment 9, EXP-26; `main/pod/pod_outputs.c`): the Field Box's output layer (`outputs.c`) and RMT
+bursts (`simple_out.c`, `simple_out_esp.c`) on **GPIO 33** (a second on **GPIO 1**,
+`ATALAIA_SIMPLE_OUT2`, with or without the buzzer), lent as `{"id":"siren","type":"output",
+"feedback":false}` after the other parts. A pod has no admin PIN (PODC-2), so building the output in
+enables it (EXP-28), with its use and longest on from the build (`ATALAIA_POD_OUT1_FUNCTION`,
+`ATALAIA_POD_OUT1_MAX_ON_S`, and `_OUT2_` for the second; `out.1` and 30 s by default). The phone
+runs the game's rules (`app/lib/prop/prop_outputs.dart`); the pod keeps the output layer's own
+limits (ms 1-600000, the build's longest on, a change at most every 500 ms; a refused CMD is still
+acknowledged), switches only while a phone is on a link, and turns every output off **at once when
+its last link goes** and **after 1.5 s without a frame from the phone while one is on** (the phone
+sends RADIO_CMD PING twice a second then; `POD_OUT_QUIET_MS`). The bursts are renewed by the pod's
+loop, so a hung pod stops them within 0.5 s. IDENT still fits in 256 bytes: with every part, the
+longest version and an output, the pod leaves out the buttons' colours and the `feedback` flags,
+then the version's build metadata, then the outputs (`pod_ident_level_t`). Size (ESP-IDF 5.3.2,
+2026-11-04): the pod image was 689,888 bytes before; 694,704 with the option off (the output layer is
+always built in), 697,808 with one output, 704,336 with two and the buzzer (17 % of the 4 MB slot);
+0 warnings.
 
 The radio is the USB modem's own code (`main/modem/modem.c`, frames
 shifted by 3): the phone sends plaintext packets with RADIO_TX, the pod
@@ -498,6 +527,8 @@ lists the checks that need the board and a phone. Code:
   too), Pod Status (plain C);
 - `main/pod/pod_caps.c` -- the capabilities on the HAL ops (plain C);
 - `main/pod/pod_settings.c` -- the settings pushed over the radio: parse, merge, stored form, apply (plain C);
+- `main/pod/pod_outputs.c` -- the simple outputs lent to the phone: descriptors, CMDs, the link and
+  lease rules, on the box's output layer (plain C);
 - `main/pod/pod_ble.c` -- the GATT service's logic, UUIDs and advertising
   data (plain C); `pod_ble_nimble.c` puts it on NimBLE;
 - `main/pod/pod_task.c`, `pod_main.c` -- the ESP-IDF task, USB, audio queue,
@@ -506,10 +537,15 @@ lists the checks that need the board and a phone. Code:
 Tests: `test/test_pod.c` (the proxy and the capabilities, against the
 shared vectors; a box's update offer through the pod, opened with the game key, its duty-cycle refusal, the box's `node.update_failed` coming back; CMD pod over the radio: taken and not passed on, a repeat, a stale rev, another node, another key), `test/test_pod_settings.c` (the shared vectors `protocol/vectors/pod_config.json` through the core's CMD decoder, the strict parser's limits, the stored form read back, what the settings do to the capabilities), `test/test_ble_gatt_stub.c` (`ctest -R ble_gatt_stub`: the
 GATT service with the Bluetooth stack stubbed), `test/test_proxy_codec.c`
-(the frames). `test/pod_host/` builds the pod's code with real AES-CCM into
+(the frames); the simple outputs in `test/test_pod.c` too (`test_outputs_*`: the IDENT vector
+`pod_simple_output`, IDENT's room with every part, the CMDs and their limits against a fake RMT, the
+boot's end of signal, a live off while linked, off when USB goes, after 1.5 s of silence and not
+while the phone pings). `test/pod_host/` builds the pod's code with real AES-CCM into
 a Linux program (USB and Bluetooth links as TCP sockets, the radio as UDP,
-the hardware on stdin) that the app's Dart tests
-(`app/test/pod/pod_host_test.dart`, `app/test/radio/pod_radio_link_test.dart`)
+the hardware on stdin; `--simple-out siren[@GPIO]`, twice at most, prints `OUTPUT siren on|off`
+and `PIN g33 low`, and `status` adds `outputs`) that the app's Dart tests
+(`app/test/pod/pod_host_test.dart`, `app/test/radio/pod_radio_link_test.dart`,
+`app/test/prop/prop_pod_outputs_test.dart`)
 and the controller's end-to-end test (`controller/tests/test_pod_e2e.py`)
 drive.
 
@@ -545,7 +581,7 @@ Field game options (under "Field network games"):
 - `ATALAIA_DEV_JOIN_KEY` -- a development field join key, used only when none is stored (set in `sdkconfig.wokwi` only); a box with only this key counts as unadopted
 
 Firmware update options (under "Firmware updates (OTA)", the Field Box only):
-- `ATALAIA_OTA_RELEASE_KEYS` -- the Ed25519 public keys (64 hex digits each, up to 4) whose releases the box installs; the default is the project's two release keys, root `424d053af5cdbc35` and CI `a4f6002b0122b131`, the next CI key of the 2026-11 rotation ([RELEASE_SIGNING.md](docs/RELEASE_SIGNING.md), [docs/community/keys.md](../../docs/community/keys.md)); empty: every update is refused
+- `ATALAIA_OTA_RELEASE_KEYS` -- the Ed25519 public keys (64 hex digits each, up to 4) whose releases the box installs; the default is the project's three release keys, root `424d053af5cdbc35`, CI `32b3c815ac30ad43` and the next CI key `a4f6002b0122b131` that replaces it ([RELEASE_SIGNING.md](docs/RELEASE_SIGNING.md), [docs/community/keys.md](../../docs/community/keys.md)); empty: every update is refused
 - `ATALAIA_OTA_VARIANT` -- the variant written into the image (`box`, `box-bench`, `box-dev`); a box installs only its own variant and board
 - `ATALAIA_OTA_MIN_BATTERY_PCT` -- refuse an update below this level (default 30; with a MAX17048 only)
 
@@ -574,11 +610,13 @@ Piezo buzzer options (under "Piezo buzzer", the Field Box and the pod; decisions
 `ATALAIA_BUZZER` (default **off**: a passive piezo is fitted) and `ATALAIA_BUZZER_PIN` (default 45).
 See "Sound: the speaker and the piezo buzzer" below.
 
-Simple output options (under "Simple output (RC relay switch)", the Field Box; draft RFC "The expansion port",
-EXP-31 to EXP-37): `ATALAIA_SIMPLE_OUT` (default **off**), `ATALAIA_SIMPLE_OUT_PIN` (46 on a V4.3, 5 on a V4.2,
-following `ATALAIA_BOARD_REV`), `ATALAIA_SIMPLE_OUT2` (a second one, offered only without the buzzer) and
-`ATALAIA_SIMPLE_OUT2_PIN` (45). `python3 tools/docker_fw.py build|bench --simple-out=on|on2|<GPIO>` and
-`--buzzer=on` set them for that build folder. See "Outputs: the simple output" below.
+Simple output options (under "Simple output (RC relay switch)", the Field Box and the pod; draft RFC "The
+expansion port", EXP-31 to EXP-37): `ATALAIA_SIMPLE_OUT` (default **off**), `ATALAIA_SIMPLE_OUT_PIN` (46 on a
+V4.3, 5 on a V4.2, following `ATALAIA_BOARD_REV`; 33 on a pod), `ATALAIA_SIMPLE_OUT2` (a second one, offered
+only without the buzzer, except on a pod) and `ATALAIA_SIMPLE_OUT2_PIN` (45; 1 on a pod); on a pod also
+`ATALAIA_POD_OUT1_FUNCTION`, `ATALAIA_POD_OUT1_MAX_ON_S` (and `_OUT2_`). `python3 tools/docker_fw.py
+build|bench|pod --simple-out=on|on2|<GPIO>` and `--buzzer=on` set them for that build folder. See "Outputs: the
+simple output" below and "The I/O pod" above.
 
 GNSS options (under "GNSS"): `ATALAIA_GNSS_PWR_PIN` (34, VGNSS_Ctrl,
 active low; driven high, module off, at boot), `ATALAIA_GNSS_POWER_ON`
@@ -685,7 +723,7 @@ channel's settings, its desired state and the rules; only the last step is the p
 | Limits | A call never runs past the channel's max on. A simple output changes state at most every 500 ms (EXP-30, EXP-36): a shorter pulse runs 500 ms, a pattern under 500 ms on or off is refused, an on within 500 ms of the last change is refused; an off never is. A script starts a channel at most twice a second (more are dropped, one `script.error` a game) |
 | Game state (EXP-29) | On only while a game runs. Every output off at boot, when the game pauses (not back on at the resume), when the sandbox halts the script, and when the game ends: before the mode's `game.end` handlers run, so an end-of-game horn they pulse is allowed, for at most **10 s** after the end (the field's CMD 12 too). The admin's test only between games |
 | Events | `output.switched` (`capability`, `ms`, `source`: `script`, `field`, `gm`, `box_admin`) for each start and each off before its time; nothing for what the game state turns off. In a field game it goes to the controller on the radio (`field_link_send_box_event`, normal priority), otherwise to the log |
-| HELLO and `node.modules` | HELLO's capabilities (key 6, `protocol/schema/capabilities.yaml`) list what the box has: button, keypad, display, led, audio, nfc, battery from the parts that started, and `output` (11) while an output is enabled. Once the controller acknowledges the HELLO the box sends `node.modules` with its enabled simple outputs, `g46:servo:siren` (EXP-36: no version, no feedback); a box with none sends nothing |
+| HELLO, `node.modules` and `node.outputs_disabled` | HELLO's capabilities (key 6, `protocol/schema/capabilities.yaml`) list what the box has: button, keypad, display, led, audio, nfc, battery from the parts that started, and `output` (11) while an output is enabled. Once the controller acknowledges the HELLO the box sends `node.modules` with its enabled simple outputs, `g46:servo:siren` (EXP-36: no version, no feedback; none enabled: no `node.modules`), and `node.outputs_disabled` with the ones fitted that its admin has not enabled, `g45:servo:horn`, then each module's output channels not enabled as its entry with only those ids, `5c:out4/1.0.0:siren.2,smoke`, or the empty text (EXPL-13, EXPL-20: `outputs_disabled_text`, `expansion_box_disabled_text`, `box_game.c` `box_game_disabled_text` and `tell_outputs_disabled`), again whenever that text changes; a box with no output fitted sends neither |
 
 **The simple output's signal** (`main/simple_out.c`, platform-free, host tests in
 `test/test_simple_out.c`; `main/simple_out_esp.c` on the ESP32): 50 Hz, **2.0 ms on, 1.0 ms off**.
@@ -706,7 +744,7 @@ part uses, the other revision's front-end pin and 45 with the buzzer (`#error` i
 `simple_out_esp.c`); `simple_out_pin_problem` checks the same at run time and in the host tests.
 A bench build has `@hang` (the game task stops for good: bench test 12, BRING_UP.md step 8b).
 
-**The host box** (`test/box_host`, `--simple-out siren[@GPIO]`, twice at most) runs the same layer
+**The host box** (`test/box_host`, `--simple-out siren[@GPIO][,disabled]`, twice at most; `,disabled`: fitted with that function, not enabled, so it is in `node.outputs_disabled` and not in `node.modules`, EXPL-13) runs the same layer
 and scheduler and prints the pulse train: `PULSE g46 t=<ms> width=<us> frames=<n> until=<ms>[ flush]`
 per burst and `PIN g46 low t=<ms>` when the last one has gone out; `status` adds `outputs`;
 `controller/tests/test_box_e2e.py` checks it against the real controller.
@@ -714,7 +752,8 @@ per burst and `PIN g46 low t=<ms>` when the last one has gone out; `status` adds
 **Not in this increment** (the RFC's later ones): the controllers sending CMD 12, their output API,
 `modules` in the node list and the capability start check, the console's outputs panel (3); modes
 using outputs (4); scenario triggers (5); the I2C port and its modules (6-8, 11); the I/O pod's
-simple outputs (9). **Not yet tried on hardware.**
+simple outputs (9: built on 2026-11-04, "The I/O pod" above; its port driver comes after 8). **Not yet
+tried on hardware.**
 
 **Size** (ESP-IDF 5.3.2, 2026-11-03, against the commit before this change): the Field Box image grew from
 2,163,296 to 2,174,736 bytes with the simple output off (+11,440: the output layer, its admin screen and
