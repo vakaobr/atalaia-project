@@ -121,8 +121,10 @@ Não decidido, ou ainda sem suporte:
   que o módulo de E/S dá de si ao telemóvel (256 bytes) tem então espaço para
   poucas saídas do módulo da porta: empresta as que cabem, as primeiras, e
   mantém as outras desligadas (com todas as peças e um out4, uma das quatro;
-  com um alvo também, nenhuma). Um módulo de E/S montado para um módulo de
-  saídas deixa de fora as peças que não usa (decisões EXPI9-23, EXPI9-27).
+  com um alvo também, nenhuma). A consola do GM mostra as outras como saídas
+  montadas mas não ativadas, como as de uma Field Box (decisão PROPC-6). Um
+  módulo de E/S montado para um módulo de saídas deixa de fora as peças que
+  não usa (decisões EXPI9-23, EXPI9-27).
 - **Energia vinda do telemóvel.** Por USB, o telemóvel alimenta a placa; com o
   interruptor principal do módulo ligado, o carregador da placa pode então
   carregar a célula do módulo a partir do telemóvel, como uma Field Box carrega
@@ -540,7 +542,7 @@ módulo em particular:
 | A sirene (ou o estroboscópio, o fumo) nunca liga | Uma compilação sem `--simple-out`; o seu uso em `build-pod\sdkconfig` não é o que o jogo pede (o registo de arranque mostra-o); nenhum jogo a decorrer; a bateria do próprio interruptor |
 | Um módulo da porta não é encontrado (nenhum `expansion: ... added` no registo) | Como numa Field Box ([guia da porta, secção 9](../expansion-port/BUILD.pt.md#9-resolução-de-problemas)): o seu endereço, o cabo, a alimentação, o firmware |
 | Os impactos do alvo nunca chegam ao jogo | O jogo não armou a placa, ou não está a decorrer; a app do telemóvel é mais antiga do que o módulo de E/S (ignora a placa) |
-| Os relés de um módulo de saídas não são oferecidos ao jogo (todos ou alguns) | Uma compilação sem `--module-outputs=on`; um módulo de E/S com todas as peças: empresta as que cabem, as primeiras, e o registo nomeia as outras (`IDENT has no room for 3 output(s), not lent (off, refused): strobe, smoke, out.4`; [secção 2](#2-o-que-está-decidido-e-o-que-não-está)) |
+| Os relés de um módulo de saídas não são oferecidos ao jogo (todos ou alguns) | Uma compilação sem `--module-outputs=on`; um módulo de E/S com todas as peças: empresta as que cabem, as primeiras, e o registo nomeia as outras (`IDENT has no room for 3 output(s), not lent (off, refused): strobe, smoke, out.4`; [secção 2](#2-o-que-está-decidido-e-o-que-não-está)); a consola mostra-as como **montadas, não ativadas** |
 | A saída desliga-se sozinha ao fim de um ou dois segundos | O telemóvel deixou de falar com o módulo (a app em segundo plano ou terminada: vê as definições de bateria da app) ou a ligação caiu: o módulo desliga-a de propósito |
 | Algo quente, um cheiro, fumo | Desliga o telemóvel, desliga o interruptor, tira o fusível, tira as células para um saco à prova de fogo |
 
