@@ -250,9 +250,12 @@ output module's pin tables hold RP2040 pins, which have no Kconfig symbol: they 
 `firmware/target-module/src/main.c` and `firmware/output-module/src/board.h`, and change with
 `hardware/target-addon/BUILD*.md` and `hardware/output-module/BUILD*.md` (where `check_wiring.py`
 checks the output module's). The simple output's pin follows the
-board revision (GPIO 46 on a V4.3, 5 on a V4.2), so it is written in the text, not in a pin table; the I/O
-pod's two simple outputs (GPIO 33 and 1, the pod build's defaults) are rows of its table without `data-kconfig`,
-since the check reads the Field Box's defaults (decision SITE9-2). The dashed
+board revision (GPIO 46 on a V4.3, 5 on a V4.2), so it is written in the text, not in a pin table. The I/O
+pod's section (`<section id="io-pod">`) is checked against the pod build's defaults instead
+(Kconfig with `firmware/esp32/sdkconfig.defaults` and `sdkconfig.pod` over it, as for
+`hardware/io-pod/BUILD.md`), so its two simple outputs are marked cells too
+(`ATALAIA_SIMPLE_OUT_PIN` 33, `ATALAIA_SIMPLE_OUT2_PIN` 1) and must stay in that section (decisions
+SITE9-2, WIRE-1 to WIRE-4). The dashed
 `figure.photo` boxes mark where the first builds' photos go (plan phase HW2) for the Satellite, the
 I/O pod, the expansion port, the target addon and the I2C output module; never a mock-up or generated picture. The Field Box's section no
 longer has one: it opens with its first real photo and clip, the bench build of 2026-10-31

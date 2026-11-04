@@ -2057,7 +2057,8 @@ build:
       preset: >-
         <strong>Zielfenster als eingebaute Voreinstellung der Field Box</strong>, sobald das Ziel auf
         dem Labortisch getestet ist; bis dahin spielt ein Feld den Modus wie jeden anderen auf eine Box.
-        Später, mit Inkrement 9, der I/O-Pod, der einem Handy ein Ziel leiht.
+        Der I/O-Pod leiht die Treffer eines Ziel-Addons schon einem Spiel auf dem Handy (Inkrement 9),
+        nur auf einem Computer getestet: siehe <a href="#io-pod">I/O-Pod</a>.
     open:
       plate: >-
         <strong>Die Platte</strong>: Materialsorte, Größe, Dicke, Ständer und Winkel, aus den ersten
