@@ -299,9 +299,11 @@ radio...)"), and link the harder ones to the glossary page:
   change a link whenever you change an id.
 - A glossary text is one to three sentences: what the thing is, and why Atalaia uses it.
 - Check each claim against the [design specification](../docs/design-spec.md). Prices are the
-  spec's approximate figures, and anything not built yet (the site server, the phone as field
-  controller, the iOS app, the thin nodes) is written as "will" or "still to come". What is built
-  but has not run on real hardware (the firmware, the controller, the app, the I/O pod) says so.
+  spec's approximate figures, and anything not built yet (the thin nodes, the satellite box, the
+  hardened release image) is written as "will" or "still to come". What is built but not yet tried
+  for real, or only on the bench or the preview server (the firmware and the controller on bench
+  boards, the I/O pod, the app on a phone in a field, the site server on a real deployment), says
+  so.
   The roadmap's status tags and the hero's status line follow `docs/phase-*/STATUS.md`.
 
 ### Portuguese terms
