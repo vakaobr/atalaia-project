@@ -514,7 +514,7 @@ amplifier and the power. For a pod in particular:
 | The siren (or strobe, smoke) never comes on | A build without `--simple-out`; its use in `build-pod\sdkconfig` is not the one the game asks for (the boot log lists it); no game running; the switch's own battery |
 | A module is not found (no `expansion: ... added` in the log) | As on a Field Box ([port guide, section 9](../expansion-port/BUILD.md#9-troubleshooting)): its address, its cable, its supply, its firmware |
 | The target's hits never reach the game | The game has not armed the plate, or is not running; the phone's app older than the pod (it ignores the plate) |
-| An output module's relays are not offered to the game | A build without `--module-outputs=on`; a pod with every part (no room: [section 2](#2-what-is-decided-and-what-is-not)) |
+| An output module's relays are not offered to the game (all or some) | A build without `--module-outputs=on`; a pod with every part: it lends as many as fit, the first ones, and the log names the others (`IDENT has no room for 3 output(s), not lent (off, refused): strobe, smoke, out.4`; [section 2](#2-what-is-decided-and-what-is-not)) |
 | The output goes off by itself after a second or two | The phone stopped talking to the pod (the app in the background or killed: see the app's battery settings) or the link dropped: the pod turns it off on purpose |
 | Anything hot, a smell, smoke | Unplug the phone, switch off, take the fuse out, take the cells out into a fire-safe bag |
 
