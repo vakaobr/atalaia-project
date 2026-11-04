@@ -13,6 +13,7 @@ library;
 import '../modes/mode_catalog.dart';
 import '../platform/services.dart';
 import '../pod/pod_codec.dart';
+import '../protocol/capability_types.g.dart';
 
 class CapabilityMap {
   CapabilityMap(this.descriptors);
@@ -52,6 +53,39 @@ class CapabilityMap {
     }
     return false;
   }
+
+  /// HELLO's capability type ids (key 6; protocol/schema/capabilities.yaml),
+  /// in id order: the types this prop really gives a mode, so the
+  /// controllers' start check takes it as it takes a box (decisions PROPC-1
+  /// to PROPC-4). The screen's team buttons are `button`, its team light
+  /// `led`; a pod's parts count by their type, its outputs and hit sensors
+  /// only while its IDENT lends them. Left out: what the prop shell gives no
+  /// mode (the vibrator, the camera, the accelerometer, a pod's case switch
+  /// and battery gauge), as a box lists only its game's parts.
+  List<int> get helloTypes {
+    final ids = <int>{};
+    for (final d in descriptors) {
+      final type = _helloType['${d['type']}'];
+      final id = type == null ? null : capabilityTypeIds[type];
+      if (id != null) ids.add(id);
+    }
+    return ids.toList()..sort();
+  }
+
+  /// A descriptor's type as HELLO names it; absent: not listed.
+  static const _helloType = {
+    'team_input': 'button',
+    'button': 'button',
+    'keypad': 'keypad',
+    'display': 'display',
+    'team_display': 'led',
+    'led': 'led',
+    'audio': 'audio',
+    'nfc': 'nfc',
+    'gps': 'gps',
+    'hit': 'hit',
+    'output': 'output',
+  };
 
   /// The capabilities [role] requires that this phone (and pod) lacks.
   List<String> missingFor(ModeRole role) => [
