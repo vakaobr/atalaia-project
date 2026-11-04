@@ -110,6 +110,20 @@ class CommandTests(unittest.TestCase):
 
 
 class TimelineTests(unittest.TestCase):
+    def test_a_relay_waits_100_ms_after_a_patterns_on_time_too(self) -> None:
+        """EXPI7-11, as the module core: a relay turned on less than 100 ms after a pattern's on time
+        ended is refused (relay_change), as after an off; 100 ms after, it is taken."""
+        spec = VECTORS["modules"]["out4"]
+
+        def out(mode: str, on: int = 0, off: int = 0) -> bytes:
+            return ex.encode_command({"op": "OUTPUT", "channel": 0, "mode": mode, "duration_100ms": 50,
+                                      "on_10ms": on, "off_10ms": off}, spec["address"])
+        m = ex.ModuleModel(spec)
+        self.assertTrue(m.write(0, out("pattern", 20, 50)))  # 200 ms on, 500 ms off
+        self.assertFalse(m.write(250, out("on")))  # 50 ms into the off time
+        self.assertIn("cmd_error", m.state(250)[1])
+        self.assertTrue(m.write(300, out("on")))  # 100 ms into it
+
     def test_every_timeline(self) -> None:
         names = {t["name"] for t in VECTORS["timelines"]}
         self.assertGreaterEqual(names, {"lease_runs_out", "lost_write_repaired", "module_restart",
