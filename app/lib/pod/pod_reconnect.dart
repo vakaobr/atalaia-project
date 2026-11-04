@@ -272,7 +272,11 @@ class PodReconnector extends ChangeNotifier {
   Future<bool> _failed(PodClient old) async {
     final b = bonds;
     final device = old.device;
-    if (b == null || old.transport.kind != 'ble') return false;
+    // A link not opened from a scan has no device to open or forget (and
+    // the plugin's word would be about some other link).
+    if (b == null || device == null || old.transport.kind != 'ble') {
+      return false;
+    }
     final PodPairError? error;
     try {
       error = await b.lastPairError();
@@ -285,13 +289,11 @@ class PodReconnector extends ChangeNotifier {
     if (error != PodPairError.needsRepair || _repaired) {
       return _stop(podPairMessage(error));
     }
-    var forgot = false;
-    if (device != null) {
-      try {
-        forgot = await b.forgetBond(device);
-      } on Object {
-        forgot = false;
-      }
+    bool forgot;
+    try {
+      forgot = await b.forgetBond(device);
+    } on Object {
+      forgot = false;
     }
     if (_halt) return true;
     if (!forgot) return _stop('pod.repair_manual');

@@ -273,6 +273,20 @@ void main() {
     expect(r.relinkMessage, 'pod.pair_timeout');
   });
 
+  test('a link not opened from a scan (no device): the plugin is never '
+      'asked', () async {
+    final link = FakePodLink(kind: 'ble');
+    final client = PodClient(link);
+    await client.start();
+    await until(() => client.ident != null);
+    final bonds = ScriptedBonds([PodPairError.needsRepair]);
+    final t = reconnector(client, failures: 2, bonds: bonds);
+    await link.drop();
+    await until(() => t.r.phase == PodLinkPhase.linked && t.tries.length == 3);
+    expect(bonds.log, isEmpty);
+    await t.r.client.close();
+  });
+
   test('over USB the plugin is never asked', () async {
     final (client, link) = await linked(kind: 'usb');
     final bonds = ScriptedBonds([PodPairError.needsRepair]);
