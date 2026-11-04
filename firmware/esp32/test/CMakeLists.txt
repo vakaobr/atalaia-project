@@ -207,9 +207,9 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/pod/pod_json.c
     ${SHELL_DIR}/pod/pod_settings.c
     ${SHELL_DIR}/pod/pod_ble.c
-    ${SHELL_DIR}/pod/pod_pair.c
     ${SHELL_DIR}/pod/pod_outputs.c
     ${SHELL_DIR}/pod/pod_port.c
+    ${SHELL_DIR}/pod/pod_pair.c
 )
 
 # ---- HAL stub ----------------------------------------------------------------

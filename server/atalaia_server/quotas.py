@@ -10,7 +10,7 @@ field, from ``config.QUOTA_DEFAULTS`` or ``ATALAIA_QUOTA_<NAME>`` (a number, or 
 | --- | --- | --- |
 | ``accounts`` | the field's user accounts | ``POST /api/v1/auth/register`` |
 | ``scheduled_games`` | the schedule, any status | ``POST /api/v1/fields/{id}/scheduled-games`` |
-| ``registrations`` | game registrations, imported ones too | a player's registration; the import refuses the rows past it |
+| ``registrations`` | game registrations, imported ones and walk-in guests too | a player's registration; the import refuses the rows past it; the sync skips new walk-in guests past it (PWI-*) |
 | ``games`` | games synced from controllers | the sync (a new game only; an update of a stored one never counts) |
 | ``atak_certs`` | live ATAK certificates (not revoked, not expired) | enrolment |
 | ``streams`` | open WebSocket streams of the field's controllers | ``WS /api/v1/sync/stream``, closed 4429 |

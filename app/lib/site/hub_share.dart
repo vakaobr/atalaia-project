@@ -12,7 +12,8 @@
 /// the code another field made; `DELETE /me/hub-share` unlinks, and this
 /// field's records leave the hub's view. What is shared still needs the
 /// person's consent at each field and the field's own switch: the screen
-/// says so, and holds no rule of its own.
+/// says so, holds no rule of its own, and opens the consent switch for this
+/// field (chrono_screens.dart, decision APPS-6).
 library;
 
 import 'dart:async';
@@ -23,6 +24,8 @@ import 'package:flutter/services.dart';
 import '../l10n/strings.dart';
 import '../ui/widgets.dart';
 import 'account_screen.dart' show accountError;
+import 'chrono_screens.dart' show MyChronoScreen;
+import 'site_api.dart' show SiteField;
 import 'site_client.dart';
 import 'site_screens.dart' show siteMoment;
 
@@ -90,9 +93,12 @@ String hubError(Strings s, Object e) {
 }
 
 class HubShareScreen extends StatefulWidget {
-  const HubShareScreen({required this.session, super.key});
+  const HubShareScreen({required this.session, this.field, super.key});
 
   final SiteSession session;
+
+  /// The field the person came from (the consent screen lists it).
+  final SiteField? field;
 
   @override
   State<HubShareScreen> createState() => _HubShareScreenState();
@@ -337,6 +343,26 @@ class _HubShareScreenState extends State<HubShareScreen> {
                           key: const Key('hub-link'),
                           onPressed: _busy ? null : _link,
                           child: Text(s.t('hub.link')),
+                        ),
+                        // The consent at this field (decision APPS-6):
+                        // last, so the code sections stay where they were.
+                        SectionTitle(s.t('hub.consent_title')),
+                        Text(s.t('hub.consent_text')),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton(
+                            key: const Key('hub-consent'),
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute<void>(
+                                builder: (_) => MyChronoScreen(
+                                  session: widget.session,
+                                  field: widget.field,
+                                ),
+                              ),
+                            ),
+                            child: Text(s.t('hub.consent_open')),
+                          ),
                         ),
                         if (st.linked) ...[
                           SectionTitle(s.t('hub.unlink_title')),

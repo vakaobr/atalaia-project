@@ -29,6 +29,12 @@
 /// in the end's 10 s grace), off at its start, a pause, the end and a halted
 /// script; each start is an output.switched for the controller.
 ///
+/// HELLO lists the prop's capability types ([helloCapabilities]: the
+/// phone's own parts and what its pod lends), so the controllers' start
+/// check takes a prop as it takes a box; they are said again whenever the
+/// pod's IDENT changes them, the pod's link breaks or the person unlinks it
+/// (decisions PROPC-1 to PROPC-4).
+///
 /// A [ChangeNotifier]: the game screen rebuilds when it changes. It has no
 /// widgets and no platform code of its own (the services are injected), so
 /// the tests drive it on the real core with a manual clock.
@@ -53,6 +59,7 @@ import '../security/ndef.dart';
 import '../security/nfc_tag_signer.dart';
 import '../ui/template/screen_template.dart';
 import 'button_tracker.dart';
+import 'capability_mapper.dart';
 import 'game_timer.dart';
 import 'prop_hits.dart';
 import 'prop_outputs.dart';
@@ -260,6 +267,31 @@ class PropSession extends ChangeNotifier {
   /// EVT pod.modules), or null before any.
   String? _modulesTold;
 
+  /// The phone's features (read when the session opens) and the pod whose
+  /// IDENT HELLO counts (null: none, or its link is down or unlinked).
+  DeviceFeatures? _features;
+  PodIdent? _capsPod;
+
+  /// What this prop offers a mode: the phone's parts and its pod's.
+  CapabilityMap get capabilities =>
+      CapabilityMap.of(_features ?? const DeviceFeatures(), pod: _capsPod);
+
+  /// HELLO's capability type ids (key 6), as the controller last heard them
+  /// or will hear them.
+  List<int> get helloCapabilities => capabilities.helloTypes;
+
+  /// The controller hears the prop's capability types again when they
+  /// changed (DualLink sends nothing when they did not).
+  void _tellCapabilities() {
+    final l = _link;
+    if (l == null) return;
+    final ids = helloCapabilities;
+    final old = l.capabilities;
+    if (old != null && listEquals(old, ids)) return;
+    _log('HELLO capabilities ${ids.join(',')}');
+    l.updateCapabilities(ids);
+  }
+
   int get _nowMs => _now().millisecondsSinceEpoch;
 
   /// Kiosk mode was left while the game ran (ADR-P3-9 tamper detection).
@@ -324,6 +356,12 @@ class PropSession extends ChangeNotifier {
         phase = PropPhase.ready;
         final l = _link;
         if (l != null) {
+          try {
+            _features = await device.features();
+          } on Object {
+            // Unknown: the screen's parts and the speaker, as a phone has.
+          }
+          _tellCapabilities();
           _linkSub = l.messages.listen(_onLink);
           l.start();
         }
@@ -465,6 +503,8 @@ class PropSession extends ChangeNotifier {
     hits.detach();
     // Its outputs and modules are gone from this prop: the controller is told.
     if (_modulesTold != null && _modulesTold!.isNotEmpty) _tellModules('');
+    _capsPod = null;
+    _tellCapabilities();
     final link = _podLink;
     if (link != null) {
       await link.unlink();
@@ -503,6 +543,9 @@ class PropSession extends ChangeNotifier {
         _log(
           'pod ${ident.fwVersion}: ${ident.capabilities.length} capabilities',
         );
+        // HELLO first, so a radio through this pod starts with them too.
+        _capsPod = ident;
+        _tellCapabilities();
         _attachRadio(client, ident, replace: reconnected);
         notifyListeners();
       case PodCapabilityEvent(:final message):
@@ -550,6 +593,11 @@ class PropSession extends ChangeNotifier {
         // and forgets its hit sensors' arming (pod_port.c).
         outputs.detach(_nowMs);
         hits.detach();
+        // What it lent is not this prop's while its link is down: HELLO
+        // (on Wi-Fi; a radio through it is down too) says so, and the
+        // next IDENT lends it again.
+        _capsPod = null;
+        _tellCapabilities();
         notifyListeners();
       case PodRadioFrame():
         break; // the radio link (PodRadioLink) reads them

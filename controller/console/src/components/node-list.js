@@ -32,15 +32,21 @@ export function linkBars(rssi) {
     return 0;
 }
 
-/** A box's modules as chips: a simple output "siren · not checked", a module "target 1.0.0: hit". */
+/** A box's modules as chips: a simple output "siren · not checked", a module "target 1.0.0: hit";
+ * and its outputs fitted but not enabled by its admin (node.outputs_disabled, EXPL-13): "horn ·
+ * fitted, not enabled by the box's admin". */
 export function ModuleChips({ node }) {
     const mods = (node && node.modules) || [];
-    if (mods.length === 0) return null;
+    const off = (node && node.outputs_disabled) || [];
+    if (mods.length === 0 && off.length === 0) return null;
     return html`<div class="modules" data-testid=${`node-modules-${node.node_id}`}>${mods.map((m) => html`<span
         class=${`chip small${m.lost ? ' warn' : ''}`} title=${m.address} data-testid=${`node-module-${node.node_id}-${m.address}`}>${
         m.feedback === false ? `${(m.caps || []).join(', ')} · ${t('nodes.not_checked')}`
             : `${m.model}${m.fw ? ` ${m.fw}` : ''}: ${(m.caps || []).join(', ')}`}${
-        m.lost ? html` · <strong class="warn">${t('nodes.module_lost')}</strong>` : ''}</span>`)}</div>`;
+        m.lost ? html` · <strong class="warn">${t('nodes.module_lost')}</strong>` : ''}</span>`)}${
+        off.map((m) => html`<span class="chip small muted" title=${m.address}
+            data-testid=${`node-output-disabled-${node.node_id}-${m.address}`}>${
+            t('nodes.outputs_disabled', { caps: (m.caps || []).join(', ') })}</span>`)}</div>`;
 }
 
 export class NodeList extends Component {

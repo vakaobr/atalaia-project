@@ -5,8 +5,9 @@
     GET /f/<slug>/                     the field page: its description, address and upcoming games
     GET /f/<slug>/games/<id>           one game: details, places, requirements, schema.org JSON-LD, and a
                                        *Register* button while registration is open and places are left
-    GET /f/<slug>/games/<id>/register  how to register for it (with an account, plan phase 16): a link that
-                                       opens the game in the app (atalaia://register?site=&field=&game=,
+    GET /f/<slug>/games/<id>/register  how to register for it (with an account, plan phase 16): a link to the
+                                       web registration page (/register/web, player_pages.py, decisions WREG-*),
+                                       a link that opens the game in the app (atalaia://register?site=&field=&game=,
                                        decision S17-10) and the page's address to paste there
     GET /f/<slug>/games.ics            iCalendar (RFC 5545) of the field's games
     GET /f/<slug>/games/<id>.ics       iCalendar of one game
@@ -444,8 +445,9 @@ async def _last_registration(db: AsyncSession, game: ScheduledGame) -> datetime:
 
 @router.api_route("/f/{slug}/games/{name}/register", methods=GET_HEAD)
 async def register_page(slug: str, name: str, request: Request, db: AsyncSession = Depends(get_session)) -> Response:
-    """How to register: with an account on this site, in the Atalaia app (no form here: the pages have no
-    JavaScript and no login, decision S16-9). Only while registration is open."""
+    """How to register, with an account on this site: on the web registration page (``player_pages.py``, decisions
+    WREG-*) or in the Atalaia app (S17-10). This page itself stays without JavaScript or login. Only while registration
+    is open."""
     page = Page(request)
     game_id = _game_id(name)
     field = await svc.public_field(db, slug)
@@ -456,11 +458,15 @@ async def register_page(slug: str, name: str, request: Request, db: AsyncSession
     registered = (await registration.counts(db, [game.id])).get(game.id, 0)
     t = page.t
     if svc.can_register(game, now, registered):
-        steps = "".join(f"<li>{esc(t[k])}</li>\n" for k in ("reg_step_account", "reg_step_app", "reg_step_ticket"))
+        steps = "".join(f"<li>{esc(t[k])}</li>\n" for k in ("reg_step_app", "reg_step_ticket"))
         site = base_url(request)
         app_link = "atalaia://register?" + urlencode({"site": site, "field": field.slug, "game": str(game.id)})
         address = f"{site}/f/{field.slug}/games/{game.id}"
-        text = (f'<p>{esc(t["reg_intro"])}</p>\n<ol class="steps">\n{steps}</ol>\n'
+        web = page.link(f"/f/{field.slug}/games/{game.id}/register/web")  # the browser's way (decisions WREG-*)
+        text = (f'<p>{esc(t["reg_intro"])}</p>\n'
+                f'<h2>{esc(t["reg_web_title"])}</h2>\n<p>{esc(t["reg_web_text"])}</p>\n'
+                f'<p class="register"><a class="button" href="{esc(web)}">{esc(t["reg_web_button"])}</a></p>\n'
+                f'<h2>{esc(t["reg_app_title"])}</h2>\n<ol class="steps">\n{steps}</ol>\n'
                 f'<p class="register"><a class="button" href="{esc(app_link)}">{esc(t["reg_open_app"])}</a></p>\n'
                 f'<p>{esc(t["reg_address"])} <code>{esc(address)}</code></p>\n'
                 f'<p class="address">{esc(t["reg_data"])}</p>\n')
