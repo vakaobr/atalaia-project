@@ -125,6 +125,7 @@
     "missing_caps": "Einer Box fehlt, was ihre Rolle braucht: {list}. Nur trotzdem starten, wenn das Spiel ohne auskommt.",
     "missing_caps_short": "Einer Box fehlt, was ihre Rolle braucht: {list}.",
     "not_checked": "{capability} an {name}: nicht geprüft (einfacher Ausgang). Vor dem Spiel ansehen.",
+    "outputs_disabled": "{name} ({role}): {caps} eingebaut, aber vom Admin der Box nicht freigegeben. Der Modus würde den Ausgang schalten: an der Box mit der Admin-PIN freigeben oder ohne ihn spielen.",
     "start_warnings": {
       "min": "{have} × {role} beigetreten; der Modus verlangt {value} ({param}).",
       "optional_caps": "{name} ({role}) hat kein {caps}: der Modus kommt ohne aus.",
@@ -247,6 +248,8 @@
       "node_setup_applied": "{zone} hat die Szenario-Einstellung bestätigt",
       "battery_low": "Der Akku einer Box ist schwach",
       "node_modules": "{zone} hat: {modules}",
+      "node_outputs_disabled": "{zone}: eingebaut, vom Admin der Box nicht freigegeben: {modules}",
+      "node_outputs_disabled_none": "{zone}: jeder eingebaute Ausgang ist freigegeben",
       "node_module_lost": "{zone} hat ein Modul verloren: {modules} ({reason})",
       "output_switched": "{zone}: {capability} an für {s} s ({source})",
       "output_switched_off": "{zone}: {capability} aus ({source})",
@@ -305,6 +308,7 @@
     "command_sent": "gesendet",
     "not_checked": "nicht geprüft",
     "module_lost": "verloren",
+    "outputs_disabled": "{caps} · eingebaut, vom Admin der Box nicht freigegeben",
     "conflict": "Zwei Boxen teilen sich Node {node}: Ein Beitritt wurde auf zwei Boxen verwendet, und sie nutzen dieselben Funk-Nonces. Nimm eine davon aus dem Spiel und lass sie mit einem neuen Beitritt erneut beitreten (Beitreten)."
   },
   "outputs": {
@@ -505,7 +509,7 @@
     "off_note": "Der Kartenabruf ist für dieses Spielfeld ausgeschaltet (Einstellungen).",
     "login": "Melde dich zuerst mit dem GM-Code an der Konsole an und öffne diese Seite dann aus dem Tab Feld.",
     "intro": "Such das Feld auf der Karte und markiere die Ecken seines Umrisses: Dieser Browser zeichnet das Feldbild aus offenen Karten. Das Bild, seine Lage auf der Karte (ATAK) und die Feldgrenze werden dann auf dem Feld-Controller gespeichert, der dafür kein Internet braucht.",
-    "sources": "Nur während du das Spiel einrichtest: Dieser Browser lädt die Karte und das Gebiet einmal von OpenStreetMap (© OpenStreetMap-Mitwirkende) und, wo es sie gibt, die offenen Luftbilder des Landes oder der Region (das DGT-Orthofoto auf dem portugiesischen Festland, das PNOA des IGN in Spanien, die Orthofotos des IGN in Frankreich und die von PDOK in den Niederlanden sowie die der öffentlichen Dienste Belgiens, Luxemburgs, der Schweiz, von elf deutschen Ländern, Polens, Tschechiens und Österreichs (basemap.at), jeweils mit ihrem Nachweis). Ist der Datendienst von OpenStreetMap ausgelastet, geht dieselbe Anfrage (nur das Gebiet des Feldes) an einen anderen öffentlichen Server mit denselben Daten (overpass.private.coffee). Sonst wird nichts heruntergeladen, und der Rest der Konsole funktioniert weiter ohne Internet.",
+    "sources": "Nur während du das Spiel einrichtest: Dieser Browser lädt die Karte und das Gebiet einmal von OpenStreetMap (© OpenStreetMap-Mitwirkende) und, wo es sie gibt, die offenen Luftbilder des Landes oder der Region (das DGT-Orthofoto auf dem portugiesischen Festland, das PNOA des IGN in Spanien, die Orthofotos des IGN in Frankreich und die von PDOK in den Niederlanden sowie die der öffentlichen Dienste Belgiens, Luxemburgs, der Schweiz, von zwölf deutschen Ländern, Polens, Tschechiens und Österreichs (basemap.at), jeweils mit ihrem Nachweis). Ist der Datendienst von OpenStreetMap ausgelastet, geht dieselbe Anfrage (nur das Gebiet des Feldes) an einen anderen öffentlichen Server mit denselben Daten (overpass.private.coffee). Sonst wird nichts heruntergeladen, und der Rest der Konsole funktioniert weiter ohne Internet.",
     "offline": "Diese Seite braucht Internet, und dieses Gerät hat gerade keins. Der Rest der Konsole funktioniert ohne.",
     "go": "Einen Ort suchen oder zu „Breite, Länge“ gehen",
     "go_button": "Suchen",
@@ -542,7 +546,7 @@
     "layer": "Ebene:",
     "layer_map": "Karte",
     "layer_ortho": "Orthofoto ({name})",
-    "layer_none": "Hier gibt es nur die OpenStreetMap-Karte: Offene, hochaufgelöste Luftbilder, die verwendet werden dürfen, gibt es nur auf dem portugiesischen Festland, in Spanien, in Frankreich (mit Korsika und den Überseegebieten), in den Niederlanden, Belgien, Luxemburg, der Schweiz und Liechtenstein, in Polen, Tschechien, Österreich und in Deutschland außer Baden-Württemberg, Niedersachsen, Hamburg, Sachsen-Anhalt und Schleswig-Holstein.",
+    "layer_none": "Hier gibt es nur die OpenStreetMap-Karte: Offene, hochaufgelöste Luftbilder, die verwendet werden dürfen, gibt es nur auf dem portugiesischen Festland, in Spanien, in Frankreich (mit Korsika und den Überseegebieten), in den Niederlanden, Belgien, Luxemburg, der Schweiz und Liechtenstein, in Polen, Tschechien, Österreich und in Deutschland außer Niedersachsen, Hamburg, Sachsen-Anhalt und Schleswig-Holstein.",
     "outline": "Der Umriss des Felds",
     "corners": "{n} von höchstens {max} Ecken (mindestens 3).",
     "corners_max": "Höchstens {n} Ecken.",

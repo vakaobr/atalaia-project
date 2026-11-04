@@ -3160,11 +3160,24 @@ S16-14, open):**
   `[checkin]` settings; a pre-declared replica the controller would refuse
   is dropped from its expected check-in (S16-6, S16-14).
 - **Outcomes** go back once the game has ended (not in batches during it);
-  walk-ins as a count only; `[sync] push_walkins` is not built (S16-11,
-  S16-13).
+  walk-ins as a count only (S16-11, S16-13); *built 2026-11-04 (decisions
+  PWI-1 to PWI-10):* with `[sync] push_walkins` (off by default, both
+  controllers) the walk-ins who are players also go, under `guests`, as guest
+  registrations (`source` `walkin`: player id, display name, declarations'
+  states), deleted 30 days after the game and with the controller's erasure
+  of the player.
 - **Registering on the web pages**: the public pages have no login and no
   JavaScript, so their *Register* button leads to a page that says how to
-  register in the app with an account (S16-9).
+  register (S16-9). *Amended 2026-11-04 (decisions WREG-1 to WREG-12, open):*
+  that page now also leads to `/f/<slug>/games/<id>/register/web`, a page of
+  the staff pages' kind (no data in the page, same-origin modules, the API
+  with the bearer token, no cookie authorises a change) where a player logs
+  in (social login, a passkey, or the password when the server takes them),
+  makes the account with a social login under the app's rules (the notice
+  opened and ticked, 16 or older, its version; LEG-*), registers with the
+  same API, checks and records as the app, and gets the ticket as a QR code
+  and text to print; the app's way (S17-10) stays. The public pages
+  themselves keep no login and no JavaScript.
 
 ---
 

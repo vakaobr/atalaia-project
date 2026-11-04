@@ -601,6 +601,7 @@ static bool link_up(box_game_t *g, const atalaia_join_t *j, bool fresh)
     fill_caps(g);
     g->modules_told = false; /* node.modules once this HELLO is acknowledged */
     g->modules_sent[0] = '\0';
+    g->disabled_sent[0] = '\0';
     g->lobby.channel_hz = j->channel_hz; /* where it listens between games, from now on */
     box_lobby_remember_channel(g);       /* and after a reboot (RFC 0001 Amendment 19) */
     g->lobby.ready_screen_due = false;
@@ -921,17 +922,11 @@ static void follow_link_state(box_game_t *g)
     }
 }
 
-size_t box_game_modules_text(const box_game_t *g, char *out, size_t cap)
+/* Appends src's entries ("a;b;c") to out (len bytes so far) one by one, whole entries only, while
+ * out stays within limit bytes: node.modules' and node.outputs_disabled's rule (section 7). */
+static size_t append_entries(char *out, size_t len, size_t limit, char *src)
 {
-    if (cap == 0) return 0;
-    out[0] = '\0';
-    size_t len = 0, limit = cap - 1 < OUT_MODULES_MAX ? cap - 1 : OUT_MODULES_MAX;
-    if (g->outputs != NULL) len = outputs_modules_text(g->outputs, out, limit + 1);
-    if (g->port == NULL) return len;
-    char mods[EXP_MODULES_TEXT_MAX + 1];
-    size_t n = expansion_box_modules_text(g->port, mods, sizeof(mods));
-    /* Whole entries only: the modules' entries one by one after the simple outputs'. */
-    for (char *entry = mods; n > 0 && *entry;) {
+    for (char *entry = src; *entry;) {
         char *semi = strchr(entry, ';');
         size_t el = semi != NULL ? (size_t)(semi - entry) : strlen(entry);
         size_t need = el + (len > 0 ? 1 : 0);
@@ -946,20 +941,65 @@ size_t box_game_modules_text(const box_game_t *g, char *out, size_t cap)
     return len;
 }
 
+size_t box_game_modules_text(const box_game_t *g, char *out, size_t cap)
+{
+    if (cap == 0) return 0;
+    out[0] = '\0';
+    size_t len = 0, limit = cap - 1 < OUT_MODULES_MAX ? cap - 1 : OUT_MODULES_MAX;
+    if (g->outputs != NULL) len = outputs_modules_text(g->outputs, out, limit + 1);
+    if (g->port == NULL) return len;
+    char mods[EXP_MODULES_TEXT_MAX + 1];
+    if (expansion_box_modules_text(g->port, mods, sizeof(mods)) == 0) return len;
+    /* Whole entries only: the modules' entries one by one after the simple outputs'. */
+    return append_entries(out, len, limit, mods);
+}
+
+size_t box_game_disabled_text(const box_game_t *g, char *out, size_t cap)
+{
+    if (cap == 0) return 0;
+    out[0] = '\0';
+    size_t len = 0, limit = cap - 1 < OUT_MODULES_MAX ? cap - 1 : OUT_MODULES_MAX;
+    if (g->outputs != NULL) len = outputs_disabled_text(g->outputs, out, limit + 1);
+    if (g->port == NULL) return len;
+    char mods[EXP_MODULES_TEXT_MAX + 1];
+    if (expansion_box_disabled_text(g->port, mods, sizeof(mods)) == 0) return len;
+    return append_entries(out, len, limit, mods);
+}
+
+/* node.outputs_disabled (decisions EXPL-13, EXPL-15, EXPL-20): with each node.modules telling, by
+ * a box that has an output fitted (a simple output or a module's output channel), the ones its
+ * admin has not enabled (the empty text when none is), so the GM's console can tell "fitted, not
+ * enabled" from "none fitted"; and again whenever that text changes while node.modules does not
+ * (EXPL-21: a module channel's settings change no node.modules entry). Its own event: an older
+ * controller refuses it alone. */
+static void tell_outputs_disabled(box_game_t *g, const char *text)
+{
+    snprintf(g->disabled_sent, sizeof(g->disabled_sent), "%s", text);
+    char data[OUT_MODULES_MAX + 16];
+    snprintf(data, sizeof(data), "{\"modules\":\"%s\"}", text);
+    field_link_send_box_event(&g->link, "node.outputs_disabled", data, g->runner->game_time_ms);
+    if (text[0] != '\0') say(g, "told the controller its outputs not enabled: %s", text);
+}
+
 /* node.modules (EXP-21): once the link's HELLO is acknowledged, the box's enabled simple outputs
  * and its modules; nothing when it has none (a box without them says nothing new). Whenever the
  * text changes after that (a module plugged in or lost, an output renamed), it is told again,
- * even when nothing is left. */
+ * even when nothing is left. node.outputs_disabled goes just before it (tell_outputs_disabled). */
 static void tell_modules(box_game_t *g)
 {
     if (g->link.hello_pending) return;
     if (g->phase != BOX_JOINED && g->phase != BOX_PLAYING) return;
-    char text[OUT_MODULES_MAX + 1];
+    char text[OUT_MODULES_MAX + 1], off[OUT_MODULES_MAX + 1];
     box_game_modules_text(g, text, sizeof(text));
-    if (g->modules_told && strcmp(text, g->modules_sent) == 0) return;
+    box_game_disabled_text(g, off, sizeof(off));
     bool first = !g->modules_told;
+    bool tell = first ? text[0] != '\0' : strcmp(text, g->modules_sent) != 0;
+    bool fitted = g->outputs != NULL && g->outputs->count > 0;
+    if ((fitted && (first || tell)) || (!first && strcmp(off, g->disabled_sent) != 0)) {
+        tell_outputs_disabled(g, off);
+    }
     g->modules_told = true;
-    if (first && text[0] == '\0') return;
+    if (!tell) return;
     snprintf(g->modules_sent, sizeof(g->modules_sent), "%s", text);
     char data[OUT_MODULES_MAX + 16];
     snprintf(data, sizeof(data), "{\"modules\":\"%s\"}", text);

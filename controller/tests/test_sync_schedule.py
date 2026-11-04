@@ -54,6 +54,7 @@ class FakeSite:
         self.gets: list[str] = []
         self.games: dict[tuple[int, int], dict[str, Any]] = {}
         self.unsupported = False
+        self.no_guests = False  # an older site server: a check-ins body with guests is refused (PWI-*)
         self.shared: list[dict[str, Any]] = []  # other fields' records by player (S14-5)
         self.no_shared_endpoint = False  # an older site server: the roster, but no shared chrono
         self.revoked: list[dict[str, Any]] = []  # the schedule answer's copies_revoked (PRIV-5)
@@ -88,6 +89,9 @@ class FakeSite:
 
     def post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
         kind = path.rsplit("/", 1)[-1]
+        if kind == "checkins" and self.no_guests and "guests" in body:
+            raise SyncError("invalid_body", 400, detail={"detail": "invalid_body", "error": "unknown_field",
+                                                          "path": "guests"})
         body = sync_format.CHECKS[kind](json.loads(json.dumps(body)))
         self.posts.append((kind, body))
         if kind == "games":
@@ -97,6 +101,9 @@ class FakeSite:
             return {"acked_id": body["events"][-1]["id"], "inserted": 0, "duplicates": 0}
         if kind == "chrono":
             return {"accepted": len(body["readings"]), "duplicates": 0, "refused": [], "violations": 0}
+        if kind == "checkins":
+            return {"linked": True, "applied": len(body["registrations"]), "ignored": 0, "declarations": 0,
+                    "guests": len(body.get("guests") or ()), "guests_ignored": 0}
         return {}
 
     def bodies(self, kind: str) -> list[dict[str, Any]]:
@@ -313,6 +320,63 @@ class ArrivalTests(GameDayCase):
             self.assertNotIn(private, text)
         self.cycle()
         self.assertEqual(len(self.site.bodies("checkins")), 1, json.dumps(self.site.bodies("checkins"), indent=0))  # once
+
+
+    def _walkins_then_end(self) -> tuple[dict[str, Any], str]:
+        """The registered player, a walk-in with a declared replica, a walk-in who left before checking in
+        and a marshal who walked in; then the game ends."""
+        self.app_checkin(self.gid, self.ident, self.reg, self.ticket_text)
+        decl = str(uuid.uuid4())
+        walk_in = self.check_in(self.gid, name="Rita Secreta", federation_number="FPA-12345",
+                                replicas=[{"declaration_id": decl, "type": "aeg", "class": "rifle",
+                                           "make_model": "Tokyo Marui M4"}])
+        self.make_marshal(self.gid)
+        self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM, json={"force": True})
+        self.client.post(f"/api/v1/games/{self.gid}/end", json={}, headers=GM)
+        return walk_in, decl
+
+    def test_walkins_go_as_guests_with_push_walkins(self) -> None:
+        """Decisions PWI-*: with [sync] push_walkins the walk-ins who are players go as guests, with their
+        display name and declarations' states; never a federation number, a make and model or a team."""
+        self.cfg.sync_push_walkins = True
+        walk_in, decl = self._walkins_then_end()
+        self.cycle()
+        [body] = self.site.bodies("checkins")
+        self.assertEqual(body["walkins"], 2)  # the marshal counts, as before
+        self.assertEqual(body["guests"], [{"player_id": walk_in["player_id"], "display_name": "Rita Secreta",
+                                           "declarations": [{"declaration_id": decl, "type": "aeg", "class": "rifle",
+                                                             "state": "pending", "reading_id": None}]}])
+        text = json.dumps(self.site.posts, ensure_ascii=False)
+        for private in ("FPA-12345", "Tokyo Marui", "Falcão", self.ticket_text):
+            self.assertNotIn(private, text)
+        game_day = self.sync.status()["game_day"]
+        self.assertEqual(game_day["walkins"], {"push": True, "supported": True, "guests_sent": 1})
+        self.cycle()
+        self.assertEqual(len(self.site.bodies("checkins")), 1)  # once, until the outcomes change
+
+    def test_walkins_are_a_count_without_push_walkins(self) -> None:
+        self._walkins_then_end()
+        self.cycle()
+        [body] = self.site.bodies("checkins")
+        self.assertEqual(body["walkins"], 2)
+        self.assertNotIn("guests", body)
+        self.assertNotIn("Rita Secreta", json.dumps(self.site.posts, ensure_ascii=False))
+        self.assertEqual(self.sync.status()["game_day"]["walkins"], {"push": False, "supported": True,
+                                                                     "guests_sent": 0})
+
+    def test_an_older_site_server_gets_the_count(self) -> None:
+        """A site server that does not know ``guests`` refuses it: the count goes, and no guests again."""
+        self.cfg.sync_push_walkins = True
+        self.site.no_guests = True
+        self._walkins_then_end()
+        with self.assertLogs("atalaia.sync", "WARNING"):
+            self.cycle()
+        [body] = self.site.bodies("checkins")
+        self.assertNotIn("guests", body)
+        self.assertEqual(body["walkins"], 2)
+        self.assertFalse(self.sync.status()["game_day"]["walkins"]["supported"])
+        self.cycle()
+        self.assertEqual(len(self.site.bodies("checkins")), 1)
 
 
 class ClaimTests(GameDayCase):

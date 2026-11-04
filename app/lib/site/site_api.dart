@@ -314,6 +314,133 @@ final class HistoryGame {
   }
 }
 
+double _num(Object? v) => v is num ? v.toDouble() : 0;
+
+/// One chrono reading of the player's, as the marshal signed it (`readings`
+/// in `GET /me/chrono`, chrono_registry.reading_json).
+final class MyChronoReading {
+  MyChronoReading(Map<String, Object?> j)
+    : readingId = '${j['reading_id']}',
+      replicaId = '${j['replica_id']}',
+      type = _str(j['type']) ?? 'checkin',
+      velocityMps = _num(j['velocity_mps']),
+      bbWeightG = _num(j['bb_weight_g']),
+      energyJ = _num(j['energy_j']),
+      outcome = _str(j['outcome']),
+      timestamp = _time(j['timestamp']);
+
+  final String readingId;
+  final String replicaId;
+
+  /// `checkin`, `spotcheck` or `retest`.
+  final String type;
+  final double velocityMps;
+  final double bbWeightG;
+  final double energyJ;
+
+  /// `pass`, `fail`, `warn`, `unjudged`, or null (not judged by the
+  /// controller).
+  final String? outcome;
+  final DateTime? timestamp;
+}
+
+/// A replica the field registered for the player (`replicas`,
+/// chrono_registry.replica_json).
+final class MyChronoReplica {
+  MyChronoReplica(Map<String, Object?> j)
+    : replicaId = '${j['replica_id']}',
+      type = _str(j['type']) ?? '',
+      replicaClass = _str(j['class']) ?? '',
+      makeModel = _str(j['make_model']);
+
+  final String replicaId;
+  final String type;
+  final String replicaClass;
+  final String? makeModel;
+}
+
+/// A reading over the limit, and what the staff did (`violations`,
+/// chrono_registry.violation_json).
+final class MyChronoViolation {
+  MyChronoViolation(Map<String, Object?> j)
+    : id = '${j['id']}',
+      violationType = _str(j['violation_type']) ?? 'over_limit',
+      energyJ = _num(j['energy_j']),
+      limitJ = _num(j['limit_j']),
+      outcome = _str(j['outcome']),
+      banActive = j['ban_active'] == true,
+      banExpiresAt = _time(j['ban_expires_at']),
+      createdAt = _time(j['created_at']);
+
+  final String id;
+
+  /// `over_limit` or `over_tolerance`.
+  final String violationType;
+  final double energyJ;
+  final double limitJ;
+
+  /// `warning`, `pulled`, `ban`, or null (nothing recorded yet).
+  final String? outcome;
+  final bool banActive;
+  final DateTime? banExpiresAt;
+  final DateTime? createdAt;
+}
+
+/// A reading of the player's the site server refused (a bad signature, an
+/// unknown key...): what was sent, never trusted (`refused_readings`).
+final class MyChronoRefused {
+  MyChronoRefused(Map<String, Object?> j)
+    : reason = _str(j['reason']) ?? '',
+      times = j['times'] is int ? j['times']! as int : 1,
+      firstSeenAt = _time(j['first_seen_at']);
+
+  final String reason;
+  final int times;
+  final DateTime? firstSeenAt;
+}
+
+/// The player's chrono history at one field (`GET /me/chrono`, plan phase
+/// 14): by the player id the account holds there.
+final class MyChronoField {
+  MyChronoField(Map<String, Object?> j)
+    : fieldId = '${j['field_id']}',
+      field = _str(j['field']) ?? '',
+      playerId = _str(j['player_id']) ?? '',
+      readings = [
+        for (final x in (j['readings'] as List?) ?? const [])
+          if (x is Map) MyChronoReading(x.cast<String, Object?>()),
+      ],
+      replicas = [
+        for (final x in (j['replicas'] as List?) ?? const [])
+          if (x is Map) MyChronoReplica(x.cast<String, Object?>()),
+      ],
+      violations = [
+        for (final x in (j['violations'] as List?) ?? const [])
+          if (x is Map) MyChronoViolation(x.cast<String, Object?>()),
+      ],
+      refused = [
+        for (final x in (j['refused_readings'] as List?) ?? const [])
+          if (x is Map) MyChronoRefused(x.cast<String, Object?>()),
+      ];
+
+  final String fieldId;
+  final String field;
+  final String playerId;
+
+  /// Oldest first, as the site server sends them.
+  final List<MyChronoReading> readings;
+  final List<MyChronoReplica> replicas;
+  final List<MyChronoViolation> violations;
+  final List<MyChronoRefused> refused;
+
+  MyChronoReplica? replica(String id) =>
+      replicas.where((r) => r.replicaId == id).firstOrNull;
+}
+
+/// The consent purpose for chrono sharing between fields (the site server's
+/// `personal_data.CHRONO_SHARING`): one per field.
+const chronoSharingPurpose = 'chrono_sharing';
+
 class SiteApi {
   SiteApi(this.session);
   final SiteSession session;
@@ -381,6 +508,52 @@ class SiteApi {
       for (final g in (j['game_history'] as List?) ?? const [])
         if (g is Map) HistoryGame(g.cast<String, Object?>()),
     ];
+  }
+
+  /// The player's chrono history at every field where the account holds a
+  /// player id (`GET /me/chrono`), by field name.
+  Future<List<MyChronoField>> myChrono() async {
+    final j = await session.call('GET', '/me/chrono');
+    return [
+      for (final f in (j['fields'] as List?) ?? const [])
+        if (f is Map) MyChronoField(f.cast<String, Object?>()),
+    ];
+  }
+
+  /// The fields with a live chrono sharing consent of the account (from
+  /// `consents` in `GET /me/data`: the only answer that lists them; a
+  /// withdrawn consent stays there with its `withdrawn_at`).
+  Future<Set<String>> chronoSharingConsents() async {
+    final j = await session.call('GET', '/me/data');
+    return {
+      for (final c in (j['consents'] as List?) ?? const [])
+        if (c is Map &&
+            c['purpose'] == chronoSharingPurpose &&
+            c['withdrawn_at'] == null &&
+            c['field_id'] is String)
+          c['field_id']! as String,
+    };
+  }
+
+  /// Gives the consent for [fieldId] (`PUT
+  /// /me/consents/chrono-sharing/{field}`; giving it again changes nothing).
+  Future<void> giveChronoSharing(String fieldId) async {
+    final r = await session.callRaw(
+      'PUT',
+      '/me/consents/chrono-sharing/${Uri.encodeComponent(fieldId)}',
+    );
+    if (!r.ok) throw SiteException(r.status, r.detail);
+  }
+
+  /// Withdraws it (`DELETE`); a consent that was already withdrawn
+  /// (404 `consent_not_found`) counts as done.
+  Future<void> withdrawChronoSharing(String fieldId) async {
+    final r = await session.callRaw(
+      'DELETE',
+      '/me/consents/chrono-sharing/${Uri.encodeComponent(fieldId)}',
+    );
+    if (r.status == 404 && r.detail == 'consent_not_found') return;
+    if (!r.ok) throw SiteException(r.status, r.detail);
   }
 
   Future<PlayerIds> playerIds() async =>

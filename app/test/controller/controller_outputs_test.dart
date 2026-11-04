@@ -125,6 +125,7 @@ void main() {
         'missing_caps': <Object?>[],
         'warnings': <Object?>[],
         'not_checked': <Object?>[],
+        'outputs_disabled': <Object?>[],
       });
     });
 
@@ -254,6 +255,75 @@ void main() {
         ),
       ]);
       expect(out['warnings'], isEmpty);
+    });
+
+    test('outputs fitted but not enabled are a note (EXPL-13, outputs.py)', () {
+      final b = capabilityTypeIds['button']!, o = capabilityTypeIds['output']!;
+      Map<String, Object?> withOff(
+        int n,
+        String role,
+        Object? caps,
+        Object? modules,
+        String off, [
+        List<String>? fns,
+      ]) => {
+        ...node(n, role, caps, modules),
+        'outputs_disabled': modulesOf(off),
+        'outputs': ?fns,
+      };
+      var out = check([
+        withOff(
+          4,
+          'bomb',
+          [b, o],
+          modulesOf('g46:servo:smoke'),
+          'g45:servo:siren',
+        ),
+        withOff(5, 'bomb', [b], null, 'g46:servo:horn;g45:servo:smoke'),
+        withOff(6, 'bomb', [b], null, 'g46:servo:horn'),
+        withOff(7, 'alarm', [b], null, 'g46:servo:siren'),
+        withOff(8, 'zone', [b], null, 'g46:servo:siren'),
+        node(9, 'bomb', [b]),
+      ]);
+      expect(
+        out['outputs_disabled']!
+            .map((d) => '${d['node']}:${d['capabilities']}')
+            .join(' '),
+        '4:[siren] 5:[smoke] 7:[siren]',
+      );
+      expect(out['outputs_disabled']!.first, {
+        'node': 4,
+        'name': 'box-4',
+        'role': 'bomb',
+        'capabilities': ['siren'],
+        'text':
+            "box-4 (bomb): siren fitted, not enabled by the box's admin "
+            '(enable at the box with the admin PIN)',
+      });
+      // A note only: what the box lacks now is still missing_caps.
+      expect(out['missing_caps'], [
+        {'node': 7, 'name': 'box-7', 'role': 'alarm', 'capability': 'output'},
+      ]);
+      out = check([
+        withOff(4, 'bomb', [b, o], modulesOf('g46:servo:siren'), ''),
+      ]);
+      expect(out['outputs_disabled'], isEmpty);
+      const objective = {
+        'requires': ['team_input'],
+        'optional': ['keypad', 'display'],
+      };
+      out = checkNodes([
+        withOff(
+          4,
+          'objective',
+          [b],
+          null,
+          'g46:servo:horn;g45:servo:strobe',
+          ['strobe', 'siren'],
+        ),
+      ], (r) => {'objective': objective}[r]);
+      expect(out['outputs_disabled']!.single['capabilities'], ['strobe']);
+      expect(modulesOf(''), isEmpty);
     });
   });
 

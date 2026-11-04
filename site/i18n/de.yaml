@@ -50,7 +50,7 @@ meta:
   build:
     title: Bauanleitungen · Atalaia
     description: >-
-      Wie du Satellit, I/O-Pod, Erweiterungsanschluss und Ziel-Addon von Atalaia aus
+      Wie du Satellit, I/O-Pod, Erweiterungsanschluss, Ziel-Addon und I2C-Ausgangsmodul von Atalaia aus
       handelsüblichen Teilen baust, wie eine Box eine Sirene oder eine Nebelmaschine schaltet und wo
       die Bauanleitung der Field Box liegt.
   glossary:
@@ -404,11 +404,11 @@ modes:
     title: Zielfenster
     text: >-
       Eine Zielscheibe leuchtet ein paar Sekunden in der Farbe eines zufälligen Teams, und ein Treffer
-      in dieser Zeit punktet für dieses Team. Das Spiel ist in Software geschrieben und getestet; das
-      nötige Ziel-Addon (eine Platte mit Treffersensor, die an eine Box gesteckt wird, deren eigene
-      Lichter das Fenster zeigen) hat eine Bauanleitung, aber seine Firmware kommt noch, und gebaut
-      wurde noch keins.
-    meta: Eine Box mit dem Ziel-Addon · noch nicht verfügbar
+      in dieser Zeit punktet für dieses Team. Das Spiel ist in Software geschrieben und getestet, auch
+      durchgehend mit einem simulierten Ziel; das nötige Ziel-Addon (eine Platte mit Treffersensor, die
+      an eine Box gesteckt wird, deren eigene Lichter das Fenster zeigen) hat eine Bauanleitung und
+      seine Firmware, aber noch keins wurde gebaut oder an einer echten Platte ausprobiert.
+    meta: Eine Box mit dem Ziel-Addon · noch nicht auf Hardware ausprobiert
   hacking_terminal:
     title: Hacking-Terminal
     text: >-
@@ -1048,8 +1048,8 @@ roadmap:
         Site-Server, für Staff außerhalb."
       - "<strong>Der Site-Server</strong>: Konten mit Zwei-Faktor-Codes, Rechte an persönlichen
         Daten, Controller-Sync, Chrono-Register, Spielverlauf und Szenario-Bibliothek."
-      - "<strong>Spielplanung und Anmeldung</strong>, mit öffentlichen Feldseiten, Kalender-Feeds
-        und Club-Profilen."
+      - "<strong>Spielplanung und Anmeldung</strong>, in der App oder ohne App auf den Webseiten des
+        Feldes, mit öffentlichen Feldseiten, Kalender-Feeds und Club-Profilen."
       - "<strong>Hosted-Modus</strong>: viele Felder auf einem Server, jedes vom anderen getrennt,
         mit seinem Deployment."
     g_modes:
@@ -1063,7 +1063,8 @@ roadmap:
           Extraktionszone; Checkpoint-Boxen punkten, solange sie gehalten werden; Positionen bleiben
           auf dem Feld-Controller und dem Handy."
         - "Die Regeln von Zielfenster: Ein Treffer, während das Ziel die Farbe eines Teams zeigt,
-          punktet für dieses Team. Das Ziel-Addon ist noch nicht gebaut."
+          punktet für dieses Team. Die Firmware des Ziel-Addons ist geschrieben; gebaut wurde noch
+          kein Ziel."
         - "Geo-Funktionen im Kern: Entfernungen und Zonen für jedes Skript, auf jeder Plattform
           identisch."
     g_scenarios:
@@ -1092,7 +1093,7 @@ roadmap:
           oder über einen Ortsnamen und zeichnet seinen Umriss auf OpenStreetMap, und der Browser
           zeichnet das Feldbild aus den Daten von OpenStreetMap über den offenen Luftbildern des
           Landes (das portugiesische Festland, Spanien, Frankreich samt Übersee, die Niederlande,
-          Belgien, Luxemburg, die Schweiz, Liechtenstein, elf deutsche Länder, Polen, Tschechien
+          Belgien, Luxemburg, die Schweiz, Liechtenstein, zwölf deutsche Länder, Polen, Tschechien
           und Österreich). Der Umriss wird zur Feldgrenze, das Außen abgedunkelt."
         - "Die Handys der Spielenden warnen mit einem Banner und einer Vibration, wenn sie die Grenze
           verlassen, mit ihrem eigenen GPS, ohne etwas zu senden."
@@ -1243,7 +1244,8 @@ roadmap:
       - "Die Go-live-Bedingungen des Hosted-Modus (ein unterschriebener Auftragsverarbeitungsvertrag pro Feld, die Freigabebedingungen, ein ausgefüllter Hinweis) und jedes Feld, das seinen eigenen Hinweis und seine Folgenabschätzung ausfüllt. Der Anwalt oder die Anwältin des Maintainers hat die rechtlichen Positionen am 30. Oktober 2026 gebilligt; der Hosted-Modus wird weiterhin nicht angeboten. Nichts von der Sicherheits-, Funk- und Rechtsarbeit vom 30. Oktober wurde auf einem echten Board oder Handy ausprobiert: Es läuft in Software und auf dem Preview-Server."
       - "Die Tests auf Hardware: echte Boards, ein echtes ATAK-Handy, eine echte 4G-Verbindung, ein
         echter Chronograph."
-      - Das Ziel-Addon, auf das die Regeln von Zielfenster warten.
+      - "Das Ziel-Addon an einer echten Platte (seine Firmware ist geschrieben), danach wird
+        Zielfenster eine Voreinstellung der Field Box."
       - "Die Anmeldung mit Apple beim echten Anbieter sowie den Schritt Benutzername und das Zusammenführen von Konten auf dem Testserver ausprobieren."
       - "jogarairsoft.pt: Der Maintainer hat ihnen am 28. Oktober 2026 geschrieben und eine Integration vorgeschlagen (ihre Events, Teams und APDs zu uns; unser Spiele-Feed, Feldprofile, öffentliche Clubs und Ergebnisse zu ihnen). Wir warten auf ihre Antwort; nichts ist zugesagt."
     gate: >-
@@ -1253,7 +1255,8 @@ roadmap:
     title: Community
     short: >-
       Visueller Modus-Editor, signierte Modus-Pakete, die Modus-Registry als Vorlage, Deutsch und
-      traditionelles Chinesisch, Bauanleitungen. Alle Software-Schritte sind gebaut.
+      traditionelles Chinesisch, Bauanleitungen, das Ziel- und das Ausgangsmodul des
+      Erweiterungsanschlusses. Alle Software-Schritte sind gebaut.
     done:
       - "<strong>Der visuelle Modus-Editor</strong>: eine Seite des Simulators, auf der ein Modus
         aus Blöcken zusammengesetzt wird (was passiert, wenn ein Team den Knopf hält, Timer, Punkte,
@@ -1295,6 +1298,15 @@ roadmap:
         <a href="{{ page.to.build }}">Bauanleitungen</a> für Satellit, I/O-Pod,
         Erweiterungsanschluss, Ziel-Addon und den einfachen Ausgang (Sirene oder Nebel über einen
         RC-Relaisschalter), als Text. Noch keine Box wurde danach gebaut.
+      - "<strong>Der Erweiterungsanschluss in der Firmware</strong>: Eine Box findet ein Modul in
+        ihrem Anschluss innerhalb von 2&nbsp;s und gibt jeden Treffer an das Skript des Modus
+        weiter, und das Zielmodul hat eine eigene Firmware, mit UF2-Dateien in den Releases. Auf
+        einem Computer gegen ein simuliertes Modul getestet, noch nicht an einem echten Anschluss
+        oder einer echten Platte."
+      - "<strong>Das I2C-Ausgangsmodul</strong>: bis zu vier Relais oder MOSFETs am Anschluss einer
+        Box, hinter einem Isolator und aus einer eigenen Versorgung, mit seiner Firmware (eine
+        UF2-Datei in den Releases) und seiner Bauanleitung. Die Firmware ist nur auf einem
+        Computer getestet, nie auf einem Board."
       - "<strong>Benutzerhandbücher</strong> für Spielende, Spielleitung, Marshals und Field-Box-Betreibende, auf Englisch und Portugiesisch."
       - "Bauanleitungen mit einer Pin-Tabelle für jede Platine, eine Firmware-Anleitung (eine veröffentlichte Version herunterladen oder selbst bauen) und eine Anleitung zum Einrichten des Controllers, auf Englisch und Portugiesisch."
       - "Die Web-Ansicht des Simulators hat jede Eingabe, die ein Modus nutzt: Tags, Tastenfeld, Treffer und GM-Befehle, mit Download des Ereignisprotokolls."
@@ -1307,16 +1319,17 @@ roadmap:
       - "Die Prüfung des Deutschen und des Chinesischen: Wenn du auf Deutsch oder Chinesisch
         spielst, hilf uns beim Prüfen. Übersetzungen in andere Sprachen beginnen in
         docs/translations (auf Englisch und Portugiesisch)."
-      - "Die Hardware: die Träger-Platine (eine fertige Leiterplatte, die den Bau erleichtert) nach
-        den ersten gebauten Boxen, Fotos echter Builds, Community-Inhalte von einem Feld."
+      - "Die Hardware: die Labortests des Erweiterungsanschlusses und des Zielmoduls, die
+        Träger-Platine (eine fertige Leiterplatte, die den Bau erleichtert) nach den ersten gebauten
+        Boxen, Fotos echter Builds, Community-Inhalte von einem Feld."
     gate: Fortlaufend nach dem ersten Release.
 
 build:
   title: Bauanleitungen
   intro: >-
     Die Props von Atalaia werden aus handelsüblichen Teilen rund um ein ESP32-Board gebaut, ohne
-    eigens gefertigte Leiterplatte. Hier stehen die Pins und Schaltpläne der Field Box, ihr einfacher Ausgang für eine Sirene oder eine Nebelmaschine sowie die Anleitungen für den Satelliten, den I/O-Pod, den Erweiterungsanschluss und
-    das Ziel-Addon, gekürzt; die vollständigen Anleitungen mit allen Prüfungen und den Tabellen zur
+    eigens gefertigte Leiterplatte. Hier stehen die Pins und Schaltpläne der Field Box, ihr einfacher Ausgang für eine Sirene oder eine Nebelmaschine sowie die Anleitungen für den Satelliten, den I/O-Pod, den Erweiterungsanschluss,
+    das Ziel-Addon und das I2C-Ausgangsmodul, gekürzt; die vollständigen Anleitungen mit allen Prüfungen und den Tabellen zur
     Fehlersuche liegen im Repository (auf Englisch und Portugiesisch).
     Um die Firmware auf eine Platine zu bringen, <a href="https://github.com/vakaobr/atalaia-project/releases">lade eine fertige Version herunter</a> oder baue sie selbst: die <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/firmware.md">Firmware-Anleitung</a> (Englisch) erklärt beides. Der Feld-Controller hat eine eigene <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/controller-setup.md">Einrichtungsanleitung</a> (Englisch). Das Modem hat eine eigene <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/en/modem.md">Modem-Anleitung</a> (Englisch).
   status: >-
@@ -1337,7 +1350,7 @@ build:
   steps: Schritte
   open: Noch nicht entschieden
   photo: "Foto folgt nach dem ersten Aufbau:"
-  coming: Kommt mit der Firmware (Inkrement 8)
+  after_bench: "Nach dem Labortisch: was echte Hardware braucht"
   simple_out:
     title: "Der einfache Ausgang: Sirene, Blitzlicht oder Nebel-Fernbedienung"
     what: >-
@@ -1778,10 +1791,12 @@ build:
   port:
     title: Erweiterungsanschluss
     status: >-
-      <strong>Entworfen, noch nicht gebaut und noch nicht von der Firmware der Box benutzt.</strong>
-      Ein Anschluss lässt sich jetzt bauen und mit dem Multimeter und den Teilen der Box prüfen; kein
-      Modul antwortet, bis der Anschlusstreiber der Box in ihrem Spiel läuft, mit Inkrement 8 des
-      Plans für den Erweiterungsanschluss, das noch kommt.
+      <strong>Entworfen, noch nicht gebaut; die Firmware der Box benutzt ihn.</strong> Ein Anschluss
+      lässt sich jetzt bauen und mit dem Multimeter und den Teilen der Box prüfen. Seit Inkrement 8 des
+      Plans für den Erweiterungsanschluss läuft der Anschlusstreiber der Box in ihrem Spiel: Er findet
+      ein Modul innerhalb von 2&nbsp;s nach dem Einstecken, liest es und führt es in der Liste. Das ist
+      nur auf einem Computer getestet, gegen ein simuliertes Modul, noch nicht an einem echten
+      Anschluss.
     what: >-
       Eine wasserdichte 5-polige M12-Buchse an der Box, in die Module von außen gesteckt werden: jetzt
       das <a href="#target-addon">Ziel-Addon</a>, später Kontakte und andere Sensoren. Es ist der
@@ -1794,7 +1809,7 @@ build:
     not_outputs: >-
       Nicht für Sirenen, Blitzlichter oder Nebel: Die kommen an den
       <a href="#field-box-simple-output">einfachen Ausgang</a>. Der Anschluss ist für Eingänge, und
-      später für ein Ausgangsmodul an einer Box, die mehr Kanäle braucht.
+      für das <a href="#output-module">I2C-Ausgangsmodul</a> an einer Box, die mehr Kanäle braucht.
     parts:
       socket: >-
         Eine <strong>weibliche</strong> M12-Einbaubuchse, A-codiert, 5-polig (IP67; ihre Kontakte
@@ -1881,16 +1896,21 @@ build:
         Kabel auf den Boden, nie in die Schusslinie. Nichts auf beiden Seiten des Anschlusses berührt
         je Netzspannung.
     photo: die fertige Anschlussplatine, beide Seiten, und die Buchse an einer Box.
-    coming:
-      driver: >-
-        <strong>Die Box liest den Anschluss</strong>: Der Anschlusstreiber wird gerade geschrieben, und
-        das Spiel der Box ruft ihn ab Inkrement 8 auf. Mit ihm kommen die Log-Zeile der Box für ein
-        Modul, die Modulliste in ihrer Konsole und der Schritt des Anschlusses in der
-        Inbetriebnahme-Liste.
+    box_title: Was die Box über den Anschluss sagt
+    box: >-
+      In ihrem seriellen Log (USB, 115200 Baud) schreibt die Box eine Zeile, wenn sie ein Modul findet
+      (<code>expansion: 0x58 added: 58:target/1.0.0:hit</code>), wenn eines nicht mehr antwortet
+      (<code>expansion: 0x58 lost (no_answer)</code>) und für jeden Treffer während eines Spiels.
+      <code>@modules</code> in ihrer seriellen Konsole listet die Module auf, und im Spiel zeigt die
+      GM-Konsole jedes als Chip unter seiner Box. Die Inbetriebnahme-Liste der Firmware hat den Schritt
+      des Anschlusses.
+    after:
       tests: >-
-        <strong>Die Tests, die ein Modul brauchen</strong>: 100-mal Ein- und Ausstecken während eines
-        Spiels, Störungen neben einer schaltenden Sirene und einem Blitzlicht, und der Strom des
-        Moduls.
+        <strong>Die Labortests des Anschlusses mit einem Modul</strong>: 100-mal Ein- und Ausstecken
+        während eines laufenden Spiels, jedes Einstecken innerhalb von 2&nbsp;s erkannt (Test 3), und
+        30 Minuten neben einer schaltenden 12-V-Sirene und einem Blitzlicht, mit gezählten CRC-Fehlern
+        und verpassten Abfragen (Test 6). Sie gehen, sobald ein Zielmodul gebaut ist; bitte melde, was
+        du misst, in einem Issue.
     open:
       splitter: >-
         <strong>Ein Verteiler</strong> für mehr als ein Modul an einer Box.
@@ -1906,31 +1926,34 @@ build:
   target:
     title: Ziel-Addon
     status: >-
-      <strong>Baubar, aber noch nicht benutzbar.</strong> Die Hardware ist entschieden, ihre Firmware
-      noch nicht geschrieben. Platte, Sensorschaltung, Gehäuse und Kabel des Moduls und den Anschluss
-      der Box kannst du jetzt bauen und mit dem Multimeter prüfen; das Modul lässt sich nicht flashen,
-      und keine Box liest es, bis Inkrement 8 des Plans für den Erweiterungsanschluss. Noch wurde kein
-      Ziel nach der Anleitung gebaut.
+      <strong>Baubar, und die Firmware ist fertig; noch nicht an einer echten Platte oder einer echten
+      Box ausprobiert.</strong> Inkrement 8 des Plans für den Erweiterungsanschluss hat die Firmware
+      des Moduls geschrieben, seine Pins festgelegt und seine UF2-Dateien in die Releases gebracht, und
+      die Box liest das Modul jetzt und gibt jeden Treffer an das Skript des Modus weiter: alles nur auf
+      einem Computer getestet, gegen ein simuliertes Modul. Du kannst das Ziel jetzt bauen, flashen und
+      in den Anschluss einer Box stecken; Strom, Abstimmung des Sensors und Spannungsteiler werden beim
+      ersten Bau festgelegt (unten). Noch wurde kein Ziel nach der Anleitung gebaut.
     what: >-
       Eine Platte, auf die geschossen wird, mit einem Piezo-Sensor, der jeden Treffer spürt, und
       einem eigenen kleinen RP2040-Board (dem <strong>Zielmodul</strong>). Es wird in den
       <a href="#expansion-port">Erweiterungsanschluss</a> einer Box gesteckt und macht die Box zu
       einem punktenden Ziel für <a href="{{ page.to.modes }}#target-windows">Zielfenster</a>, dessen
-      Regeln gebaut und im Simulator getestet sind; das Fenster zeigt der Leuchtring der Box selbst,
-      also braucht das Modul kein Licht. Jede Box mit Anschluss nimmt eins: eine Field Box, ein
-      Satellit oder ein I/O-Pod.
+      Regeln gebaut und im Simulator getestet sind, auch durchgehend mit einem simulierten Ziel; das
+      Fenster zeigt der Leuchtring der Box selbst, also braucht das Modul kein Licht. Jede Box mit
+      Anschluss nimmt eins: eine Field Box, ein Satellit oder ein I/O-Pod.
     how: >-
       Der Piezo, auf die Rückseite der Platte geklebt, macht aus einem Treffer eine kurze Spitze; das
       Modul findet ihren Höchstwert, die Stärke von 0 bis 255, und hält bis zu 16 Treffer mit ihrem
       Alter bereit, bis die Box sie abholt. Die Box liest es alle 20&nbsp;ms über den Anschluss, etwa
       5&nbsp;% des Busses, so erreicht ein Treffer das Spiel nach etwa 21&nbsp;ms, und keiner zählt
-      doppelt. Die Skripte der Modi erhalten jeden Treffer mit seiner Stärke und können das Ziel scharf
-      machen und entschärfen. Etwa <span class="nowrap">10–15&nbsp;€</span> für das Modul, dazu
-      Platte, Kabel und der Anschluss der Box (die Schätzungen des Projekts).
+      doppelt. Die Skripte der Modi erhalten jeden Treffer als <code>hit.hit</code> mit seiner Stärke,
+      nur während ein Spiel läuft, und können das Ziel scharf machen und entschärfen. Etwa
+      <span class="nowrap">10–15&nbsp;€</span> für das Modul, dazu Platte, Kabel und der Anschluss der
+      Box (die Schätzungen des Projekts).
     parts:
       board: >-
-        Ein <strong>RP2040-Board</strong>, Klasse RP2040-Zero oder ein Raspberry Pi Pico, mit
-        reduziertem Takt, damit es innerhalb der 25&nbsp;mA des Anschlusses bleibt.
+        Ein <strong>RP2040-Board</strong>, Klasse RP2040-Zero oder ein Raspberry Pi Pico, mit 48&nbsp;MHz
+        getaktet, damit es innerhalb der 25&nbsp;mA des Anschlusses bleibt.
       piezo: >-
         Eine <strong>Piezo-Scheibe</strong> mit 27–35&nbsp;mm (und Ersatz: sie brechen), ein
         Gummipolster von 2–3&nbsp;mm und Kontaktkleber.
@@ -1944,23 +1967,45 @@ build:
       address: >-
         Zwei Lötbrücken (oder ein 2-poliger DIP-Schalter) für die Adresse: 0x58 mit beiden offen,
         0x59–0x5B für ein zweites Ziel an derselben Box.
+      led: >-
+        Eine 3-mm-LED und ein 1-kΩ-Widerstand: Sie blinkt, während die Box das Modul bittet, sich zu
+        zeigen, damit man es auf dem Feld findet.
       connector: >-
         Ein <strong>männlicher</strong> M12-Einbaustecker, A-codiert, 5-polig, das
         M12-Verlängerungskabel (höchstens 2&nbsp;m), ein kleines IP65-Gehäuse, Lochraster und Kabel.
       plate: Eine Stahlplatte oder eine Polycarbonat-Platte, und ein Ständer.
+    pins_title: Die Pins des Moduls
+    pins_intro: >-
+      So, wie die Firmware des Moduls sie benutzt: dieselben GPIO-Nummern auf einem RP2040-Zero und
+      einem Pico. Alle anderen Pins bleiben unbeschaltet.
+    pin_rp2040: RP2040-Pin
+    pin:
+      v3: >-
+        Versorgung, etwa 3,0&nbsp;V: M12-Pin 1 (braun), über den MOSFET. Bei einem Pico zusätzlich
+        3V3_EN an Masse
+      gnd: "Masse: M12-Pin 3 (blau)"
+      sda: "I2C-SDA, ohne Pull-up: M12-Pin 2 (weiß)"
+      scl: "I2C-SCL, ohne Pull-up: M12-Pin 4 (schwarz)"
+      adc0: "Die Eingangsschaltung des Piezos (ADC0)"
+      adc1: "Die Eingangsschaltung einer zweiten Platte (ADC1), nur mit der Firmware für zwei Platten"
+      a0: "Adress-Lötbrücke an Masse: plus 1"
+      a1: "Adress-Lötbrücke an Masse: plus 2"
+      led: "Die Anode der LED; ihre Kathode über 1&nbsp;kΩ an Masse"
     steps:
       port: >-
         Bau und prüf zuerst den <a href="#expansion-port">Erweiterungsanschluss</a> der Box.
       supply: >-
-        Die Versorgung: M12-Pin 1 über den MOSFET an den 3V3-Pin des RP2040-Boards, nie an seinen 5-V-
-        oder USB-Pin; Pin 3 an Masse; Pin 5 kurz abgeschnitten und isoliert.
+        Die Versorgung: M12-Pin 1 über den MOSFET an den 3V3-Pin des RP2040-Boards, nie an seinen 5-V-,
+        VBUS-, VSYS- oder USB-Pin; Pin 3 an Masse; Pin 5 kurz abgeschnitten und isoliert. Bei einem
+        RP2040-Zero bleibt sein eigener Spannungsregler dann stromlos; bei einem Pico 3V3_EN an Masse
+        legen, damit sein Regler aus ist.
       piezo: >-
         Kleb den Piezo mit seinem Polster in die Mitte der Plattenrückseite; den Entladewiderstand über
-        seine Litzen, dann Spannungsteiler und Dioden auf dem Weg zu einem der Analog-Pins des RP2040
-        (GPIO&nbsp;26–28).
+        seine Litzen, dann Spannungsteiler und Dioden auf dem Weg zu GP26 (die zweite Eingangsschaltung
+        eines Moduls für zwei Platten an GP27).
       bus: >-
-        SDA (Pin 2) und SCL (Pin 4) an die I2C-Pins des RP2040, ohne Pull-up-Widerstände im Modul;
-        lass beide Adress-Lötbrücken offen für 0x58.
+        SDA (Pin 2) an GP4 und SCL (Pin 4) an GP5, ohne Pull-up-Widerstände im Modul; die
+        Adress-Lötbrücken von GP2 und GP3 an Masse, beide offen für 0x58; die LED an GP14.
       enclosure: >-
         Das Gehäuse hinter der Platte, am Ständer befestigt statt an der Platte, sein Stecker von den
         Schießenden weg, und das Kabel nach unten und am Boden entlang zur Box.
@@ -1968,25 +2013,52 @@ build:
         Prüf mit dem Multimeter, das Modul stromlos: kein Kurzschluss zwischen Pin 1 und 3, Pin 5
         offen, kein Pull-up an Pin 2 und 4, die Dioden messen sich als Dioden, etwa 1&nbsp;MΩ über dem
         Piezo.
-    coming:
-      firmware: >-
-        <strong>Die Firmware des Moduls</strong> und ihre UF2-Datei aus der CI und den Releases, zum
-        Flashen, indem man die Datei auf das Laufwerk zieht, das das Board über USB zeigt.
-      pins: >-
-        <strong>Die Pin-Tabelle des Moduls</strong>: welche RP2040-Pins I2C, den Eingang des Piezos,
-        die Adress-Lötbrücken und seine LED tragen, und wie das gewählte Board 3,3&nbsp;V an seinem
-        3V3-Pin aufnimmt. Bis dahin lässt die Anleitung diese Leitungen für später.
-      box: >-
-        <strong>Die Box liest das Modul</strong>: ihr Anschlusstreiber vom Spiel aufgerufen, jeder
-        Treffer an das Skript des Modus weitergegeben, und das Modul im Log der Box und in der
-        Spielleitungskonsole.
+    flash_title: Das Modul flashen
+    flash_intro: >-
+      Die Firmware des Moduls ist eine UF2-Datei, von Hand über USB geflasht und nie über die Luft, mit
+      dem Modul von der Box getrennt: Steck nie das USB-Kabel und das Kabel des Anschlusses
+      gleichzeitig ein.
+    flash:
+      download: >-
+        <strong>Die UF2-Datei holen</strong>: <code>atalaia-target-module-&lt;Version&gt;.uf2</code>
+        (<code>atalaia-target-module-2-&lt;Version&gt;.uf2</code> für zwei Platten) aus einem
+        <a href="https://github.com/vakaobr/atalaia-project/releases">Release</a>, ab dem ersten nach
+        0.7.0, und mit den <code>SHA256SUMS</code> des Release prüfen: Moduldateien sind nicht
+        signiert. Oder selbst bauen mit <code>python3 tools/docker_module.py build</code>.
+      boot: >-
+        <strong>Flashen</strong>: die BOOT-Taste des Boards halten, während du sein USB-Kabel an einen
+        Computer steckst, die UF2-Datei auf das Laufwerk ziehen, das erscheint (<code>RPI-RP2</code>),
+        und das USB-Kabel abziehen, sobald das Board neu startet.
+      found: >-
+        <strong>In den Anschluss der Box stecken</strong>: Innerhalb von 2&nbsp;s meldet das serielle
+        Log der Box <code>expansion: 0x58 added: 58:target/1.0.0:hit</code>, und <code>@modules</code>
+        in ihrer seriellen Konsole listet das Ziel auf.
+      armed: >-
+        <strong>Im Spiel ausprobieren</strong>: Zielfenster auf der Box starten; die Platte ist scharf,
+        und ein Klopfen darauf erscheint im Log als
+        <code>expansion: hit hit, strength &lt;n&gt;</code>.
+    after:
+      power: >-
+        <strong>Strom und 3V3 des Moduls</strong>: unter 25&nbsp;mA bei 48&nbsp;MHz, mit einem
+        Multimeter in Reihe mit Pin 1 (Labortest 4), und etwa 3,0&nbsp;V an seinem 3V3-Pin, während es
+        läuft.
       tuning: >-
-        <strong>Messungen beim ersten Bau</strong>: der Strom des Moduls (unter 25&nbsp;mA), und der
-        Sensor, abgestimmt auf echten Platten aus Stahl und Polycarbonat, was die Schwelle und die
-        Spannungsteiler-Widerstände festlegt.
-      mode: >-
-        <strong>Zielfenster als Voreinstellung der Field Box</strong>, sobald das Ziel auf dem
-        Labortisch getestet ist, und später der I/O-Pod, der einem Handy ein Ziel leiht.
+        <strong>Schwelle, Sperrzeit und Stärkeskala</strong> auf echten Platten aus Stahl und
+        Polycarbonat, an der Energiegrenze des Felds und mit Augenschutz (Labortest 8). Die Vorgaben der
+        Firmware (eine Schwelle von 300 von 4095, 50&nbsp;ms Sperrzeit) sind nur ein Ausgangspunkt.
+      divider: >-
+        <strong>Die zwei Widerstände des Spannungsteilers</strong>, im selben Test gewählt (darum
+        stecken sie in Fassungen): ein Treffer aus der Entfernung deutlich über der Schwelle, ein
+        Treffer direkt über dem Piezo, ohne die Dioden zu erreichen.
+      port: >-
+        <strong>Die Tests des Anschlusses mit einem Modul</strong>: Ein- und Ausstecken während eines
+        Spiels und Störungen neben einer Sirene, in der Liste des
+        <a href="#expansion-port">Erweiterungsanschlusses</a>.
+      preset: >-
+        <strong>Zielfenster als eingebaute Voreinstellung der Field Box</strong>, sobald das Ziel auf
+        dem Labortisch getestet ist; bis dahin spielt ein Feld den Modus wie jeden anderen auf eine Box.
+        Der I/O-Pod leiht die Treffer eines Ziel-Addons schon einem Spiel auf dem Handy (Inkrement 9),
+        nur auf einem Computer getestet: siehe <a href="#io-pod">I/O-Pod</a>.
     open:
       plate: >-
         <strong>Die Platte</strong>: Materialsorte, Größe, Dicke, Ständer und Winkel, aus den ersten
@@ -2012,9 +2084,156 @@ build:
         <strong>Die Energiegrenzen des Felds</strong> gelten beim Schießen auf Ziele wie auf Menschen.
     photo: das fertige Ziel, Platte und Sensor, und der Anschluss an einer Box.
     full: >-
-      Alle Schritte, Prüfungen und Entscheidungen, und die Liste dessen, was auf Inkrement 8 wartet
-      (auf Englisch und Portugiesisch):
+      Alle Schritte, Prüfungen und Entscheidungen, und was noch auf den Labortisch wartet (auf
+      Englisch und Portugiesisch):
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/target-addon/BUILD.md">Bauanleitung für das Ziel-Addon</a>.
+  out_module:
+    title: I2C-Ausgangsmodul
+    status: >-
+      <strong>Entworfen, noch nicht gebaut; später und optional.</strong> Seine Firmware ist
+      geschrieben (Inkrement 11 des Plans für den Erweiterungsanschluss) und nur auf einem Computer
+      getestet: Sie lässt sich für den RP2040 bauen, und ihre UF2-Datei kommt mit den Releases, aber
+      sie lief noch nie auf einem Board, und keine Box hat ein echtes Modul gesteuert. Noch wurde kein
+      Modul nach der Anleitung gebaut.
+    what: >-
+      Ein Modul für den <a href="#expansion-port">Erweiterungsanschluss</a> einer Box, das bis zu
+      vier Lasten (eine Sirene, ein Blitzlicht, eine Hupe, den Niederspannungs-Fernbedienungseingang
+      einer Nebelmaschine) über Relais oder MOSFETs schaltet, aus <strong>einer eigenen
+      Versorgung</strong>. Ein kleines RP2040-Board führt seine Firmware aus: Die Box hält einen
+      Ausgang nur so lange an, wie sie weiter in ihn schreibt (jeder Ausgang ist 1,5&nbsp;s nach dem
+      letzten Schreiben aus), und das Modul hält seine eigenen festen Grenzen, eine höchste Einschaltzeit
+      und eine kürzeste Auszeit je Kanal, mit einem zweiten, unabhängigen Wächter. Etwa
+      <span class="nowrap">25–35&nbsp;€</span> ohne Versorgung und Lasten (die Schätzung des
+      Projekts).
+    how: >-
+      Ein <strong>I2C-Isolator</strong> (Klasse ISO1540 oder ADuM1250) führt den Bus über eine
+      Trennstrecke: Die Masse der Box und die Masse des Moduls sind nie verbunden, also bleiben die
+      Spitze eines Relais, der Kurzschluss einer Last oder eine verpolte Batterie auf der Seite des
+      Moduls. Die Box-Seite des Isolators ist das Einzige an den 3,3&nbsp;V des Anschlusses (ein paar
+      mA); alles andere läuft aus dem eigenen Eingang des Moduls mit 9–15&nbsp;V (eine
+      12-V-Batterie oder der Akku der Sirene selbst).
+    simple_first: >-
+      <strong>Nimm zuerst den <a href="#field-box-simple-output">einfachen Ausgang</a></strong>: Für
+      eine Sirene, ein Blitzlicht oder eine Nebel-Fernbedienung ist er billiger und einfacher, ohne
+      eigene Firmware. Dieses Modul ist für eine Box, die mehr Kanäle braucht, als sie freie Pins hat,
+      oder wissen will, ob die Versorgung der Lasten da ist.
+    rules_title: Regeln für das Ausgangsmodul
+    rules:
+      mains: >-
+        <strong>Nie Netzspannung.</strong> Es schaltet nur Lasten mit Schutzkleinspannung (SELV):
+        höchstens 24&nbsp;V DC und 2&nbsp;A je Kanal. Nichts darin, daran oder damit verbunden berührt
+        je eine 230- oder 110-V-Leitung, auch nicht über ein dafür ausgelegtes Relais; ein Netzgerät
+        braucht eine fertig gekaufte, zertifizierte, geschlossene Schalteinheit mit einem
+        Niederspannungs-Steuereingang.
+      smoke: >-
+        <strong>Nebelmaschinen nur über ihren dokumentierten
+        Niederspannungs-Fernbedienungseingang</strong> (einen Kontakteingang oder einen
+        Niederspannungs-Auslöser, der im Handbuch des Herstellers steht), oder ein Akku-Nebelgerät,
+        das für das Auslösen über einen Kontakt gebaut ist. Viele billige Netz-Nebelmaschinen führen
+        Netzspannung im Kabel ihrer Fernbedienung: Schließ nie ein Relais daran an, und öffne nie
+        eine. Steht es nicht schriftlich im Handbuch, wird die Maschine nicht benutzt.
+      pyro: >-
+        <strong>Nie Pyrotechnik</strong>, Zünder oder Rauchgranaten.
+      bare: >-
+        <strong>Nie eine nackte PCF8574- oder MCP23017-Relaisplatine</strong> stattdessen am
+        Anschluss: Sie hat keine eigene Zeitgrenze, ein Relais bleibt also an, wenn die Box abstürzt.
+    parts:
+      board: >-
+        Ein <strong>RP2040-Board</strong>: ein Raspberry Pi Pico oder ein RP2040-Zero.
+      isolator: >-
+        Ein <strong>I2C-Isolator</strong> auf einer Platine, Klasse ISO1540 oder ADuM1250, mit zwei
+        getrennten Versorgungen und Massen; die Pull-up-Widerstände auf seiner Box-Seite kommen ab (die
+        Anschlussplatine hat sie).
+      mosfet: >-
+        Ein <strong>P-Kanal-MOSFET</strong> (Klasse AO3401 oder SI2301) und ein 10-kΩ-Widerstand,
+        damit ein selbst gebautes, verpolt verdrahtetes Kabel den Isolator nicht rückwärts speist.
+      relays: >-
+        Eine optogekoppelte 4-Kanal-<strong>Relaisplatine mit High-Level-Trigger</strong> (Eingang
+        high ist Relais an, oder ein Trigger-Jumper auf high), 5-V-Spulen, Kontakte für mindestens
+        2&nbsp;A bei 30&nbsp;V DC, und ein 10-kΩ-Pull-down an jedem Eingang, damit jedes Relais aus
+        bleibt, während das Board im Reset ist oder geflasht wird. Oder eine MOSFET-Platine für
+        3,3-V-Logik, für oft geschaltete Gleichstromlasten wie Blitzlichter.
+      supply: >-
+        <strong>Die eigene Versorgung</strong>: ein Eingang für 9–15&nbsp;V DC, eine träge
+        1-A-Sicherung, eine Schottky-Diode der Klasse 1N5819 gegen eine verpolte Batterie und ein
+        Abwärtswandler (Klasse MP1584 oder LM2596), auf 5,0&nbsp;V eingestellt, für das RP2040-Board
+        und die Relaisspulen.
+      loads: >-
+        <strong>Für jede Last</strong>: eine eigene Batterie und eine eigene Sicherung von höchstens
+        2&nbsp;A, über die potenzialfreien Kontakte des Relais (COM und NO), und eine Freilaufdiode
+        über einer Motorsirene, einer Hupe oder jeder Spule.
+      connector: >-
+        Ein <strong>männlicher</strong> M12-Einbaustecker, A-codiert, 5-polig, und das M12-Kabel
+        (höchstens 2&nbsp;m), ein IP65-Kunststoffgehäuse von etwa
+        150&nbsp;×&nbsp;110&nbsp;×&nbsp;70&nbsp;mm mit Kabelverschraubungen, eine Status-LED,
+        Lochraster, Kabel und Beschriftungen („SELV ONLY, NEVER MAINS“).
+    pins_title: Die Pins des Moduls
+    pins_intro: >-
+      So, wie die Firmware des Moduls sie benutzt, an den Stiftleisten eines Pico oder eines
+      RP2040-Zero; die M12-Pins gehen nur an die Box-Seite des Isolators, und sein Pin 3 (die Masse
+      der Box) an nichts anderes.
+    pin:
+      sda: "I2C-SDA: die Modul-Seite des Isolators (4,7&nbsp;kΩ an ihre 3,3&nbsp;V)"
+      scl: "I2C-SCL: die Modul-Seite des Isolators (4,7&nbsp;kΩ an ihre 3,3&nbsp;V)"
+      ch1: "OUT 1: IN1 der Relaisplatine, high ist an; 10&nbsp;kΩ an Masse"
+      ch2: "OUT 2: IN2; 10&nbsp;kΩ an Masse"
+      ch3: "OUT 3: IN3; 10&nbsp;kΩ an Masse"
+      ch4: "OUT 4: IN4; 10&nbsp;kΩ an Masse"
+      a0: "Adress-Lötbrücke an Masse: plus 1"
+      a1: "Adress-Lötbrücke an Masse: plus 2"
+      led: "Die Anode der Status-LED; ihre Kathode über 1&nbsp;kΩ an Masse"
+      sense: "Die Versorgungsmessung (optional): ein Teiler 100&nbsp;kΩ / 22&nbsp;kΩ von der Batterie der Lasten"
+    pins_more: >-
+      Die Adresse ist 0x5C mit beiden Brücken offen (0x5D–0x5F mit ihnen). Die 5&nbsp;V des
+      Abwärtswandlers gehen an VSYS des Pico oder an den 5-V-Pin des RP2040-Zero, der 3V3-Pin des
+      Boards an die Modul-Seite des Isolators.
+    flash_title: Flashen und erstes Einschalten
+    flash:
+      download: >-
+        <strong>Die UF2-Datei holen</strong>: <code>atalaia-output-module-&lt;Version&gt;.uf2</code>
+        aus einem <a href="https://github.com/vakaobr/atalaia-project/releases">Release</a>, ab dem
+        ersten nach 0.7.0, mit seinen <code>SHA256SUMS</code> geprüft (nicht signiert). Sie hat die
+        vorgegebene Kanalliste, vier allgemeine Relais mit je höchstens 30&nbsp;s, für einen ersten
+        Labortest; für andere Lasten baust du deine eigene mit der Kanalliste dessen, was eingebaut
+        ist (<code>python3 tools/docker_module.py build</code>).
+      boot: >-
+        <strong>Flashen</strong> mit ausgeschalteter Versorgung, abgezogenem M12-Kabel und getrennten
+        Lasten: die BOOT-Taste des Boards halten, während du es an den USB eines Computers steckst, die
+        UF2-Datei auf das Laufwerk kopieren, das erscheint, und USB abziehen.
+      first: >-
+        <strong>Erstes Einschalten, Lasten getrennt</strong>: Kein Relais klickt, beim Einschalten
+        oder nach 20 Einschaltzyklen, und die LED bleibt dunkel (schnelles Blinken heißt, die Firmware
+        hat ihre Kanalliste abgelehnt).
+      box: >-
+        <strong>An einer Box</strong>: Die Box findet es als <code>5c:out4/1.0.0</code>, und seine
+        Ausgänge bleiben <strong>aus, bis sie an der Box im Admin-Menü freigegeben werden</strong>,
+        mit Funktion und höchster Einschaltzeit jedes Kanals; dessen 1-s-Test klickt dann jedes Relais
+        der Reihe nach.
+    after:
+      lease: >-
+        <strong>Aus innerhalb von 1,5&nbsp;s</strong> mit einem eingeschalteten Relais, jedes Mal,
+        wenn die Box ihre Versorgung verliert, neu startet oder das Kabel durchtrennt oder abgezogen
+        wird (Labortest 5, auf Video gestoppt).
+      isolator: >-
+        <strong>Der Isolator bei den 3,0&nbsp;V des Anschlusses</strong>, dem unteren Ende seines
+        Bereichs, und der Low-Pegel des Busses durch ihn und den Puffer des Anschlusses (mit einem
+        Oszilloskop); der Strom des Moduls aus dem Anschluss (ein paar mA erwartet).
+      relays: >-
+        <strong>Die Relais ziehen bei 3,3&nbsp;V an</strong>, ihr Spulenstrom, der Strom der eigenen
+        Versorgung des Moduls und der Wert der Eingangssicherung, die Versorgungsmessung gegen ein
+        Multimeter, und Watchdog und Wächter auf einem echten Board.
+      noise: >-
+        <strong>Störungen</strong>: eine 12-V-Sirene und ein Blitzlicht schalten 30 Minuten neben der
+        Box und ihrem Kabel, mit gezählten CRC-Fehlern und verpassten Abfragen (Labortest 6).
+      smoke: >-
+        <strong>Nebel</strong>: ein Akku-Nebelgerät oder eine Nebelmaschine mit dokumentiertem
+        Niederspannungseingang, ausgelöst durch die Explosion von Bombe, gestoppt durch „Alle Ausgänge
+        aus“ der Spielleitung und durch das Spielende (Labortest 10).
+    photo: das fertige Modul, beide Seiten des Isolators und seine Beschriftungen.
+    full: >-
+      Alle Teile, die zwei Seiten, die Versorgung, die Lasten, die Pins, die Prüfungen und was auf
+      den Labortisch wartet (auf Englisch und Portugiesisch):
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/output-module/BUILD.md">Bauanleitung für das I2C-Ausgangsmodul</a>.
 
 hub:
   title: Community-Hub

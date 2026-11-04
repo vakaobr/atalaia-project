@@ -188,6 +188,7 @@ EVENTS = {
     'node.modules': EventDef(57, 'normal', ('modules',)),
     'node.module_lost': EventDef(58, 'critical', ('modules', 'reason')),
     'output.switched': EventDef(59, 'normal', ('capability', 'ms', 'source')),
+    'node.outputs_disabled': EventDef(60, 'normal', ('modules',)),
 }
 
 # Capability type ids: what HELLO lists in its capabilities (key 6, decision EXP-20).

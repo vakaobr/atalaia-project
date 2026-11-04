@@ -10,9 +10,10 @@
 //   Czechia; EPSG:4326, so the picture is already in the image's frame), fetched with fetch() so the canvas
 //   can still be exported (each WMS sends Access-Control-Allow-Origin, * or the page's origin); a white picture
 //   (outside its coverage) is dropped and OpenStreetMap drawn alone; a source with only a WMTS (basemap.at in
-//   Austria, MF-94 to MF-99) has its Web Mercator tiles over the area fetched the same way (at the zoom
-//   nearest the image's scale, at most WMTS_MAX_TILES of them, a few at a time), stitched on a canvas and
-//   reprojected row by row into the image's frame; a tile it has no picture for (404) stays white;
+//   Austria, MF-94 to MF-99; LGL's in Baden-Württemberg, MF-100 to MF-105) has its Web Mercator tiles over
+//   the area fetched the same way (at the zoom nearest the image's scale, at most WMTS_MAX_TILES of them, a
+//   few at a time), stitched on a canvas and reprojected row by row into the image's frame; a tile it has no
+//   picture for (404) stays white;
 // - OpenStreetMap's data for the area from the Overpass API, one query with a size cap (MF-50 to MF-53:
 //   when the main instance is busy, retried with exponential backoff and jitter, and asked of one other
 //   public instance, within about a minute, cancellable), drawn on a canvas: woods, scrub, grass, farmland, water, bare ground, buildings, fences, walls and hedges,
@@ -279,6 +280,15 @@ export function wmtsPlan(b, frame, zmax) {
     return null;
 }
 
+/** MF-101: whether the WMTS tile (z, x, y) has any part inside box ([west, south, east, north], degrees). */
+function tileInBox(box, z, x, y) {
+    const [west, south, east, north] = box;
+    const tl = project(north, west, z);
+    const br = project(south, east, z);
+    return x >= Math.floor(tl.x / TILE_PX) && x <= Math.floor(br.x / TILE_PX)
+        && y >= Math.floor(tl.y / TILE_PX) && y <= Math.floor(br.y / TILE_PX);
+}
+
 /** One tile: an ImageBitmap, 'missing' (the server has no picture there: 404, 204, 410) or 'failed'. */
 async function fetchTile(url, fetcher) {
     let r;
@@ -300,9 +310,10 @@ async function fetchTile(url, fetcher) {
  * with CORS, WMTS_PARALLEL at a time, stitched on a white canvas, then drawn into the image's frame (latitude
  * linear down the image, as the WMS pictures in EPSG:4326) one row at a time from the Mercator rows; at most
  * maxSide pixels on a side, as a WMS's. A tile the server has no picture for stays white (the coverage's
- * edge: report.missing counts them, of report.tiles); one it could not send (a network error, another HTTP
- * error, not an image) fails the whole picture with MapError('ortho_tiles', '<failed>/<tiles>'), so the GM
- * never gets a picture with holes in it; none at all: null, as a white WMS picture. */
+ * edge, or outside the source's wmtsBox, not asked: report.missing counts them, of report.tiles); one it
+ * could not send (a network error, another HTTP error, not an image) fails the whole picture with
+ * MapError('ortho_tiles', '<failed>/<tiles>'), so the GM never gets a picture with holes in it; none at all:
+ * null, as a white WMS picture. */
 async function fetchWmtsPhoto(b, frame, source, fetcher, report) {
     const plan = wmtsPlan(b, frame, source.wmtsMax);
     if (!plan) throw new MapError('too_big', `${frame.width} × ${frame.height}`);
@@ -320,7 +331,9 @@ async function fetchWmtsPhoto(b, frame, source, fetcher, report) {
     const worker = async () => {
         while (todo.length && !failed) {
             const [i, j] = todo.shift();
-            const tile = await fetchTile(source.wmts(z, x0 + i, y0 + j), fetcher);
+            // MF-101: a tile outside the source's box is not asked (its server answers 400): white, as a 404.
+            const tile = source.wmtsBox && !tileInBox(source.wmtsBox, z, x0 + i, y0 + j) ? 'missing'
+                : await fetchTile(source.wmts(z, x0 + i, y0 + j), fetcher);
             if (tile === 'missing') missing += 1;
             else if (tile === 'failed') failed += 1;
             else {
