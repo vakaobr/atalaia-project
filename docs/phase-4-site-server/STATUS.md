@@ -657,8 +657,12 @@ a chrono pass, the outcomes); 296 controller tests (18 new:
 the console's browser tests (1 new: a game from the schedule, expected players,
 *Arrived*, a scanned ticket, the counts); the Dart ticket tests against the
 same vectors. Built since: the app's screens for logging in and the account
-(`app/lib/site/site_auth.dart`, `account_screen.dart`, `site_screens.dart`).
-Not yet: a real game day (HW1); `[sync] push_walkins`; the
+(`app/lib/site/site_auth.dart`, `account_screen.dart`, `site_screens.dart`);
+`[sync] push_walkins` (2026-11-04, decisions PWI-1 to PWI-10: the walk-ins as
+guest registrations, opt-in on both controllers, deleted 30 days after the
+game; tested with the shared `checkin_outcomes` vectors, both controllers'
+sync tests and the site server's `WalkinGuestTests`).
+Not yet: a real game day (HW1); the
 registration import (17). Decisions S16-1 to S16-14, all open; S16-4 (claims
 confirmed by the controller), S16-6 (the field's limit template set on both
 sides) and S16-9 (no registration form on the public pages) want the

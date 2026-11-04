@@ -144,6 +144,7 @@ acima, cada uma separada, granular e revogável.
 | **Inscrição (servidor)**: o teu identificador de jogador no campo, um nome a mostrar no jogo (por omissão o teu nome de utilizador), a preferência de equipa, o teu **número de associado** se o jogo o pedir, as réplicas que declaras, se vieste ou não, se pagaste (o campo anota; nenhum pagamento é processado) | Organizar o jogo | b) contrato: o jogo em que te inscreves |
 | Um **bilhete de inscrição**: um segredo aleatório mostrado uma vez; só se guarda um hash | Associar a tua chegada à inscrição | b) contrato |
 | **Check-in no campo (controlador)**: o nome ou a alcunha que escreves, a preferência de equipa, as réplicas que declaras, **o resultado da verificação do cartão de associado** se o campo a fizer (2.3; **nada verifica o número com ninguém**), a hora. O teu telemóvel cria um identificador para este campo; o controlador guarda-o e um hash do segredo que o acompanha. **Não se pede email, telefone, data de nascimento, documento de identificação nem fotografia** | Gerir o jogo e saber quem está no campo | b) contrato: o jogo em que entras; f) o interesse do campo em jogos seguros |
+| **[ESCOLHA DO CAMPO: só se o campo ligar `[sync] push_walkins`; caso contrário, apagar esta linha.]** **Chegada sem inscrição no servidor**: se fizeres o check-in sem inscrição, depois de um jogo da agenda o controlador envia ao servidor o teu identificador de jogador no campo, o nome que escreveste e o resultado de cronógrafo de cada réplica que declaraste (tipo, classe, passou ou recusada). Nunca o teu número de associado, a equipa, a marca e o modelo de uma réplica nem um bilhete. É uma inscrição de convidado, sem conta | Manter o registo do campo de quem jogou e das verificações de cronógrafo | **[ADVOGADO: o fundamento; o projeto não o decide]** |
 | **Filiação numa associação**: ver 2.3 | | |
 | Um marshal ou a organização pode confirmar ou fazer o check-in à mão mesmo que a verificação da filiação falhe. Fica registado com o identificador da pessoa e o veredicto, nunca o número | Decisão da equipa | f) |
 
@@ -408,7 +409,9 @@ cronógrafo e a tua posição funcionam na rede Wi-Fi do próprio campo. O teu
 nome, a tua preferência de equipa e as tuas réplicas declaradas (e, até o
 check-in ser confirmado, o teu número de associado) **ficam no controlador e nunca são enviados ao servidor
 nem a mais lado nenhum** (nomes e números do check-in nunca são enviados,
-mesmo quando o controlador sincroniza).
+mesmo quando o controlador sincroniza; **[ESCOLHA DO CAMPO: se o campo ligar
+`[sync] push_walkins`, dizer em vez disso: "exceto o nome de quem fez o
+check-in sem inscrição, ver 2.2"]**).
 
 ### 4.2 Com o servidor (opcional)
 
@@ -416,7 +419,9 @@ Quando o controlador tem internet e o campo usa o servidor, o controlador
 liga-se a ele (o servidor nunca se liga ao controlador) e envia: os jogos
 com os seus eventos e pontuações, as leituras de cronógrafo (cada uma como
 assinada), as réplicas, o resultado de cada inscrição (veio ou não veio), o
-número de entradas sem inscrição como contagem e as chaves públicas dos marshals. Recebe o calendário, a lista de inscritos do próximo jogo, as
+número de entradas sem inscrição como contagem **[ESCOLHA DO CAMPO: com
+`[sync] push_walkins`, "e cada entrada sem inscrição como inscrição de
+convidado (2.2)"]** e as chaves públicas dos marshals. Recebe o calendário, a lista de inscritos do próximo jogo, as
 definições e a imagem do campo, cenários e, de quem consentiu, os registos
 de cronógrafo de outros campos. Os dados viajam por HTTPS.
 
@@ -490,6 +495,7 @@ DO CAMPO]** é um que o campo pode alterar; os outros estão fixos no código.
 | Os registos do próprio anfitrião (ver 2.11) | anfitrião | **[ESCOLHA DO ANFITRIÃO]** |
 | O que resta de uma conta apagada (uma linha vazia com um nome aleatório `deleted-...`: sem nome, email, palavra-passe nem papéis) | servidor | Até ser apagada a última entrada do registo de segurança que a refere, no máximo 36 meses depois de usares a conta; depois a própria linha é apagada |
 | Dados de inscrição de quem não tem conta (convidados importados) | servidor | 30 dias depois do jogo |
+| **[ESCOLHA DO CAMPO: com `[sync] push_walkins`]** Chegadas sem inscrição enviadas como inscrições de convidado (2.2) | servidor | 30 dias depois do jogo, ou logo que o controlador te apague a teu pedido |
 | O número de associado de uma inscrição | servidor | Apagado quando o check-in é confirmado; no máximo 30 dias depois do jogo |
 | Reclamações de um identificador de jogador de um telemóvel | servidor | 30 dias depois de feitas |
 | Jogos marcados e as suas inscrições | servidor | 24 meses depois de o jogo terminar |
@@ -819,3 +825,11 @@ parecer aprovado:
    guarda e se precisa de consentimento) e se a Parte B também se mostra na
    criação de conta pela web. Nada mais muda: os dados, as finalidades, os
    fundamentos e os prazos de uma inscrição são os mesmos da app.
+6. **Chegadas sem inscrição como convidados** (2.2, decisões PWI-*,
+   acrescentado a 2026-11-04): a opção `[sync] push_walkins` envia ao
+   servidor o identificador de jogador, o nome e os resultados de cronógrafo
+   de quem chega sem inscrição, guardados 30 dias depois do jogo. O
+   fundamento, se o aviso do check-in no campo o tem de dizer
+   antes do check-in (o aviso de check-in do controlador por omissão diz que
+   o nome nunca é enviado; um campo que ligue isto dá o seu, `[checkin]
+   notice_pt`/`notice_en`), e a redação ficam para o advogado.

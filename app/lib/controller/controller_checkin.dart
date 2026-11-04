@@ -52,6 +52,7 @@ import '../protocol/checkin_ticket.dart';
 import '../security/bytes.dart';
 import '../security/player_token.dart';
 import 'controller_engine.dart';
+import 'controller_sync_format.dart' show checkinOutcomes;
 import 'field_addresses.dart';
 import 'registration_import.dart';
 
@@ -4371,39 +4372,15 @@ class ControllerCheckin {
   /// What goes back to the site server after the game (checkin.py
   /// `outcomes`): per registration its outcome and its declarations' final
   /// states, and the walk-ins as a count. No names, no federation numbers.
-  Map<String, Object?> outcomes(int gameId) {
-    const arrivedStates = ['pending', 'checked_in', 'left'];
-    final regs = <Map<String, Object?>>[];
-    var walkins = 0;
-    for (final r in _rows(gameId)) {
-      final arrived =
-          arrivedStates.contains(r['status']) ||
-          (r['status'] == 'removed' && r['checked_in_at'] != null);
-      final rid = r['registration_id'];
-      if (rid == null || rid == '') {
-        if (arrived) walkins++;
-        continue;
-      }
-      final fromRoster = r['from_roster'] == true;
-      final ticket = r['ticket_sha256'];
-      if (!fromRoster && (ticket == null || ticket == '')) continue;
-      final pid = r['player_id']! as String;
-      regs.add({
-        'registration_id': rid,
-        'player_id': pid,
-        'outcome': arrived ? 'checked_in' : 'no_show',
-        'declarations': [
-          for (final d in _decls(gameId, pid).take(20))
-            {
-              'declaration_id': d['declaration_id'],
-              'state': d['state'],
-              'reading_id': d['reading_id'],
-            },
-        ],
-        if (!fromRoster) 'ticket_sha256': ticket,
-      });
+  /// With [guests] (`[sync] push_walkins`, decisions PWI-*) the walk-ins
+  /// also go as guests with their display names (`checkinOutcomes`, shared
+  /// with the Pi through vectors/sync.json).
+  Map<String, Object?> outcomes(int gameId, {bool guests = false}) {
+    final decls = <String, List<Map<String, Object?>>>{};
+    for (final d in _decls(gameId)) {
+      decls.putIfAbsent(d['player_id']! as String, () => []).add(d);
     }
-    return {'registrations': regs, 'walkins': walkins};
+    return checkinOutcomes(_rows(gameId), decls, guests: guests);
   }
 
   // --- retention ------------------------------------------------------------------

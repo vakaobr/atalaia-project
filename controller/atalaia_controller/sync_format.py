@@ -187,10 +187,10 @@ def _json_size(value: Any) -> int:
     return len(json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
 
 
-def _envelope(body: Any, extra: tuple[str, ...], game: bool = True) -> dict[str, Any]:
+def _envelope(body: Any, extra: tuple[str, ...], game: bool = True, optional: tuple[str, ...] = ()) -> dict[str, Any]:
     """The common part: ``game`` only in the bodies about one game (not the field's chrono registry)."""
     body = _obj(body, "")
-    _keys(body, "", ("sync_version", "controller", *(("game",) if game else ()), *extra))
+    _keys(body, "", ("sync_version", "controller", *(("game",) if game else ()), *extra), optional)
     if body["sync_version"] != SYNC_VERSION or isinstance(body["sync_version"], bool):
         _fail("unsupported_version", "sync_version")
     ctrl = _obj(body["controller"], "controller")
@@ -551,6 +551,8 @@ MAX_DECLARATIONS = 20       # a registration's pre-declared replicas (the contro
 SCHEDULED_STATES = ("published", "in_progress", "completed", "cancelled")
 ROSTER_STATES = ("published", "in_progress", "completed", "cancelled")
 OUTCOMES_CHECKIN = ("checked_in", "no_show")
+ARRIVED_STATES = ("pending", "checked_in", "left")  # a check-in at the field (checkin.ARRIVED)
+GUEST_NAME_MAX = 32          # a guest's display name (the check-in's NAME_MAX, the registration's display_name)
 DECLARATION_STATES = ("pending", "passed", "refused", "withdrawn")
 CLAIM_RESULTS = ("confirmed", "refused", "unknown")
 PLAYER_ID = re.compile(r"p-[a-z2-7]{12}")
@@ -761,11 +763,14 @@ def check_checkins(body: Any) -> dict[str, Any]:
     """POST /api/v1/sync/checkins: after a game made from a scheduled game, each registration's outcome
     and its declarations' final states, and how many walked in (a count only). No names, no federation
     numbers. ``ticket_sha256`` only for a registration the controller did not have in a roster (the app
-    sent its registration id and ticket at check-in): the site server compares it with its own."""
-    body = _envelope(body, ("scheduled_game_id", "registrations", "walkins"))
+    sent its registration id and ticket at check-in): the site server compares it with its own. ``guests``
+    only with the controller's ``[sync] push_walkins`` (decisions PWI-*): the walk-ins as guest registrations,
+    each with its player id, display name and declarations' final states; never more than ``walkins``."""
+    body = _envelope(body, ("scheduled_game_id", "registrations", "walkins"), optional=("guests",))
     _uuid(body["scheduled_game_id"], "scheduled_game_id")
     _int(body["walkins"], "walkins", 0, 100000)
     seen: set[str] = set()
+    seen_players: set[str] = set()
     for i, r in enumerate(_list(body["registrations"], "registrations", MAX_ROSTER)):
         path = f"registrations[{i}]"
         r = _obj(r, path)
@@ -775,6 +780,7 @@ def check_checkins(body: Any) -> dict[str, Any]:
             _fail("duplicate_registration", f"{path}.registration_id")
         seen.add(r["registration_id"])
         _text(r["player_id"], f"{path}.player_id", 14, pattern=PLAYER_ID)
+        seen_players.add(r["player_id"])
         if r["outcome"] not in OUTCOMES_CHECKIN:
             _fail("bad_outcome", f"{path}.outcome")
         _text(r.setdefault("ticket_sha256", None), f"{path}.ticket_sha256", 64, null=True, pattern=SHA256_HEX)
@@ -790,7 +796,89 @@ def check_checkins(body: Any) -> dict[str, Any]:
             if d["state"] not in DECLARATION_STATES:
                 _fail("bad_state", f"{dpath}.state")
             _uuid(d.setdefault("reading_id", None), f"{dpath}.reading_id", null=True)
+    if "guests" in body:
+        _check_guests(body, seen_players)
     return body
+
+
+def _check_guests(body: dict[str, Any], players: set[str]) -> None:
+    """``guests`` of a check-ins body (decisions PWI-*): walk-ins the field pushes as guest registrations. A guest
+    is a walk-in who came (its outcome is ``checked_in``): its player id (not one of the body's registrations'),
+    its display name for the game and its declarations with their type, class and final state. Never a team, a
+    federation number, a make and model or a ticket."""
+    guests = _list(body["guests"], "guests", MAX_ROSTER)
+    if len(guests) > body["walkins"]:
+        _fail("too_many_guests", "guests")
+    decls: set[str] = set()
+    for i, g in enumerate(guests):
+        path = f"guests[{i}]"
+        g = _obj(g, path)
+        _keys(g, path, ("player_id", "display_name", "declarations"))
+        _text(g["player_id"], f"{path}.player_id", 14, pattern=PLAYER_ID)
+        if g["player_id"] in players:
+            _fail("duplicate_player", f"{path}.player_id")
+        players.add(g["player_id"])
+        _text(g["display_name"], f"{path}.display_name", GUEST_NAME_MAX)
+        for j, d in enumerate(_list(g["declarations"], f"{path}.declarations", MAX_DECLARATIONS)):
+            dpath = f"{path}.declarations[{j}]"
+            d = _obj(d, dpath)
+            _keys(d, dpath, ("declaration_id", "type", "class", "state"), ("reading_id",))
+            _uuid(d["declaration_id"], f"{dpath}.declaration_id")
+            if d["declaration_id"] in decls:
+                _fail("duplicate_declaration", f"{dpath}.declaration_id")
+            decls.add(d["declaration_id"])
+            if d["type"] not in REPLICA_TYPES:
+                _fail("bad_type", f"{dpath}.type")
+            _text(d["class"], f"{dpath}.class", 32, pattern=REPLICA_CLASS)
+            if d["state"] not in DECLARATION_STATES:
+                _fail("bad_state", f"{dpath}.state")
+            _uuid(d.setdefault("reading_id", None), f"{dpath}.reading_id", null=True)
+
+
+def checkin_outcomes(rows: list[dict[str, Any]], declarations: dict[str, list[dict[str, Any]]],
+                     guests: bool = False) -> dict[str, Any]:
+    """What a controller sends after a game (POST /api/v1/sync/checkins), from its check-in ``rows`` (in check-in
+    order: ``player_id``, ``status``, ``checked_in_at``, ``registration_id``, ``from_roster``, ``ticket_sha256``,
+    ``role``, ``display_name``) and each player's ``declarations`` in their order. Both controllers compute it
+    here (the phone with ``checkinOutcomes``), checked against ``checkin_outcomes`` in vectors/sync.json.
+
+    A registration (a row with a registration id) goes with its outcome and its declarations' final states, a
+    registration the controller had only from the app with its ticket's hash; one imported at the controller (no
+    roster, no ticket) is the controller's own and does not go. A walk-in (no registration id) who came counts in
+    ``walkins``. With ``guests`` (``[sync] push_walkins``, decisions PWI-*) each such walk-in who is a player
+    (not staff) and still has a name also goes under ``guests``: player id, display name and declarations with
+    their type, class and state; without it the answer has no ``guests`` at all."""
+    regs: list[dict[str, Any]] = []
+    out_guests: list[dict[str, Any]] = []
+    walkins = 0
+    for r in rows:
+        arrived = r["status"] in ARRIVED_STATES or (r["status"] == "removed" and r.get("checked_in_at") is not None)
+        pid = r["player_id"]
+        decls = declarations.get(pid, [])[:MAX_DECLARATIONS]
+        if not r.get("registration_id"):
+            if not arrived:
+                continue
+            walkins += 1
+            if guests and r.get("role", "player") == "player" and r.get("display_name"):
+                out_guests.append({"player_id": pid, "display_name": r["display_name"][:GUEST_NAME_MAX],
+                                   "declarations": [{"declaration_id": d["declaration_id"], "type": d["type"],
+                                                     "class": d["class"], "state": d["state"],
+                                                     "reading_id": d.get("reading_id")} for d in decls]})
+            continue
+        if not r.get("from_roster") and not r.get("ticket_sha256"):
+            continue
+        entry: dict[str, Any] = {
+            "registration_id": r["registration_id"], "player_id": pid,
+            "outcome": "checked_in" if arrived else "no_show",
+            "declarations": [{"declaration_id": d["declaration_id"], "state": d["state"],
+                              "reading_id": d.get("reading_id")} for d in decls]}
+        if not r.get("from_roster"):
+            entry["ticket_sha256"] = r["ticket_sha256"]
+        regs.append(entry)
+    out: dict[str, Any] = {"registrations": regs, "walkins": walkins}
+    if guests:
+        out["guests"] = out_guests
+    return out
 
 
 def check_claims(body: Any) -> dict[str, Any]:

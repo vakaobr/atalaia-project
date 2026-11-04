@@ -145,6 +145,7 @@ class SyncConfig {
     this.branding = 'local',
     this.library = true,
     this.remoteGm = false,
+    this.pushWalkins = false,
     this.caPem,
   });
 
@@ -165,6 +166,10 @@ class SyncConfig {
 
   /// Open the stream for the remote GM (controller_remote_gm.dart).
   final bool remoteGm;
+
+  /// Push the walk-ins as guest registrations after a game (the Pi's
+  /// `[sync] push_walkins`, decisions PWI-*); off: a count only.
+  final bool pushWalkins;
 
   /// A CA certificate (PEM) to check the site server against instead of
   /// the system's (the Pi's `[sync] ca_file`).
@@ -199,6 +204,7 @@ class SyncConfig {
     'branding': branding,
     'library': library,
     'remote_gm': remoteGm,
+    'push_walkins': pushWalkins,
     if (caPem != null) 'ca_pem': caPem,
   };
 
@@ -216,6 +222,7 @@ class SyncConfig {
       branding: j['branding'] == 'site' ? 'site' : 'local',
       library: j['library'] != false,
       remoteGm: j['remote_gm'] == true,
+      pushWalkins: j['push_walkins'] == true,
       caPem: j['ca_pem'] as String?,
     );
   }
@@ -409,6 +416,9 @@ class ControllerSync {
   bool gameDaySupported = true;
   double? schedulePulledAt;
   int claimsAnswered = 0;
+  // False once a site server refused `guests` (an older one): until a restart.
+  bool guestsSupported = true;
+  int guestsSent = 0;
   bool sharedChronoSupported = true; // S14-5: GET /api/v1/sync/chrono
   int sharedChronoStored = 0; // records kept at the last pull
   bool brandingSupported = true;
@@ -1207,33 +1217,74 @@ class ControllerSync {
     for (final (link, game) in _linked()) {
       if (game['state'] != 'ended') continue;
       final gid = game['id']! as int;
-      final out = checkin.outcomes(gid);
+      final guests = config.pushWalkins && guestsSupported;
+      var out = checkin.outcomes(gid, guests: guests);
       final item = '$gid:${game['game_seed']}';
-      final sha = digestOf(out);
+      var sha = digestOf(out);
       if (sha == sent[item]) continue;
-      final env = envelope(game);
-      final regs = (out['registrations']! as List).cast<Object?>();
-      for (var start = 0; start < max(regs.length, 1); start += maxRoster) {
-        final body = <String, Object?>{
-          ...env,
-          'scheduled_game_id': link['scheduled_game_id'],
-          'walkins': out['walkins'],
-          'registrations': jsonDecode(
-            jsonEncode(
-              regs.sublist(start, min(start + maxRoster, regs.length)),
-            ),
-          ),
-        };
-        try {
-          await _bound(game, '/api/v1/sync/checkins', checkCheckins(body));
-        } on SyncFormatError {
-          // Not in protocol/sync.md's form (the Pi logs it).
-        } on SyncError catch (e) {
-          if (e.status != 400) rethrow;
-        }
+      if (!await _sendCheckins(link, game, out) && guests) {
+        // The site server does not know `guests` (an older one): the count
+        // only, from now on.
+        out = checkin.outcomes(gid);
+        sha = digestOf(out);
+        if (sha != sent[item]) await _sendCheckins(link, game, out);
       }
       _markSynced('checkins', {item: sha});
     }
+  }
+
+  /// One game's outcomes in bodies of at most [maxRoster] registrations and
+  /// [maxRoster] guests each; false only when the site server refused
+  /// `guests` as a field it does not know (sync_client.py `_send_checkins`).
+  Future<bool> _sendCheckins(
+    Map<String, Object?> link,
+    Map<String, Object?> game,
+    Map<String, Object?> out,
+  ) async {
+    final env = envelope(game);
+    final regs = (out['registrations']! as List).cast<Object?>();
+    final guests = (out['guests'] as List?)?.cast<Object?>();
+    int chunksOf(int n) => (n + maxRoster - 1) ~/ maxRoster;
+    final chunks = max(
+      max(chunksOf(regs.length), chunksOf(guests?.length ?? 0)),
+      1,
+    );
+    List<Object?> part(List<Object?> l, int n) => jsonDecode(
+      jsonEncode(
+        l.sublist(
+          min(n * maxRoster, l.length),
+          min((n + 1) * maxRoster, l.length),
+        ),
+      ),
+    ) as List<Object?>;
+    for (var n = 0; n < chunks; n++) {
+      final body = <String, Object?>{
+        ...env,
+        'scheduled_game_id': link['scheduled_game_id'],
+        'walkins': out['walkins'],
+        'registrations': part(regs, n),
+        if (guests != null) 'guests': part(guests, n),
+      };
+      try {
+        final answer = await _bound(
+          game,
+          '/api/v1/sync/checkins',
+          checkCheckins(body),
+        );
+        final stored = answer['guests'];
+        if (guests != null && stored is int) guestsSent += stored;
+      } on SyncFormatError {
+        // Not in protocol/sync.md's form (the Pi logs it).
+      } on SyncError catch (e) {
+        if (e.status != 400) rethrow;
+        final (code, where) = _refusal(e);
+        if (guests != null && code == 'unknown_field' && where == 'guests') {
+          guestsSupported = false;
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   // --- branding and saved teams -----------------------------------------------
@@ -1704,6 +1755,11 @@ class ControllerSync {
         'schedule_pulled_at': schedulePulledAt,
         'linked_games': schedule?.scheduleLinks().length ?? 0,
         'claims_answered': claimsAnswered,
+        'walkins': {
+          'push': config.pushWalkins,
+          'supported': guestsSupported,
+          'guests_sent': guestsSent,
+        },
         'changes': scheduleChanges,
         'shared_chrono': {
           'supported': sharedChronoSupported,

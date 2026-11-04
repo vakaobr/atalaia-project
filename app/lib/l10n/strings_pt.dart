@@ -1118,6 +1118,9 @@ const Map<String, String> ptStrings = {
       'Cenários e predefinições de jogo do campo do servidor do site',
   'ctl_site.remote_gm': 'GM remoto',
   'ctl_site.remote_gm_hint': 'Os GM do campo no servidor do site podem iniciar, pausar e terminar o jogo em curso. Desligado por omissão.',
+  'ctl_site.push_walkins':
+      'Enviar as chegadas sem inscrição ao servidor do site como convidados',
+  'ctl_site.push_walkins_hint': 'Depois de um jogo da agenda, quem jogou sem inscrição vai para o servidor do site com o nome e os resultados de cronógrafo das réplicas; o servidor apaga-os 30 dias depois do jogo. Desligado por omissão: só o número.',
   'ctl_site.atak': 'Feed ATAK (Cursor on Target)',
   'ctl_site.atak_hint':
       'As caixas e as zonas nos mapas do ATAK, pelo Wi-Fi do campo.',
