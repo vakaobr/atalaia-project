@@ -95,6 +95,12 @@ Decidido (no firmware e nos documentos de conceção):
   que o telemóvel vê como um dispositivo série) e Bluetooth LE
   (`atalaia-pod-XXXX`, um telemóvel de cada vez, emparelhado e cifrado;
   decisões PF3, PF4).
+- **Emparelhamento com código**: o pequeno OLED de 0,96" da placa fica
+  apagado, exceto enquanto um telemóvel emparelha por Bluetooth: mostra um
+  código de 6 dígitos, e o telemóvel pede-o, para que ninguém se meta entre o
+  telemóvel e o módulo enquanto emparelham (decisões PODPK-1 a PODPK-11;
+  [secção 10](#10-ligá-lo-a-um-telemóvel)). O botão **PRG** da placa,
+  carregado 5 segundos, faz o módulo esquecer todos os telemóveis.
 - **O registo (log)** vai para o pino de transmissão da UART0, o GPIO 43, e
   não para a porta USB-C, que leva as tramas do módulo.
 - **Saídas simples** (opcionais, desde 2026-11-04; rascunho do RFC «The
@@ -408,13 +414,18 @@ firmware/esp32/README.md):
 | Sem interruptor da caixa | `CONFIG_ATALAIA_POD_TAMPER_PIN=-1` (opcional: um interruptor sem ligação nunca comunica nada) |
 | Interruptor aberto enquanto a tampa está fechada | `# CONFIG_ATALAIA_POD_TAMPER_OPEN_HIGH is not set` |
 | Só USB, sem Bluetooth | `# CONFIG_ATALAIA_POD_BLE is not set` |
+| O OLED está avariado: emparelhar sem código (Just Works) | `# CONFIG_ATALAIA_POD_BLE_PASSKEY is not set` |
+| Sem botão para esquecer os telemóveis | `CONFIG_ATALAIA_POD_BOND_CLEAR_PIN=-1` (por omissão 0: o botão PRG) |
 | Anel de 12 ou 16 LED | `CONFIG_ATALAIA_LED_COUNT=12` (ou 16) |
 | Antena com mais de 2 dBi | `CONFIG_ATALAIA_RADIO_ANTENNA_GAIN_DBI=` o seu ganho, arredondado para cima |
 | O uso de uma saída simples ([8.1](#81-saídas-simples-opcionais)) | `CONFIG_ATALAIA_POD_OUT1_FUNCTION="siren"` (`strobe`, `smoke`, `light`, `horn`, `out.1`; saída 2: `POD_OUT2_FUNCTION`) |
 | O seu tempo máximo ligada | `CONFIG_ATALAIA_POD_OUT1_MAX_ON_S=10` (1-600 s, 30 por omissão; por agora a app para aos 30 s) |
 
-Deixa `CONFIG_ATALAIA_POD_BLE_ENCRYPTED` ligado: impede que a chave do jogo
-circule numa ligação Bluetooth sem cifra.
+Deixa `CONFIG_ATALAIA_POD_BLE_ENCRYPTED` e `CONFIG_ATALAIA_POD_BLE_PASSKEY`
+ligados: o primeiro impede que a chave do jogo circule numa ligação Bluetooth
+sem cifra, o segundo garante que o telemóvel que emparelha é o que tens na mão
+(um código no OLED do módulo). Sem OLED, o registo no GPIO 43 mostra na mesma
+`pairing passkey 123456`.
 
 ### Definições pelo rádio
 
@@ -465,8 +476,28 @@ teclado, LED, áudio). Em resumo:
    *Dispositivo de jogo > Módulo de E/S > Procurar módulos*, abre-o, permite o
    acesso USB: "Módulo ligado por USB".
 2. **Bluetooth.** Desligado do cabo: *Procurar módulos* lista
-   `atalaia-pod-XXXX`; abre-o e confirma uma vez a pergunta de emparelhamento
-   do Android: "Módulo ligado por BLE".
+   `atalaia-pod-XXXX`; abre-o. O OLED do módulo mostra **PAIR**, os segundos
+   que faltam e um código de 6 dígitos (`123 456`), com o nome do módulo por
+   baixo; a janela de emparelhamento do Android pede-o: escreve os 6 dígitos
+   em menos de 30 segundos. O OLED mostra **PAIRED** e a app "Módulo ligado
+   por BLE". Só uma vez: o telemóvel e o módulo guardam o emparelhamento. O
+   ecrã do módulo está sempre em inglês (o módulo não tem idioma).
+   - **Um código errado** (ou *Cancelar*): o OLED mostra **FAILED**, a app diz
+     que o código não coincidiu. Abre o módulo outra vez: um código novo.
+   - **Demasiado lento**: **TOO SLOW** no OLED e uma mensagem na app. Um
+     telemóvel que se liga e nunca emparelha é largado ao fim de 60 segundos.
+   - **"Este módulo tem de ser emparelhado outra vez"**: o telemóvel foi
+     emparelhado com este módulo antes de haver código (um firmware anterior à
+     0.8), ou o módulo esqueceu os telemóveis. O OLED mostra **PAIR AGAIN**; a
+     app esquece o emparelhamento antigo e abre o módulo outra vez sozinha,
+     uma vez: escreve o código novo. Se o Android não deixar a app esquecê-lo,
+     a app avisa: esquece `atalaia-pod-XXXX` nas definições de Bluetooth do
+     Android e liga-o de novo.
+   - **Esquecer todos os telemóveis**: abre a tampa e carrega no botão **PRG**
+     da placa durante 5 segundos. O OLED mostra **FORGET ALL** com uma barra,
+     depois **CLEARED**; um telemóvel ligado é largado. Todos os telemóveis
+     emparelham de novo com código. (Abrir a tampa comunica uma violação se o
+     interruptor da caixa estiver ligado: faz isto entre jogos.)
 3. **Um jogo.** Um jogo de dispositivo de jogo no telemóvel com o módulo
    ligado: os seus botões são as equipas do jogo, por número, o seu anel mostra
    a equipa, o seu leitor verifica as etiquetas de quem joga, e a ligação
@@ -484,6 +515,8 @@ módulo em particular:
 | O telemóvel não encontra o módulo por USB | Um cabo ou uma extensão de painel só de carga; o telemóvel não tem USB host (OTG) |
 | Abrir a porta USB reinicia o módulo | A app põe DTR e RTS ao mesmo tempo; outra app série pode não o fazer: usa a app da Atalaia |
 | `atalaia-pod-XXXX` não aparece na lista | A antena de 2,4 GHz em falta ou no conector errado; outro telemóvel está ligado (um de cada vez); Bluetooth desligado na compilação |
+| O Android pede um código mas o OLED fica apagado | O OLED não foi encontrado no arranque (o registo diz `SSD1306 OLED not found`): o código está no registo do GPIO 43 (`pairing passkey 123456`); verifica o OLED da placa, ou compila sem código (secção 9) |
+| "Este módulo tem de ser emparelhado outra vez" sempre | O Android não esqueceu o emparelhamento: esquece `atalaia-pod-XXXX` nas definições de Bluetooth e liga-o de novo |
 | O telemóvel nunca mostra "Alguém abriu o módulo de E/S" | Sem interruptor no GPIO 47, ou nunca o leu fechado (a tampa não o carrega); um interruptor ligado ao contrário exige `POD_TAMPER_OPEN_HIGH` desligado |
 | O módulo comunica uma abertura sozinho | O interruptor larga quando a caixa leva uma pancada: monta-o mais firme, ou usa um interruptor de alavanca |
 | O botão 4 nunca regista | Está no P7 do PCF8574: o expansor tem de estar montado e ser encontrado no arranque |

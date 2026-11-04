@@ -208,6 +208,7 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/pod/pod_settings.c
     ${SHELL_DIR}/pod/pod_ble.c
     ${SHELL_DIR}/pod/pod_outputs.c
+    ${SHELL_DIR}/pod/pod_pair.c
 )
 
 # ---- HAL stub ----------------------------------------------------------------
@@ -258,6 +259,7 @@ set(TEST_SOURCES
     test_screen_template.c
     test_pod.c
     test_pod_settings.c
+    test_pod_pair.c
     test_fw_update.c
     test_mode_package.c
     test_mode_fetch.c

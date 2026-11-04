@@ -4,18 +4,20 @@
 /// Linking an I/O pod (protocol/capability-proxy.md): over USB-OTG first,
 /// else Bluetooth LE. The screen finds pods, opens the chosen link, waits
 /// for the pod's IDENT and hands the linked [PodClient] back. Over
-/// Bluetooth the pod asks to pair first (an encrypted link, decision PF4),
-/// so the wait is longer: Android shows its pairing question. Not run with
-/// a real pod yet (plan phase G).
+/// Bluetooth the pod asks to pair first (an encrypted link, decision PF4)
+/// with a 6-digit passkey on its OLED that Android's pairing dialog asks
+/// for (PODPK-1 to PODPK-11, lib/pod/pod_pairing.dart), so the wait is
+/// longer; a wrong passkey, a pairing that ran out of time and a pod that
+/// needs pairing again each get their message, and the last is paired
+/// again once by itself. Not run with a real pod yet (plan phase G).
 library;
-
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 
 import '../app.dart';
 import '../l10n/strings.dart';
 import '../pod/pod_client.dart';
+import '../pod/pod_pairing.dart';
 import '../pod/pod_reconnect.dart';
 import '../pod/pod_transports.dart';
 import '../ui/widgets.dart';
@@ -45,6 +47,9 @@ class _PodScreenState extends State<PodScreen> {
   bool _busy = false;
   String? _error;
 
+  /// While a Bluetooth pod pairs: what to tell the person ("pod.pair_hint", "pod.repair").
+  String? _pairing;
+
   Future<void> _find() async {
     final services = context.services;
     setState(() {
@@ -70,41 +75,33 @@ class _PodScreenState extends State<PodScreen> {
     final services = context.services;
     final transport = d.kind == 'usb' ? services.usbPods : services.blePods;
     if (transport == null) return;
-    setState(() => _busy = true);
-    if (!await transport.open(d)) {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _error = 'pod.open_failed';
-        });
-      }
-      return;
-    }
-    final client = PodClient(transport, device: d);
-    final identified = Completer<void>();
-    final sub = client.events.listen((e) {
-      if (e is PodIdentified && !identified.isCompleted) identified.complete();
+    setState(() {
+      _busy = true;
+      _error = null;
+      _pairing = d.kind == 'ble' ? 'pod.pair_hint' : null;
     });
-    await client.start();
-    try {
-      await identified.future.timeout(
-        d.kind == 'usb'
-            ? const Duration(seconds: 3)
-            : const Duration(seconds: 30),
-      );
-    } on TimeoutException {
-      await sub.cancel();
-      await client.close();
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _error = 'pod.no_ident';
-        });
-      }
+    final outcome = await linkPod(
+      d,
+      () => linkAndIdentify(transport, d, transport.open),
+      bonds: transport,
+      onRepair: () {
+        if (mounted) setState(() => _pairing = 'pod.repair');
+      },
+    );
+    if (!mounted) {
+      if (outcome is PodLinked<PodClient>) await outcome.link.close();
       return;
     }
-    await sub.cancel();
-    if (mounted) Navigator.pop(context, client);
+    switch (outcome) {
+      case PodLinked(:final link):
+        Navigator.pop(context, link);
+      case PodLinkFailed(:final messageKey):
+        setState(() {
+          _busy = false;
+          _pairing = null;
+          _error = messageKey;
+        });
+    }
   }
 
   @override
@@ -119,6 +116,7 @@ class _PodScreenState extends State<PodScreen> {
           Text(s.t('pod.intro')),
           const SizedBox(height: 12),
           if (_error != null) Notice(s.t(_error!), kind: NoticeKind.error),
+          if (_pairing != null) Notice(s.t(_pairing!)),
           FilledButton.icon(
             icon: const Icon(Icons.search),
             label: Text(s.t('pod.find')),
