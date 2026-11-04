@@ -9,7 +9,10 @@
  * radio cleared when its link goes, and every capability's events and
  * commands; the simple outputs lent to the phone (main/pod/pod_outputs.c, the expansion
  * port's increment 9) with a fake RMT: their CMDs, their limits, off when the link goes or the
- * phone falls silent, and IDENT's room for them. The frames come from
+ * phone falls silent, and IDENT's room for them; the expansion port (main/pod/pod_port.c, the
+ * port half of increment 9) on the module core behind a fake bus: hits lent and armed by the
+ * phone, a module's outputs lent without the feedback flag and turned off with the link, and the
+ * EVT pod.modules after every IDENT and change. The frames come from
  * protocol/vectors/capability_proxy.yaml where a vector exists. Crypto: the core's test stub (the
  * real AES-CCM: the host pod, test/pod_host, in the app's and the controller's tests).
  */
@@ -25,7 +28,9 @@
 #include "pod/pod.h"
 #include "pod/pod_caps.h"
 #include "pod/pod_json.h"
+#include "module_sim.h"
 #include "pod/pod_outputs.h"
+#include "pod/pod_port.h"
 #include "pod/pod_settings.h"
 #include "proxy_vectors.h"
 #include "simple_out.h"
@@ -191,15 +196,23 @@ static uint32_t now(void *ctx)
     (void)ctx;
     return clock_ms;
 }
+/* The phone acknowledges every EVT at each turn, as the app does (off unless a test sets it). */
+static bool auto_ack;
+static int acked_upto[POD_LINK_COUNT];
 /* The simple outputs (none unless a test adds them: add_output). */
 static pod_outputs_t outs;
 static simple_out_t simple[OUTPUTS_MAX];
 static int simple_count; /* the simple outputs added (not outputs_t's count of every channel) */
+/* The expansion port (no bus unless a test plugs modules in: setup_port). */
+static pod_port_t port;
+static module_sim_t sims[EXP_ADDR_COUNT];
+static bool plugged[EXP_ADDR_COUNT];
 
 static bool command(void *ctx, const atalaia_proxy_msg_t *m)
 {
     (void)ctx;
     if (pod_outputs_owns(&outs, m->cap_id)) return pod_outputs_command(&outs, m);
+    if (pod_port_owns(&port, m->cap_id)) return pod_port_command(&port, m);
     return pod_caps_command(&caps, m);
 }
 static const char *fw = "0.3.0";
@@ -210,12 +223,7 @@ static void ident(void *ctx, atalaia_proxy_ident_t *out, pod_ident_level_t level
 {
     (void)ctx;
     snprintf(out->fw_version, sizeof(out->fw_version), "%s", fw);
-    size_t n = pod_caps_descriptors(&caps, out->caps_json, sizeof(out->caps_json),
-                                    level == POD_IDENT_FULL);
-    if (n > 0 && level < POD_IDENT_NO_OUTPUTS) {
-        pod_outputs_append(&outs, out->caps_json, n, sizeof(out->caps_json),
-                           level == POD_IDENT_FULL);
-    }
+    pod_port_ident_caps(&port, &caps, level, out->caps_json, sizeof(out->caps_json));
     compact_idents += level != POD_IDENT_FULL;
     last_level = level;
     out->has_battery = true;
@@ -318,6 +326,11 @@ static void setup_with(const pod_caps_config_t *cfg, bool radio)
     pod_init(&pod, &io, &rio, &atalaia_crypto_test_stub, "test", radio, 16);
     pod_outputs_init(&outs, NULL);
     simple_count = 0;
+    pod_port_ops_t pops = {.ctx = NULL, .emit = emit};
+    pod_port_init(&port, NULL, &outs, NULL, &pops);
+    memset(plugged, 0, sizeof(plugged));
+    auto_ack = false;
+    memset(acked_upto, 0, sizeof(acked_upto));
 }
 
 static void setup(void)
@@ -351,15 +364,37 @@ static void phone_send_vector(pod_link_t link, const char *name)
     if (v != NULL) pod_feed(&pod, link, v->frame, v->frame_len);
 }
 
+static void phone_send(pod_link_t link, uint8_t type, const uint8_t *payload, size_t len);
+
+static void ack_evts(void)
+{
+    for (int l = 0; l < POD_LINK_COUNT; l++) {
+        if (acked_upto[l] > phone[l].frames) acked_upto[l] = 0; /* the phone was cleared */
+        for (; acked_upto[l] < phone[l].frames; acked_upto[l]++) {
+            int i = acked_upto[l];
+            atalaia_proxy_msg_t m;
+            if (phone[l].type[i] != ATALAIA_PROXY_EVT ||
+                !atalaia_proxy_msg_decode(phone[l].payload[i], phone[l].len[i], &m)) {
+                continue;
+            }
+            uint8_t b[2];
+            atalaia_proxy_ack_encode(m.seq, b, sizeof(b));
+            phone_send((pod_link_t)l, ATALAIA_PROXY_ACK, b, 2);
+        }
+    }
+}
+
 static void advance(uint32_t ms)
 {
     while (ms > 0) {
         uint32_t step = ms < 10 ? ms : 10;
         clock_ms += step;
         ms -= step;
+        if (auto_ack) ack_evts();
         pod_caps_poll(&caps, clock_ms, -1, emit, NULL);
         pod_tick(&pod);
         pod_outputs_tick(&outs, pod_phone_on(&pod), pod_heard_ms(&pod), clock_ms);
+        pod_port_tick(&port, pod_phone_on(&pod), clock_ms);
     }
 }
 
@@ -1377,6 +1412,7 @@ static bool fake_rmt(void *ctx, uint16_t width_us, uint16_t frames, bool flush)
 /* An enabled simple output with that use and longest on, as a pod build adds it. */
 static void add_output(const char *function, int gpio, uint32_t max_on_s)
 {
+    auto_ack = true; /* the phone acknowledges the EVT pod.modules */
     int i = simple_count++;
     simple_out_rmt_t rmt = {.ctx = &simple[i], .send = fake_rmt};
     simple_out_init(&simple[i], gpio, &rmt);
@@ -1394,6 +1430,7 @@ static void add_output(const char *function, int gpio, uint32_t max_on_s)
 static void setup_outputs(void)
 {
     setup();
+    auto_ack = true; /* the phone acknowledges the EVT pod.modules */
     so_burst_count = 0;
     add_output("siren", 33, 30);
     add_output("strobe", 1, 10);
@@ -1651,6 +1688,321 @@ static void test_outputs_link_loss(void)
     CHECK(level(0));
 }
 
+/* ---- The expansion port (pod_port.c) ------------------------------------------------------ */
+
+static module_sim_t *sim_at(uint8_t addr)
+{
+    if (addr < EXP_ADDR_FIRST || addr > EXP_ADDR_LAST) return NULL;
+    return plugged[addr - EXP_ADDR_FIRST] ? &sims[addr - EXP_ADDR_FIRST] : NULL;
+}
+static bool f_probe(void *ctx, uint8_t addr)
+{
+    (void)ctx;
+    return sim_at(addr) != NULL;
+}
+static int f_write(void *ctx, uint8_t addr, const uint8_t *d, size_t n)
+{
+    (void)ctx;
+    module_sim_t *m = sim_at(addr);
+    if (m == NULL) return EXP_BUS_FAIL;
+    module_sim_write(m, clock_ms, d, n);
+    return EXP_BUS_OK;
+}
+static int f_write_read(void *ctx, uint8_t addr, const uint8_t *o, size_t on, uint8_t *in,
+                        size_t inn)
+{
+    (void)ctx;
+    module_sim_t *m = sim_at(addr);
+    if (m == NULL) return EXP_BUS_FAIL;
+    module_sim_write(m, clock_ms, o, on);
+    module_sim_read(m, clock_ms, in, inn);
+    return EXP_BUS_OK;
+}
+static module_sim_t *plug(const char *name, uint8_t addr)
+{
+    int i = addr - EXP_ADDR_FIRST;
+    CHECK(module_sim_named(&sims[i], name, addr, clock_ms));
+    plugged[i] = true;
+    return &sims[i];
+}
+
+static int ident_resends;
+static void count_ident_resend(void *ctx)
+{
+    (void)ctx;
+    ident_resends++;
+    pod_send_ident_all(&pod);
+}
+
+/* A pod (cfg) whose phone acknowledges its EVTs; plug() its modules, then start_port(). */
+static void setup_port(const pod_caps_config_t *cfg)
+{
+    setup_with(cfg, true);
+    auto_ack = true;
+    ident_resends = 0;
+}
+static void start_port(bool module_outputs, uint32_t max_on_s)
+{
+    static const exp_bus_t bus = {NULL, f_probe, f_write, f_write_read};
+    pod_port_config_t pc = {.module_outputs = module_outputs, .module_max_on_s = max_on_s};
+    pod_port_ops_t pops = {.ctx = NULL, .emit = emit, .ident_changed = count_ident_resend};
+    pod_port_init(&port, &bus, &outs, &pc, &pops);
+    pod_port_start(&port, clock_ms);
+}
+
+/* The EVTs of a capability on a link, the n-th from the last (0: the last). */
+static bool nth_evt(pod_link_t link, const char *cap, const char *event, int n,
+                    atalaia_proxy_msg_t *m)
+{
+    phone_t *ph = &phone[link];
+    for (int i = ph->frames - 1; i >= 0; i--) {
+        if (ph->type[i] != ATALAIA_PROXY_EVT ||
+            !atalaia_proxy_msg_decode(ph->payload[i], ph->len[i], m)) {
+            continue;
+        }
+        if (strcmp(m->cap_id, cap) == 0 && strcmp(m->name, event) == 0 && n-- == 0) return true;
+    }
+    return false;
+}
+static int count_evt(pod_link_t link, const char *cap, const char *event)
+{
+    int n = 0;
+    atalaia_proxy_msg_t m;
+    while (nth_evt(link, cap, event, n, &m)) n++;
+    return n;
+}
+static const uint8_t *raw_evt(pod_link_t link, const char *cap, const char *event, size_t *len)
+{
+    phone_t *ph = &phone[link];
+    atalaia_proxy_msg_t m;
+    for (int i = ph->frames - 1; i >= 0; i--) {
+        if (ph->type[i] == ATALAIA_PROXY_EVT &&
+            atalaia_proxy_msg_decode(ph->payload[i], ph->len[i], &m) &&
+            strcmp(m.cap_id, cap) == 0 && strcmp(m.name, event) == 0) {
+            *len = ph->raw_len[i];
+            return ph->raw[i];
+        }
+    }
+    return NULL;
+}
+
+static void test_port_hits(void)
+{
+    pod_caps_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.button[0] = true;
+    setup_port(&cfg);
+    module_sim_t *t = plug("target", 0x58);
+    start_port(false, 30);
+    CHECK(module_sim_armed(t) == 0);
+    /* The phone links: IDENT lends the hit sensor, the EVT pod.modules follows it. */
+    phone_send_vector(POD_LINK_USB, "cmd_ident");
+    atalaia_proxy_ident_t id;
+    CHECK(phone[POD_LINK_USB].frames == 1 &&
+          atalaia_proxy_ident_decode(phone[POD_LINK_USB].payload[0], phone[POD_LINK_USB].len[0],
+                                     &id));
+    CHECK(strcmp(id.caps_json, "[{\"id\":\"btn.1\",\"type\":\"button\"},"
+                               "{\"id\":\"hit\",\"type\":\"hit\"}]") == 0);
+    advance(10);
+    atalaia_proxy_msg_t m;
+    CHECK(nth_evt(POD_LINK_USB, "pod", "modules", 0, &m));
+    CHECK(strcmp(m.data_json, "{\"modules\":\"58:target/1.0.0:hit\",\"max_on_s\":{}}") == 0);
+    CHECK(pod_port_owns(&port, "hit") && pod_port_owns(&port, "hit.2") &&
+          !pod_port_owns(&port, "ring"));
+
+    /* A hit before the phone armed the plate: the module keeps nothing, the phone hears nothing. */
+    CHECK(!module_sim_hit(t, clock_ms, 0, MC_EVENT_HIT, 120));
+    out_cmd("hit", "arm", "{\"args\":[]}", 1);
+    advance(50);
+    CHECK(module_sim_armed(t) == 1);
+    CHECK(module_sim_hit(t, clock_ms, 0, MC_EVENT_HIT, 180));
+    advance(50);
+    CHECK(nth_evt(POD_LINK_USB, "hit", "hit", 0, &m) &&
+          strcmp(m.data_json, "{\"strength\":180}") == 0);
+    /* The vector's bytes: target_hit is {"strength": 200} at its seq. */
+    CHECK(port.hits == 1);
+    /* Disarm: kept on the module. */
+    out_cmd("hit", "disarm", "", 2);
+    advance(50);
+    CHECK(module_sim_armed(t) == 0);
+    out_cmd("hit", "arm", "", 3);
+    advance(50);
+    CHECK(module_sim_armed(t) == 1);
+    /* A method a hit sensor lacks: acknowledged, unknown. */
+    uint32_t unknown = pod.count.cmd_unknown;
+    out_cmd("hit", "fire", "", 4);
+    CHECK(pod.count.cmd_unknown == unknown + 1);
+
+    /* The link goes: disarmed, the arming forgotten; a hit is not kept. */
+    pod_set_link_up(&pod, POD_LINK_USB, false);
+    advance(50);
+    CHECK(module_sim_armed(t) == 0 && port.xb.armed == 0);
+    CHECK(!module_sim_hit(t, clock_ms, 0, MC_EVENT_HIT, 90));
+    /* It links again: IDENT and the EVT again; nothing armed until the phone says so. */
+    pod_set_link_up(&pod, POD_LINK_USB, true);
+    phone_send_vector(POD_LINK_USB, "cmd_ident");
+    advance(50);
+    CHECK(count_evt(POD_LINK_USB, "pod", "modules") == 2 && module_sim_armed(t) == 0);
+
+    /* A second target plugged in during the session: IDENT again (hit, hit.2 with their channel),
+     * the EVT with both, and a hit on it says its channel. */
+    int idents = count_type(POD_LINK_USB, ATALAIA_PROXY_IDENT);
+    module_sim_t *t2 = plug("target", 0x59);
+    advance(EXP_PROBE_MS + 100);
+    CHECK(ident_resends == 1 && count_type(POD_LINK_USB, ATALAIA_PROXY_IDENT) == idents + 1);
+    CHECK(nth_evt(POD_LINK_USB, "pod", "modules", 0, &m));
+    CHECK(strcmp(m.data_json, "{\"modules\":\"58:target/1.0.0:hit;59:target/1.0.0:hit.2\","
+                              "\"max_on_s\":{}}") == 0);
+    int last = phone[POD_LINK_USB].frames - 1;
+    for (; last >= 0 && phone[POD_LINK_USB].type[last] != ATALAIA_PROXY_IDENT; last--) {
+    }
+    CHECK(last >= 0 && atalaia_proxy_ident_decode(phone[POD_LINK_USB].payload[last],
+                                                  phone[POD_LINK_USB].len[last], &id));
+    CHECK(strstr(id.caps_json, "{\"id\":\"hit\",\"type\":\"hit\",\"channel\":1},"
+                               "{\"id\":\"hit.2\",\"type\":\"hit\",\"channel\":2}") != NULL);
+    out_cmd("hit.2", "arm", "", 10);
+    advance(50);
+    CHECK(module_sim_armed(t2) == 1 && module_sim_armed(t) == 0);
+    CHECK(module_sim_hit(t2, clock_ms, 0, MC_EVENT_HIT, 90));
+    advance(50);
+    CHECK(nth_evt(POD_LINK_USB, "hit.2", "hit", 0, &m) &&
+          strcmp(m.data_json, "{\"strength\":90,\"channel\":2}") == 0);
+    /* Its bytes are the vector's second_target_hit but for the seq: the data the same. */
+    size_t rl = 0;
+    CHECK(raw_evt(POD_LINK_USB, "hit.2", "hit", &rl) != NULL);
+
+    /* It is unplugged during the session: pod.module_lost, then IDENT and the EVT without it. */
+    plugged[1] = false;
+    advance(1000);
+    CHECK(nth_evt(POD_LINK_USB, "pod", "module_lost", 0, &m));
+    CHECK(strcmp(m.data_json, "{\"modules\":\"59:target/1.0.0:hit.2\",\"reason\":\"no_answer\"}") ==
+          0);
+    CHECK(nth_evt(POD_LINK_USB, "pod", "modules", 0, &m) &&
+          strcmp(m.data_json, "{\"modules\":\"58:target/1.0.0:hit\",\"max_on_s\":{}}") == 0);
+    CHECK(ident_resends == 2);
+    /* Lost with no phone on a link: nothing told. */
+    pod_set_link_up(&pod, POD_LINK_USB, false);
+    plugged[0] = false;
+    int lost = count_evt(POD_LINK_USB, "pod", "module_lost");
+    advance(1000);
+    CHECK(count_evt(POD_LINK_USB, "pod", "module_lost") == lost);
+}
+
+static void test_port_outputs(void)
+{
+    /* A siren on GPIO 33 and an out4 lent (siren.2, strobe, smoke, out.4), at most 20 s each. */
+    pod_caps_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.button[0] = true;
+    setup_port(&cfg);
+    so_burst_count = 0;
+    add_output("siren", 33, 30);
+    module_sim_t *o4 = plug("out4", 0x5C);
+    module_sim_t *t = plug("target", 0x58);
+    start_port(true, 20);
+    advance(10);
+    CHECK(outs.out.count == 5 && outs.out.simple == 1);
+    CHECK(pod_outputs_owns(&outs, "siren.2") && pod_outputs_owns(&outs, "out.4"));
+    fw = "0.8.0";
+    phone_send_vector(POD_LINK_USB, "cmd_ident");
+    const proxy_frame_vector_t *v = frame_vector("pod_port_modules");
+    CHECK(v != NULL && phone[POD_LINK_USB].frames == 1);
+    if (v != NULL) {
+        CHECK(phone[POD_LINK_USB].raw_len[0] == v->frame_len &&
+              memcmp(phone[POD_LINK_USB].raw[0], v->frame, v->frame_len) == 0);
+    }
+    CHECK(last_level == POD_IDENT_FULL);
+    advance(10);
+    /* The EVT pod.modules: the box's node.modules text and each lent output's longest on; its
+     * bytes are the vector's pod_modules. */
+    size_t rl = 0;
+    const uint8_t *raw = raw_evt(POD_LINK_USB, "pod", "modules", &rl);
+    const proxy_frame_vector_t *ev = frame_vector("pod_modules");
+    CHECK(raw != NULL && ev != NULL);
+    if (raw != NULL && ev != NULL) {
+        atalaia_proxy_msg_t a, b;
+        CHECK(atalaia_proxy_msg_decode(ev->payload, ev->payload_len, &b));
+        atalaia_proxy_msg_t m;
+        CHECK(nth_evt(POD_LINK_USB, "pod", "modules", 0, &m));
+        a = m;
+        CHECK(strcmp(a.data_json, b.data_json) == 0);
+    }
+
+    /* The phone switches the module's siren.2: OUTPUT to the module, its relay on, the lease. */
+    out_cmd("siren.2", "pulse", "{\"ms\":5000}", 1);
+    advance(60);
+    uint8_t bits = 0;
+    module_sim_state(o4, clock_ms, &bits, NULL);
+    CHECK(bits == 0x01 && o4->outputs_taken >= 1);
+    for (int k = 0; k < 6; k++) {
+        advance(400);
+        phone_send_vector(POD_LINK_USB, "cmd_ping");
+    }
+    module_sim_state(o4, clock_ms, &bits, NULL);
+    CHECK(bits == 0x01 && o4->leases >= 1);
+    /* At most the pod's 20 s (the module's strobe: 120 s of its own). */
+    out_cmd("strobe", "on", "{\"ms\":600000}", 2);
+    int ch = outputs_find(&outs.out, "strobe");
+    CHECK(ch >= 0 && outs.out.ch[ch].until_ms - outs.out.ch[ch].start_ms == 20000);
+
+    /* The link goes: the output layer turns them off, the driver tells the module at once. */
+    pod_set_link_up(&pod, POD_LINK_USB, false);
+    advance(300);
+    module_sim_state(o4, clock_ms, &bits, NULL);
+    CHECK(bits == 0 && outs.link_offs == 1);
+
+    /* The phone's app hangs with its link up: off after 1.5 s, the module with it. */
+    pod_set_link_up(&pod, POD_LINK_USB, true);
+    phone_send_vector(POD_LINK_USB, "cmd_ident");
+    advance(600);
+    out_cmd("smoke", "pulse", "{\"ms\":10000}", 3);
+    advance(100);
+    module_sim_state(o4, clock_ms, &bits, NULL);
+    CHECK(bits == 0x04);
+    auto_ack = false;
+    advance(POD_OUT_QUIET_MS + 300);
+    module_sim_state(o4, clock_ms, &bits, NULL);
+    CHECK(bits == 0 && outs.quiet_offs == 1);
+    (void)t;
+
+    /* Without --module-outputs (the build's default) the module's channels are not lent; the text
+     * still lists them, as a box's node.modules does. */
+    setup_port(&cfg);
+    plug("out4", 0x5C);
+    start_port(false, 30);
+    advance(10);
+    CHECK(!pod_outputs_owns(&outs, "siren") && outs.out.count == 4);
+    phone_send_vector(POD_LINK_USB, "cmd_ident");
+    atalaia_proxy_ident_t id;
+    CHECK(atalaia_proxy_ident_decode(phone[POD_LINK_USB].payload[0], phone[POD_LINK_USB].len[0],
+                                     &id) &&
+          strstr(id.caps_json, "output") == NULL);
+    advance(10);
+    atalaia_proxy_msg_t m;
+    CHECK(nth_evt(POD_LINK_USB, "pod", "modules", 0, &m) &&
+          strcmp(m.data_json, "{\"modules\":\"5c:out4/1.0.0:siren,strobe,smoke,out.4\","
+                              "\"max_on_s\":{}}") == 0);
+    out_cmd("siren", "pulse", "{\"ms\":1000}", 1);
+    CHECK(pod.count.cmd_unknown == 1);
+
+    /* A long version and every part: IDENT drops the flags, the hit sensors' channel, the version,
+     * then the outputs, then the hit sensors, in turn. */
+    pod_caps_config_t full = full_config();
+    setup_port(&full);
+    add_output("siren", 33, 30);
+    plug("target", 0x58);
+    plug("target", 0x59);
+    plug("out4", 0x5C);
+    start_port(true, 30);
+    advance(10);
+    fw = "0.3.0-123-g0123456-dirt";
+    phone_send_vector(POD_LINK_USB, "cmd_ident");
+    CHECK(atalaia_proxy_ident_decode(phone[POD_LINK_USB].payload[0], phone[POD_LINK_USB].len[0],
+                                     &id));
+    CHECK(last_level == POD_IDENT_NO_OUTPUTS && strstr(id.caps_json, "output") == NULL &&
+          strstr(id.caps_json, "\"hit.2\"") != NULL && strstr(id.caps_json, "channel") == NULL);
+}
+
 void run_pod_tests(void)
 {
     test_fw_version();
@@ -1668,4 +2020,6 @@ void run_pod_tests(void)
     test_outputs_boot_and_live();
     test_outputs_commands();
     test_outputs_link_loss();
+    test_port_hits();
+    test_port_outputs();
 }

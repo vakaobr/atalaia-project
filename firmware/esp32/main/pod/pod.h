@@ -54,11 +54,12 @@ typedef enum {
  * How much IDENT leaves out to fit in 256 bytes (pod_send_ident tries each in turn, until one
  * fits; decision PF6, increment 9 of the expansion port):
  *   POD_IDENT_FULL        everything;
- *   POD_IDENT_COMPACT     the buttons' colours and the outputs' "feedback" flags left out (both
- *                         optional to the phone);
+ *   POD_IDENT_COMPACT     the buttons' colours, the outputs' "feedback" flags and the port's hit
+ *                         sensors' "channel" left out (all optional to the phone);
  *   POD_IDENT_SHORT_FW    and fw_version cut to its release (0.8.0-dev.412+g8560d54: 0.8.0);
  *   POD_IDENT_NO_OUTPUTS  and the outputs left out (logged: a pod with every part, a long
- *                         version and two outputs).
+ *                         version and two outputs);
+ *   POD_IDENT_NO_PORT     and the expansion port's hit sensors left out too (logged).
  * After the last, the capabilities are left out altogether.
  */
 typedef enum {
@@ -66,7 +67,8 @@ typedef enum {
     POD_IDENT_COMPACT = 1,
     POD_IDENT_SHORT_FW = 2,
     POD_IDENT_NO_OUTPUTS = 3,
-    POD_IDENT_LEVELS = 4,
+    POD_IDENT_NO_PORT = 4,
+    POD_IDENT_LEVELS = 5,
 } pod_ident_level_t;
 
 /* What the pod's settings made of a CMD pod (pod_settings.h). */
@@ -194,6 +196,10 @@ void pod_feed(pod_t *p, pod_link_t link, const uint8_t *data, size_t len);
 
 /* Sends an IDENT frame on a link. */
 void pod_send_ident(pod_t *p, pod_link_t link);
+
+/* Sends IDENT again on every active link (the capabilities changed: a module on the expansion
+ * port found or lost, pod_port.h). */
+void pod_send_ident_all(pod_t *p);
 
 /*
  * A capability's event, as an EVT on every active link (data_json: a JSON

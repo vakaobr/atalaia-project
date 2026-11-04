@@ -500,8 +500,9 @@ menu "Atalaia Field Box Configuration"
             default 30
             help
                 The pod never keeps the output on longer than this, whatever
-                the phone asks. The phone's app applies 30 s too, so a longer
-                time is cut there until the app learns the pod's.
+                the phone asks. The pod tells the phone (the EVT pod.modules'
+                max_on_s), so the app uses it; an app from before that keeps
+                30 s.
 
         config ATALAIA_POD_OUT2_FUNCTION
             string "The pod's output 2: its use"
@@ -516,6 +517,49 @@ menu "Atalaia Field Box Configuration"
             depends on ATALAIA_SIMPLE_OUT2 && ATALAIA_POD_MODE
             range 1 600
             default 30
+    endmenu
+
+    # ---- The I/O pod's expansion port (draft RFC "The expansion port", increment 9, EXP-26) ----
+    menu "Expansion port (I/O pod)"
+        depends on ATALAIA_POD_MODE
+
+        config ATALAIA_POD_PORT
+            bool "Look for modules on the expansion port"
+            default y
+            help
+                The box's port driver on the pod's I2C bus (GPIO 17 SDA and
+                18 SCL, the bus of the keypad's expander, the NFC reader and
+                the battery gauge, behind the port board's buffer: EXP-2; no
+                GPIO of its own). Modules at 0x58-0x5F are found at boot and
+                within 2 s of being plugged in. A target module's hit sensors
+                are lent to the phone as `hit` (and `hit.2`), reporting only
+                while a phone is on a link and has armed them. With no module
+                plugged in it costs one probe every 250 ms. Not yet tried on
+                hardware. Wiring: hardware/expansion-port/BUILD.md.
+
+        config ATALAIA_POD_MODULE_OUTPUTS
+            bool "Lend an output module's channels to the phone"
+            depends on ATALAIA_POD_PORT
+            default n
+            help
+                An output module's channels (a relay board on the port,
+                increment 11) as `output` capabilities for the phone's mode
+                and the field's CMD 12. A Field Box's admin enables each
+                channel at the box (EXP-28); a pod has no admin PIN, so
+                building this in is what enables them, as for the pod's
+                simple outputs. The pod holds the module's lease: whatever
+                the phone does, every output goes off within 1.5 s of the
+                phone's link going or falling silent. Off by default.
+
+        config ATALAIA_POD_MODULE_MAX_ON_S
+            int "A module output's longest on (seconds)"
+            depends on ATALAIA_POD_MODULE_OUTPUTS
+            range 1 600
+            default 30
+            help
+                The pod never keeps a module's channel on longer than this,
+                nor longer than the module's own longest on. The pod tells
+                the phone each output's longest on, so the app uses it.
     endmenu
 
     # ---- Battery gauge (MAX17048 over I2C, shared bus with NFC and OLED) ----

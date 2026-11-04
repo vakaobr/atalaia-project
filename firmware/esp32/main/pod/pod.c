@@ -74,6 +74,7 @@ void pod_send_ident(pod_t *p, pod_link_t link)
             if (cut > 0) id.fw_version[cut] = '\0';
         }
         if (level == POD_IDENT_NO_OUTPUTS) say(p, "IDENT does not fit; sent without the outputs");
+        if (level == POD_IDENT_NO_PORT) say(p, "IDENT does not fit; sent without the hit sensors");
         id.has_radio = p->radio.radio_present;
         id.protocol_version = ATALAIA_PROXY_VERSION;
         /* As the modem's JSON IDENT: measure with a radio and a measuring build; field and
@@ -92,6 +93,13 @@ void pod_send_ident(pod_t *p, pod_link_t link)
         n = atalaia_proxy_ident_encode(&id, buf, sizeof(buf));
     }
     if (n > 0) send(p, (int)link, ATALAIA_PROXY_IDENT, buf, n);
+}
+
+void pod_send_ident_all(pod_t *p)
+{
+    for (int l = 0; l < POD_LINK_COUNT; l++) {
+        if (p->links[l].active) pod_send_ident(p, (pod_link_t)l);
+    }
 }
 
 /* ---- The radio: the modem's frames, 3 types up ------------------------------------- */
@@ -136,9 +144,7 @@ static bool radio_filter(void *ctx, const atalaia_header_t *hdr, const uint8_t *
     if (r == POD_CONFIG_APPLIED) {
         p->count.config_applied++;
         say(p, "pod settings rev %lu taken", (unsigned long)rev);
-        for (int l = 0; l < POD_LINK_COUNT; l++) {
-            if (p->links[l].active) pod_send_ident(p, (pod_link_t)l);
-        }
+        pod_send_ident_all(p);
     } else {
         p->count.config_repeats++;
     }

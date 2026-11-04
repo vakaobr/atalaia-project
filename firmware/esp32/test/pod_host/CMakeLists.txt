@@ -17,6 +17,8 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 get_filename_component(CORE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../../core" ABSOLUTE)
 get_filename_component(MAIN_DIR "${CMAKE_CURRENT_LIST_DIR}/../../main" ABSOLUTE)
+# The module core (firmware/module-core/): the simulated modules of --module (test/module_sim.c).
+get_filename_component(MODULE_CORE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../module-core" ABSOLUTE)
 
 find_library(MBEDCRYPTO_LIB NAMES libmbedcrypto.a mbedcrypto)
 find_path(MBEDTLS_INCLUDE_DIR mbedtls/ccm.h)
@@ -34,6 +36,11 @@ add_executable(pod_host
     ${MAIN_DIR}/pod/pod_settings.c
     ${MAIN_DIR}/pod/pod_ble.c
     ${MAIN_DIR}/pod/pod_outputs.c
+    ${MAIN_DIR}/pod/pod_port.c
+    ${MAIN_DIR}/expansion.c
+    ${MAIN_DIR}/expansion_box.c
+    ${MODULE_CORE_DIR}/src/module_core.c
+    ${CMAKE_CURRENT_LIST_DIR}/../module_sim.c
     ${MAIN_DIR}/outputs.c
     ${MAIN_DIR}/simple_out.c
     ${MAIN_DIR}/screen_json.c
@@ -60,7 +67,8 @@ add_executable(pod_host
     ${CORE_DIR}/src/pair_frame.c
 )
 target_include_directories(pod_host PRIVATE
-    ${CORE_DIR}/include ${CORE_DIR}/src ${MAIN_DIR} ${MBEDTLS_INCLUDE_DIR})
+    ${CORE_DIR}/include ${CORE_DIR}/src ${MAIN_DIR} ${MBEDTLS_INCLUDE_DIR}
+    ${MODULE_CORE_DIR}/include ${CMAKE_CURRENT_LIST_DIR}/..)
 target_compile_definitions(pod_host PRIVATE ATALAIA_HAVE_MBEDTLS)
 target_link_libraries(pod_host PRIVATE ${MBEDCRYPTO_LIB})
 # floor() in the output layer (main/outputs.c, main/pod/pod_outputs.c).

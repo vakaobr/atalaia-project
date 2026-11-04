@@ -53,14 +53,14 @@ size_t pod_outputs_append(const pod_outputs_t *po, char *json, size_t len, size_
     char tail[ATALAIA_PROXY_JSON_MAX];
     size_t n = 0;
     bool first = len == 2; /* "[]": no comma before the first */
-    /* Every channel the layer has is a simple output today (the shell adds only those); when
-     * module channels join it (the port half of increment 9), only the simple ones say
-     * "feedback": false. */
+    /* The simple outputs first, then a module's output channels (the expansion port: pod_port.h);
+     * only a simple output says "feedback": false (a module's channel leaves the key out). */
     for (int i = 0; i < po->out.count; i++) {
         const out_channel_t *c = &po->out.ch[i];
         if (!c->set.enabled) continue;
+        bool flag = feedback && !c->module;
         int w = snprintf(tail + n, sizeof(tail) - n, "%s{\"id\":\"%s\",\"type\":\"output\"%s}",
-                         first ? "" : ",", c->id, feedback ? ",\"feedback\":false" : "");
+                         first ? "" : ",", c->id, flag ? ",\"feedback\":false" : "");
         if (w < 0 || n + (size_t)w >= sizeof(tail)) return 0;
         n += (size_t)w;
         first = false;

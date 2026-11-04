@@ -64,9 +64,10 @@ bool pod_outputs_owns(const pod_outputs_t *po, const char *cap_id);
 
 /*
  * The enabled outputs' descriptors added to IDENT's capability array json (len bytes, "[...]",
- * NUL-terminated, in a buffer of cap): {"id":"siren","type":"output","feedback":false}, without
- * "feedback" unless feedback. Returns the new length, or 0 when they do not fit (json is then
- * unchanged).
+ * NUL-terminated, in a buffer of cap): a simple output {"id":"siren","type":"output",
+ * "feedback":false}, without "feedback" unless feedback; a module's output channel (the expansion
+ * port, pod_port.h) {"id":"strobe","type":"output"}. Returns the new length, or 0 when they do not
+ * fit (json is then unchanged).
  */
 size_t pod_outputs_append(const pod_outputs_t *po, char *json, size_t len, size_t cap,
                           bool feedback);
