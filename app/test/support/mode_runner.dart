@@ -25,11 +25,11 @@ import 'package:atalaia_app/ffi/bindings.dart';
 import 'package:atalaia_app/ffi/callbacks.dart';
 import 'package:atalaia_app/ffi/core_node.dart';
 import 'package:atalaia_app/ffi/native_types.dart';
+import 'package:atalaia_app/prop/box_outputs.dart';
 import 'package:atalaia_app/security/nfc_tag_signer.dart';
 import 'package:crypto/crypto.dart';
 import 'package:yaml/yaml.dart';
 
-import 'box_outputs.dart';
 import 'event_schema.dart';
 
 /// How the test's nodes run.

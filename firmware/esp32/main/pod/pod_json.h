@@ -19,6 +19,12 @@ bool pod_json_str(const char *json, const char *key, char *out, size_t cap);
 /* The number value of a top-level key (true/false read as 1/0). */
 bool pod_json_num(const char *json, const char *key, double *out);
 
+/* A top-level key is there, whatever its value. */
+bool pod_json_has(const char *json, const char *key);
+
+/* The value of a top-level key when it is a JSON number (not true or false, not a string). */
+bool pod_json_number(const char *json, const char *key, double *out);
+
 /* Element index of the top-level "args" array, as a string or a number. */
 bool pod_json_arg_str(const char *json, size_t index, char *out, size_t cap);
 bool pod_json_arg_num(const char *json, size_t index, double *out);

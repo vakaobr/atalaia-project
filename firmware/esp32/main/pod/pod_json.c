@@ -146,6 +146,18 @@ bool pod_json_num(const char *json, const char *key, double *out)
     return i != 0 && read_number(json, i, out);
 }
 
+bool pod_json_has(const char *json, const char *key)
+{
+    return find_key(json, key) != 0;
+}
+
+bool pod_json_number(const char *json, const char *key, double *out)
+{
+    size_t i = find_key(json, key);
+    if (i == 0 || !(json[i] == '-' || (json[i] >= '0' && json[i] <= '9'))) return false;
+    return read_number(json, i, out);
+}
+
 bool pod_json_arg_str(const char *json, size_t index, char *out, size_t cap)
 {
     size_t i = find_arg(json, index);
