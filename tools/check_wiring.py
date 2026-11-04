@@ -38,7 +38,10 @@ with --resolve before drawing. The check fails when:
   pod's BUILD.md, GUIDES below) or of the project page's build page
   (site/src/build.html, its cells marked data-kconfig) gives a GPIO that is
   not its Kconfig default, a pin no part may use, or leaves out a pin it must
-  list (phase 5 plan phase 12);
+  list (phase 5 plan phase 12); the pod's guide and the page's pod section
+  (<section id="io-pod">, its simple outputs on GPIO 33 and 1 included) are
+  read with the pod build's defaults, Kconfig with sdkconfig.defaults and
+  sdkconfig.pod over it (GUIDE_SDKCONFIG, SITE_SECTION_SDKCONFIG below);
 - the expansion port's pin table (hardware/expansion-port/BUILD.md and its
   Portuguese BUILD.pt.md, the table after the marker PORT_MARKER) does not give
   the M12 pin-out of decision EXP-1 (pin, wire colour and signal; SDA and SCL on
@@ -46,6 +49,11 @@ with --resolve before drawing. The check fails when:
   and option cells, pin 5 not connected), or the keypad expander's Kconfig
   address falls in the expansion modules' range 0x58-0x5F (EXP-7: PORT_PINOUT,
   EXPANSION_ADDRESSES below);
+- the I2C output module's pin table (hardware/output-module/BUILD.md and
+  BUILD.pt.md, the table after the marker OUTPUT_MARKER) does not give each pin
+  of firmware/output-module/src/board.h exactly once, on its GP number; or
+  board.h itself puts two pins on one GPIO, a pin outside GP0-GP29, SDA and SCL
+  off an i2c0 pair, or the supply sense off an ADC pin (OUTPUT_BOARD below);
 - a rendered SVG or PNG is missing, or an SVG was not rendered from the
   current source and Kconfig defaults (the render writes the SHA-256 of the
   resolved source into it).
@@ -89,6 +97,11 @@ GUIDES: dict[Path, tuple[str, ...]] = {
         "ATALAIA_LED_PIN", "ATALAIA_NFC_SDA_PIN", "ATALAIA_NFC_SCL_PIN", "ATALAIA_AUDIO_BCLK_PIN",
         "ATALAIA_AUDIO_LRCLK_PIN", "ATALAIA_AUDIO_DOUT_PIN", "ATALAIA_POD_TAMPER_PIN"),
 }
+# A guide whose pins are those of another firmware variant: its table is checked against that
+# build's Kconfig defaults (the I/O pod's simple outputs: GPIO 33 and 1, not the Field Box's 46).
+GUIDE_CHOICE: dict[Path, frozenset[str]] = {
+    REPO / "hardware" / "io-pod" / "BUILD.md": frozenset({"ATALAIA_POD_MODE"}),
+}
 # The expansion port's build guide (draft RFC "The expansion port", increment 10): the port uses no
 # GPIO of its own, so its only pins are the I2C bus's, behind the port board's buffer. Both languages
 # are checked: the table is the same in each, and only the colour and signal words differ.
@@ -107,18 +120,41 @@ PORT_PINOUT: dict[int, tuple[tuple[str, ...], tuple[str, ...] | None, str | None
     4: (("black", "preto"), ("SCL",), "ATALAIA_NFC_SCL_PIN"),
     5: (("grey", "cinzento"), None, None),
 }
+# The I2C output module's build guide (draft RFC "The expansion port", increment 11): its RP2040 pins
+# are the firmware's own (board.h's OUT_PIN_* defines), not the box's Kconfig; each language's table
+# names each define in backticks next to its GP number ("| GP6 | `OUT_PIN_CH0` | ...").
+OUTPUT_BOARD = REPO / "firmware" / "output-module" / "src" / "board.h"
+OUTPUT_GUIDES = [REPO / "hardware" / "output-module" / "BUILD.md",
+                 REPO / "hardware" / "output-module" / "BUILD.pt.md"]
+OUTPUT_MARKER = "<!-- check_wiring: output-module-pins -->"
+OUTPUT_DEFINE = re.compile(r"^#define\s+(OUT_PIN_\w+)\s+(\d+)\b", re.MULTILINE)
+OUTPUT_SYMBOL = re.compile(r"`(OUT_PIN_\w+)`")
+RP2040_ADC_PINS = range(26, 30)
 # Expansion modules answer at 0x58-0x5F (EXP-7); the box's own parts and the keypad search stay out.
 EXPANSION_ADDRESSES = range(0x58, 0x60)
 BOX_ADDRESSES = {0x24: "the PN532", 0x36: "the battery gauge", 0x3C: "the board's OLED"}
 KEYPAD_SEARCH = (range(0x20, 0x28), range(0x38, 0x40))
 # A guide whose pins are those of another firmware variant: its table is checked against that
-# build's Kconfig defaults (the I/O pod's simple outputs: GPIO 33 and 1, not the Field Box's 46).
-GUIDE_CHOICE: dict[Path, frozenset[str]] = {
-    REPO / "hardware" / "io-pod" / "BUILD.md": frozenset({"ATALAIA_POD_MODE"}),
+# build's Kconfig defaults, Kconfig.projbuild read with the variant's sdkconfig files laid over it in
+# the order tools/docker_fw.py gives them (POD_DEFAULTS there): the I/O pod's simple outputs are
+# GPIO 33 and 1, not the Field Box's 46 and 45.
+ESP32 = REPO / "firmware" / "esp32"
+POD_SDKCONFIG = (ESP32 / "sdkconfig.defaults", ESP32 / "sdkconfig.pod")
+GUIDE_SDKCONFIG: dict[Path, tuple[Path, ...]] = {
+    REPO / "hardware" / "io-pod" / "BUILD.md": POD_SDKCONFIG,
 }
 GUIDE_SYMBOL = re.compile(r"`(ATALAIA_\w+)`")
 # The project page's build page: <td data-kconfig="ATALAIA_BTN1_PIN">4</td>.
 SITE_CELL = re.compile(r'data-kconfig="(ATALAIA_\w+)"[^>]*>([^<]*)<')
+SITE_SECTION = re.compile(r'<section id="([\w-]+)"(.*?)</section>', re.DOTALL)
+# A section of the build page whose pins are another variant's, as GUIDE_SDKCONFIG (decision
+# WIRE-1): the pod's section is read with the pod build's defaults, and must mark the cells named
+# here (its guide's pins and its two simple outputs, WIRE-2); every other cell, with the Field Box's.
+SITE_SECTION_SDKCONFIG: dict[str, tuple[Path, ...]] = {"io-pod": POD_SDKCONFIG}
+SITE_SECTION_REQUIRED: dict[str, tuple[str, ...]] = {
+    "io-pod": GUIDES[REPO / "hardware" / "io-pod" / "BUILD.md"] + (
+        "ATALAIA_SIMPLE_OUT_PIN", "ATALAIA_SIMPLE_OUT2_PIN"),
+}
 
 BOARD = "BOARD"
 HASH_MARK = "atalaia-wiring-source-sha256:"
@@ -211,12 +247,12 @@ REVISION_FEM: dict[str, tuple[int, str]] = {
 }
 DEFAULT_REVISION = "ATALAIA_BOARD_HELTEC_V4_3"
 # The I/O pod's simple outputs (EXP-34, increment 9): the pod has no display, so its pins 33, 1 and
-# 3 are free; output 1 on GPIO 33, output 2 on GPIO 1. The display's and the on-board OLED's
-# symbols keep their Field Box defaults in a pod build but drive nothing there, and the keypad's
-# GPIO matrix is the Wokwi emulator's (a pod has the PCF8574; the firmware refuses a clash in a
-# matrix build at compile time).
+# 3 are free; output 1 on GPIO 33, output 2 on GPIO 1. The display's symbols keep their Field Box
+# defaults in a pod build but drive nothing there, and the keypad's GPIO matrix is the Wokwi
+# emulator's (a pod has the PCF8574; the firmware refuses a clash in a matrix build at compile
+# time). The on-board OLED is checked: a pod shows its Bluetooth passkey on it (PODPK-2).
 POD_SIMPLE_OUT = {"ATALAIA_SIMPLE_OUT_PIN": 33, "ATALAIA_SIMPLE_OUT2_PIN": 1}
-POD_UNUSED_PREFIXES = ("ATALAIA_DISP_", "ATALAIA_OLED_", "ATALAIA_KP_ROW", "ATALAIA_KP_COL")
+POD_UNUSED_PREFIXES = ("ATALAIA_DISP_", "ATALAIA_KP_ROW", "ATALAIA_KP_COL")
 # Optional parts Kconfig never builds together (`depends on !...`): their pins may share a GPIO.
 EXCLUSIVE = {frozenset({"ATALAIA_BUZZER_PIN", "ATALAIA_SIMPLE_OUT2_PIN"})}
 SHARED_BUS = {17, 18}  # board-internal, but the shared I2C bus is meant to be wired
@@ -258,13 +294,42 @@ def _truth(expr: str, bools: dict[str, bool]) -> bool:
     return any(all(term(t) for t in part.split("&&")) for part in expr.split("||"))
 
 
-def read_kconfig_defaults(text: str, choose: frozenset[str] = frozenset()) -> dict[str, int]:
+def read_sdkconfig(paths: tuple[Path, ...]) -> dict[str, str]:
+    """The values an sdkconfig defaults file sets, later files over earlier ones:
+    `CONFIG_SYM=y` -> {"SYM": "y"}, `# CONFIG_SYM is not set` -> "n"."""
+    values: dict[str, str] = {}
+    for path in paths:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            m = re.fullmatch(r"CONFIG_(\w+)=(.*)", line)
+            if m:
+                values[m.group(1)] = m.group(2).strip().strip('"')
+                continue
+            m = re.fullmatch(r"#\s*CONFIG_(\w+) is not set", line)
+            if m:
+                values[m.group(1)] = "n"
+    return values
+
+
+def variant_defaults(kconfig_text: str, sdkconfig: tuple[Path, ...]) -> dict[str, int]:
+    """A firmware variant's pin defaults: Kconfig with the variant's sdkconfig files over it (its
+    `=y` choice members chosen, its bools and numbers set)."""
+    values = read_sdkconfig(sdkconfig)
+    chosen = frozenset(name for name, value in values.items() if value == "y")
+    return read_kconfig_defaults(kconfig_text, chosen, values)
+
+
+def read_kconfig_defaults(text: str, choose: frozenset[str] = frozenset(),
+                          fixed: dict[str, str] | None = None) -> dict[str, int]:
     """Returns the default of every numeric `config` symbol.
 
     Handles conditional defaults (`default 6 if SYM`, the first true one wins)
     and choices (`default SYM` selects that choice member; a member in `choose`
-    is selected instead, as a build that picks it).
+    is selected instead, as a build that picks it). `fixed` holds the values an
+    sdkconfig file sets (read_sdkconfig): a bool or a number there wins over its
+    Kconfig default.
     """
+    fixed = fixed or {}
     numeric: dict[str, list[tuple[str, str | None]]] = {}
     bool_defaults: dict[str, list[tuple[str, str | None]]] = {}
     choice_members: list[list[str]] = []
@@ -319,13 +384,22 @@ def read_kconfig_defaults(text: str, choose: frozenset[str] = frozenset()) -> di
             chosen = picked[0]
         for member in members:
             bools[member] = member == chosen
+    for name, value in fixed.items():
+        if value in ("y", "n") and name not in bools:
+            bools[name] = value == "y"
     for name, options in bool_defaults.items():
+        if fixed.get(name) in ("y", "n"):
+            bools[name] = fixed[name] == "y"
+            continue
         for value, cond in options:
             if cond is None or _truth(cond, bools):
                 bools[name] = value == "y"
                 break
     defaults: dict[str, int] = {}
     for name, options in numeric.items():
+        if re.fullmatch(r"-?\d+|0x[0-9a-fA-F]+", fixed.get(name, "")):
+            defaults[name] = int(fixed[name], 0)
+            continue
         for value, cond in options:
             if cond is None or _truth(cond, bools):
                 defaults[name] = int(value, 0)
@@ -552,7 +626,7 @@ def check_pin(where: str, symbol: str, cell: str, defaults: dict[str, int],
     if gpio in STRAP_TOLERANT and symbol in STRAP_TOLERANT[gpio][0]:
         return []
     if POD_SIMPLE_OUT.get(symbol) == gpio:
-        return []  # the I/O pod's guide, read with its build's defaults (GUIDE_CHOICE)
+        return []  # the I/O pod's guide or page section, read with its build's defaults
     if symbol in REVISION_FREE:
         # A guide's tables are for the default revision (a V4.3); its cell names both.
         if gpio == REVISION_FREE[symbol][DEFAULT_REVISION]:
@@ -667,15 +741,103 @@ def check_port_addresses(defaults: dict[str, int]) -> list[str]:
 
 
 def check_site_build(text: str, required: set[str], defaults: dict[str, int],
-                     internal: set[int]) -> list[str]:
-    """The project page's build page: each cell marked data-kconfig holds that pin's GPIO."""
+                     internal: set[int],
+                     section_defaults: dict[str, dict[str, int]] | None = None) -> list[str]:
+    """The project page's build page: each cell marked data-kconfig holds that pin's GPIO, the
+    Field Box's default, or in a section of section_defaults (the I/O pod's) that build's."""
+    section_defaults = section_defaults or {}
     errors: list[str] = []
     seen: set[str] = set()
-    for symbol, cell in SITE_CELL.findall(text):
+    sections = {m.group(1): m.group(2) for m in SITE_SECTION.finditer(text)}
+    for name in sorted(set(section_defaults) | set(SITE_SECTION_REQUIRED)):
+        if name not in sections:
+            errors.append(f"{SITE_BUILD.name}: no <section id=\"{name}\">")
+    for name, body in sections.items():
+        where = f"{SITE_BUILD.name} (#{name})"
+        section_seen: set[str] = set()
+        for symbol, cell in SITE_CELL.findall(body):
+            section_seen.add(symbol)
+            errors += check_pin(where, symbol, cell.strip(), section_defaults.get(name, defaults),
+                                internal)
+        seen |= section_seen
+        errors += [f"{where}: no data-kconfig cell for {s}"
+                   for s in SITE_SECTION_REQUIRED.get(name, ()) if s not in section_seen]
+    outside = SITE_SECTION.sub("", text)
+    for symbol, cell in SITE_CELL.findall(outside):
         seen.add(symbol)
         errors += check_pin(SITE_BUILD.name, symbol, cell.strip(), defaults, internal)
     errors += [f"{SITE_BUILD.name}: no data-kconfig cell for {s}" for s in sorted(required)
                if s not in seen]
+    return errors
+
+
+def read_output_board(text: str) -> dict[str, int]:
+    """board.h's OUT_PIN_* defines: symbol -> GP number."""
+    return {name: int(gp) for name, gp in OUTPUT_DEFINE.findall(text)}
+
+
+def check_output_board(pins: dict[str, int]) -> list[str]:
+    """The output module's pins themselves: one GPIO each, on the RP2040, the bus on an i2c0 pair,
+    the supply sense on an ADC pin."""
+    name = OUTPUT_BOARD.relative_to(REPO).as_posix()
+    errors: list[str] = []
+    if not pins:
+        return [f"{name}: no OUT_PIN_* define"]
+    for symbol in ("OUT_PIN_SDA", "OUT_PIN_SCL", "OUT_PIN_SUPPLY_SENSE", "OUT_PIN_LED",
+                   "OUT_PIN_JUMPER_A0", "OUT_PIN_JUMPER_A1", "OUT_PIN_CH0"):
+        if symbol not in pins:
+            errors.append(f"{name}: no {symbol}")
+    by_gp: dict[int, list[str]] = {}
+    for symbol, gp in pins.items():
+        by_gp.setdefault(gp, []).append(symbol)
+        if gp > 29:
+            errors.append(f"{name}: {symbol} is GP{gp}; the RP2040 has GP0-GP29")
+    for gp, symbols in sorted(by_gp.items()):
+        if len(symbols) > 1:
+            errors.append(f"{name}: {' and '.join(sorted(symbols))} are both GP{gp}")
+    sda, scl = pins.get("OUT_PIN_SDA"), pins.get("OUT_PIN_SCL")
+    if sda is not None and scl is not None and (sda % 4 != 0 or scl != sda + 1):
+        errors.append(f"{name}: SDA GP{sda} and SCL GP{scl} are not an i2c0 pair (GP0/1, GP4/5, ...)")
+    sense = pins.get("OUT_PIN_SUPPLY_SENSE")
+    if sense is not None and sense not in RP2040_ADC_PINS:
+        errors.append(f"{name}: OUT_PIN_SUPPLY_SENSE is GP{sense}, not an ADC pin (GP26-GP29)")
+    return errors
+
+
+def check_output_table(name: str, text: str, pins: dict[str, int]) -> list[str]:
+    """The output module's pin table: each board.h pin exactly once, its GP number in the cell
+    before its backticked name."""
+    if OUTPUT_MARKER not in text:
+        return [f"{name}: no pin table after the marker {OUTPUT_MARKER!r}"]
+    errors: list[str] = []
+    seen: dict[str, int] = {}
+    in_table = False
+    for line in text.split(OUTPUT_MARKER, 1)[1].splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            if in_table:
+                break
+            continue
+        in_table = True
+        cells = [c.strip() for c in stripped.strip("|").split("|")]
+        for i, cell in enumerate(cells):
+            m = OUTPUT_SYMBOL.fullmatch(cell)
+            if not m:
+                continue
+            symbol = m.group(1)
+            seen[symbol] = seen.get(symbol, 0) + 1
+            if symbol not in pins:
+                errors.append(f"{name}: the pin table names {symbol}, which board.h does not have")
+                continue
+            gp = re.fullmatch(r"GP(\d+)", cells[i - 1]) if i > 0 else None
+            if gp is None or int(gp.group(1)) != pins[symbol]:
+                errors.append(f"{name}: {symbol} is GP{pins[symbol]} in board.h, the table says "
+                              f"{cells[i - 1] if i > 0 else 'nothing'!r}")
+    for symbol in pins:
+        if symbol not in seen:
+            errors.append(f"{name}: the pin table has no row for {symbol}")
+        elif seen[symbol] > 1:
+            errors.append(f"{name}: the pin table has {seen[symbol]} rows for {symbol}")
     return errors
 
 
@@ -687,17 +849,24 @@ def check_guides(kconfig_path: Path) -> list[str]:
     errors: list[str] = []
     for path, required in GUIDES.items():
         name = path.relative_to(REPO).as_posix()
-        choice = GUIDE_CHOICE.get(path)
-        guide_defaults = read_kconfig_defaults(kconfig_text, choice) if choice else defaults
+        sdkconfig = GUIDE_SDKCONFIG.get(path)
+        guide_defaults = variant_defaults(kconfig_text, sdkconfig) if sdkconfig else defaults
         errors += check_guide(name, path.read_text(encoding="utf-8"), required, guide_defaults,
                               internal)
     for path in PORT_GUIDES:
         errors += check_port_table(path.relative_to(REPO).as_posix(),
                                    path.read_text(encoding="utf-8"), defaults)
     errors += check_port_addresses(defaults)
+    output_pins = read_output_board(OUTPUT_BOARD.read_text(encoding="utf-8"))
+    errors += check_output_board(output_pins)
+    for path in OUTPUT_GUIDES:
+        errors += check_output_table(path.relative_to(REPO).as_posix(),
+                                     path.read_text(encoding="utf-8"), output_pins)
     required_all = {s for symbols in GUIDES.values() for s in symbols}
+    section_defaults = {name: variant_defaults(kconfig_text, sdkconfig)
+                        for name, sdkconfig in SITE_SECTION_SDKCONFIG.items()}
     errors += check_site_build(SITE_BUILD.read_text(encoding="utf-8"), required_all, defaults,
-                               internal)
+                               internal, section_defaults)
     return errors
 
 
@@ -894,7 +1063,7 @@ def main(argv: list[str]) -> int:
         print(f"check_wiring: {len(errors)} problem(s)", file=sys.stderr)
         return 1
     print("check_wiring: the wiring diagrams, the pin tables (Field Box, build guides, the "
-          "expansion port, project page) and the Kconfig defaults agree")
+          "expansion port, the output module, project page) and the Kconfig defaults agree")
     return 0
 
 

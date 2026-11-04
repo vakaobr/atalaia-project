@@ -137,6 +137,8 @@ export function eventWords(e) {
         const r = t(`feed.module_lost_reasons.${reason}`);
         if (!r.startsWith('feed.')) reason = r;
     }
+    // Outputs fitted but not enabled by the box's admin (EXPL-13); none: every one is enabled.
+    if (e.type === 'node.outputs_disabled' && !d.modules) key += '_none';
     let source = d.source || '';
     if (e.type === 'output.switched') {
         const r = t(`feed.output_sources.${source}`);

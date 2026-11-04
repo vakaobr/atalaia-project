@@ -400,6 +400,8 @@ class Controller:
         # The live game's boxes' modules, from their last node.modules (outputs.py, EXP-21), and the
         # CMD 12 rate limit per node (EXP-30).
         self._modules: dict[int, list[dict[str, Any]]] = {}
+        # Their outputs fitted but not enabled, from their last node.outputs_disabled (EXPL-13).
+        self._outputs_disabled: dict[int, list[dict[str, Any]]] = {}
         self._output_rate = outputs.RateLimit()
         self._meta_cache: dict[str, tuple[int, Optional[scenarios.Meta]]] = {}
         self.key_lost = False
@@ -640,6 +642,8 @@ class Controller:
                 known.battery_pct = node["battery_pct"]
             if isinstance(node.get("modules"), list):
                 self._modules[node["node_id"]] = node["modules"]
+            if isinstance(node.get("outputs_disabled"), list):
+                self._outputs_disabled[node["node_id"]] = node["outputs_disabled"]
         self._restore_health(fc, game["id"])
         # The controller's own events go on from their stored seq: from 1 again, an event at the
         # same game time and of the same type as an earlier one (a second GM adjustment before
@@ -695,6 +699,7 @@ class Controller:
         self._field_scores = {}
         self._box_end = None
         self._modules = {}
+        self._outputs_disabled = {}
         self._output_rate.clear()
         if self.transport is not None:
             self.transport.flush()  # frames still waiting for their gap go now: the key goes next
@@ -1624,21 +1629,28 @@ class Controller:
         """The start check's capability part for these joined nodes (outputs.check_nodes)."""
         assert self.game is not None
         stored = {n["node_id"]: n for n in self.store.nodes(self.game["id"])}
+        # A scenario's game: the outputs its triggers switch on each box, by the name the GM gave it.
+        meta = self.scenario_meta(self.game.get("mode_id"))
         info = []
         for node_id, role in nodes:
             row = stored.get(node_id, {})
             live = self.fc.nodes.get(node_id) if self.fc is not None else None
             caps = live.hello.get("capabilities") if live is not None and live.hello else row.get("capabilities")
-            info.append({"node": node_id, "name": live.name if live is not None else row.get("name", str(node_id)),
-                         "role": role, "capabilities": caps,
-                         "modules": self._modules.get(node_id, row.get("modules"))})
+            entry = {"node": node_id, "name": live.name if live is not None else row.get("name", str(node_id)),
+                     "role": role, "capabilities": caps, "modules": self._modules.get(node_id, row.get("modules")),
+                     "outputs_disabled": self._outputs_disabled.get(node_id, row.get("outputs_disabled"))}
+            if meta is not None:
+                entry["outputs"] = meta.node_outputs(self.scenario_names.get(node_id))
+            info.append(entry)
         return outputs.check_nodes(info, self._role_spec)
 
     def start_check(self) -> dict[str, Any]:
         """What Start would say now: the needed roles, how many nodes of each have joined, the
         missing ones (Start refuses unless forced), the joined nodes that lack a capability their
         role requires (``missing_caps``: refused too), the mode's minimums not met and optional
-        capabilities lacking (warnings), and the simple outputs no box can check (``not_checked``)."""
+        capabilities lacking (warnings), the simple outputs no box can check (``not_checked``), and
+        the outputs a box has fitted but not enabled that its role would switch (``outputs_disabled``:
+        notes, EXPL-13)."""
         with self._lock:
             if self.game is None:
                 raise Conflict("no live game")
@@ -1671,7 +1683,8 @@ class Controller:
             warnings += caps["warnings"]
             return {"needed": needed, "joined": dict(sorted(joined.items())), "missing": missing,
                     "missing_caps": caps["missing_caps"], "warnings": warnings,
-                    "not_checked": caps["not_checked"], "ok": not missing and not caps["missing_caps"]}
+                    "not_checked": caps["not_checked"], "outputs_disabled": caps["outputs_disabled"],
+                    "ok": not missing and not caps["missing_caps"]}
 
     def start_game(self, game_id: int, force: bool = False) -> dict[str, Any]:
         with self._lock:
@@ -1888,6 +1901,9 @@ class Controller:
             "capabilities": hello.get("capabilities"),
             # Its modules and simple outputs, from its last node.modules; null until it says (EXP-21).
             "modules": self._modules.get(node.node_id),
+            # Its outputs fitted but not enabled by its admin, from its last node.outputs_disabled;
+            # null until it says, [] when every one is enabled (EXPL-13).
+            "outputs_disabled": self._outputs_disabled.get(node.node_id),
             # The box's stable device id (HELLO key 10, protocol/field-frames.md), as hex.
             "device_id": device.hex() if isinstance(device, (bytes, bytearray)) and len(device) == 8 else None,
             "score": {t: v.get(f"node-{node.node_id}", 0) for t, v in self.fc._scores.items()},
@@ -1945,12 +1961,15 @@ class Controller:
                     raise Conflict(f"game {game_id} is {self.game['state']}: an output turns on only while "
                                    "the game runs (off works whenever the game is live)")
                 types = outputs.types_of(node.hello.get("capabilities") if node.hello else None)
+                # Fitted but not enabled (EXPL-13): the refusal says so, so the GM knows where to look.
+                off = params["capability"] in outputs.output_caps(self._outputs_disabled.get(node_id))
+                admin = f"; its {params['capability']} is fitted, not enabled by the box's admin" if off else ""
                 if types and outputs.OUTPUT_TYPE not in node.hello.get("capabilities", []):
-                    raise Conflict(f"{node.name} has no output enabled (its HELLO lists none)")
+                    raise Conflict(f"{node.name} has no output enabled (its HELLO lists none){admin}")
                 known = self._modules.get(node_id)
                 if known is not None and params["capability"] not in outputs.output_caps(known):
                     raise Conflict(f"{node.name} has no output {params['capability']} (it has: "
-                                   f"{', '.join(sorted(outputs.output_caps(known))) or 'none'})")
+                                   f"{', '.join(sorted(outputs.output_caps(known))) or 'none'}){admin}")
             wait = self._output_rate.wait_ms(node_id, act, self.now_ms())
             if wait:
                 raise TooSoon(f"an output of {node.name} was switched less than 2 s ago; again in "
@@ -2003,12 +2022,24 @@ class Controller:
 
     def _on_modules(self, record: dict[str, Any]) -> None:
         """A box's node.modules (its modules and simple outputs) or node.module_lost: the node list's
-        ``modules``, stored with the node and told to the consoles."""
+        ``modules``; its node.outputs_disabled: the node list's ``outputs_disabled`` (EXPL-13). Stored
+        with the node and told to the consoles."""
         assert self.game is not None and self.fc is not None
         node = self.fc.nodes.get(int(record["node"]))
         if node is None:
             return
         text = (record.get("data") or {}).get("modules")
+        if record["type"] == "node.outputs_disabled":
+            disabled = outputs.modules_of(text)
+            if disabled is None:
+                log.warning("node %d: node.outputs_disabled not in protocol/expansion-port.md's form: %r",
+                            node.node_id, text)
+                return
+            self._outputs_disabled[node.node_id] = disabled
+            self._on_node(node, "modules")
+            if self.game.get("state") == "ready" and not self.game.get("joined"):
+                self._emit({"type": "game", "game": self.public_game(self.game)})  # outputs_disabled changed
+            return
         if record["type"] == "node.modules":
             modules = outputs.modules_of(text)
             if modules is None:
@@ -2308,7 +2339,8 @@ class Controller:
                 self._emit({"type": "game", "game": self.public_game(self.game)})
         if self.positions is not None:
             self.positions.on_event(self.game["id"], record)
-        if (record.get("type") in ("node.modules", "node.module_lost") and record["node"] != self.node_id
+        if (record.get("type") in ("node.modules", "node.module_lost", "node.outputs_disabled")
+                and record["node"] != self.node_id
                 and record.get("origin") != "controller" and self.fc is not None):
             self._on_modules(record)
         if self.field is not None and record["node"] != self.node_id and record.get("origin") != "controller":

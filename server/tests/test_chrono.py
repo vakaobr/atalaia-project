@@ -749,7 +749,8 @@ class FieldErasureTests(ChronoCase):
         await self.link(user_id, "p-rita", other[0][0])  # the same id at another field is another person's
         body = field_body(erasures=[{"player_id": "p-rita", "chrono": True, "identity": False, "erased_at": T0}])
         self.assertEqual(await self.post("erasures", body), {
-            "players": 1, "chrono_readings": 2, "chrono_rejects": 0, "replicas": 1, "identities": 0, "claims": 0})
+            "players": 1, "chrono_readings": 2, "chrono_rejects": 0, "replicas": 1, "identities": 0, "claims": 0,
+            "guests": 0})
         self.assertEqual(await self.count("field_player_ids"), 3)  # chrono only: the links stay
         self.assertEqual([r[0] for r in await self.fetch("SELECT player_id FROM chrono_readings")], ["p-bea"])
         self.assertEqual(await self.count("chrono_violations"), 0)

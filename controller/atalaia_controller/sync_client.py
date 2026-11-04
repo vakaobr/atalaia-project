@@ -51,7 +51,11 @@ another field, never judged and never sent back: decision S14-5), and accounts' 
 /api/v1/sync/claims``), which it answers by comparing the claimed secret's
 hash with its own (``POST /api/v1/sync/claims``: the hashes never leave the
 controller). Once a linked game has ended, its registrations' outcomes go back
-(``POST /api/v1/sync/checkins``), again only when they change. A site server
+(``POST /api/v1/sync/checkins``), again only when they change; with
+``[sync] push_walkins = true`` (off by default, decisions PWI-*) its walk-ins
+go too, as guests (player id, display name, declarations' states), which the
+site server keeps 30 days after the game; a site server that does not know
+``guests`` gets the count only. A site server
 without these endpoints (an older one) is skipped quietly. The site server
 never sends anything into a running game: a roster pulled after the start is
 not applied.
@@ -92,7 +96,8 @@ longer lists is gone): only what this controller installed from the site, and
 a scenario neither a game that is not ended runs, nor a scheduled game names,
 nor the GM replaced with a manifest of their own, which stay.
 
-**Never sent:** positions (P4R25), check-in names and federation numbers,
+**Never sent:** positions (P4R25), check-in names (but the walk-ins' display names with
+``[sync] push_walkins``) and federation numbers,
 tokens, the game, join and token keys, private keys. The bodies carry the fields listed in
 protocol/sync.md only; a node's info goes through a list of allowed keys, and
 every event is checked with ``sync_format.check_event`` before it is sent
@@ -318,6 +323,8 @@ class SyncClient:
         self.game_day_supported = True
         self.schedule_pulled_at: Optional[float] = None
         self.claims_answered = 0
+        self.guests_supported = True  # False once a site server refused ``guests`` (an older one): until a restart
+        self.guests_sent = 0
         self.erasures_supported = True  # S14-10: an older site server has no POST /api/v1/sync/erasures
         self.erasures_sent = 0
         self.limit_j_supported = True  # PKD-3: an older site server refuses a reading's ``limit_j``
@@ -857,34 +864,58 @@ class SyncClient:
         self.claims_answered += sum(1 for r in results if r["result"] != "unknown")
 
     def _push_checkins(self) -> None:
-        """Once a linked game has ended: its registrations' outcomes, again only when they change."""
+        """Once a linked game has ended: its registrations' outcomes, again only when they change; with
+        ``[sync] push_walkins`` its walk-ins as guests too (decisions PWI-*)."""
         if self.checkin is None:
             return
         sent = self.store.sync_items("checkins")
         for link, game in self._linked():
             if game["state"] != "ended":
                 continue
-            out = self.checkin.outcomes(game["id"])
+            guests = bool(getattr(self.cfg, "sync_push_walkins", False)) and self.guests_supported
+            out = self.checkin.outcomes(game["id"], guests=guests)
             item = f"{game['id']}:{game['game_seed']}"
             sha = digest(out)  # before the check below fills in its defaults
             if sha == sent.get(item):
                 continue
-            env = self._envelope(game)
-            regs = out["registrations"]
-            for start in range(0, max(len(regs), 1), MAX_ROSTER):
-                body = {**env, "scheduled_game_id": link["scheduled_game_id"], "walkins": out["walkins"],
-                        "registrations": json.loads(json.dumps(regs[start:start + MAX_ROSTER]))}
-                try:
-                    self._bound(game, "/api/v1/sync/checkins", check_checkins(body))
-                except SyncFormatError as exc:
-                    log.error("game %d: the check-in outcomes are not in protocol/sync.md's form: %s", game["id"], exc)
-                except SyncError as exc:
-                    if exc.status != 400:
-                        raise
-                    code, where = _refusal(exc)
-                    log.error("the site server refused the check-in outcomes of game %d (%s at %s)", game["id"],
-                              code, where)
+            if not self._send_checkins(link, game, out) and guests:
+                # The site server does not know ``guests`` (an older one): the count only, from now on.
+                out = self.checkin.outcomes(game["id"])
+                sha = digest(out)
+                if sha != sent.get(item):
+                    self._send_checkins(link, game, out)
             self.store.mark_synced("checkins", {item: sha})
+
+    def _send_checkins(self, link: dict[str, Any], game: dict[str, Any], out: dict[str, Any]) -> bool:
+        """Sends one game's outcomes in bodies of at most MAX_ROSTER registrations and MAX_ROSTER guests each;
+        False only when the site server refused ``guests`` as a field it does not know."""
+        env = self._envelope(game)
+        regs, guests = out["registrations"], out.get("guests")
+        chunks = max(-(-len(regs) // MAX_ROSTER), -(-len(guests or ()) // MAX_ROSTER), 1)
+        for n in range(chunks):
+            part = slice(n * MAX_ROSTER, (n + 1) * MAX_ROSTER)
+            body = {**env, "scheduled_game_id": link["scheduled_game_id"], "walkins": out["walkins"],
+                    "registrations": json.loads(json.dumps(regs[part]))}
+            if guests is not None:
+                body["guests"] = json.loads(json.dumps(guests[part]))
+            try:
+                answer = self._bound(game, "/api/v1/sync/checkins", check_checkins(body))
+                if guests is not None and isinstance(answer, dict):
+                    self.guests_sent += int(answer.get("guests") or 0)
+            except SyncFormatError as exc:
+                log.error("game %d: the check-in outcomes are not in protocol/sync.md's form: %s", game["id"], exc)
+            except SyncError as exc:
+                if exc.status != 400:
+                    raise
+                code, where = _refusal(exc)
+                if guests is not None and code == "unknown_field" and where == "guests":
+                    log.warning("the site server does not take walk-ins as guests ([sync] push_walkins): "
+                                "it gets their count only")
+                    self.guests_supported = False
+                    return False
+                log.error("the site server refused the check-in outcomes of game %d (%s at %s)", game["id"],
+                          code, where)
+        return True
 
     # --- branding and saved teams (plan phase 18) ------------------------------------------
 
@@ -1192,6 +1223,8 @@ class SyncClient:
                 "game_day": {"supported": self.game_day_supported, "schedule_pulled_at": self.schedule_pulled_at,
                              "linked_games": len(self.store.schedule_links()),
                              "claims_answered": self.claims_answered,
+                             "walkins": {"push": bool(getattr(self.cfg, "sync_push_walkins", False)),
+                                         "supported": self.guests_supported, "guests_sent": self.guests_sent},
                              "changes": self.schedule_changes,
                              "shared_chrono": {"supported": self.shared_chrono_supported,
                                                "stored": self.shared_chrono_stored}},

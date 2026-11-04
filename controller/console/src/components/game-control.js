@@ -194,13 +194,18 @@ class CreateGame extends Component {
 }
 
 /** The outputs a mode's roles say they switch (a role's `outputs:`, draft RFC "The expansion port",
- * EXP-22): "Bomb / Rush would switch these outputs on a box that has them: smoke, siren". */
+ * EXP-22): "Bomb / Rush would switch these outputs on a box that has them: smoke, siren"; for a
+ * scenario, those its triggers switch on each of its boxes (the compiled `outputs`, EXP-25):
+ * "siren, strobe (master); horn (gate)". */
 function modeOutputs(mode) {
     const fns = [...new Set(Object.values(mode.roles || {})
         .flatMap((r) => (r && Array.isArray(r.outputs) ? r.outputs : [])))];
-    if (!fns.length) return null;
+    const boxes = mode.kind === 'scenario' && mode.outputs && typeof mode.outputs === 'object'
+        ? Object.entries(mode.outputs).filter(([, list]) => Array.isArray(list) && list.length) : [];
+    const list = boxes.length ? boxes.map(([box, list]) => `${list.join(', ')} (${box})`).join('; ') : fns.join(', ');
+    if (!list) return null;
     return html`<p class="muted small" data-testid="game-mode-outputs">${t('game.mode_outputs',
-        { mode: modeText(mode, 'name'), list: fns.join(', ') })}</p>`;
+        { mode: modeText(mode, 'name'), list })}</p>`;
 }
 
 class Broadcast extends Component {

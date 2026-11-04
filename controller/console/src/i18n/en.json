@@ -125,6 +125,7 @@
     "missing_caps": "A box lacks what its role needs: {list}. Start anyway only if the game can do without it.",
     "missing_caps_short": "A box lacks what its role needs: {list}.",
     "not_checked": "{capability} on {name}: not checked (simple output). Look at it before the game.",
+    "outputs_disabled": "{name} ({role}): {caps} fitted, not enabled by the box's admin. The mode would switch it: enable it at the box with the admin PIN, or play without it.",
     "start_warnings": {
       "min": "{have} × {role} joined; the mode asks for {value} ({param}).",
       "optional_caps": "{name} ({role}) has no {caps}: the mode does without it.",
@@ -247,6 +248,8 @@
       "node_setup_applied": "{zone} confirmed its scenario setup",
       "battery_low": "A box's battery is low",
       "node_modules": "{zone} has: {modules}",
+      "node_outputs_disabled": "{zone}: fitted, not enabled by the box's admin: {modules}",
+      "node_outputs_disabled_none": "{zone}: every output fitted is enabled",
       "node_module_lost": "{zone} lost a module: {modules} ({reason})",
       "output_switched": "{zone}: {capability} on for {s} s ({source})",
       "output_switched_off": "{zone}: {capability} off ({source})",
@@ -305,6 +308,7 @@
     "command_sent": "sent",
     "not_checked": "not checked",
     "module_lost": "lost",
+    "outputs_disabled": "{caps} · fitted, not enabled by the box's admin",
     "conflict": "Two boxes share node {node}: one join was used on two boxes, and they use the same radio nonces. Take one of them out of the game and join it again with a new join (Join)."
   },
   "outputs": {
@@ -505,7 +509,7 @@
     "off_note": "Map fetching is off for this field (Settings).",
     "login": "Sign in to the console with the GM code first, then open this page from the Field tab.",
     "intro": "Find the field on the map and mark the corners of its outline: this browser draws the field image from open maps. The image, its place on the map (ATAK) and the field boundary are then saved on the field controller, which needs no internet for this.",
-    "sources": "Only while you set the game up: this browser fetches the map and the area once, from OpenStreetMap (© OpenStreetMap contributors) and, where there is one, the country's or region's open aerial imagery (the DGT orthophoto in mainland Portugal, IGN's PNOA in Spain, IGN's orthophotos in France and PDOK's in the Netherlands, and the public services' of Belgium, Luxembourg, Switzerland, eleven German states, Poland, Czechia and Austria (basemap.at), each with its credit). If OpenStreetMap's data service is busy, the same question (only the field's area) goes to another public server with the same data (overpass.private.coffee). Nothing else is downloaded, and the rest of the console keeps working without internet.",
+    "sources": "Only while you set the game up: this browser fetches the map and the area once, from OpenStreetMap (© OpenStreetMap contributors) and, where there is one, the country's or region's open aerial imagery (the DGT orthophoto in mainland Portugal, IGN's PNOA in Spain, IGN's orthophotos in France and PDOK's in the Netherlands, and the public services' of Belgium, Luxembourg, Switzerland, twelve German states, Poland, Czechia and Austria (basemap.at), each with its credit). If OpenStreetMap's data service is busy, the same question (only the field's area) goes to another public server with the same data (overpass.private.coffee). Nothing else is downloaded, and the rest of the console keeps working without internet.",
     "offline": "This page needs internet, and this device has none now. The rest of the console works without it.",
     "go": "Search for a place, or go to “latitude, longitude”",
     "go_button": "Search",
@@ -542,7 +546,7 @@
     "layer": "Layer:",
     "layer_map": "Map",
     "layer_ortho": "Orthophoto ({name})",
-    "layer_none": "Here there is only OpenStreetMap's map: open high-resolution aerial imagery that may be used is only available in mainland Portugal, Spain, France (with Corsica and its overseas territories), the Netherlands, Belgium, Luxembourg, Switzerland and Liechtenstein, Poland, Czechia, Austria, and Germany except Baden-Württemberg, Lower Saxony, Hamburg, Saxony-Anhalt and Schleswig-Holstein.",
+    "layer_none": "Here there is only OpenStreetMap's map: open high-resolution aerial imagery that may be used is only available in mainland Portugal, Spain, France (with Corsica and its overseas territories), the Netherlands, Belgium, Luxembourg, Switzerland and Liechtenstein, Poland, Czechia, Austria, and Germany except Lower Saxony, Hamburg, Saxony-Anhalt and Schleswig-Holstein.",
     "outline": "The field's outline",
     "corners": "{n} of at most {max} corners (at least 3).",
     "corners_max": "At most {n} corners.",

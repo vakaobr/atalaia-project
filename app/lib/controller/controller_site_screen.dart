@@ -37,7 +37,7 @@ class _ControllerSiteScreenState extends State<ControllerSiteScreen> {
   final _staff = TextEditingController();
   var _failover = 'manual';
   var _syncOn = false, _brandingSite = false, _library = true;
-  var _remoteGm = false;
+  var _remoteGm = false, _pushWalkins = false;
   var _atakOn = false, _players = false, _remote = false;
   var _remotePlayers = false;
   var _staffTls = false;
@@ -63,6 +63,7 @@ class _ControllerSiteScreenState extends State<ControllerSiteScreen> {
       _brandingSite = sync.branding == 'site';
       _library = sync.library;
       _remoteGm = sync.remoteGm;
+      _pushWalkins = sync.pushWalkins;
     }
     final atak = st.controllerAtak;
     AtakConfig a;
@@ -109,6 +110,7 @@ class _ControllerSiteScreenState extends State<ControllerSiteScreen> {
         branding: _brandingSite ? 'site' : 'local',
         library: _library,
         remoteGm: _remoteGm,
+        pushWalkins: _pushWalkins,
       );
       final problem = cfg.problem();
       if (problem != null) {
@@ -247,6 +249,13 @@ class _ControllerSiteScreenState extends State<ControllerSiteScreen> {
                 _remoteGm,
                 (v) => _remoteGm = v,
                 hint: s.t('ctl_site.remote_gm_hint'),
+              ),
+              _switch(
+                'sync-push-walkins',
+                s.t('ctl_site.push_walkins'),
+                _pushWalkins,
+                (v) => _pushWalkins = v,
+                hint: s.t('ctl_site.push_walkins_hint'),
               ),
             ],
             const Divider(height: 32),

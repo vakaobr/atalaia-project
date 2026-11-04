@@ -50,7 +50,7 @@ const _fieldMapOrthophotos =
     'https://geo4.service24.rlp.de https://geoportal.saarland.de '
     'https://geodienste.sachsen.de https://www.geoproxy.geoportal-th.de '
     'https://mapy.geoportal.gov.pl https://ags.cuzk.gov.cz '
-    'https://mapsneu.wien.gv.at';
+    'https://mapsneu.wien.gv.at https://owsproxy.lgl-bw.de';
 const _fieldMapOrthoTiles =
     'https://wmts1.geoportail.lu https://wmts.geo.admin.ch '
     'https://www.wmts.nrw.de';
