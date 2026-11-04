@@ -1,0 +1,50 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$hh_title</h1>
+<p id="hh-none" class="notice" role="note" hidden>$hh_not_hosted</p>
+<div id="hh-main" hidden>
+<p>$hh_intro</p>
+<section id="hh-switch-section" aria-labelledby="hh-switch-title">
+<h2 id="hh-switch-title">$hh_switch_title</h2>
+<p id="hh-state"></p>
+<p>$hh_what</p>
+<ul>
+<li>$hh_what_yes</li>
+<li>$hh_what_no</li>
+<li>$hh_what_keep</li>
+<li>$hh_what_off</li>
+</ul>
+<form id="hh-form" class="staff-form" method="post" novalidate hidden>
+<fieldset disabled>
+<p class="check"><input type="checkbox" id="hh-enabled" name="enabled"> <label for="hh-enabled">$hh_enabled</label></p>
+<button type="submit" id="hh-save">$hh_save</button>
+</fieldset>
+</form>
+<p id="hh-admin-only" class="hint" hidden>$hh_admin_only</p>
+</section>
+<section id="hh-list-section" aria-labelledby="hh-list-title">
+<h2 id="hh-list-title">$hh_list_title</h2>
+<p id="hh-off" class="notice" role="note" hidden>$hh_reciprocity</p>
+<div id="hh-list" hidden>
+<p>$hh_fields_intro</p>
+<ul id="hh-fields" class="acct-list"></ul>
+<form id="hh-filter" class="staff-form inline" method="get" novalidate>
+<fieldset disabled>
+<div class="row">
+<label for="hh-mode">$filter_mode</label>
+<input id="hh-mode" name="mode" maxlength="128" autocapitalize="none" spellcheck="false">
+</div>
+<button type="submit" id="hh-apply">$apply</button>
+</fieldset>
+</form>
+<p id="hh-empty" hidden>$hh_empty</p>
+<div class="table-wrap">
+<table id="hh-table" class="data" hidden>
+<thead><tr><th scope="col">$hh_col_field</th><th scope="col">$col_mode</th><th scope="col">$col_started</th><th scope="col">$hh_col_ended</th><th scope="col">$col_scores</th><th scope="col">$col_winner</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p><button type="button" id="hh-more" hidden>$hh_more</button></p>
+</div>
+</section>
+</div>

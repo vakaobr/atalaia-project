@@ -731,6 +731,22 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(len(self.db.fetch("SELECT 1 FROM fields")), 1)
         self.db.fetch("DELETE FROM fields")
 
+    def test_0031_with_data(self) -> None:
+        """0031_hub_history: a field that exists does not share its game history (opt-in, HUBH-1), and back down the
+        columns are gone with the field kept."""
+        command.upgrade(self.cfg, "0030_sharing_terms")
+        self.db.fetch("INSERT INTO fields (name, slug) VALUES ('Arena', 'arena')")
+        command.upgrade(self.cfg, "0031_hub_history")
+        row = self.db.fetch("SELECT history_sharing_enabled, history_shared_since FROM fields WHERE slug = 'arena'")[0]
+        self.assertEqual((row[0], row[1]), (False, None))
+        self.db.fetch("UPDATE fields SET history_sharing_enabled = true, history_shared_since = now()")
+        command.downgrade(self.cfg, "0030_sharing_terms")
+        columns = {r["column_name"] for r in self.db.fetch(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'fields'")}
+        self.assertFalse({c for c in columns if c.startswith("history_shar")})
+        self.assertEqual(len(self.db.fetch("SELECT 1 FROM fields")), 1)
+        self.db.fetch("DELETE FROM fields")
+
     def test_one_linear_history(self) -> None:
         self.assertEqual(len(self.script.get_heads()), 1)
         self.assertEqual(len(self.script.get_bases()), 1)
