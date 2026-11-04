@@ -17,7 +17,7 @@ Each domain keeps the format it was built with (decision P5R-11):
     editor    simulator/atalaia_sim/editor/i18n/<lang>.json the mode editor
     app       app/lib/l10n/strings_<lang>.dart              the Flutter app ("-" as "_")
     box       firmware/esp32/main/box_text.c                the Field Box's screens (one column a language)
-    server    server/atalaia_server/web/i18n.py, staff_i18n.py   the site server's pages
+    server    server/atalaia_server/web/i18n.py, staff_i18n.py, player_i18n.py   the site server's pages
     modes     modes/*/mode.yaml (i18n.<lang>)               the built-in modes' names, descriptions, labels
 
 The languages and their state are in docs/translations/status.yaml. For each domain a language
@@ -212,7 +212,7 @@ def read_box(root: Path) -> Domain:
 def read_server(root: Path) -> Domain:
     tables: dict[str, dict[str, str]] = {}
     where = {}
-    for name in ("i18n.py", "staff_i18n.py"):
+    for name in ("i18n.py", "staff_i18n.py", "player_i18n.py"):
         path = root / "server" / "atalaia_server" / "web" / name
         if not path.is_file():
             continue
@@ -224,7 +224,7 @@ def read_server(root: Path) -> Domain:
                 for lang, texts in ast.literal_eval(node.value).items():
                     prefix = name.removesuffix(".py") + "."
                     tables.setdefault(lang, {}).update({prefix + k: v for k, v in texts.items()})
-                    where[lang] = "server/atalaia_server/web/{i18n,staff_i18n}.py"
+                    where[lang] = "server/atalaia_server/web/{i18n,staff_i18n,player_i18n}.py"
     return Domain("server", BRACES, tables, where)
 
 

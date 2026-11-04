@@ -657,12 +657,17 @@ a chrono pass, the outcomes); 296 controller tests (18 new:
 the console's browser tests (1 new: a game from the schedule, expected players,
 *Arrived*, a scanned ticket, the counts); the Dart ticket tests against the
 same vectors. Built since: the app's screens for logging in and the account
-(`app/lib/site/site_auth.dart`, `account_screen.dart`, `site_screens.dart`).
-Not yet: a real game day (HW1); `[sync] push_walkins`; the
+(`app/lib/site/site_auth.dart`, `account_screen.dart`, `site_screens.dart`);
+`[sync] push_walkins` (2026-11-04, decisions PWI-1 to PWI-10: the walk-ins as
+guest registrations, opt-in on both controllers, deleted 30 days after the
+game; tested with the shared `checkin_outcomes` vectors, both controllers'
+sync tests and the site server's `WalkinGuestTests`).
+Not yet: a real game day (HW1); the
 registration import (17). Decisions S16-1 to S16-14, all open; S16-4 (claims
 confirmed by the controller), S16-6 (the field's limit template set on both
 sides) and S16-9 (no registration form on the public pages) want the
-maintainer's eye.
+maintainer's eye. S16-9's "later also on the web pages" is built since
+2026-11-04 (WREG-*, below).
 
 ## Other fields' chrono records on the controllers (S14-5, built 2026-10-27, in software)
 
@@ -698,10 +703,13 @@ controller's `test_sync_schedule.py` (7 new) and the answer vectors, 2,078 Dart
 tests (5 new in `controller_sync_test.dart`, the vectors in
 `controller_sync_format_test.dart`); `tools/check.sh` green.
 
-Not yet: a real field pair (HW1); the app's own screens for the person's
-consent per field (the endpoints exist, `PUT /api/v1/me/consents/chrono-sharing/{field}`);
-the player's own view of other fields' records in the app; a browser test of the
-console's new list.
+Not yet: a real field pair (HW1); the player's own view of other fields'
+records in the app; a browser test of the console's new list. The app's
+screens for the person's consent per field and their own chrono history were
+built on 2026-11-04 (`app/lib/site/chrono_screens.dart`: *My chrono checks and
+sharing*, a switch per field, off until turned on and confirmed, withdrawn
+after a confirmation; `GET /api/v1/me/chrono`, `PUT`/`DELETE
+/api/v1/me/consents/chrono-sharing/{field}`; decisions APPS-1 to APPS-8).
 
 ## Plan phase 17: registration import and platform adapters, and the app's registration screens (built 2026-10-20, in software)
 
@@ -759,7 +767,11 @@ checking it again; a team the site drops leaves the controller), the
 migration's data test, and the controller's `test_sync_branding.py` against an
 in-memory site server; the shared vectors gain 2 valid and 9 invalid field
 answers. Not yet: a real deployment, the console's "from the site server"
-label. Decisions S18-1 to S18-12, all open.
+label. Decisions S18-1 to S18-12, all open. The club pages in the app (S18-11)
+were built on 2026-11-04 (`app/lib/site/clubs.dart`, `club_screens.dart`: the
+account's clubs, a club's page with its fields and members, memberships and
+invitations, making, changing and deleting a club, inviting, roles, leaving;
+images and moderation stay on the staff pages; decisions APPS-9 to APPS-16).
 
 ### Follow-up: the field's settings and branding changes on the stream (BR24, S18-11; 2026-10-27, in software)
 
@@ -1146,3 +1158,7 @@ Answers S20-8's "a field-wide history across fields" with the maintainer's decis
 ## The hub link code page (2026-10-31)
 
 `/staff/account/hub-share` (decisions HLC-*): the staff-style page for SVX-2's link code that the app's screen (APF-4) already had. In a hosted hub a signed-in person makes a link code at one field, enters it at another, sees the other fields they are linked at, gives or withdraws this field's `chrono_sharing` consent, and unlinks; every refusal in words in four languages; linked from `/staff/account` only when `GET /me/hub-share` answers. The API grew `field`, `consent` and `others` in the `GET` answer and one more `SECURITY DEFINER` function, `atalaia_share_peers(uuid)` (`hosted migrate` makes it; `hosted check` and `drop_sql` know it). Tests: `tests/test_hub_share_page.py`, `tests/test_hub_share.py`, `tests/test_tenants.py`, `tests_browser/test_hubshare_browser.py` (the hub's four calls faked in the browser, as the browser tests run a single field).
+
+## Registering on the web pages (WREG, 2026-11-04, in software)
+
+What S16-9 left for later, now that social login and passkeys exist (LG-*): `/f/<slug>/games/<id>/register/web` (`server/atalaia_server/web/player_pages.py`, `player_i18n.py`, `static/player/register.js`), linked from the game's *Register* page next to the app's way. A player logs in with Google, Microsoft or Apple, a passkey, or the password (with its TOTP code) when the server takes passwords; a new account comes only from a social login with the privacy notice opened and ticked, the 16-or-older box and the notice's version, checked by the server as for the app (LEG-*, CONS-4). Then the app's form (name, team, the federation number or the field's membership rule, the pre-declared replicas), the same API (`POST .../registrations`, `/api/v1/me/registrations`), so the same checks and records (`source` `site`, the audit entries), and the ticket as a QR code drawn in the page (the console's vendored generator, copied) and as text, shown once, printable. Back on the page later: the registration, change, cancel, a new ticket, the way into the app, and a passkey for next time. The page is of the staff pages' kind: no data in the HTML, `no-store`, `noindex`, the CSP unchanged (no inline script), no cookie authorises a change (CSRF), every value as text. New: a social login may return to that page (`PLAYER_RETURN_TO`, only `?lang=`), and 20 registrations and new tickets an hour per account (WREG-5), app and web alike. Four languages. Tests: `server/tests/test_web_registration.py`, `server/tests_browser/test_register_browser.py` (Chromium). Not yet on a real deployment or an iPhone. Decisions WREG-1 to WREG-12, all open; WREG-11 asks the maintainer's lawyer about the privacy notice templates.

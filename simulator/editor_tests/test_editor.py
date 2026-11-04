@@ -569,6 +569,112 @@ class EditorTests(unittest.TestCase):
                 self.assertEqual([(p["key"], p.get("name")) for p in self.generate(page, bad)["problems"]],
                                  [("problem_role_outputs", "bomb")])
 
+    def test_output_blocks(self):
+        """The mode editor's blocks for outputs (draft RFC "The expansion port", the rest of increment 4): a
+        box script's cap("siren"):pulse(ms), :on(), :on(ms), :off() and :pattern(on_ms, off_ms, ms), and a
+        field script's field.send(node, "output", {...}); a missing time, * switched on and a function no
+        role's outputs: names are problems, and the blocks leave the manifest as the role's outputs make it."""
+        page = self.open()
+
+        def out(fn, act, ms=None):
+            return B("atalaia_output", {"FN": fn, "ACT": act}, {"MS": num(ms) if ms is not None else None})
+
+        def pattern(kind, fn, on_ms, off_ms, ms, node=None):
+            inputs = {"ON_MS": num(on_ms), "OFF_MS": num(off_ms), "MS": num(ms)}
+            if kind == "field":
+                return B("atalaia_field_output_pattern", {"FN": fn}, {"NODE": node, **inputs})
+            return B("atalaia_output_pattern", {"FN": fn}, inputs)
+
+        def fout(fn, act, ms=None):
+            return B("atalaia_field_output", {"FN": fn, "ACT": act},
+                     {"NODE": ev("node"), "MS": num(ms) if ms is not None else None})
+
+        roles = [{"name": "zone", "outputs": ["siren", "strobe", "light"]}]
+        node = [on("team_input.hold", seq(out("siren", "pulse", 3000), pattern("node", "strobe", 500, 1500, 4000),
+                                          out("light", "on"), out("light", "on", 2000), out("light", "off", 99)))]
+        field = [on("zone.captured", seq(fout("siren", "pulse", 10000), fout("light", "on", 2000),
+                                         pattern("field", "strobe", 500, 1500, 30000, ev("node")),
+                                         fout("*", "off")), kind="field")]
+        made = self.generate(page, project(node=node, field=field, roles=roles))
+        self.assertEqual(made["problems"], [])
+        self.assertEqual(body(made["node_lua"]), (
+            'on("team_input.hold", function()\n'
+            '  cap("siren"):pulse(3000)\n'
+            '  cap("strobe"):pattern(500, 1500, 4000)\n'
+            '  cap("light"):on()\n'
+            '  cap("light"):on(2000)\n'
+            '  cap("light"):off()\n'
+            'end)\n'))
+        self.assertEqual(body(made["field_lua"]), (
+            'on("zone.captured", function(e)\n'
+            '  field.send(e.node, "output", { capability = "siren", act = "pulse", ms = 10000 })\n'
+            '  field.send(e.node, "output", { capability = "light", act = "on", ms = 2000 })\n'
+            '  field.send(e.node, "output", { capability = "strobe", act = "pattern", ms = 30000, on_ms = 500, '
+            'off_ms = 1500 })\n'
+            '  field.send(e.node, "output", { capability = "*", act = "off" })\n'
+            'end)\n'))
+        # The manifest is the role's outputs: (output optional), as without the blocks.
+        self.assertEqual(yaml.safe_load(made["mode_yaml"])["roles"], {
+            "zone": {"requires": ["team_input"], "optional": ["output"], "outputs": ["siren", "strobe", "light"]}})
+
+        # Problems: a pulse without its time (box and field), a field on without one, * switched on, a
+        # pattern step missing, and a function no role lists (* is every output: never unlisted).
+        no_ms = B("atalaia_output_pattern", {"FN": "strobe"}, {"ON_MS": num(500), "MS": num(4000)})
+        bad_node = [on("team_input.hold", seq(out("siren", "pulse"), out("horn", "pulse", 1000), no_ms))]
+        bad_field = [on("zone.captured", seq(fout("siren", "on"), fout("*", "pulse", 1000)), kind="field")]
+        problems = self.generate(page, project(node=bad_node, field=bad_field, roles=roles))["problems"]
+        self.assertEqual(sorted((p["key"], p.get("name"), p["script"]) for p in problems), [
+            ("problem_output_all", None, "field"), ("problem_output_ms", None, "field"),
+            ("problem_output_ms", None, "node"), ("problem_output_ms", None, "node"),
+            ("problem_output_unlisted", "horn", "node")])
+        self.assertTrue(all(p["block"] for p in problems))
+        self.assertIn('cap("siren"):pulse(0)\n', self.generate(page, project(node=bad_node, roles=roles))["node_lua"])
+
+        # The generated box script switches the simulated box's outputs (no script error).
+        node = [on("team_input.press", seq(out("siren", "pulse", 3000), pattern("node", "strobe", 500, 1500, 4000),
+                                           out("light", "on"),
+                                           B("atalaia_after", inputs={"SECONDS": num(1), "DO": out("light", "off")})))]
+        made = self.generate(page, project(node=node, roles=roles))
+        self.assertEqual(made["problems"], [])
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "unit"
+            (folder / "tests").mkdir(parents=True)
+            self.write_mode(folder, made)
+            (folder / "tests" / "outputs.yaml").write_text(
+                "name: outputs\nnodes: { z1: zone }\nsteps:\n"
+                "  - wait: 1\n"
+                "  - press: { node: z1, team: red }\n"
+                "  - expect: { type: output.switched, node: z1, data: { capability: siren, ms: 3000, source: script } }\n"
+                "  - expect: { type: output.switched, node: z1, data: { capability: light, ms: 30000 } }\n"
+                "  - expect_output: { node: z1, capability: siren, active: true, source: script }\n"
+                "  - expect_output: { node: z1, capability: strobe, active: true }\n"
+                "  - expect_output: { node: z1, capability: light, active: true }\n"
+                "  - wait: 2\n"
+                "  - expect: { type: output.switched, node: z1, data: { capability: light, ms: 0 } }\n"
+                "  - expect_output: { node: z1, capability: light, active: false }\n"
+                "  - expect_output: { node: z1, capability: siren, active: true }\n"
+                "  - wait: 1.5\n"
+                "  - expect_output: { node: z1, capability: siren, active: false }\n"
+                "  - expect_no: script.error\n")
+            [test] = load_mode(folder).tests
+            result = run_test(CORE, load_mode(folder), test)
+            self.assertTrue(result.passed, f"{result.message}\n" + "\n".join(result.log) + made["node_lua"])
+
+    def test_output_blocks_in_the_toolbox_in_four_languages(self):
+        """The output blocks are in the box's hardware and the field's toolboxes, in pt, en, de and zh-tw."""
+        texts = {"en": ("Box hardware", "switch output", "Field", "of box"),
+                 "pt": ("Hardware da caixa", "acionar a saída", "Campo", "acionar a saída"),
+                 "de": ("Box-Hardware", "Ausgang", "Spielfeld", "der Box"),
+                 "zh-tw": ("盒子硬體", "閃爍輸出", "場地", "的輸出")}
+        for lang, (box, output, field, field_output) in texts.items():
+            with self.subTest(lang=lang):
+                page = self.open(lang)
+                page.locator("#ws-node .blocklyToolboxCategory", has_text=box).click()
+                expect(page.locator("#ws-node .blocklyToolboxFlyout")).to_contain_text(output)
+                page.click("#tab-field")
+                page.locator("#ws-field .blocklyToolboxCategory", has_text=field).first.click()
+                expect(page.locator("#ws-field .blocklyToolboxFlyout")).to_contain_text(field_output)
+
     def test_roles_and_kinds(self):
         page = self.open()
         node = [on("team_input.hold", B("atalaia_log", inputs={"TEXT": ev("team")}), y=0),

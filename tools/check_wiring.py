@@ -97,6 +97,11 @@ GUIDES: dict[Path, tuple[str, ...]] = {
         "ATALAIA_LED_PIN", "ATALAIA_NFC_SDA_PIN", "ATALAIA_NFC_SCL_PIN", "ATALAIA_AUDIO_BCLK_PIN",
         "ATALAIA_AUDIO_LRCLK_PIN", "ATALAIA_AUDIO_DOUT_PIN", "ATALAIA_POD_TAMPER_PIN"),
 }
+# A guide whose pins are those of another firmware variant: its table is checked against that
+# build's Kconfig defaults (the I/O pod's simple outputs: GPIO 33 and 1, not the Field Box's 46).
+GUIDE_CHOICE: dict[Path, frozenset[str]] = {
+    REPO / "hardware" / "io-pod" / "BUILD.md": frozenset({"ATALAIA_POD_MODE"}),
+}
 # The expansion port's build guide (draft RFC "The expansion port", increment 10): the port uses no
 # GPIO of its own, so its only pins are the I2C bus's, behind the port board's buffer. Both languages
 # are checked: the table is the same in each, and only the colour and signal words differ.
@@ -242,12 +247,12 @@ REVISION_FEM: dict[str, tuple[int, str]] = {
 }
 DEFAULT_REVISION = "ATALAIA_BOARD_HELTEC_V4_3"
 # The I/O pod's simple outputs (EXP-34, increment 9): the pod has no display, so its pins 33, 1 and
-# 3 are free; output 1 on GPIO 33, output 2 on GPIO 1. The display's and the on-board OLED's
-# symbols keep their Field Box defaults in a pod build but drive nothing there, and the keypad's
-# GPIO matrix is the Wokwi emulator's (a pod has the PCF8574; the firmware refuses a clash in a
-# matrix build at compile time).
+# 3 are free; output 1 on GPIO 33, output 2 on GPIO 1. The display's symbols keep their Field Box
+# defaults in a pod build but drive nothing there, and the keypad's GPIO matrix is the Wokwi
+# emulator's (a pod has the PCF8574; the firmware refuses a clash in a matrix build at compile
+# time). The on-board OLED is checked: a pod shows its Bluetooth passkey on it (PODPK-2).
 POD_SIMPLE_OUT = {"ATALAIA_SIMPLE_OUT_PIN": 33, "ATALAIA_SIMPLE_OUT2_PIN": 1}
-POD_UNUSED_PREFIXES = ("ATALAIA_DISP_", "ATALAIA_OLED_", "ATALAIA_KP_ROW", "ATALAIA_KP_COL")
+POD_UNUSED_PREFIXES = ("ATALAIA_DISP_", "ATALAIA_KP_ROW", "ATALAIA_KP_COL")
 # Optional parts Kconfig never builds together (`depends on !...`): their pins may share a GPIO.
 EXCLUSIVE = {frozenset({"ATALAIA_BUZZER_PIN", "ATALAIA_SIMPLE_OUT2_PIN"})}
 SHARED_BUS = {17, 18}  # board-internal, but the shared I2C bus is meant to be wired

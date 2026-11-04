@@ -8,8 +8,9 @@
 // ortho-coverage.js), its WMS for the drawn image (a GetMap in EPSG:4326 at the image's size, at most maxSide
 // on a side, fetched so the canvas stays exportable: every one sends Access-Control-Allow-Origin, * or the
 // page's own origin), or, where it has no WMS that may be used, its WMTS (wmts: the GetTile URL of a
-// 256-pixel GoogleMapsCompatible tile z/x/y, down to wmtsMax; field-render.js stitches the tiles over the
-// image and crops them to it, MF-94), the map's
+// 256-pixel GoogleMapsCompatible tile z/x/y, down to wmtsMax, and optionally wmtsBox, the box [west, south,
+// east, north] outside which it has no tiles; field-render.js stitches the tiles over the image and crops them
+// to it, MF-94, MF-101), the map's
 // *Ortofoto* tiles (its WMTS in Web Mercator where it has one, else a WMS GetMap per 256-pixel tile in
 // EPSG:3857), and its credit, shown in the map's corner and burned into the image. The page's
 // Content-Security-Policy names each origin (api.py FIELD_MAP_ORIGINS); test_console.py checks the two lists
@@ -60,6 +61,8 @@ const DL_BY = 'https://www.govdata.de/dl-de/by-2-0';
 const DL_ZERO = 'https://www.govdata.de/dl-de/zero-2-0';
 // MF-95: basemap.at's orthophoto, the host its own capabilities document is served from (CORS *).
 const BASEMAP_AT_WMTS = 'https://mapsneu.wien.gv.at/basemap/bmaporthofoto30cm/normal/google3857';
+// MF-101: LGL Baden-Württemberg's DOP 20 cm WMTS (KVP GetTile only; CORS *).
+const LGL_BW_WMTS = 'https://owsproxy.lgl-bw.de/owsproxy/ows/WMTS_LGL-BW_ATKIS_DOP_20_C';
 
 /** The sources, in the order a tie is decided: a region inside another's outer ring (Berlin in
  * Brandenburg, Brussels in Flemish Brabant) comes first; no other two overlap. */
@@ -157,6 +160,20 @@ export const ORTHO_SOURCES = [
         wms: 'https://isk.geobasis-bb.de/mapproxy/dop20c/service/wms', layer: 'bebb_dop20c', maxSide: 4096,
         credit: '© GeoBasis-DE/LGB, dl-de/by-2-0', imageCredit: '© GeoBasis-DE/LGB, dl-de/by-2-0 (Daten geändert)',
         href: DL_BY,
+    },
+    {
+        // MF-101: Baden-Württemberg, LGL's DOP 20 cm; dl-de/by-2-0, its capabilities' credit with the year
+        // obtained ("LGL-BW (2024) Datenlizenz Deutschland - Namensnennung - Version 2.0, www.lgl-bw.de").
+        // Its WMS failed every GetMap on 2026-10-23 (MF-80): the drawn image is stitched from its WMTS (set
+        // GoogleMapsCompatible, levels "GoogleMapsCompatible:<zoom>", 0 to 20; 19 is the photo's 20 cm), which
+        // also gives the map's tiles. A tile outside its capabilities' limits (the Land's box) answers 400, so
+        // those are not asked (wmtsBox, inside the capabilities' WGS84BoundingBox).
+        id: 'de-bw', name: 'LGL Baden-Württemberg', coverage: COVERAGE.DE_BW,
+        wmts: wmtsTile(LGL_BW_WMTS, 'DOP_20_C', 'GoogleMapsCompatible', 'default',
+                       { matrix: (z) => `GoogleMapsCompatible:${z}` }),
+        wmtsMax: 19, wmtsBox: [7.494311, 47.468568, 10.66599, 49.804545], maxSide: 4096,
+        credit: `LGL-BW (${YEAR}) dl-de/by-2-0, www.lgl-bw.de`,
+        imageCredit: `LGL-BW (${YEAR}) dl-de/by-2-0, www.lgl-bw.de (Daten geändert)`, href: DL_BY,
     },
     {
         // MF-76: Bayern, DOP20; CC BY 4.0, "Bayerische Vermessungsverwaltung – www.geodaten.bayern.de". Its WMTS

@@ -51,12 +51,12 @@ from typing import Any, Iterable, Optional
 
 import yaml
 from atalaia_controller import REPO_ROOT, apd as apd_core, checkin_ticket, sync_format
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import chrono_registry, hub_share, quotas
-from ..models import (Field, FieldApiKey, FieldPlayerId, Game, GameRegistration, PlayerIdClaim,
+from ..models import (WALKIN_SOURCE, Field, FieldApiKey, FieldPlayerId, Game, GameRegistration, PlayerIdClaim,
                       RegistrationReplica, Replica, ScheduledGame, User)
 from . import scheduling
 
@@ -834,11 +834,13 @@ async def apply_checkins(db: AsyncSession, field_id: uuid.UUID, game: Game, body
     """POST /api/v1/sync/checkins: each registration's outcome and its declarations' final states. A
     registration the controller had in a roster is matched by its id and player id; one it had not (the
     app sent its registration id and ticket at check-in, ``ticket_sha256``) only if that ticket is the
-    registration's. Anything else is ignored and counted."""
+    registration's. Anything else is ignored and counted. ``guests`` (the controller's ``[sync] push_walkins``,
+    decisions PWI-*) are stored as guest registrations (``apply_guests``)."""
     sched = await db.scalar(select(ScheduledGame).where(ScheduledGame.id == uuid.UUID(body["scheduled_game_id"]),
                                                         ScheduledGame.field_id == field_id).with_for_update())
     if sched is None:
-        return {"linked": False, "applied": 0, "ignored": len(body["registrations"])}
+        return {"linked": False, "applied": 0, "ignored": len(body["registrations"]), "guests": 0,
+                "guests_ignored": len(body.get("guests") or ())}
     if sched.controller_game is None:
         sched.controller_game = game.id
     sched.walkins = body["walkins"]
@@ -864,7 +866,54 @@ async def apply_checkins(db: AsyncSession, field_id: uuid.UUID, game: Game, body
                 RegistrationReplica.declaration_id == uuid.UUID(d["declaration_id"])).values(
                 state=d["state"], reading_id=uuid.UUID(d["reading_id"]) if d["reading_id"] else None))
             declarations += result.rowcount or 0
-    return {"linked": True, "applied": applied, "ignored": ignored, "declarations": declarations}
+    guests, guests_ignored = await apply_guests(db, field_id, sched, body.get("guests") or (), now)
+    return {"linked": True, "applied": applied, "ignored": ignored, "declarations": declarations,
+            "guests": guests, "guests_ignored": guests_ignored}
+
+
+async def apply_guests(db: AsyncSession, field_id: uuid.UUID, sched: ScheduledGame, guests: Iterable[dict[str, Any]],
+                       now: datetime) -> tuple[int, int]:
+    """The walk-ins a controller pushed with ``[sync] push_walkins`` (decisions PWI-*): each a guest registration of
+    the scheduled game (``source`` ``walkin``, no account, no ticket, ``checked_in``) with its declarations'
+    final states. Pushed again (the outcomes changed), the same player's guest is updated and its replicas
+    replaced. A player id that already has a registration of another source in this game is ignored (the
+    controller did not know it was registered), as is a declaration id another registration holds. A guest
+    is deleted 30 days after the game (``personal_data``, ADR-P4-8's guest rule) and by the controller's
+    erasure of the player (``chrono_registry.erase_identity``). In hosted mode a new guest past the field's
+    ``registrations`` quota is ignored too (the outcomes still apply). Returns (stored, ignored)."""
+    stored = ignored = 0
+    free = await quotas.room(db, "registrations", field_id) if guests else None  # None: no limit
+    for item in guests:
+        reg = await db.scalar(select(GameRegistration).where(GameRegistration.scheduled_game == sched.id,
+                                                             GameRegistration.player_id == item["player_id"]))
+        if reg is not None and (reg.source != WALKIN_SOURCE or reg.user_id is not None):
+            ignored += 1
+            continue
+        if reg is None:
+            if free is not None and free <= 0:
+                ignored += 1
+                continue
+            if free is not None:
+                free -= 1
+            reg = GameRegistration(scheduled_game=sched.id, field_id=field_id, user_id=None, player_id=item["player_id"],
+                                   source=WALKIN_SOURCE, created_at=now)
+            db.add(reg)
+        reg.display_name, reg.status, reg.outcome_at, reg.updated_at = item["display_name"], "checked_in", now, now
+        reg.outcome_by = None
+        await db.flush()
+        await db.execute(delete(RegistrationReplica).where(RegistrationReplica.registration == reg.id))
+        wanted = [uuid.UUID(d["declaration_id"]) for d in item["declarations"]]
+        taken = set(await db.scalars(select(RegistrationReplica.declaration_id).where(
+            RegistrationReplica.declaration_id.in_(wanted)))) if wanted else set()
+        for position, d in enumerate(item["declarations"]):
+            if uuid.UUID(d["declaration_id"]) in taken:
+                continue
+            db.add(RegistrationReplica(registration=reg.id, declaration_id=uuid.UUID(d["declaration_id"]),
+                                       replica_type=d["type"], replica_class=d["class"], position=position,
+                                       state=d["state"],
+                                       reading_id=uuid.UUID(d["reading_id"]) if d["reading_id"] else None))
+        stored += 1
+    return stored, ignored
 
 
 # --- claims of a phone's player id (decision S16-4) -------------------------------------------

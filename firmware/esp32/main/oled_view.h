@@ -98,6 +98,34 @@ bool oled_text_hold(oled_text_t *t, const oled_hold_t *holds, int n, uint32_t ho
  */
 void oled_version_lines(const char *version, char *line1, size_t n1, char *line2, size_t n2);
 
+/*
+ * The I/O pod's Bluetooth pairing screens (pod/pod_pair.h, decisions PODPK-1 to PODPK-11): the
+ * pod's OLED is dark except while it pairs. The pod has no language of its own (no game's
+ * reaches it), so these are English, digits and the pod's name, in ASCII (PODPK-7).
+ */
+typedef enum {
+    OLED_PAIR_NONE = 0, /* the OLED dark */
+    OLED_PAIR_PASSKEY,  /* "PAIR" and the seconds left; "123 456"; the pod's name */
+    OLED_PAIR_PAIRED,
+    OLED_PAIR_FAILED,   /* wrong passkey, cancelled */
+    OLED_PAIR_TIMEOUT,  /* too slow */
+    OLED_PAIR_AGAIN,    /* a bond the pod does not trust: forget the pod on the phone, pair again */
+    OLED_PAIR_CLEARING, /* the PRG button held: progress towards clearing the bonds */
+    OLED_PAIR_CLEARED,
+} oled_pair_t;
+
+typedef struct {
+    oled_pair_t show;
+    uint32_t passkey; /* OLED_PAIR_PASSKEY: 0-999999 */
+    long secs_left;   /* OLED_PAIR_PASSKEY: seconds left to type it, -1 none */
+    int progress;     /* OLED_PAIR_CLEARING: 0-100 */
+    char name[20];    /* "atalaia-pod-XXXX", or "" */
+} oled_pair_view_t;
+
+/* The three lines of a pairing screen; false for OLED_PAIR_NONE (the OLED dark). The passkey is
+ * shown as two groups of three digits, zeros kept ("012 345"). */
+bool oled_text_pair(const oled_pair_view_t *v, oled_text_t *out);
+
 /* Packs a 128x64 RGB565 frame into SSD1306 pages: a pixel is lit when its
  * brightness is at least half. */
 void oled_pack(const uint16_t *rgb565, uint8_t fb[HAL_OLED_FB_SIZE]);
@@ -144,6 +172,9 @@ void oled_view_set_timer_reader(long (*left_s)(void));
 
 /* Draws t on scr (the three-line layout; builds it on first use). */
 void oled_view_draw(lv_obj_t *scr, const oled_text_t *t);
+
+/* Clears scr to black (every pixel dark): the I/O pod's OLED between pairings. */
+void oled_view_clear(lv_obj_t *scr);
 #endif
 
 #endif /* ATALAIA_OLED_VIEW_H */

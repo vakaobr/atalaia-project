@@ -156,15 +156,16 @@ A box offers what its modules and simple outputs carry as capabilities of the st
 
 **Feedback** (EXP-36): a simple output cannot tell whether anything is plugged in. Its capability descriptor says `"feedback": false` (left out, meaning true, for a module's channel), the controllers' node list gives it `"feedback": false`, the console marks it "not checked", and it never raises `node.module_lost`. A pattern on a simple output has on and off times of at least 500 ms.
 
-## 7. What the field learns: `node.modules`, `node.module_lost`, `output.switched`
+## 7. What the field learns: `node.modules`, `node.module_lost`, `output.switched`, `node.outputs_disabled`
 
-Three standard events ([`schema/events.yaml`](schema/events.yaml), ids 57-59; data keys 42-45):
+Four standard events ([`schema/events.yaml`](schema/events.yaml), ids 57-60; data keys 42-45):
 
 | Event | Priority | Data | When |
 | --- | --- | --- | --- |
 | `node.modules` | normal | `modules`: the compact text below | After the box's HELLO is acknowledged, whenever a module comes or goes, and when its admin changes a simple output's settings |
 | `node.module_lost` | critical | `modules` (the module that went, in the same text), `reason` (`no_answer`, `bad_ident`) | A module the box had during a running game stops answering |
 | `output.switched` | normal | `capability` (the function), `ms` (how long; 0 = turned off), `source` (`script`, `field`, `gm`, `box_admin`) | Each time an output turns on, and when one is turned off before its time: the game's record of who fired what |
+| `node.outputs_disabled` | normal | `modules`: the outputs fitted that the box's admin has not enabled, in the compact text below (the empty text when every one is) | With each `node.modules` (and at the same moment when the box has no output enabled, so sends no `node.modules`), by a box that has an output fitted (a simple output or a module's output channel), and again whenever its own text changes while `node.modules` does not (EXPL-21); a box without outputs never sends it (decisions EXPL-13, EXPL-20) |
 
 **The compact text** is at most **100 bytes**: entries joined by `;` (none: the empty text), each either
 
@@ -174,6 +175,7 @@ Three standard events ([`schema/events.yaml`](schema/events.yaml), ids 57-59; da
 An address appears once. The controllers turn it into the node list's `modules`, a list of `{"address", "model", "fw", "caps", "feedback"}` (`fw` null and `feedback` false for a simple output), served the same by both controllers (contract cases in `controller_api.json` come with the controllers' increment).
 
 **A phone prop** sends the same events for its I/O pod (draft RFC "The expansion port", increment 9; decision EXPI9-19): the pod builds the text as a box does, its simple outputs `g33:servo:siren` included (the GPIO is the pod's, so no new entry form is needed), and hands it to the phone in its EVT `pod.modules` ([capability-proxy.md](capability-proxy.md), "The pod's expansion port"); the phone sends `node.modules` when the text changes and `node.module_lost` during a game ([prop-link.md](prop-link.md)). A prop's `output.switched` is the phone's own (its prop shell keeps the game's rules for the pod's outputs).
+**Outputs fitted, not enabled** (EXP-28, EXPL-12, EXPL-13). A box leaves an output its admin has not enabled out of `node.modules` and out of HELLO's capability types (`output` only while one is enabled), so the field could not tell a box with a siren fitted but not enabled from one with no siren. `node.outputs_disabled` says which: the same compact text: a simple output's entry (`g45:servo:horn`), and for a module with output channels its admin has not enabled (every one, until the admin enables it at the box: EXPI8-7) the module's entry with only those ids (`5c:out4/1.0.0:siren.2,smoke`), the simple outputs first, whole entries only within the 100 bytes (EXPL-20). A module's entry in `node.modules` lists its usable channels whether enabled or not, so for a module the event is what tells the two apart. It is its own event and not a key of `node.modules` on purpose: decoders refuse an unknown data key ([README.md](README.md), "Events on LoRa"), so an older controller would refuse the whole `node.modules`; an older controller refuses `node.outputs_disabled` alone, as an unknown event id, and keeps everything else. A controller keeps the last one per node as the node list's `outputs_disabled` (the same shape as `modules`; null until the box says, as for a box from before), and the start check adds a **note**, never a refusal or a warning, for each joined box whose role's `outputs:` (or its scenario's) names one of them, so the GM can have it enabled at the box with the admin PIN (contract case "EXPL outputs fitted, not enabled" in `controller_api.json`).
 
 ## 8. Switching an output from the field: CMD opcode 12
 

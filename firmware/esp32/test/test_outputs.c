@@ -163,6 +163,39 @@ static void test_modules_text(void)
     CHECK(outputs_modules_text(&o, text, sizeof(text)) == 0 && text[0] == '\0');
 }
 
+/* node.outputs_disabled's text (EXPL-13): the outputs fitted but not enabled, in node.modules'
+ * form; never past OUT_MODULES_MAX or the buffer. */
+static void test_disabled_text(void)
+{
+    char text[OUT_MODULES_MAX + 1];
+    fresh(2, "siren", "smoke");
+    CHECK(outputs_disabled_text(&o, text, sizeof(text)) == 0 && text[0] == '\0');
+    fresh(1, NULL, NULL);
+    CHECK(outputs_disabled_text(&o, text, sizeof(text)) == strlen("g46:servo:out.1"));
+    CHECK(strcmp(text, "g46:servo:out.1") == 0);
+    /* The admin set a function and left it disabled; the other is enabled. */
+    fresh(2, "siren", NULL);
+    out_settings_t s = o.ch[1].set;
+    snprintf(s.function, sizeof(s.function), "%s", "horn");
+    CHECK(outputs_configure(&o, 1, &s) == OUT_OK);
+    CHECK(outputs_disabled_text(&o, text, sizeof(text)) == strlen("g45:servo:horn"));
+    CHECK(strcmp(text, "g45:servo:horn") == 0);
+    outputs_modules_text(&o, text, sizeof(text));
+    CHECK(strcmp(text, "g46:servo:siren") == 0);
+    /* Both disabled with the same function: the second's id is horn.2. */
+    s = o.ch[0].set;
+    s.enabled = false;
+    snprintf(s.function, sizeof(s.function), "%s", "horn");
+    CHECK(outputs_configure(&o, 0, &s) == OUT_OK);
+    outputs_disabled_text(&o, text, sizeof(text));
+    CHECK(strcmp(text, "g46:servo:horn;g45:servo:horn.2") == 0);
+    /* A short buffer: whole entries only. */
+    char small[20];
+    CHECK(outputs_disabled_text(&o, small, sizeof(small)) == strlen("g46:servo:horn"));
+    CHECK(strcmp(small, "g46:servo:horn") == 0);
+    CHECK(outputs_disabled_text(&o, small, 0) == 0);
+}
+
 /* ---- Switching -------------------------------------------------------------------------- */
 
 static void test_only_while_a_game_runs(void)
@@ -603,6 +636,7 @@ void run_outputs_tests(void)
 {
     test_defaults_and_settings();
     test_modules_text();
+    test_disabled_text();
     test_only_while_a_game_runs();
     test_limits();
     test_patterns();

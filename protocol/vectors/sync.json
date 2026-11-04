@@ -1,5 +1,5 @@
 {
- "description": "Controller sync bodies (protocol/sync.md). Every valid body passes its kind's check (games, events, scores, nodes, marshals, replicas, chrono, checkins, claims); nodes_unknown_info_dropped keeps only the info keys listed under info. Every invalid body fails with the error code and path given (the first problem found, in the order of protocol/sync.md's tables). merge: the snapshots merged in order by maximum per (source, team) give counters, and the totals are the counters' sum per team plus the deltas (GM adjustments, score.delta), worked out by hand from protocol/sync.md's rule (decision P4R10). The chrono bodies use the marshal test key and records of chrono_record.json: chrono_readings verifies on the site server once marshals_with_a_rotated_key is stored (its second key is that test key, valid from 1792000000). answers (plan phases 16, 18 and 20): the answers of the GET endpoints the controller pulls (schedule, roster, claims, field: the branding and saved teams, images by SHA-256, presets: the scenario library by id, revision and SHA-256 and the game presets, and scenario: one manifest whose UTF-8 bytes hash to its sha256), each valid one passing sync_format.ANSWERS[kind] and each invalid one failing with its error and path; the site server's own answers are checked with the same functions in its tests. stream (plan phase 19): the remote GM's messages on WS /api/v1/sync/stream (hello, live and command.result from the controller, command from the site server), each valid one passing sync_format.STREAM[kind] and each invalid one failing with its error and path; format vectors made for this repository from protocol/sync.md (there is no external source to copy them from). library_removal (decision S20-8): what a controller installed from the site (state: scenario id to SHA-256, preset name to digest) and a checked presets answer give the scenarios and presets to remove, sorted (sync_format.library_removals); the controller then keeps any a game that is not ended or a scheduled game uses, and any scenario the GM replaced.",
+ "description": "Controller sync bodies (protocol/sync.md). Every valid body passes its kind's check (games, events, scores, nodes, marshals, replicas, chrono, checkins, claims); nodes_unknown_info_dropped keeps only the info keys listed under info. Every invalid body fails with the error code and path given (the first problem found, in the order of protocol/sync.md's tables). merge: the snapshots merged in order by maximum per (source, team) give counters, and the totals are the counters' sum per team plus the deltas (GM adjustments, score.delta), worked out by hand from protocol/sync.md's rule (decision P4R10). The chrono bodies use the marshal test key and records of chrono_record.json: chrono_readings verifies on the site server once marshals_with_a_rotated_key is stored (its second key is that test key, valid from 1792000000). answers (plan phases 16, 18 and 20): the answers of the GET endpoints the controller pulls (schedule, roster, claims, field: the branding and saved teams, images by SHA-256, presets: the scenario library by id, revision and SHA-256 and the game presets, and scenario: one manifest whose UTF-8 bytes hash to its sha256), each valid one passing sync_format.ANSWERS[kind] and each invalid one failing with its error and path; the site server's own answers are checked with the same functions in its tests. stream (plan phase 19): the remote GM's messages on WS /api/v1/sync/stream (hello, live and command.result from the controller, command from the site server), each valid one passing sync_format.STREAM[kind] and each invalid one failing with its error and path; format vectors made for this repository from protocol/sync.md (there is no external source to copy them from). library_removal (decision S20-8): what a controller installed from the site (state: scenario id to SHA-256, preset name to digest) and a checked presets answer give the scenarios and presets to remove, sorted (sync_format.library_removals); the controller then keeps any a game that is not ended or a scheduled game uses, and any scenario the GM replaced. checkin_outcomes (decisions PWI-*): a controller's check-in rows (in check-in order) and each player's declarations, with [sync] push_walkins off or on (guests), give the outcomes it sends in POST /api/v1/sync/checkins (sync_format.checkin_outcomes, checkinOutcomes on the phone).",
  "valid": [
   {
    "name": "game_minimal",
@@ -384,6 +384,80 @@
       "player_id": "p-bbbbbbbbbbbb",
       "outcome": "checked_in",
       "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ]
+   }
+  },
+  {
+   "name": "checkins_with_guests",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ],
+    "guests": [
+     {
+      "player_id": "p-cccccccccccc",
+      "display_name": "Zé Coruja",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c101",
+        "type": "aeg",
+        "class": "rifle",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d101"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c102",
+        "type": "bolt_action",
+        "class": "sniper",
+        "state": "refused"
+       }
+      ]
+     },
+     {
+      "player_id": "p-dddddddddddd",
+      "display_name": "Rita Falcão",
       "declarations": []
      }
     ]
@@ -9847,6 +9921,901 @@
    },
    "error": "out_of_range",
    "path": "walkins"
+  },
+  {
+   "name": "checkins_more_guests_than_walkins",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 1,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ],
+    "guests": [
+     {
+      "player_id": "p-cccccccccccc",
+      "display_name": "Zé Coruja",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c101",
+        "type": "aeg",
+        "class": "rifle",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d101"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c102",
+        "type": "bolt_action",
+        "class": "sniper",
+        "state": "refused"
+       }
+      ]
+     },
+     {
+      "player_id": "p-dddddddddddd",
+      "display_name": "Rita Falcão",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "too_many_guests",
+   "path": "guests"
+  },
+  {
+   "name": "checkins_guest_with_a_federation_number",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ],
+    "guests": [
+     {
+      "player_id": "p-cccccccccccc",
+      "display_name": "Zé Coruja",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c101",
+        "type": "aeg",
+        "class": "rifle",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d101"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c102",
+        "type": "bolt_action",
+        "class": "sniper",
+        "state": "refused"
+       }
+      ],
+      "federation_number": "FPA-1"
+     },
+     {
+      "player_id": "p-dddddddddddd",
+      "display_name": "Rita Falcão",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "unknown_field",
+   "path": "guests[0].federation_number"
+  },
+  {
+   "name": "checkins_guest_with_a_team",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ],
+    "guests": [
+     {
+      "player_id": "p-cccccccccccc",
+      "display_name": "Zé Coruja",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c101",
+        "type": "aeg",
+        "class": "rifle",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d101"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c102",
+        "type": "bolt_action",
+        "class": "sniper",
+        "state": "refused"
+       }
+      ]
+     },
+     {
+      "player_id": "p-dddddddddddd",
+      "display_name": "Rita Falcão",
+      "declarations": [],
+      "team_preference": "red"
+     }
+    ]
+   },
+   "error": "unknown_field",
+   "path": "guests[1].team_preference"
+  },
+  {
+   "name": "checkins_guest_without_a_name",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ],
+    "guests": [
+     {
+      "player_id": "p-cccccccccccc",
+      "display_name": "Zé Coruja",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c101",
+        "type": "aeg",
+        "class": "rifle",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d101"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c102",
+        "type": "bolt_action",
+        "class": "sniper",
+        "state": "refused"
+       }
+      ]
+     },
+     {
+      "player_id": "p-dddddddddddd",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "missing",
+   "path": "guests[1].display_name"
+  },
+  {
+   "name": "checkins_guest_name_too_long",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ],
+    "guests": [
+     {
+      "player_id": "p-cccccccccccc",
+      "display_name": "Zé Coruja",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c101",
+        "type": "aeg",
+        "class": "rifle",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d101"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c102",
+        "type": "bolt_action",
+        "class": "sniper",
+        "state": "refused"
+       }
+      ]
+     },
+     {
+      "player_id": "p-dddddddddddd",
+      "display_name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "bad_text",
+   "path": "guests[1].display_name"
+  },
+  {
+   "name": "checkins_guest_is_a_registration",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ],
+    "guests": [
+     {
+      "player_id": "p-cccccccccccc",
+      "display_name": "Zé Coruja",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c101",
+        "type": "aeg",
+        "class": "rifle",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d101"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c102",
+        "type": "bolt_action",
+        "class": "sniper",
+        "state": "refused"
+       }
+      ]
+     },
+     {
+      "player_id": "p-zzzzzzzzzzzz",
+      "display_name": "Rita Falcão",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "duplicate_player",
+   "path": "guests[1].player_id"
+  },
+  {
+   "name": "checkins_guest_twice",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ],
+    "guests": [
+     {
+      "player_id": "p-cccccccccccc",
+      "display_name": "Zé Coruja",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c101",
+        "type": "aeg",
+        "class": "rifle",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d101"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c102",
+        "type": "bolt_action",
+        "class": "sniper",
+        "state": "refused"
+       }
+      ]
+     },
+     {
+      "player_id": "p-cccccccccccc",
+      "display_name": "Rita Falcão",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "duplicate_player",
+   "path": "guests[1].player_id"
+  },
+  {
+   "name": "checkins_guest_declaration_without_a_class",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ],
+    "guests": [
+     {
+      "player_id": "p-cccccccccccc",
+      "display_name": "Zé Coruja",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c101",
+        "type": "aeg",
+        "class": "rifle",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d101"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c102",
+        "type": "bolt_action",
+        "state": "refused"
+       }
+      ]
+     },
+     {
+      "player_id": "p-dddddddddddd",
+      "display_name": "Rita Falcão",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "missing",
+   "path": "guests[0].declarations[1].class"
+  },
+  {
+   "name": "checkins_guest_declaration_bad_type",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ],
+    "guests": [
+     {
+      "player_id": "p-cccccccccccc",
+      "display_name": "Zé Coruja",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c101",
+        "type": "laser",
+        "class": "rifle",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d101"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c102",
+        "type": "bolt_action",
+        "class": "sniper",
+        "state": "refused"
+       }
+      ]
+     },
+     {
+      "player_id": "p-dddddddddddd",
+      "display_name": "Rita Falcão",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "bad_type",
+   "path": "guests[0].declarations[0].type"
+  },
+  {
+   "name": "checkins_guest_declaration_bad_state",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ],
+    "guests": [
+     {
+      "player_id": "p-cccccccccccc",
+      "display_name": "Zé Coruja",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c101",
+        "type": "aeg",
+        "class": "rifle",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d101"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c102",
+        "type": "bolt_action",
+        "class": "sniper",
+        "state": "judged"
+       }
+      ]
+     },
+     {
+      "player_id": "p-dddddddddddd",
+      "display_name": "Rita Falcão",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "bad_state",
+   "path": "guests[0].declarations[1].state"
+  },
+  {
+   "name": "checkins_guest_declaration_twice",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ],
+    "guests": [
+     {
+      "player_id": "p-cccccccccccc",
+      "display_name": "Zé Coruja",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c101",
+        "type": "aeg",
+        "class": "rifle",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d101"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c102",
+        "type": "bolt_action",
+        "class": "sniper",
+        "state": "refused"
+       }
+      ]
+     },
+     {
+      "player_id": "p-dddddddddddd",
+      "display_name": "Rita Falcão",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c101",
+        "type": "aeg",
+        "class": "rifle",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d101"
+       }
+      ]
+     }
+    ]
+   },
+   "error": "duplicate_declaration",
+   "path": "guests[1].declarations[0].declaration_id"
+  },
+  {
+   "name": "checkins_guests_not_a_list",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ],
+    "guests": {}
+   },
+   "error": "bad_batch_size",
+   "path": "guests"
   },
   {
    "name": "claims_with_a_game",
@@ -19621,6 +20590,417 @@
    },
    "dropped": 0,
    "after": "apply_answer_first"
+  }
+ ],
+ "checkin_outcomes": [
+  {
+   "name": "walkins_as_a_count",
+   "why": "push_walkins off: the registrations from the roster and from the app go; the one imported at the controller does not; four walk-ins came (one removed after checking in, a marshal, one whose name the retention erased), one removed before checking in did not; no guests key",
+   "guests": false,
+   "rows": [
+    {
+     "player_id": "p-aaaaaaaaaaaa",
+     "status": "checked_in",
+     "checked_in_at": 1792000100.0,
+     "role": "player",
+     "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+     "from_roster": true,
+     "ticket_sha256": null,
+     "display_name": "Ana Roster"
+    },
+    {
+     "player_id": "p-zzzzzzzzzzzz",
+     "status": "expected",
+     "checked_in_at": null,
+     "role": "player",
+     "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+     "from_roster": true,
+     "ticket_sha256": null,
+     "display_name": "Não Veio"
+    },
+    {
+     "player_id": "p-bbbbbbbbbbbb",
+     "status": "left",
+     "checked_in_at": 1792000200.0,
+     "role": "player",
+     "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+     "from_roster": false,
+     "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+     "display_name": "Da App"
+    },
+    {
+     "player_id": "p-eeeeeeeeeeee",
+     "status": "checked_in",
+     "checked_in_at": 1792000250.0,
+     "role": "player",
+     "registration_id": "0192f3a4-0000-7000-8000-00000000b004",
+     "from_roster": false,
+     "ticket_sha256": null,
+     "display_name": "Importado Aqui"
+    },
+    {
+     "player_id": "p-cccccccccccc",
+     "status": "checked_in",
+     "checked_in_at": 1792000300.0,
+     "role": "player",
+     "registration_id": null,
+     "from_roster": false,
+     "ticket_sha256": null,
+     "display_name": "Zé Coruja"
+    },
+    {
+     "player_id": "p-dddddddddddd",
+     "status": "removed",
+     "checked_in_at": 1792000400.0,
+     "role": "player",
+     "registration_id": null,
+     "from_roster": false,
+     "ticket_sha256": null,
+     "display_name": "Rita Falcão"
+    },
+    {
+     "player_id": "p-ffffffffffff",
+     "status": "pending",
+     "checked_in_at": null,
+     "role": "marshal",
+     "registration_id": null,
+     "from_roster": false,
+     "ticket_sha256": null,
+     "display_name": "Marshal Mário"
+    },
+    {
+     "player_id": "p-gggggggggggg",
+     "status": "left",
+     "checked_in_at": 1792000500.0,
+     "role": "player",
+     "registration_id": null,
+     "from_roster": false,
+     "ticket_sha256": null,
+     "display_name": null
+    },
+    {
+     "player_id": "p-hhhhhhhhhhhh",
+     "status": "removed",
+     "checked_in_at": null,
+     "role": "player",
+     "registration_id": null,
+     "from_roster": false,
+     "ticket_sha256": null,
+     "display_name": "Saiu Antes"
+    }
+   ],
+   "declarations": {
+    "p-aaaaaaaaaaaa": [
+     {
+      "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+      "type": "aeg",
+      "class": "rifle",
+      "make_model": "Tokyo Marui M4",
+      "replica_id": null,
+      "state": "passed",
+      "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+     },
+     {
+      "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+      "type": "aeg",
+      "class": "rifle",
+      "make_model": "Tokyo Marui M4",
+      "replica_id": null,
+      "state": "withdrawn",
+      "reading_id": null
+     }
+    ],
+    "p-cccccccccccc": [
+     {
+      "declaration_id": "0192f3a4-0000-7000-8000-00000000c101",
+      "type": "aeg",
+      "class": "rifle",
+      "make_model": "Tokyo Marui M4",
+      "replica_id": null,
+      "state": "passed",
+      "reading_id": "0192f3a4-0000-7000-8000-00000000d101"
+     },
+     {
+      "declaration_id": "0192f3a4-0000-7000-8000-00000000c102",
+      "type": "bolt_action",
+      "class": "sniper",
+      "make_model": "Tokyo Marui M4",
+      "replica_id": null,
+      "state": "refused",
+      "reading_id": null
+     }
+    ],
+    "p-hhhhhhhhhhhh": [
+     {
+      "declaration_id": "0192f3a4-0000-7000-8000-00000000c103",
+      "type": "aeg",
+      "class": "rifle",
+      "make_model": "Tokyo Marui M4",
+      "replica_id": null,
+      "state": "pending",
+      "reading_id": null
+     }
+    ]
+   },
+   "outcome": {
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-aaaaaaaaaaaa",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn",
+        "reading_id": null
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "declarations": [],
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f"
+     }
+    ],
+    "walkins": 4
+   }
+  },
+  {
+   "name": "walkins_as_guests",
+   "why": "push_walkins on: the same check-in; the guests are the walk-ins who came, are players and still have a name, with their declarations' type, class and state (no make and model, no replica id); the count is unchanged",
+   "guests": true,
+   "rows": [
+    {
+     "player_id": "p-aaaaaaaaaaaa",
+     "status": "checked_in",
+     "checked_in_at": 1792000100.0,
+     "role": "player",
+     "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+     "from_roster": true,
+     "ticket_sha256": null,
+     "display_name": "Ana Roster"
+    },
+    {
+     "player_id": "p-zzzzzzzzzzzz",
+     "status": "expected",
+     "checked_in_at": null,
+     "role": "player",
+     "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+     "from_roster": true,
+     "ticket_sha256": null,
+     "display_name": "Não Veio"
+    },
+    {
+     "player_id": "p-bbbbbbbbbbbb",
+     "status": "left",
+     "checked_in_at": 1792000200.0,
+     "role": "player",
+     "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+     "from_roster": false,
+     "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+     "display_name": "Da App"
+    },
+    {
+     "player_id": "p-eeeeeeeeeeee",
+     "status": "checked_in",
+     "checked_in_at": 1792000250.0,
+     "role": "player",
+     "registration_id": "0192f3a4-0000-7000-8000-00000000b004",
+     "from_roster": false,
+     "ticket_sha256": null,
+     "display_name": "Importado Aqui"
+    },
+    {
+     "player_id": "p-cccccccccccc",
+     "status": "checked_in",
+     "checked_in_at": 1792000300.0,
+     "role": "player",
+     "registration_id": null,
+     "from_roster": false,
+     "ticket_sha256": null,
+     "display_name": "Zé Coruja"
+    },
+    {
+     "player_id": "p-dddddddddddd",
+     "status": "removed",
+     "checked_in_at": 1792000400.0,
+     "role": "player",
+     "registration_id": null,
+     "from_roster": false,
+     "ticket_sha256": null,
+     "display_name": "Rita Falcão"
+    },
+    {
+     "player_id": "p-ffffffffffff",
+     "status": "pending",
+     "checked_in_at": null,
+     "role": "marshal",
+     "registration_id": null,
+     "from_roster": false,
+     "ticket_sha256": null,
+     "display_name": "Marshal Mário"
+    },
+    {
+     "player_id": "p-gggggggggggg",
+     "status": "left",
+     "checked_in_at": 1792000500.0,
+     "role": "player",
+     "registration_id": null,
+     "from_roster": false,
+     "ticket_sha256": null,
+     "display_name": null
+    },
+    {
+     "player_id": "p-hhhhhhhhhhhh",
+     "status": "removed",
+     "checked_in_at": null,
+     "role": "player",
+     "registration_id": null,
+     "from_roster": false,
+     "ticket_sha256": null,
+     "display_name": "Saiu Antes"
+    }
+   ],
+   "declarations": {
+    "p-aaaaaaaaaaaa": [
+     {
+      "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+      "type": "aeg",
+      "class": "rifle",
+      "make_model": "Tokyo Marui M4",
+      "replica_id": null,
+      "state": "passed",
+      "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+     },
+     {
+      "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+      "type": "aeg",
+      "class": "rifle",
+      "make_model": "Tokyo Marui M4",
+      "replica_id": null,
+      "state": "withdrawn",
+      "reading_id": null
+     }
+    ],
+    "p-cccccccccccc": [
+     {
+      "declaration_id": "0192f3a4-0000-7000-8000-00000000c101",
+      "type": "aeg",
+      "class": "rifle",
+      "make_model": "Tokyo Marui M4",
+      "replica_id": null,
+      "state": "passed",
+      "reading_id": "0192f3a4-0000-7000-8000-00000000d101"
+     },
+     {
+      "declaration_id": "0192f3a4-0000-7000-8000-00000000c102",
+      "type": "bolt_action",
+      "class": "sniper",
+      "make_model": "Tokyo Marui M4",
+      "replica_id": null,
+      "state": "refused",
+      "reading_id": null
+     }
+    ],
+    "p-hhhhhhhhhhhh": [
+     {
+      "declaration_id": "0192f3a4-0000-7000-8000-00000000c103",
+      "type": "aeg",
+      "class": "rifle",
+      "make_model": "Tokyo Marui M4",
+      "replica_id": null,
+      "state": "pending",
+      "reading_id": null
+     }
+    ]
+   },
+   "outcome": {
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-aaaaaaaaaaaa",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn",
+        "reading_id": null
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "declarations": [],
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f"
+     }
+    ],
+    "walkins": 4,
+    "guests": [
+     {
+      "player_id": "p-cccccccccccc",
+      "display_name": "Zé Coruja",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c101",
+        "type": "aeg",
+        "class": "rifle",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d101"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c102",
+        "type": "bolt_action",
+        "class": "sniper",
+        "state": "refused",
+        "reading_id": null
+       }
+      ]
+     },
+     {
+      "player_id": "p-dddddddddddd",
+      "display_name": "Rita Falcão",
+      "declarations": []
+     }
+    ]
+   }
+  },
+  {
+   "name": "no_one_with_guests",
+   "why": "push_walkins on and nobody checked in: an empty guests list",
+   "guests": true,
+   "rows": [],
+   "declarations": {},
+   "outcome": {
+    "registrations": [],
+    "walkins": 0,
+    "guests": []
+   }
   }
  ]
 }
