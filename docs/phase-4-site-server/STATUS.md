@@ -662,7 +662,8 @@ Not yet: a real game day (HW1); `[sync] push_walkins`; the
 registration import (17). Decisions S16-1 to S16-14, all open; S16-4 (claims
 confirmed by the controller), S16-6 (the field's limit template set on both
 sides) and S16-9 (no registration form on the public pages) want the
-maintainer's eye.
+maintainer's eye. S16-9's "later also on the web pages" is built since
+2026-11-04 (WREG-*, below).
 
 ## Other fields' chrono records on the controllers (S14-5, built 2026-10-27, in software)
 
@@ -1146,3 +1147,7 @@ Answers S20-8's "a field-wide history across fields" with the maintainer's decis
 ## The hub link code page (2026-10-31)
 
 `/staff/account/hub-share` (decisions HLC-*): the staff-style page for SVX-2's link code that the app's screen (APF-4) already had. In a hosted hub a signed-in person makes a link code at one field, enters it at another, sees the other fields they are linked at, gives or withdraws this field's `chrono_sharing` consent, and unlinks; every refusal in words in four languages; linked from `/staff/account` only when `GET /me/hub-share` answers. The API grew `field`, `consent` and `others` in the `GET` answer and one more `SECURITY DEFINER` function, `atalaia_share_peers(uuid)` (`hosted migrate` makes it; `hosted check` and `drop_sql` know it). Tests: `tests/test_hub_share_page.py`, `tests/test_hub_share.py`, `tests/test_tenants.py`, `tests_browser/test_hubshare_browser.py` (the hub's four calls faked in the browser, as the browser tests run a single field).
+
+## Registering on the web pages (WREG, 2026-11-04, in software)
+
+What S16-9 left for later, now that social login and passkeys exist (LG-*): `/f/<slug>/games/<id>/register/web` (`server/atalaia_server/web/player_pages.py`, `player_i18n.py`, `static/player/register.js`), linked from the game's *Register* page next to the app's way. A player logs in with Google, Microsoft or Apple, a passkey, or the password (with its TOTP code) when the server takes passwords; a new account comes only from a social login with the privacy notice opened and ticked, the 16-or-older box and the notice's version, checked by the server as for the app (LEG-*, CONS-4). Then the app's form (name, team, the federation number or the field's membership rule, the pre-declared replicas), the same API (`POST .../registrations`, `/api/v1/me/registrations`), so the same checks and records (`source` `site`, the audit entries), and the ticket as a QR code drawn in the page (the console's vendored generator, copied) and as text, shown once, printable. Back on the page later: the registration, change, cancel, a new ticket, the way into the app, and a passkey for next time. The page is of the staff pages' kind: no data in the HTML, `no-store`, `noindex`, the CSP unchanged (no inline script), no cookie authorises a change (CSRF), every value as text. New: a social login may return to that page (`PLAYER_RETURN_TO`, only `?lang=`), and 20 registrations and new tickets an hour per account (WREG-5), app and web alike. Four languages. Tests: `server/tests/test_web_registration.py`, `server/tests_browser/test_register_browser.py` (Chromium). Not yet on a real deployment or an iPhone. Decisions WREG-1 to WREG-12, all open; WREG-11 asks the maintainer's lawyer about the privacy notice templates.

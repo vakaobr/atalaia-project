@@ -146,6 +146,7 @@ jobs:
               - 'modes/**'
               - 'registry/apds/**'
               - 'tools/dev/server-browser/**'
+              - 'controller/console/src/lib/qrcode.module.js' # the web registration's copy is checked against it (WREG-8)
               - 'tools/docker_server.py'
               - 'tools/server_deploy.py'
               - 'tools/server_deploy_hosted.py'

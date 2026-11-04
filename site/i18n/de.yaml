@@ -1038,8 +1038,8 @@ roadmap:
         Site-Server, für Staff außerhalb."
       - "<strong>Der Site-Server</strong>: Konten mit Zwei-Faktor-Codes, Rechte an persönlichen
         Daten, Controller-Sync, Chrono-Register, Spielverlauf und Szenario-Bibliothek."
-      - "<strong>Spielplanung und Anmeldung</strong>, mit öffentlichen Feldseiten, Kalender-Feeds
-        und Club-Profilen."
+      - "<strong>Spielplanung und Anmeldung</strong>, in der App oder ohne App auf den Webseiten des
+        Feldes, mit öffentlichen Feldseiten, Kalender-Feeds und Club-Profilen."
       - "<strong>Hosted-Modus</strong>: viele Felder auf einem Server, jedes vom anderen getrennt,
         mit seinem Deployment."
     g_modes:

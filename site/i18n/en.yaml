@@ -985,8 +985,8 @@ roadmap:
         site server, for staff away from it."
       - "<strong>The site server</strong>: accounts with two-factor codes, personal data rights,
         controller sync, the chrono registry, game history and the scenario library."
-      - "<strong>Game scheduling and registration</strong>, with public field pages, calendar feeds
-        and club profiles."
+      - "<strong>Game scheduling and registration</strong>, in the app or on the field's web pages
+        with no app, with public field pages, calendar feeds and club profiles."
       - "<strong>Hosted mode</strong>: many fields on one server, each kept apart, with its
         deployment."
     g_modes:
