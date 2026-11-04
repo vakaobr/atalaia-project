@@ -2197,9 +2197,10 @@ static void test_port_withheld(void)
         phone_send_vector(POD_LINK_USB, "cmd_ping");
     }
     CHECK(last_level == POD_IDENT_TRIM && last_trim == 1 && !pod_outputs_owns(&outs, "out.4"));
-    CHECK(strcmp(last_modules(), "{\"modules\":\"58:target/1.0.0:hit;5c:out4/1.0.0:siren,strobe,smoke\","
-                                 "\"max_on_s\":{\"siren\":30,\"strobe\":30,\"smoke\":30},"
-                                 "\"withheld\":\"5c:out4/1.0.0:out.4\"}") == 0);
+    CHECK(strcmp(last_modules(),
+                 "{\"modules\":\"58:target/1.0.0:hit;5c:out4/1.0.0:siren,strobe,smoke\","
+                 "\"max_on_s\":{\"siren\":30,\"strobe\":30,\"smoke\":30},"
+                 "\"withheld\":\"5c:out4/1.0.0:out.4\"}") == 0);
     CHECK(pod_port_withheld_text(&port, text, sizeof(text)) == strlen("5c:out4/1.0.0:out.4") &&
           strcmp(text, "5c:out4/1.0.0:out.4") == 0);
     CHECK(logged("told the phone its outputs not lent: 5c:out4/1.0.0:out.4"));

@@ -36,11 +36,11 @@
  * takes the longest ons for its own model. A pod with an output fitted adds "withheld", the
  * outputs fitted that it does not lend (pod_port_withheld_text; "" when it lends every one), which
  * the phone tells the controller as node.outputs_disabled, so the console shows them as a box's
- * outputs fitted but not enabled (decision PROPC-6). A module that stops answering while a phone is on a
- * link is the EVT "pod" "module_lost" ({"modules": its entry, "reason"}), which the phone tells
- * the controller as node.module_lost during a game. A change of the lent capabilities sends IDENT
- * again first (ops.ident_changed). An older phone drops these EVTs: they name no capability of
- * IDENT.
+ * outputs fitted but not enabled (decision PROPC-6). A module that stops answering while a phone is
+ * on a link is the EVT "pod" "module_lost" ({"modules": its entry, "reason"}), which the phone
+ * tells the controller as node.module_lost during a game. A change of the lent capabilities sends
+ * IDENT again first (ops.ident_changed). An older phone drops these EVTs: they name no capability
+ * of IDENT.
  *
  * Without a bus (a pod built without the port, or one whose bus did not install) only the simple
  * outputs are told.
