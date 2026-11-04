@@ -105,6 +105,7 @@ process.
 | floor plan / level | planta / piso | Grundriss / Ebene | 平面圖 / 樓層 | |
 | Bluetooth beacon (indoor positions) | baliza | Beacon | 信標 | as the app's dialog and sharing line write it: "Usar as balizas", "Beacons nutzen", "使用信標" (LSW-3); a Field Box is a beacon too |
 | map grid / grid square ("C4") | quadrícula / quadrícula C4 | Gitter / Planquadrat C4 | 方格 / 方格 C4 | rows are letters (zh-tw: 列), columns numbers (欄); "grelha" stays the boxes' plain placeholder grid (MF-91) |
+| map tile (of an aerial photo or a map) | mosaico | Kachel | 圖磚 | the 256-pixel squares a WMTS sends; the console names them only when some are missing or did not arrive (MF-96) |
 | crest | emblema | Wappen | 隊徽 | |
 | federation number | número de federado | Verbandsnummer | 協會會員編號 | |
 | APD (membership) | APD (filiação) | APD (Mitgliedschaft) | APD（會員資格） | APD stays as is in every language; pt-PT: the membership is "filiação"; the number is "número de associado" (the maintainer, 2026-10-28), never "sócio" |
@@ -125,6 +126,10 @@ process.
 | expansion port | porta de expansão | Erweiterungsanschluss | 擴充埠 | the M12 socket modules plug into (draft RFC "The expansion port"); its port board: placa da porta / Anschlussplatine / 擴充埠板 *(check)* |
 | simple output | saída simples | einfacher Ausgang | 簡易輸出 | the box's RC relay switch output for a siren, strobe or smoke remote (EXP-31) *(check)* |
 | RC relay switch | interruptor de relé RC | RC-Relaisschalter | RC 繼電器開關 | *(check)* |
+| I2C output module | módulo de saídas I2C | I2C-Ausgangsmodul | I2C 輸出模組 | the expansion port's relay module (EXP-16, increment 11) *(check)* |
+| I2C isolator | isolador I2C | I2C-Isolator | I2C 隔離器 | *(check)* |
+| high-level trigger (relay board) | disparo por nível alto | High-Level-Trigger | 高電位觸發 | *(check)* |
+| after the bench (build page) | depois da bancada | nach dem Labortisch | 工作台測試之後 | what needs real hardware (SITE8-4) *(check)* |
 | enclosure switch (tamper) | interruptor da caixa | Gehäuseschalter | 外殼開關 | the alert: "violação" / "Manipulationsalarm" *(check)*; zh-tw: 警報：「防拆警報」 |
 | Li-ion cell | célula (de iões de lítio) | Zelle, Akku | 鋰電池芯、電芯 | "pilha" is a disposable battery |
 | resettable fuse (PTC) | fusível rearmável | rückstellbare Sicherung | 可自恢復保險絲 | the target addon's port (P5J-16) *(check)* |

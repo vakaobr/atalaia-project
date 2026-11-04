@@ -34,6 +34,7 @@ What holds personal data now (plan phases 10-12):
 | ``game_registrations`` with ``registration_replicas`` (plan phase 16) | the person's registrations with their pre-declared replicas and outcomes (``registrations.json``; never the ticket's hash) | a game not yet started: cancelled; every one: the account, the name, the team preference, the federation (membership) number, the APD and its expiry and the ticket's hash cleared, the replicas' make and model too (the outcome and the declarations' states stay, the field's history) | the federation (membership) number, the APD and its expiry 30 days after the game (ADR-P4-11, APD-*), the number itself already when the game's outcome arrives or the game ends (LEG-5); the rest with the scheduled game (24 months) |
 | ``player_id_claims`` (plan phase 16) | the person's claims of a phone's player id (``player_id_claims.json``) | deleted | 30 days after the claim was made |
 | imported ``game_registrations`` (plan phase 17: ``source`` not ``site``, no account) with their replicas | (no account: the field's staff see them in the game's list and its CSV export) | (no account to erase; the field answers a request from the person, as the data controller of what it imported) | deleted 30 days after the game, the guest rule (ADR-P4-8, ADR-P4-12) |
+| walk-in guest ``game_registrations`` (``source`` ``walkin``, no account; only with a controller's ``[sync] push_walkins``, PWI-*) with their replicas: player id, display name, ``checked_in``, declarations' type, class and state | (no account: the field's staff see them in the game's list and its CSV export) | (no account to erase; the controller's erasure of the player id, ``identity``, deletes them; the field answers a request from the person) | deleted 30 days after the game, the guest rule (ADR-P4-8) |
 | ``platform_links``, ``external_game_links`` (plan phase 17) | (the field's: no person in them) | | |
 | ``club_members`` (plan phase 18) | the person's clubs, club role and invitations (``clubs.json``) | deleted (a club whose last admin goes keeps its profile; a server administrator can still manage it) | an invitation not accepted, 30 days after it was made; a membership with the account |
 | ``club_reports`` (plan phase 18) | the reports the person made while logged in (``club_reports.json``; never an address) | kept for the moderation record, without the link to the account (reporter and deciding administrator) | 12 months after the decision (an open report stays until decided) |
@@ -77,6 +78,11 @@ Imported registrations (plan phase 17) belong to no account: a list the field br
 another platform, with only the import's columns (any other column is never read). The field is
 the data controller for them and must have its own basis for that list (the import asks the staff
 to confirm it); they are guests, so the whole registration goes 30 days after its game.
+Walk-ins (decisions PWI-*) reach the site server only when the field turns on its controller's
+``[sync] push_walkins``: each walk-in who came becomes a guest registration (``source`` ``walkin``,
+no account, no ticket) with the player id, the display name given at the field and the declarations'
+final states, never a team, a federation number or a make and model. They are guests too: the whole
+registration goes 30 days after its game, or at once when the controller erases that player.
 
 Clubs (plan phase 18) are organisations' public profiles; who belongs to one is the person's
 (``club_members``). A membership exists only once the invited person accepts it (decision S18-9).
@@ -106,12 +112,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from . import chrono_registry, erasure_ledger, hub_share, tenancy
+from . import chrono_registry, erasure_ledger, history_share, hub_share, tenancy
 from .config import RetentionPolicy
 from .atak_models import AtakCert
 from .preview_models import CONTACT_RETENTION, RETENTION as FEEDBACK_RETENTION, PreviewFeedback
 from .audit import record
-from .models import (ROLE_BY_ID, AuditLog, Base, ChronoCopyRevocation, GameResult, ChronoReading, ChronoReject, Club, ClubMember, ClubReport, Consent, Field,
+from .models import (WALKIN_SOURCE, ROLE_BY_ID, AuditLog, Base, ChronoCopyRevocation, GameResult, ChronoReading, ChronoReject, Club, ClubMember, ClubReport, Consent, Field,
                      FieldPlayerId, FirmwareRelease, Game, GameRegistration, MarshalKey, NoticeRecord, PlayerIdClaim, RegistrationReplica, Replica,
                      ScheduledGame, User, UserFieldRole, UserGameRole, UserSession, OidcLogin, Passkey, UserIdentity)
 from .services import branding, history
@@ -572,6 +578,7 @@ async def purge(db: AsyncSession, now: Optional[datetime] = None, dry_run: bool 
               "game_results": results, "game_results_expired": results_gone.rowcount or 0}
     counts.update(await _purge_chrono(db, now))
     await hub_share.sync_all(db)  # a hosted hub's copies follow what the purge removed (SVX-2)
+    await history_share.sync_field(db, now)  # and its shared game history (HUBH-*): gone at the field, gone there
     # The schedule (plan phase 15): a scheduled game is game history once it has ended.
     scheduled = await db.execute(delete(ScheduledGame).where(ScheduledGame.ends_at < now - GAME_RETENTION))
     counts["scheduled_games"] = scheduled.rowcount or 0
@@ -585,8 +592,13 @@ async def purge(db: AsyncSession, now: Optional[datetime] = None, dry_run: bool 
     counts["federation_numbers"] = federation.rowcount or 0
     claims = await db.execute(delete(PlayerIdClaim).where(PlayerIdClaim.created_at < now - CLAIM_RETENTION))
     counts["player_id_claims"] = claims.rowcount or 0
-    # Imported registrations (plan phase 17) are guests: the whole row 30 days after the game (replicas cascade).
+    # Guests: the whole row 30 days after the game (replicas cascade). The walk-ins a controller pushed with
+    # [sync] push_walkins (decisions PWI-*), then imported registrations (plan phase 17).
     guests_ended = select(ScheduledGame.id).where(ScheduledGame.ends_at < now - GUEST_RETENTION).scalar_subquery()
+    walkins = await db.execute(delete(GameRegistration).where(
+        GameRegistration.source == WALKIN_SOURCE, GameRegistration.user_id.is_(None),
+        GameRegistration.scheduled_game.in_(guests_ended)))
+    counts["walkin_guests"] = walkins.rowcount or 0
     guests = await db.execute(delete(GameRegistration).where(
         GameRegistration.source != "site", GameRegistration.user_id.is_(None),
         GameRegistration.scheduled_game.in_(guests_ended)))

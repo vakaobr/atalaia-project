@@ -28,7 +28,7 @@ VECTORS = json.loads((REPO / "protocol" / "vectors" / "sync.json").read_text(enc
 
 class VectorTests(unittest.TestCase):
     def test_counts(self) -> None:
-        self.assertEqual((len(VECTORS["valid"]), len(VECTORS["invalid"]), len(VECTORS["merge"])), (15, 76, 3))
+        self.assertEqual((len(VECTORS["valid"]), len(VECTORS["invalid"]), len(VECTORS["merge"])), (16, 88, 3))
         self.assertEqual((len(VECTORS["answers"]["valid"]), len(VECTORS["answers"]["invalid"])), (24, 86))
         self.assertEqual({v["kind"] for v in VECTORS["answers"]["valid"]}, set(fmt.ANSWERS))
         self.assertEqual({v["kind"] for v in VECTORS["valid"]}, set(fmt.CHECKS))
@@ -129,6 +129,23 @@ class VectorTests(unittest.TestCase):
             with self.subTest(case=case["name"]):
                 answer = fmt.check_presets(copy.deepcopy(case["answer"]))
                 self.assertEqual(fmt.library_removals(case["state"], answer), case["removals"])
+
+    def test_checkin_outcomes(self) -> None:
+        """Decisions PWI-*: what a controller sends after a game, walk-ins as a count or as guests; the phone's
+        ``checkinOutcomes`` is held to the same cases."""
+        self.assertEqual([c["name"] for c in VECTORS["checkin_outcomes"]],
+                         ["walkins_as_a_count", "walkins_as_guests", "no_one_with_guests"])
+        for case in VECTORS["checkin_outcomes"]:
+            with self.subTest(case=case["name"]):
+                out = fmt.checkin_outcomes(copy.deepcopy(case["rows"]), copy.deepcopy(case["declarations"]),
+                                           guests=case["guests"])
+                self.assertEqual(out, case["outcome"])
+                self.assertEqual("guests" in out, case["guests"])
+                body = {"sync_version": 1, "controller": {"id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+                                                          "version": "0.1.0"},
+                        "game": {"game_id": 1, "game_seed": 2},
+                        "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001", **copy.deepcopy(out)}
+                fmt.check_checkins(body)  # what a controller makes always passes the check
 
     def test_merge(self) -> None:
         for case in VECTORS["merge"]:

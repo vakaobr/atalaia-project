@@ -414,8 +414,62 @@ static void test_game_timer_header(void)
     CHECK(strcmp(t.head_right, "12 pts") == 0);
 }
 
+/* The I/O pod's pairing screens (PODPK-2, PODPK-7). */
+static void test_pairing_screens(void)
+{
+    oled_pair_view_t v;
+    oled_text_t t;
+    memset(&v, 0, sizeof(v));
+    strcpy(v.name, "atalaia-pod-1A2B");
+
+    v.show = OLED_PAIR_NONE;
+    CHECK(!oled_text_pair(&v, &t)); /* dark */
+    CHECK(!oled_text_pair(NULL, &t));
+
+    v.show = OLED_PAIR_PASSKEY;
+    v.passkey = 123456;
+    v.secs_left = 30;
+    CHECK(oled_text_pair(&v, &t));
+    CHECK(strcmp(t.head, "PAIR") == 0 && strcmp(t.head_right, "0:30") == 0);
+    CHECK(strcmp(t.big, "123 456") == 0 && strcmp(t.foot, "atalaia-pod-1A2B") == 0);
+    CHECK(t.bar == -1 && t.since == -1 && !t.zone);
+    /* Leading zeros are kept: the phone wants all six digits. */
+    v.passkey = 7089;
+    v.secs_left = 9;
+    CHECK(oled_text_pair(&v, &t));
+    CHECK(strcmp(t.big, "007 089") == 0 && strcmp(t.head_right, "0:09") == 0);
+    v.passkey = 0;
+    v.secs_left = -1;
+    CHECK(oled_text_pair(&v, &t));
+    CHECK(strcmp(t.big, "000 000") == 0 && t.head_right[0] == 0);
+
+    v.show = OLED_PAIR_PAIRED;
+    CHECK(oled_text_pair(&v, &t));
+    CHECK(strcmp(t.head, "BLUETOOTH") == 0 && strcmp(t.big, "PAIRED") == 0);
+    CHECK(strcmp(t.foot, "atalaia-pod-1A2B") == 0);
+    v.show = OLED_PAIR_FAILED;
+    CHECK(oled_text_pair(&v, &t));
+    CHECK(strcmp(t.big, "FAILED") == 0 && strcmp(t.foot, "Try again") == 0);
+    v.show = OLED_PAIR_TIMEOUT;
+    CHECK(oled_text_pair(&v, &t));
+    CHECK(strcmp(t.big, "TOO SLOW") == 0);
+    v.show = OLED_PAIR_AGAIN;
+    CHECK(oled_text_pair(&v, &t));
+    CHECK(strcmp(t.big, "PAIR AGAIN") == 0 && strcmp(t.foot, "Forget on phone") == 0);
+    v.show = OLED_PAIR_CLEARING;
+    v.progress = 40;
+    CHECK(oled_text_pair(&v, &t));
+    CHECK(strcmp(t.head, "FORGET ALL") == 0 && strcmp(t.big, "HOLD") == 0 && t.bar == 40);
+    v.progress = 140;
+    CHECK(oled_text_pair(&v, &t) && t.bar == 100);
+    v.show = OLED_PAIR_CLEARED;
+    CHECK(oled_text_pair(&v, &t));
+    CHECK(strcmp(t.big, "CLEARED") == 0 && t.bar == -1);
+}
+
 void run_oled_view_tests(void)
 {
+    test_pairing_screens();
     test_game_timer_header();
     test_version_lines();
     test_mode_title();

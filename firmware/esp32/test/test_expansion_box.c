@@ -294,6 +294,89 @@ static void test_a_modules_outputs_join_the_output_layer(void)
     CHECK(strcmp(text, "g46:servo:siren") == 0);
 }
 
+/* A module's output channels left disabled (EXPI8-7: every one until the admin enables it) are in
+ * node.outputs_disabled (EXPL-20): its entry with only those ids, after the simple outputs not
+ * enabled, whole entries within 100 bytes; enabling one at the box changes the text (and no
+ * node.modules entry); a lost module leaves it. */
+static void test_a_modules_channels_left_disabled(void)
+{
+    setup(true);
+    out_backend_t be = {.ctx = &simple_be, .drive = fake_drive, .set = NULL};
+    out_settings_t s;
+    outputs_default_settings(1, &s);
+    snprintf(s.function, sizeof(s.function), "horn"); /* fitted, not enabled */
+    CHECK(outputs_add_simple(&outs, 45, &be, &s) == 1);
+    plug("out4", 0x5C);
+    start();
+    run_to(OUT_GAME_NONE, 50);
+    CHECK(outs.count == 6 && outs.simple == 2);
+    char text[OUT_MODULES_MAX + 1];
+    CHECK(expansion_box_disabled_text(&xb, text, sizeof(text)) ==
+          strlen("5c:out4/1.0.0:siren.2,strobe,smoke,out.4"));
+    CHECK(strcmp(text, "5c:out4/1.0.0:siren.2,strobe,smoke,out.4") == 0);
+    box_game_t g;
+    memset(&g, 0, sizeof(g));
+    g.outputs = &outs;
+    g.port = &xb;
+    box_game_disabled_text(&g, text, sizeof(text));
+    CHECK(strcmp(text, "g45:servo:horn;5c:out4/1.0.0:siren.2,strobe,smoke,out.4") == 0);
+    /* node.modules is unchanged by the settings: the module's entry lists its usable channels. */
+    char mods[OUT_MODULES_MAX + 1];
+    box_game_modules_text(&g, mods, sizeof(mods));
+    CHECK(strcmp(mods, "g46:servo:siren;5c:out4/1.0.0:siren.2,strobe,smoke,out.4") == 0);
+    /* The admin enables the strobe: it leaves the text; node.modules stays as it was. */
+    s = outs.ch[3].set;
+    CHECK(strcmp(outs.ch[3].id, "strobe") == 0);
+    s.enabled = true;
+    CHECK(outputs_configure(&outs, 3, &s) == OUT_OK);
+    box_game_disabled_text(&g, text, sizeof(text));
+    CHECK(strcmp(text, "g45:servo:horn;5c:out4/1.0.0:siren.2,smoke,out.4") == 0);
+    box_game_modules_text(&g, text, sizeof(text));
+    CHECK(strcmp(text, mods) == 0);
+    /* Every channel enabled: the module has no entry; the horn alone is left. */
+    for (int i = outs.simple; i < outs.count; i++) {
+        s = outs.ch[i].set;
+        s.enabled = true;
+        CHECK(outputs_configure(&outs, i, &s) == OUT_OK);
+    }
+    CHECK(expansion_box_disabled_text(&xb, text, sizeof(text)) == 0 && text[0] == '\0');
+    box_game_disabled_text(&g, text, sizeof(text));
+    CHECK(strcmp(text, "g45:servo:horn") == 0);
+
+    /* Two modules: whole entries only, within 100 bytes. A second out4's entry
+     * ("5d:out4/1.0.0:siren.3,strobe.2,smoke.2,out.4.2", 47 bytes) does not fit after the
+     * simple ones and the first module's (14 + 1 + 41 + 1 + 47 > 100): it is left out whole. */
+    setup(true);
+    CHECK(outputs_add_simple(&outs, 45, &be, NULL) == 1); /* a new box's: out.2, disabled */
+    plug("out4", 0x5C);
+    plug("out4", 0x5D);
+    start();
+    run_to(OUT_GAME_NONE, 50);
+    CHECK(outs.count == 10);
+    char both[EXP_MODULES_TEXT_MAX + 1];
+    expansion_box_disabled_text(&xb, both, sizeof(both));
+    CHECK(strcmp(both, "5c:out4/1.0.0:siren.2,strobe,smoke,out.4;"
+                       "5d:out4/1.0.0:siren.3,strobe.2,smoke.2,out.4.2") == 0);
+    memset(&g, 0, sizeof(g));
+    g.outputs = &outs;
+    g.port = &xb;
+    size_t n = box_game_disabled_text(&g, text, sizeof(text));
+    CHECK(n <= OUT_MODULES_MAX && n == strlen(text));
+    CHECK(strcmp(text, "g45:servo:out.2;5c:out4/1.0.0:siren.2,strobe,smoke,out.4") == 0);
+    /* A small buffer: whole entries only, never a cut one. */
+    char small[20];
+    CHECK(box_game_disabled_text(&g, small, sizeof(small)) == strlen("g45:servo:out.2"));
+    CHECK(strcmp(small, "g45:servo:out.2") == 0);
+
+    /* The first module is lost: its channels leave the text with it. */
+    plugged[0x5C - EXP_ADDR_FIRST] = false;
+    run_to(OUT_GAME_NONE, 9000);
+    box_game_disabled_text(&g, text, sizeof(text));
+    const char *left = "g45:servo:out.2;5d:out4/1.0.0:";
+    CHECK(strncmp(text, left, strlen(left)) == 0);
+    CHECK(strstr(text, "5c:") == NULL);
+}
+
 /* The box's max on is never above the module's: an on without a time ends on the box's side at
  * the module's max on (so the module's min off, which follows only its own max on, never comes). */
 static void test_an_on_ends_at_the_modules_max_on(void)
@@ -343,6 +426,7 @@ void run_expansion_box_tests(void)
     test_a_target_plugged_in_during_a_game_is_armed_at_once();
     test_a_module_lost_during_a_game();
     test_a_modules_outputs_join_the_output_layer();
+    test_a_modules_channels_left_disabled();
     test_an_on_ends_at_the_modules_max_on();
     test_status_json();
 }

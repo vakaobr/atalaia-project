@@ -1,0 +1,111 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<p class="back no-print"><a href="$game_url">$back</a></p>
+<h1>$heading</h1>
+<p class="when">$when</p>
+<p class="no-print">$w_intro</p>
+<section id="login-section" class="no-print" aria-labelledby="login-title" hidden>
+<h2 id="login-title">$w_login_title</h2>
+<p>$w_login_intro</p>
+<form id="login-form" class="staff-form" method="post" novalidate hidden>
+<fieldset id="login-fields" disabled>
+<label for="username">$username</label>
+<input id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="320" required>
+<label for="password">$password</label>
+<input id="password" name="password" type="password" autocomplete="current-password" maxlength="4096" required>
+<button type="submit">$login_button</button>
+</fieldset>
+</form>
+<form id="totp-form" class="staff-form" method="post" novalidate hidden>
+<fieldset id="totp-fields" disabled>
+<p>$totp_intro</p>
+<label for="code">$totp_code</label>
+<input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]{6,8}" required>
+<button type="submit">$totp_button</button>
+</fieldset>
+</form>
+<div id="passkey-row" hidden>
+<p class="hint">$w_passkey_hint</p>
+<p><button type="button" id="passkey-login">$login_passkey</button></p>
+</div>
+<div id="social-row" class="alt-logins" hidden>
+<h3>$w_new_title</h3>
+<p id="new-intro">$w_new_intro</p>
+<p id="no-notice" class="notice" hidden>$w_no_notice</p>
+<div id="signup-row" class="signup">
+<p id="signup-error" class="field-error" role="alert" hidden></p>
+<p id="notice-row">$notice_link</p>
+<p><label><input type="checkbox" id="notice-seen" aria-describedby="notice-first signup-error" disabled> $w_notice_seen</label> <span id="notice-first" class="hint">$w_notice_first</span></p>
+<p><label><input type="checkbox" id="age-confirmed" aria-describedby="signup-error"> $w_age</label></p>
+</div>
+<div id="oidc-buttons" class="alt-buttons"></div>
+</div>
+<p id="no-social" class="hint" hidden>$w_no_social</p>
+</section>
+<p id="closed" class="notice" hidden>$w_closed</p>
+<p id="game-cancelled" class="notice" hidden>$w_game_cancelled</p>
+<section id="reg-state" aria-labelledby="reg-state-text" hidden>
+<p id="reg-state-text" class="status ok"></p>
+</section>
+<section id="ticket" class="ticket" aria-labelledby="ticket-title" hidden>
+<h2 id="ticket-title">$w_ticket_title</h2>
+<p class="notice no-print" id="ticket-once">$w_ticket_once</p>
+<div id="ticket-qr" class="ticket-qr"></div>
+<p>$w_ticket_text</p>
+<p><code id="ticket-text" class="ticket-text"></code></p>
+<p class="hint">$w_ticket_secret</p>
+<p class="no-print"><button type="button" id="print-ticket">$w_print</button></p>
+</section>
+<section id="ticket-lost" class="no-print" hidden>
+<p class="hint">$w_ticket_lost</p>
+<p><button type="button" id="new-ticket">$w_new_ticket</button></p>
+</section>
+<form id="reg-form" class="staff-form no-print" method="post" novalidate hidden>
+<fieldset id="reg-fields" disabled>
+<legend id="reg-legend">$w_form</legend>
+<label for="reg-name">$w_name</label>
+<input id="reg-name" name="display_name" maxlength="$name_max" autocomplete="nickname" aria-describedby="reg-name-hint" required>
+<p id="reg-name-hint" class="hint">$w_name_hint</p>
+<div id="fed-block" hidden>
+<label for="reg-fed" id="reg-fed-label"></label>
+<input id="reg-fed" name="federation_number" maxlength="$fed_max" autocomplete="off">
+</div>
+<div id="apd-block" hidden>
+<h3 id="apd-title"></h3>
+<p id="apd-accepts" class="hint"></p>
+<label for="apd-pick" id="apd-pick-label"></label>
+<select id="apd-pick" name="apd_id"></select>
+<label for="apd-number" id="apd-number-label"></label>
+<input id="apd-number" name="membership_number" maxlength="$fed_max" autocomplete="off" aria-describedby="apd-hint">
+<p id="apd-hint" class="hint">$w_apd_hint</p>
+<label for="apd-expires" id="apd-expires-label"></label>
+<input id="apd-expires" name="membership_expires" maxlength="10" inputmode="numeric" placeholder="2027-01-31" autocomplete="off">
+</div>
+<div id="team-block" hidden>
+<label for="reg-team">$w_team</label>
+<select id="reg-team" name="team_preference"></select>
+</div>
+<div id="replicas-block" hidden>
+<h3 id="replicas-title"></h3>
+<ul id="replicas" class="replicas"></ul>
+<p><button type="button" id="replica-add" class="secondary">$w_replica_add</button></p>
+</div>
+<p id="reg-error" class="field-error" role="alert" hidden></p>
+<p class="hint" id="data-note">$w_data_note</p>
+<button type="submit" id="reg-submit">$w_register</button>
+</fieldset>
+</form>
+<p id="cancel-row" class="no-print" hidden><button type="button" id="reg-cancel" class="danger">$w_cancel</button></p>
+<section id="next" class="no-print" aria-labelledby="next-title" hidden>
+<h2 id="next-title">$w_next_title</h2>
+<p>$w_next_web</p>
+<p>$w_next_app</p>
+<p class="register"><a class="button" id="open-app" href="$app_link">$w_open_app</a></p>
+<p><a href="$field_url">$w_field_page</a></p>
+</section>
+<section id="passkey-add" class="no-print" aria-labelledby="pk-title" hidden>
+<h2 id="pk-title">$w_pk_title</h2>
+<p>$w_pk_intro</p>
+<p><button type="button" id="pk-add">$w_pk_add</button></p>
+<p id="pk-elsewhere" class="hint" hidden>$w_pk_elsewhere <a href="$account_href">$w_account</a></p>
+</section>

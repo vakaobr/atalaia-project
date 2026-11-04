@@ -1,0 +1,20 @@
+/* SPDX-FileCopyrightText: 2026 The Atalaia contributors */
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* The web registration page (player_pages.py), on top of field.css and staff.css: the ticket's QR code at a size a
+   marshal's phone reads from a screen or from paper, and a printout that holds only the ticket. */
+body.player main, body.player footer { max-width: 44rem; }
+body.player .when { color: var(--muted); margin-top: 0; }
+body.player h3 { font-size: 1.05rem; margin: 1rem 0 0.25rem; }
+.ticket { margin: 1rem 0; padding: 0.5rem 1rem 1rem; border: 2px solid var(--accent); border-radius: 0.3rem; }
+.ticket-qr svg { display: block; width: min(18rem, 100%); height: auto; margin: 0.5rem 0; }
+.ticket-text { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 0.85rem;
+               overflow-wrap: anywhere; word-break: break-all; }
+ul.replicas li.replica-row { border-top: 1px solid var(--line); padding-top: 0.5rem; }
+ul.replicas li.replica-row .replica-name { flex: 1 1 100%; font-weight: 600; }
+#signup-row.invalid { border: 2px solid var(--warn); border-radius: 0.3rem; padding: 0.25rem 0.75rem; }
+@media print {
+  .no-print { display: none !important; }
+  body.player h1 { font-size: 1.3rem; }
+  .ticket { border: 1px solid #000; }
+  .ticket-qr svg { width: 7cm; }
+}

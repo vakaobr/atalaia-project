@@ -211,9 +211,19 @@ int _jsonSize(Object? value) => utf8.encode(jsonEncode(value)).length;
 Object? _default(Json m, String key, Object? value) =>
     m.putIfAbsent(key, () => value);
 
-Json _envelope(Object? raw, List<String> extra, {bool game = true}) {
+Json _envelope(
+  Object? raw,
+  List<String> extra, {
+  bool game = true,
+  List<String> optional = const [],
+}) {
   final body = _obj(raw, '');
-  _keys(body, '', ['sync_version', 'controller', if (game) 'game', ...extra]);
+  _keys(body, '', [
+    'sync_version',
+    'controller',
+    if (game) 'game',
+    ...extra,
+  ], optional);
   if (body['sync_version'] != syncVersion) {
     _fail('unsupported_version', 'sync_version');
   }
@@ -689,6 +699,9 @@ const maxClaims = 500;
 const maxDeclarations = 20;
 const _scheduledStates = ['published', 'in_progress', 'completed', 'cancelled'];
 const _checkinOutcomes = ['checked_in', 'no_show'];
+
+/// A guest's display name (sync_format.GUEST_NAME_MAX).
+const guestNameMax = 32;
 const _declarationStates = ['pending', 'passed', 'refused', 'withdrawn'];
 const claimResults = ['confirmed', 'refused', 'unknown'];
 final playerIdRe = _full(r'p-[a-z2-7]{12}');
@@ -985,15 +998,18 @@ Json checkClaimsList(Object? raw) {
   return body;
 }
 
+/// sync_format.check_checkins: `guests` only with `[sync] push_walkins`
+/// (decisions PWI-*).
 Json checkCheckins(Object? raw) {
-  final body = _envelope(raw, [
-    'scheduled_game_id',
-    'registrations',
-    'walkins',
-  ]);
+  final body = _envelope(
+    raw,
+    ['scheduled_game_id', 'registrations', 'walkins'],
+    optional: ['guests'],
+  );
   _uuid(body['scheduled_game_id'], 'scheduled_game_id');
   _int(body['walkins'], 'walkins', 0, 100000);
   final seen = <Object?>{};
+  final seenPlayers = <Object?>{};
   final regs = _list(body['registrations'], 'registrations', maxRoster);
   for (var i = 0; i < regs.length; i++) {
     final path = 'registrations[$i]';
@@ -1009,6 +1025,7 @@ Json checkCheckins(Object? raw) {
       _fail('duplicate_registration', '$path.registration_id');
     }
     _text(r['player_id'], '$path.player_id', 14, pattern: playerIdRe);
+    seenPlayers.add(r['player_id']);
     if (!_checkinOutcomes.contains(r['outcome'])) {
       _fail('bad_outcome', '$path.outcome');
     }
@@ -1043,7 +1060,135 @@ Json checkCheckins(Object? raw) {
       );
     }
   }
+  if (body.containsKey('guests')) _checkGuests(body, seenPlayers);
   return body;
+}
+
+/// sync_format._check_guests: the walk-ins pushed as guest registrations.
+void _checkGuests(Json body, Set<Object?> players) {
+  final guests = _list(body['guests'], 'guests', maxRoster);
+  if (guests.length > (body['walkins']! as int)) {
+    _fail('too_many_guests', 'guests');
+  }
+  final decls = <Object?>{};
+  for (var i = 0; i < guests.length; i++) {
+    final path = 'guests[$i]';
+    final g = _obj(guests[i], path);
+    _keys(g, path, ['player_id', 'display_name', 'declarations']);
+    _text(g['player_id'], '$path.player_id', 14, pattern: playerIdRe);
+    if (!players.add(g['player_id'])) {
+      _fail('duplicate_player', '$path.player_id');
+    }
+    _text(g['display_name'], '$path.display_name', guestNameMax);
+    final list = _list(
+      g['declarations'],
+      '$path.declarations',
+      maxDeclarations,
+    );
+    for (var j = 0; j < list.length; j++) {
+      final dpath = '$path.declarations[$j]';
+      final d = _obj(list[j], dpath);
+      _keys(
+        d,
+        dpath,
+        ['declaration_id', 'type', 'class', 'state'],
+        ['reading_id'],
+      );
+      _uuid(d['declaration_id'], '$dpath.declaration_id');
+      if (!decls.add(d['declaration_id'])) {
+        _fail('duplicate_declaration', '$dpath.declaration_id');
+      }
+      if (!replicaTypesSync.contains(d['type'])) {
+        _fail('bad_type', '$dpath.type');
+      }
+      _text(d['class'], '$dpath.class', 32, pattern: _replicaClassRe);
+      if (!_declarationStates.contains(d['state'])) {
+        _fail('bad_state', '$dpath.state');
+      }
+      _uuid(
+        _default(d, 'reading_id', null),
+        '$dpath.reading_id',
+        nullable: true,
+      );
+    }
+  }
+}
+
+bool _truthy(Object? v) =>
+    v != null && v != false && v != 0 && v != '' && v != 0.0;
+
+/// sync_format.checkin_outcomes: what a controller sends after a game
+/// (POST /api/v1/sync/checkins) from its check-in [rows] (in check-in order)
+/// and each player's [declarations] in their order, checked against
+/// `checkin_outcomes` in vectors/sync.json. With [guests]
+/// (`[sync] push_walkins`, decisions PWI-*) the walk-ins who came, are
+/// players and still have a name also go as guests; without it the answer
+/// has no `guests` at all.
+Json checkinOutcomes(
+  List<Map<String, Object?>> rows,
+  Map<String, List<Map<String, Object?>>> declarations, {
+  bool guests = false,
+}) {
+  const arrivedStates = ['pending', 'checked_in', 'left'];
+  final regs = <Json>[];
+  final outGuests = <Json>[];
+  var walkins = 0;
+  for (final r in rows) {
+    final arrived =
+        arrivedStates.contains(r['status']) ||
+        (r['status'] == 'removed' && r['checked_in_at'] != null);
+    final pid = r['player_id']! as String;
+    final decls = (declarations[pid] ?? const []).take(maxDeclarations);
+    if (!_truthy(r['registration_id'])) {
+      if (!arrived) continue;
+      walkins++;
+      final name = r['display_name'];
+      if (guests &&
+          (r['role'] ?? 'player') == 'player' &&
+          name is String &&
+          name.isNotEmpty) {
+        final runes = name.runes;
+        outGuests.add({
+          'player_id': pid,
+          'display_name': runes.length > guestNameMax
+              ? String.fromCharCodes(runes.take(guestNameMax))
+              : name,
+          'declarations': [
+            for (final d in decls)
+              {
+                'declaration_id': d['declaration_id'],
+                'type': d['type'],
+                'class': d['class'],
+                'state': d['state'],
+                'reading_id': d['reading_id'],
+              },
+          ],
+        });
+      }
+      continue;
+    }
+    final fromRoster = _truthy(r['from_roster']);
+    if (!fromRoster && !_truthy(r['ticket_sha256'])) continue;
+    regs.add({
+      'registration_id': r['registration_id'],
+      'player_id': pid,
+      'outcome': arrived ? 'checked_in' : 'no_show',
+      'declarations': [
+        for (final d in decls)
+          {
+            'declaration_id': d['declaration_id'],
+            'state': d['state'],
+            'reading_id': d['reading_id'],
+          },
+      ],
+      if (!fromRoster) 'ticket_sha256': r['ticket_sha256'],
+    });
+  }
+  return {
+    'registrations': regs,
+    'walkins': walkins,
+    if (guests) 'guests': outGuests,
+  };
 }
 
 Json checkClaims(Object? raw) {

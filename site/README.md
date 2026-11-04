@@ -245,19 +245,24 @@ every language: each GPIO cell names its Kconfig symbol (`<td data-kconfig="ATAL
 and `tools/check_wiring.py` (in `tools/check.sh`) fails if a number is not that symbol's default
 in `firmware/esp32/main/Kconfig.projbuild`. When a pin default changes, change the number here,
 in `hardware/satellite/BUILD.md` and in `hardware/io-pod/BUILD.md` together (the expansion port's
-table holds only SDA and SCL: `hardware/expansion-port/BUILD.md`). The simple output's pin follows the
+table holds only SDA and SCL: `hardware/expansion-port/BUILD.md`). The target module's and the I2C
+output module's pin tables hold RP2040 pins, which have no Kconfig symbol: they follow
+`firmware/target-module/src/main.c` and `firmware/output-module/src/board.h`, and change with
+`hardware/target-addon/BUILD*.md` and `hardware/output-module/BUILD*.md` (where `check_wiring.py`
+checks the output module's). The simple output's pin follows the
 board revision (GPIO 46 on a V4.3, 5 on a V4.2), so it is written in the text, not in a pin table; the I/O
 pod's two simple outputs (GPIO 33 and 1, the pod build's defaults) are rows of its table without `data-kconfig`,
 since the check reads the Field Box's defaults (decision SITE9-2). The dashed
 `figure.photo` boxes mark where the first builds' photos go (plan phase HW2) for the Satellite, the
-I/O pod, the expansion port and the target addon; never a mock-up or generated picture. The Field Box's section no
+I/O pod, the expansion port, the target addon and the I2C output module; never a mock-up or generated picture. The Field Box's section no
 longer has one: it opens with its first real photo and clip, the bench build of 2026-10-31
 (`#field-box-first-build`, see [Field Box photo and clip](#field-box-photo-and-clip)). Portuguese words: guia de montagem, caixa satélite, módulo de E/S, módulo de
-alvo, porta de expansão, saída simples; German: Bauanleitung, Satellit, I/O-Pod, Ziel-Addon,
-Erweiterungsanschluss, einfacher Ausgang; Chinese: 組裝指南, 衛星盒, I/O 模組, 標靶擴充模組, 擴充埠,
-簡易輸出. What waits for increment 8 of the draft RFC "The expansion port" (the target module's
-firmware, its pin table and UF2 files, the box reading the port) goes under "Coming with the
-firmware" (`build.coming`) and is never filled in before the firmware fixes it.
+alvo, módulo de saídas I2C, porta de expansão, saída simples; German: Bauanleitung, Satellit, I/O-Pod,
+Ziel-Addon, I2C-Ausgangsmodul, Erweiterungsanschluss, einfacher Ausgang; Chinese: 組裝指南, 衛星盒,
+I/O 模組, 標靶擴充模組, I2C 輸出模組, 擴充埠, 簡易輸出. Increments 8 and 11 of the draft RFC "The
+expansion port" built the modules' firmware, pins and UF2 files; what still needs real hardware
+(currents, tuning, divider values, the bench tests, Target Windows as a preset) goes under "After
+the bench" (`build.after_bench`) and is never filled in with values the bench has not measured.
 
 The Field Box's section has a pin table of the same kind and its two WireViz wiring drawings
 (2026-10-26, the maintainer's request). The SVGs have one source, `hardware/field-box/wiring/*.svg`

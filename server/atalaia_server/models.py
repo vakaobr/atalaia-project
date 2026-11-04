@@ -101,6 +101,11 @@ class Field(Base):
     sharing_terms_version: Mapped[Optional[str]] = mapped_column(String(64))
     sharing_terms_accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     sharing_terms_accepted_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # HUBH-* (migration 0031): the field shares its game history (game-level results only, never a player) with the
+    # other fields of a hosted hub that share theirs; off by default, the field's admin turns it on. ``history_shared_since``
+    # is when it was last turned on (null while off).
+    history_sharing_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    history_shared_since: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     public_scoreboard: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     # The public field page and its feeds (ADR-P4-11, ADR-P4-12; plan phase 15): off by default.
     public_page: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
@@ -823,6 +828,9 @@ class ScheduledGame(Base):
 
 REGISTRATION_STATUSES = ("registered", "cancelled", "checked_in", "no_show")
 CLAIM_STATUSES = ("pending", "confirmed", "refused")
+
+
+WALKIN_SOURCE = "walkin"  # a walk-in a controller pushed with [sync] push_walkins: a guest (decisions PWI-*)
 
 
 class GameRegistration(Base):

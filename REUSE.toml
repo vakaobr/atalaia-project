@@ -95,7 +95,7 @@ SPDX-FileCopyrightText = "2018 Google Inc."
 SPDX-License-Identifier = "Apache-2.0"
 
 [[annotations]]
-path = "controller/console/src/lib/qrcode.module.js"
+path = ["controller/console/src/lib/qrcode.module.js", "server/atalaia_server/web/static/player/qrcode.module.js"]
 precedence = "override"
 SPDX-FileCopyrightText = "2009 Kazuhiko Arase"
 SPDX-License-Identifier = "MIT"

@@ -34,9 +34,15 @@ void pod_ble_init(pod_ble_t *b, pod_t *pod, const pod_ble_stack_t *stack, bool r
     b->pod = pod;
     b->stack = *stack;
     b->require_encryption = require_encryption;
+    b->require_mitm = require_encryption;
     b->mtu = POD_BLE_MTU_MIN;
     b->status[0] = 0xFF;
     b->status[1] = 0x80;
+}
+
+void pod_ble_require_mitm(pod_ble_t *b, bool on)
+{
+    b->require_mitm = on && b->require_encryption;
 }
 
 size_t pod_ble_adv_data(uint8_t *out, size_t cap)
@@ -70,9 +76,16 @@ void pod_ble_device_name(const uint8_t addr_le[6], char out[POD_BLE_NAME_SIZE])
 
 /* ---- The link -------------------------------------------------------------------- */
 
+/* Encrypted (and with a MITM-protected key) when the build asks for it. */
+static bool secure(const pod_ble_t *b)
+{
+    if (!b->require_encryption) return true;
+    return b->encrypted && (b->authenticated || !b->require_mitm);
+}
+
 static void update(pod_ble_t *b)
 {
-    bool ready = b->connected && b->tx_subscribed && (b->encrypted || !b->require_encryption);
+    bool ready = b->connected && b->tx_subscribed && secure(b);
     if (ready == b->ready) return;
     b->ready = ready;
     if (ready) {
@@ -93,6 +106,7 @@ void pod_ble_on_connect(pod_ble_t *b, uint16_t conn)
     b->connected = true;
     b->conn = conn;
     b->encrypted = false;
+    b->authenticated = false;
     b->tx_subscribed = false;
     b->status_subscribed = false;
     b->mtu = POD_BLE_MTU_MIN;
@@ -105,17 +119,24 @@ void pod_ble_on_disconnect(pod_ble_t *b)
 {
     b->connected = false;
     b->encrypted = false;
+    b->authenticated = false;
     b->tx_subscribed = false;
     b->status_subscribed = false;
     b->mtu = POD_BLE_MTU_MIN;
     update(b);
 }
 
-void pod_ble_on_encryption(pod_ble_t *b, bool encrypted)
+void pod_ble_on_security(pod_ble_t *b, bool encrypted, bool authenticated)
 {
     if (!b->connected) return;
     b->encrypted = encrypted;
+    b->authenticated = encrypted && authenticated;
     update(b);
+}
+
+void pod_ble_on_encryption(pod_ble_t *b, bool encrypted)
+{
+    pod_ble_on_security(b, encrypted, encrypted);
 }
 
 void pod_ble_on_subscribe(pod_ble_t *b, pod_ble_chr_t chr, bool notify)
@@ -139,8 +160,8 @@ void pod_ble_on_mtu(pod_ble_t *b, uint16_t mtu)
 void pod_ble_on_write(pod_ble_t *b, const uint8_t *data, size_t len)
 {
     if (!b->connected) return;
-    if (b->require_encryption && !b->encrypted) {
-        b->count.writes_refused++; /* the stack refuses these too (an encrypted write only) */
+    if (!secure(b)) {
+        b->count.writes_refused++; /* the stack refuses these too (an authenticated write only) */
         return;
     }
     b->count.writes++;
