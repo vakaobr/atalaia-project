@@ -246,7 +246,9 @@ and `tools/check_wiring.py` (in `tools/check.sh`) fails if a number is not that 
 in `firmware/esp32/main/Kconfig.projbuild`. When a pin default changes, change the number here,
 in `hardware/satellite/BUILD.md` and in `hardware/io-pod/BUILD.md` together (the expansion port's
 table holds only SDA and SCL: `hardware/expansion-port/BUILD.md`). The simple output's pin follows the
-board revision (GPIO 46 on a V4.3, 5 on a V4.2), so it is written in the text, not in a pin table. The dashed
+board revision (GPIO 46 on a V4.3, 5 on a V4.2), so it is written in the text, not in a pin table; the I/O
+pod's two simple outputs (GPIO 33 and 1, the pod build's defaults) are rows of its table without `data-kconfig`,
+since the check reads the Field Box's defaults (decision SITE9-2). The dashed
 `figure.photo` boxes mark where the first builds' photos go (plan phase HW2) for the Satellite, the
 I/O pod, the expansion port and the target addon; never a mock-up or generated picture. The Field Box's section no
 longer has one: it opens with its first real photo and clip, the bench build of 2026-10-31

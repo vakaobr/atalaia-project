@@ -143,6 +143,8 @@ class _PropGameScreenState extends State<PropGameScreen> {
         'fw_version': 'app-$appVersion',
         'core_version': services.runner.coreVersion ?? '',
         'tier': 0,
+        // The session fills them in before the link starts, and again when
+        // the pod changes them (PropSession.helloCapabilities).
         'capabilities': const <int>[],
       },
       connect:
@@ -170,6 +172,8 @@ class _PropGameScreenState extends State<PropGameScreen> {
         'fw_version': 'app-$appVersion',
         'core_version': services.runner.coreVersion ?? '',
         'tier': 0,
+        // The session fills them in before the link starts, and again when
+        // the pod changes them (PropSession.helloCapabilities).
         'capabilities': const <int>[],
       },
     );

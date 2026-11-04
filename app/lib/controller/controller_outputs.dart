@@ -15,7 +15,8 @@
 ///   warning. `team_input` and `team_display` are met by the types of
 ///   protocol/schema/capabilities.yaml's `role_names`; any other name that is
 ///   not a type is never checked. Only nodes whose HELLO lists a type this
-///   controller knows are checked; an enabled simple output counts as present
+///   controller knows are checked (a phone prop since 0.8.0 lists its own
+///   parts and its pod's, PROPC-1); an enabled simple output counts as present
 ///   and is named "not checked". A role's `outputs:` (EXP-22, increment 4)
 ///   names the functions its mode switches: a box with outputs (its HELLO
 ///   lists `output` and its `node.modules` came) but none of them is the

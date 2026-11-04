@@ -26,7 +26,9 @@ with --resolve before drawing. The check fails when:
 - the optional simple output (an RC relay switch on a spare gate; draft RFC "The
   expansion port", EXP-34) is not on the front-end-module pin the board revision
   leaves free (GPIO 46 on a V4.3, 5 on a V4.2: REVISION_FREE below), or shares a
-  pin with another part on that revision;
+  pin with another part on that revision; or, in an I/O pod's build, is not on
+  GPIO 33 (its second on GPIO 1: POD_SIMPLE_OUT below) or shares a pin with
+  another part the pod has;
 - the keypad is not on the PCF8574 the way hal_esp_keypad.c scans it (rows on
   P0-P3, columns on P4-P6), the team button of ATALAIA_KP_P7_BUTTON is not on
   its P7, the expander address differs from the Kconfig default, or its INT
@@ -124,6 +126,11 @@ RP2040_ADC_PINS = range(26, 30)
 EXPANSION_ADDRESSES = range(0x58, 0x60)
 BOX_ADDRESSES = {0x24: "the PN532", 0x36: "the battery gauge", 0x3C: "the board's OLED"}
 KEYPAD_SEARCH = (range(0x20, 0x28), range(0x38, 0x40))
+# A guide whose pins are those of another firmware variant: its table is checked against that
+# build's Kconfig defaults (the I/O pod's simple outputs: GPIO 33 and 1, not the Field Box's 46).
+GUIDE_CHOICE: dict[Path, frozenset[str]] = {
+    REPO / "hardware" / "io-pod" / "BUILD.md": frozenset({"ATALAIA_POD_MODE"}),
+}
 GUIDE_SYMBOL = re.compile(r"`(ATALAIA_\w+)`")
 # The project page's build page: <td data-kconfig="ATALAIA_BTN1_PIN">4</td>.
 SITE_CELL = re.compile(r'data-kconfig="(ATALAIA_\w+)"[^>]*>([^<]*)<')
@@ -218,6 +225,13 @@ REVISION_FEM: dict[str, tuple[int, str]] = {
     "ATALAIA_BOARD_HELTEC_V4_2": (46, "ATALAIA_RADIO_FEM_CTX_PIN"),
 }
 DEFAULT_REVISION = "ATALAIA_BOARD_HELTEC_V4_3"
+# The I/O pod's simple outputs (EXP-34, increment 9): the pod has no display, so its pins 33, 1 and
+# 3 are free; output 1 on GPIO 33, output 2 on GPIO 1. The display's and the on-board OLED's
+# symbols keep their Field Box defaults in a pod build but drive nothing there, and the keypad's
+# GPIO matrix is the Wokwi emulator's (a pod has the PCF8574; the firmware refuses a clash in a
+# matrix build at compile time).
+POD_SIMPLE_OUT = {"ATALAIA_SIMPLE_OUT_PIN": 33, "ATALAIA_SIMPLE_OUT2_PIN": 1}
+POD_UNUSED_PREFIXES = ("ATALAIA_DISP_", "ATALAIA_OLED_", "ATALAIA_KP_ROW", "ATALAIA_KP_COL")
 # Optional parts Kconfig never builds together (`depends on !...`): their pins may share a GPIO.
 EXCLUSIVE = {frozenset({"ATALAIA_BUZZER_PIN", "ATALAIA_SIMPLE_OUT2_PIN"})}
 SHARED_BUS = {17, 18}  # board-internal, but the shared I2C bus is meant to be wired
@@ -239,8 +253,10 @@ V4_GNSS = {
 # that part tolerates (Kconfig.projbuild's header; decisions PIN-3, PIN-5):
 # GPIO -> (the Kconfig pins allowed on it, why only those).
 SHARED: dict[int, tuple[set[str], str]] = {
-    1: ({"ATALAIA_DISP_CS_PIN", "ATALAIA_DISP_DC_PIN", "ATALAIA_DISP_RST_PIN"},
-        "the battery-voltage ADC input, 100 kohm to GND: a low-speed output only"),
+    1: ({"ATALAIA_DISP_CS_PIN", "ATALAIA_DISP_DC_PIN", "ATALAIA_DISP_RST_PIN",
+         "ATALAIA_SIMPLE_OUT2_PIN"},
+        "the battery-voltage ADC input, 100 kohm to GND: a low-speed output only (a display "
+        "line, or an I/O pod's second simple output)"),
     35: ({"ATALAIA_LED_PIN"}, "the board's white LED: the LED ring's data only"),
     44: ({"ATALAIA_BTN1_PIN", "ATALAIA_BTN2_PIN", "ATALAIA_BTN3_PIN", "ATALAIA_BTN4_PIN"},
          "UART0's RX line: a team button only (the box then takes no console input there)"),
@@ -468,6 +484,27 @@ def check_simple_outputs(kconfig_text: str, internal: set[int]) -> list[str]:
                         or frozenset({symbol, out}) in EXCLUSIVE):
                     continue
                 errors.append(f"Kconfig: {out} = {gpio} on a {name}, the default of {symbol} too")
+    # The I/O pod's build: its own pins for them, clear of every part a pod drives.
+    for revision, (fem, other_fem_symbol) in REVISION_FEM.items():
+        defaults = read_kconfig_defaults(kconfig_text, frozenset({revision, "ATALAIA_POD_MODE"}))
+        name = revision.removeprefix("ATALAIA_BOARD_HELTEC_").replace("_", ".")
+        for out, wanted in POD_SIMPLE_OUT.items():
+            gpio = defaults.get(out)
+            if gpio != wanted:
+                errors.append(f"Kconfig: {out} defaults to {gpio} in an I/O pod build on a {name}, "
+                              f"not GPIO {wanted}")
+                continue
+            if gpio in V4_GNSS or gpio == fem or (gpio in internal and gpio not in (5, 46)):
+                errors.append(f"Kconfig: {out} = {gpio} in an I/O pod build, a pin the board keeps")
+            if gpio in SHARED and out not in SHARED[gpio][0]:
+                errors.append(f"Kconfig: {out} = {gpio} in an I/O pod build, which is "
+                              f"{SHARED[gpio][1]}")
+            for symbol, other in sorted(defaults.items()):
+                if (symbol == out or not symbol.endswith("_PIN") or other != gpio
+                        or symbol == other_fem_symbol or symbol.startswith(POD_UNUSED_PREFIXES)):
+                    continue
+                errors.append(f"Kconfig: {out} = {gpio} in an I/O pod build on a {name}, the "
+                              f"default of {symbol} too")
     return errors
 
 
@@ -529,6 +566,8 @@ def check_pin(where: str, symbol: str, cell: str, defaults: dict[str, int],
         return [f"{where}: {symbol} is disabled by default (-1): a guide lists wired pins only"]
     if gpio in STRAP_TOLERANT and symbol in STRAP_TOLERANT[gpio][0]:
         return []
+    if POD_SIMPLE_OUT.get(symbol) == gpio:
+        return []  # the I/O pod's guide, read with its build's defaults (GUIDE_CHOICE)
     if symbol in REVISION_FREE:
         # A guide's tables are for the default revision (a V4.3); its cell names both.
         if gpio == REVISION_FREE[symbol][DEFAULT_REVISION]:
@@ -733,7 +772,10 @@ def check_guides(kconfig_path: Path) -> list[str]:
     errors: list[str] = []
     for path, required in GUIDES.items():
         name = path.relative_to(REPO).as_posix()
-        errors += check_guide(name, path.read_text(encoding="utf-8"), required, defaults, internal)
+        choice = GUIDE_CHOICE.get(path)
+        guide_defaults = read_kconfig_defaults(kconfig_text, choice) if choice else defaults
+        errors += check_guide(name, path.read_text(encoding="utf-8"), required, guide_defaults,
+                              internal)
     for path in PORT_GUIDES:
         errors += check_port_table(path.relative_to(REPO).as_posix(),
                                    path.read_text(encoding="utf-8"), defaults)
