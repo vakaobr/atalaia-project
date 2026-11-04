@@ -57,8 +57,27 @@ const EVENT_KEYS = [
 export const BUILTIN_SCREENS = ['neutral', 'captured', 'countdown', 'standby', 'code_entry', 'defused', 'exploded',
     'final_score'];
 
+/** An output function a role may name in its `outputs:` and a script may switch (atalaia_sim.mode
+ * OUTPUT_FUNCTION, draft RFC "The expansion port", EXP-22): siren, strobe, smoke, light, horn, out.1-out.9,
+ * and a second one of a box with .2-.9 (siren.2). */
+export const OUTPUT_FUNCTION = /^(siren|strobe|smoke|light|horn|out\.[1-9])(\.[2-9])?$/;
+
+/** An output function for a box's own script, or null. */
+function outputFunction(text) {
+    const name = String(text).trim();
+    return OUTPUT_FUNCTION.test(name) ? name : null;
+}
+
+/** An output function for field.send(node, "output", ...), which may also be * (every output, off only). */
+function fieldOutputFunction(text) {
+    return String(text).trim() === '*' ? '*' : outputFunction(text);
+}
+
 /** The most points a polygon zone may have (ATALAIA_GEO_POLYGON_MAX in core/include/atalaia/geo.h). */
 export const POLYGON_MAX = 32;
+
+/** What an output block does: [message key, act]. */
+const OUTPUT_ACTS = [['act_pulse', 'pulse'], ['act_on', 'on'], ['act_off', 'off']];
 
 const HUE = {
     events: 30, timers: 200, memory: 290, game: 350, score: 60, box: 160, settings: 330, field: 120, geo: 180,
@@ -223,6 +242,25 @@ function definitions(t) {
             type: 'atalaia_sound', message0: t('sound'), args0: [nameField('CLIP', 'captured')],
             colour: HUE.box, tooltip: t('sound_tip'),
         }),
+        // The box's outputs (draft RFC "The expansion port", increment 4): cap("siren"):pulse(ms), :on(),
+        // :on(max_ms), :off() and :pattern(on_ms, off_ms, ms).
+        statement({
+            type: 'atalaia_output', message0: t('output'),
+            args0: [
+                nameField('FN', 'siren', outputFunction),
+                { type: 'field_dropdown', name: 'ACT', options: options(OUTPUT_ACTS) },
+                { type: 'input_value', name: 'MS', check: 'Number' },
+            ],
+            inputsInline: true, colour: HUE.box, tooltip: t('output_tip'),
+        }),
+        statement({
+            type: 'atalaia_output_pattern', message0: t('output_pattern'),
+            args0: [
+                nameField('FN', 'strobe', outputFunction),
+                ...['ON_MS', 'OFF_MS', 'MS'].map((name) => ({ type: 'input_value', name, check: 'Number' })),
+            ],
+            inputsInline: true, colour: HUE.box, tooltip: t('output_pattern_tip'),
+        }),
         statement({
             type: 'atalaia_team_display', message0: t('team_display'),
             args0: [{ type: 'input_value', name: 'TEAM' }], colour: HUE.box, tooltip: t('team_display_tip'),
@@ -351,6 +389,26 @@ function definitions(t) {
             message1: t('field_send_with'), args1: [{ type: 'input_statement', name: 'DATA', check: PAIR }],
             colour: HUE.field, tooltip: t('field_send_mode_tip'),
         }),
+        // A box's outputs from the controller: field.send(node, "output", {...}), CMD 12 with src field.
+        statement({
+            type: 'atalaia_field_output', message0: t('field_output'),
+            args0: [
+                nameField('FN', 'siren', fieldOutputFunction),
+                { type: 'input_value', name: 'NODE' },
+                { type: 'field_dropdown', name: 'ACT', options: options(OUTPUT_ACTS) },
+                { type: 'input_value', name: 'MS', check: 'Number' },
+            ],
+            inputsInline: true, colour: HUE.field, tooltip: t('field_output_tip'),
+        }),
+        statement({
+            type: 'atalaia_field_output_pattern', message0: t('field_output_pattern'),
+            args0: [
+                nameField('FN', 'strobe', outputFunction),
+                { type: 'input_value', name: 'NODE' },
+                ...['ON_MS', 'OFF_MS', 'MS'].map((name) => ({ type: 'input_value', name, check: 'Number' })),
+            ],
+            inputsInline: true, colour: HUE.field, tooltip: t('field_output_pattern_tip'),
+        }),
         value({
             type: 'atalaia_field_score', message0: t('field_score'), args0: [{ type: 'input_value', name: 'TEAM' }],
             output: 'Number', colour: HUE.field, tooltip: t('field_score_tip'),
@@ -418,10 +476,14 @@ export function toolbox(kind, t, screens = []) {
     const box = [
         ...screenNames.map((name) => block('atalaia_screen', null, { NAME: name })),
         block('atalaia_sound'), block('atalaia_team_display', { TEAM: txt('red') }),
+        block('atalaia_output', { MS: num(5000) }),
+        block('atalaia_output_pattern', { ON_MS: num(500), OFF_MS: num(1500), MS: num(30000) }),
     ];
     const field = [
         block('atalaia_field_ids'), block('atalaia_field_owner'), block('atalaia_field_common_owner'),
         block('atalaia_field_send'), block('atalaia_field_send_mode'),
+        block('atalaia_field_output', { MS: num(10000) }),
+        block('atalaia_field_output_pattern', { ON_MS: num(500), OFF_MS: num(1500), MS: num(30000) }),
     ];
     const geo = [
         block('atalaia_geo_in_zone', { LAT: { block: { type: 'atalaia_event_value', fields: { KEY: 'lat' } } },

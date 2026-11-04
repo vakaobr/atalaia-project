@@ -153,6 +153,7 @@ void main() {
     for (final type in [
       'node.modules',
       'node.module_lost',
+      'node.outputs_disabled',
       'output.switched',
     ]) {
       expect(isPlayerFeedEvent(type), isFalse, reason: type);

@@ -106,6 +106,13 @@ valid:
   - name: "The GM turns a siren off before its time (id 59, ms 0)"
     event: {"node": 7, "seq": 12, "t": 1830000, "type": "output.switched", "data": {"capability": "siren", "ms": 0, "source": "gm"}}
     cbor: "a5 01 07 02 0c 03 1a 00 1b ec 70 04 18 3b 08 a3 18 2b 65 73 69 72 65 6e 18 2c 00 18 2d 62 67 6d"
+  # Outputs fitted but not enabled (decision EXPL-13; id 60, normal by default; modules, key 42).
+  - name: "A box's horn is fitted but its admin has not enabled it (id 60; modules, key 42)"
+    event: {"node": 3, "seq": 6, "t": 0, "type": "node.outputs_disabled", "data": {"modules": "g45:servo:horn"}}
+    cbor: "a5 01 03 02 06 03 00 04 18 3c 08 a1 18 2a 6e 67 34 35 3a 73 65 72 76 6f 3a 68 6f 72 6e"
+  - name: "Every output of the box is enabled (id 60, the empty text)"
+    event: {"node": 3, "seq": 6, "t": 0, "type": "node.outputs_disabled", "data": {"modules": ""}}
+    cbor: "a5 01 03 02 06 03 00 04 18 3c 08 a1 18 2a 60"
   # Node health (decisions S19-9, FU1-1 to FU1-6): a box's own battery.low (the link's event
   # seq 0, telemetry by default so no prio key), and the link events the controller logs about a
   # box (the box's node id). Bytes worked out by hand from RFC 8949 (major types 0, 3 and 5).

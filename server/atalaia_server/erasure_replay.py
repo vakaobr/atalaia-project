@@ -24,7 +24,7 @@ from . import chrono_registry, erasure_ledger, personal_data, tenancy
 from .audit import record
 from .config import Settings
 from .db import make_engine, make_sessionmaker
-from .models import ChronoReading, ChronoReject, Field, FieldPlayerId, PlayerIdClaim, Replica, User
+from .models import WALKIN_SOURCE, ChronoReading, ChronoReject, Field, FieldPlayerId, GameRegistration, PlayerIdClaim, Replica, User
 
 REASON = "restore_replay"
 
@@ -36,13 +36,15 @@ async def _player_ids(db: AsyncSession, field_id: uuid.UUID) -> set[str]:
                           (Replica.owner_player_id, Replica.field_id), (FieldPlayerId.player_id, FieldPlayerId.field_id),
                           (PlayerIdClaim.player_id, PlayerIdClaim.field_id)):
         found.update(p for p in await db.scalars(select(column).where(where == field_id).distinct()) if p)
+    found.update(await db.scalars(select(GameRegistration.player_id).where(  # walk-in guests (PWI-*)
+        GameRegistration.field_id == field_id, GameRegistration.source == WALKIN_SOURCE).distinct()))
     return found
 
 
 async def apply_entries(db: AsyncSession, entries: list[dict[str, Any]]) -> dict[str, int]:
     """The entries of one database, applied in the caller's transaction (the caller commits); returns what was done."""
     done = {"accounts": 0, "players": 0, "chrono_readings": 0, "chrono_rejects": 0, "replicas": 0, "identities": 0,
-            "claims": 0}
+            "claims": 0, "guests": 0}
     accounts = {e["hash"] for e in entries if e["kind"] == "account"}
     if accounts:
         for user_id in list(await db.scalars(select(User.id).where(~User.username.startswith(personal_data.ERASED_PREFIX,

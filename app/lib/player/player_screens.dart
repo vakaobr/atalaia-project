@@ -1716,6 +1716,7 @@ const playerHiddenEventTypes = <String>{
   'node.modes_failed',
   'node.modules',
   'node.offline',
+  'node.outputs_disabled',
   'node.online',
   'node.rebooted',
   'node.setup_applied',

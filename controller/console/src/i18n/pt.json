@@ -125,6 +125,7 @@
     "missing_caps": "Falta a uma caixa o que o seu papel precisa: {list}. Só se deve começar mesmo assim se o jogo passar sem isso.",
     "missing_caps_short": "Falta a uma caixa o que o seu papel precisa: {list}.",
     "not_checked": "{capability} em {name}: não verificado (saída simples). Convém confirmar antes do jogo.",
+    "outputs_disabled": "{name} ({role}): {caps} instalada, mas não ativada pela administração da caixa. O modo acionaria esta saída: ativa-a na própria caixa com o PIN de administração, ou joga sem ela.",
     "start_warnings": {
       "min": "{have} × {role} juntas; o modo pede {value} ({param}).",
       "optional_caps": "{name} ({role}) não tem {caps}: o modo funciona sem isso.",
@@ -247,6 +248,8 @@
       "node_setup_applied": "{zone} confirmou a configuração do cenário",
       "battery_low": "Uma caixa tem a bateria fraca",
       "node_modules": "{zone} tem: {modules}",
+      "node_outputs_disabled": "{zone}: instalada, não ativada pela administração da caixa: {modules}",
+      "node_outputs_disabled_none": "{zone}: todas as saídas instaladas estão ativadas",
       "node_module_lost": "{zone} perdeu um módulo: {modules} ({reason})",
       "output_switched": "{zone}: {capability} ligado durante {s} s ({source})",
       "output_switched_off": "{zone}: {capability} desligado ({source})",
@@ -305,6 +308,7 @@
     "command_sent": "enviado",
     "not_checked": "não verificado",
     "module_lost": "perdido",
+    "outputs_disabled": "{caps} · instalada, não ativada pela administração da caixa",
     "conflict": "Duas caixas partilham o n.º {node}: a mesma entrada foi usada em duas caixas, que usam os mesmos nonces do rádio. Tira uma delas do jogo e junta-a de novo com outra entrada (Juntar)."
   },
   "outputs": {
@@ -505,7 +509,7 @@
     "off_note": "A obtenção de mapas está desligada neste campo (Definições).",
     "login": "Entra primeiro na consola com o código de acesso da organização e abre esta página a partir do separador Campo.",
     "intro": "Encontra o campo no mapa e marca os cantos do seu limite: este navegador desenha a imagem do campo a partir de mapas abertos. A imagem, a sua posição no mapa (ATAK) e o limite do campo ficam depois guardados no controlador de campo, que não precisa de internet para isto.",
-    "sources": "Só enquanto preparas o jogo: este navegador obtém o mapa e a área uma vez, do OpenStreetMap (© OpenStreetMap contributors) e, onde houver, da fotografia aérea aberta do país ou da região (o ortofotomapa da DGT em Portugal continental, o PNOA do IGN em Espanha, as ortofotos do IGN em França e as do PDOK nos Países Baixos, e as dos serviços públicos da Bélgica, do Luxemburgo, da Suíça, de onze estados alemães, da Polónia e da Chéquia, cada uma com o seu crédito). Se o serviço de dados do OpenStreetMap estiver ocupado, a mesma pergunta (só a área do campo) vai a outro servidor público com os mesmos dados (overpass.private.coffee). Nada mais é descarregado, e o resto da consola continua a funcionar sem internet.",
+    "sources": "Só enquanto preparas o jogo: este navegador obtém o mapa e a área uma vez, do OpenStreetMap (© OpenStreetMap contributors) e, onde houver, da fotografia aérea aberta do país ou da região (o ortofotomapa da DGT em Portugal continental, o PNOA do IGN em Espanha, as ortofotos do IGN em França e as do PDOK nos Países Baixos, e as dos serviços públicos da Bélgica, do Luxemburgo, da Suíça, de onze estados alemães, da Polónia, da Chéquia e da Áustria (basemap.at), cada uma com o seu crédito). Se o serviço de dados do OpenStreetMap estiver ocupado, a mesma pergunta (só a área do campo) vai a outro servidor público com os mesmos dados (overpass.private.coffee). Nada mais é descarregado, e o resto da consola continua a funcionar sem internet.",
     "offline": "Esta página precisa de internet, e este dispositivo não tem agora. O resto da consola funciona sem ela.",
     "go": "Procurar um sítio, ou ir para «latitude, longitude»",
     "go_button": "Procurar",
@@ -542,7 +546,7 @@
     "layer": "Camada:",
     "layer_map": "Mapa",
     "layer_ortho": "Ortofoto ({name})",
-    "layer_none": "Aqui só há o mapa do OpenStreetMap: só há fotografia aérea aberta de alta resolução que se possa usar em Portugal continental, Espanha, França (com a Córsega e os territórios ultramarinos), nos Países Baixos, na Bélgica, no Luxemburgo, na Suíça e no Liechtenstein, na Polónia, na Chéquia e na Alemanha menos Baden-Württemberg, Baixa Saxónia, Hamburgo, Saxónia-Anhalt e Schleswig-Holstein.",
+    "layer_none": "Aqui só há o mapa do OpenStreetMap: só há fotografia aérea aberta de alta resolução que se possa usar em Portugal continental, Espanha, França (com a Córsega e os territórios ultramarinos), nos Países Baixos, na Bélgica, no Luxemburgo, na Suíça e no Liechtenstein, na Polónia, na Chéquia, na Áustria e na Alemanha menos Baden-Württemberg, Baixa Saxónia, Hamburgo, Saxónia-Anhalt e Schleswig-Holstein.",
     "outline": "O limite do campo",
     "corners": "{n} de no máximo {max} cantos (pelo menos 3).",
     "corners_max": "No máximo {n} cantos.",
@@ -588,6 +592,7 @@
     "no_ortho": "A ortofoto ({name}) não tem imagem desta área: a imagem é desenhada só com o OpenStreetMap.",
     "osm_from": "Os dados do OpenStreetMap vieram de {host} (o servidor principal estava ocupado); os deste servidor podem estar uns meses atrasados.",
     "ortho_failed": "Não foi possível obter a ortofoto ({name}) ({detail}): a imagem é desenhada só com o OpenStreetMap.",
+    "ortho_partial": "A ortofoto ({name}) não tem imagem de parte desta área ({missing} de {tiles} mosaicos): essa parte fica em branco.",
     "errors": {
       "too_big": "O limite é grande demais ({detail} de lado; no máximo 4 km): desenha um mais pequeno.",
       "offline": "Sem internet: esta página precisa dela para obter o mapa.",
@@ -595,6 +600,7 @@
       "too_much": "Demasiados dados de mapa nesta área: desenha um limite mais pequeno.",
       "osm_failed": "Não foi possível obter os dados do OpenStreetMap ({detail}).",
       "ortho_failed": "Não foi possível obter o ortofotomapa ({detail}).",
+      "ortho_tiles": "não chegaram {detail} mosaicos da ortofoto",
       "too_big_image": "A imagem continua acima de 4 MB depois de reduzida: desenha um limite mais pequeno.",
       "unreachable": "Não foi possível chegar aos servidores de dados do OpenStreetMap ({detail}): estão ocupados ou inacessíveis. Verifica a ligação à internet, ou tenta outra vez daqui a uns minutos."
     }

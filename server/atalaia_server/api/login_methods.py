@@ -98,6 +98,9 @@ BINDING_PATH = "/api/v1/auth/oidc"
 STATE_TTL_S = 600
 DEFAULT_RETURN = "/staff/login"
 RETURN_TO = re.compile(r"/staff/[A-Za-z0-9/_.?=&%-]{0,380}")
+# The web registration page of a field's game (player_pages.py, WREG-3), with only its language in the query.
+PLAYER_RETURN_TO = re.compile(r"/f/[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?/games/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}"
+                              r"-[0-9a-f]{4}-[0-9a-f]{12}/register/web(?:\?lang=(?:pt|en|de|zh-tw))?")
 APP_SECRET_RE = r"^[A-Za-z0-9_-]{43}$"   # 32 bytes, base64url without padding: a verifier or its SHA-256
 APP_RETURN = "/app/oidc"      # the app's own path on this host: an Android App Link or an iOS Universal Link
 APP_RETURN_TO = re.compile(r"/app/oidc(?:\?[A-Za-z0-9_.=&%-]{0,380})?")
@@ -189,7 +192,8 @@ def new_state(request: Request, provider: str) -> str:
 
 
 def safe_return_to(text: str, origin: Optional[str] = None) -> str:
-    """A path on the staff pages (with its query), or the app's named path ``/app/oidc`` (PKA-1: the app asks
+    """A path on the staff pages (with its query), a game's web registration page (``/f/<slug>/games/<id>/register/web``,
+    with ``?lang=`` at most: WREG-3), or the app's named path ``/app/oidc`` (PKA-1: the app asks
     for it as a link on this very host, which the phone opens in the app; ``origin`` is this site's address,
     so the full address of that link is read as its path), else the staff login: nothing else is a place to
     send a browser after a login (no other host, no protocol-relative address)."""
@@ -197,7 +201,7 @@ def safe_return_to(text: str, origin: Optional[str] = None) -> str:
         text = text[len(origin):]
     parts = urlsplit(text)
     if parts.scheme or parts.netloc or parts.fragment or "//" in text or "\\" in text \
-            or not (RETURN_TO.fullmatch(text) or APP_RETURN_TO.fullmatch(text)):
+            or not (RETURN_TO.fullmatch(text) or PLAYER_RETURN_TO.fullmatch(text) or APP_RETURN_TO.fullmatch(text)):
         return DEFAULT_RETURN
     return text
 

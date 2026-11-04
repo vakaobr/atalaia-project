@@ -177,6 +177,13 @@
     "sound_tip": "Toca um dos sons da caixa, p. ex. captured, armed ou explosion.",
     "team_display": "acender as luzes da caixa com a cor de %1",
     "team_display_tip": "Mostra a cor de uma equipa nas luzes da caixa (none apaga-as).",
+    "output": "acionar a saída %1 %2 durante %3 ms",
+    "output_tip": "Aciona uma das saídas da caixa (uma sirene, uma máquina de fumo...): impulso durante esse tempo, ligar (no máximo esse tempo; vazio: o tempo máximo da própria saída) ou desligar. Só com o jogo a decorrer, e uma caixa sem essa saída ignora-o. Indique a função nas saídas do papel, no separador Modo.",
+    "output_pattern": "piscar a saída %1 ligada %2 ms, desligada %3 ms, durante %4 ms",
+    "output_pattern_tip": "Liga e desliga uma das saídas da caixa alternadamente (0,5 a 10 s cada) durante esse tempo, p. ex. um estroboscópio.",
+    "act_pulse": "impulso",
+    "act_on": "ligar",
+    "act_off": "desligar",
     "param": "definição %1",
     "param_tip": "O valor de uma das definições do modo, como a organização a escolheu para este jogo.",
     "param_declare": "a definição %1 é %2",
@@ -242,6 +249,10 @@
     "on_command_tip": "Corre os blocos de dentro quando a organização carrega neste comando, ou quando o script do controlador o envia.",
     "field_send_mode": "enviar o comando do modo %1 à caixa %2",
     "field_send_mode_tip": "Envia um dos comandos do próprio modo a uma caixa, que o recebe em \"quando chega o comando do modo …\".",
+    "field_output": "acionar a saída %1 da caixa %2 %3 durante %4 ms",
+    "field_output_tip": "Aciona uma saída de uma caixa a partir do controlador (field.send … \"output\"): impulso ou ligar durante esse tempo, ou desligar; * com desligar: todas as saídas da caixa. O controlador envia a uma caixa no máximo um arranque a cada 2 s.",
+    "field_output_pattern": "piscar a saída %1 da caixa %2 ligada %3 ms, desligada %4 ms, durante %5 ms",
+    "field_output_pattern_tip": "Liga e desliga uma saída de uma caixa alternadamente (0,5 a 10 s cada) durante esse tempo, a partir do controlador.",
     "problem_screen_unknown": "O ecrã \"{name}\" não é da caixa nem um dos ficheiros de ecrãs do modo (separador Modo).",
     "problem_polygon_points": "Uma área precisa de 3 a {name} cantos.",
     "problem_no_role": "O modo precisa de pelo menos um papel.",
@@ -252,6 +263,9 @@
     "problem_role_no_input": "O papel \"{name}\" não precisa de nenhuma das entradas a que o script da caixa reage.",
     "problem_role_unknown": "\"{name}\" não é um dos papéis do modo (separador Modo).",
     "problem_command_twice": "O comando da organização \"{name}\" está declarado duas vezes.",
-    "problem_command_unhandled": "O comando da organização \"{name}\" não tem um bloco \"quando chega o comando do modo …\"."
+    "problem_command_unhandled": "O comando da organização \"{name}\" não tem um bloco \"quando chega o comando do modo …\".",
+    "problem_output_ms": "Este bloco de saída precisa do tempo em ms.",
+    "problem_output_all": "* (todas as saídas) só pode ser desligado.",
+    "problem_output_unlisted": "A saída \"{name}\" não está nas saídas de nenhum papel (separador Modo): indique-a aí, para que a consola e a verificação do início saibam que o modo a usa."
   }
 }

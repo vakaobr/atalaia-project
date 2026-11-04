@@ -168,3 +168,8 @@ events:
   node.modules:               { id: 57, prio: normal,    data: [modules] }
   node.module_lost:           { id: 58, prio: critical,  data: [modules, reason] }
   output.switched:            { id: 59, prio: normal,    data: [capability, ms, source] }
+  # Outputs fitted but not enabled (decision EXPL-13; draft RFC 0000 "Phase 3 events" Amendment 6): sent
+  # with node.modules by a box that has an output fitted, whether or not its admin enabled any (modules: the
+  # disabled ones in node.modules' compact text, the empty text when none is). Its own event, not a key of
+  # node.modules: an older controller refuses an event it does not know and keeps node.modules whole.
+  node.outputs_disabled:      { id: 60, prio: normal,    data: [modules] }

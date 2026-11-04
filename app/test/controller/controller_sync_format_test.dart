@@ -25,7 +25,7 @@ void main() {
       (l! as List).cast<Map<String, Object?>>();
 
   test('the counts and kinds are the Pi\'s', () {
-    expect((list(v['valid']).length, list(v['invalid']).length), (15, 76));
+    expect((list(v['valid']).length, list(v['invalid']).length), (16, 88));
     final answers = v['answers']! as Map;
     expect(
       (list(answers['valid']).length, list(answers['invalid']).length),
@@ -109,6 +109,41 @@ void main() {
       'node': 0xffff,
     });
     expect(checkCommand(named('command_end'))['params'], {'reason': ''});
+  });
+
+  test('the outcomes after a game, walk-ins as a count or as guests '
+      '(decisions PWI-*)', () {
+    final cases = list(v['checkin_outcomes']);
+    expect(cases.map((c) => c['name']), [
+      'walkins_as_a_count',
+      'walkins_as_guests',
+      'no_one_with_guests',
+    ]);
+    for (final c in cases) {
+      final rows = [
+        for (final r in list(c['rows'])) Map<String, Object?>.from(r),
+      ];
+      final decls = <String, List<Map<String, Object?>>>{
+        for (final e in (c['declarations']! as Map).entries)
+          e.key as String: [
+            for (final d in e.value! as List)
+              Map<String, Object?>.from(d as Map),
+          ],
+      };
+      final out = checkinOutcomes(rows, decls, guests: c['guests'] == true);
+      expect(_copy(out), c['outcome'], reason: '${c['name']}');
+      expect(out.containsKey('guests'), c['guests'], reason: '${c['name']}');
+      checkCheckins({
+        'sync_version': 1,
+        'controller': {
+          'id': '0192f3a4-5b6c-7d8e-9f01-23456789abcd',
+          'version': '0.1.0',
+        },
+        'game': {'game_id': 1, 'game_seed': 2},
+        'scheduled_game_id': '0192f3a4-0000-7000-8000-00000000a001',
+        ..._copy(out)! as Map<String, Object?>,
+      });
+    }
   });
 
   test('what the site no longer lists is the Pi\'s (decision S20-8)', () {

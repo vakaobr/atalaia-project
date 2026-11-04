@@ -250,6 +250,8 @@ typedef struct {
     expansion_box_t *port;
     /* node.modules' text as last told in this link (a change is told again, even to nothing). */
     char modules_sent[OUT_MODULES_MAX + 1];
+    /* node.outputs_disabled's text as last told in this link (EXPL-20: a change is told again). */
+    char disabled_sent[OUT_MODULES_MAX + 1];
 } box_game_t;
 
 void box_game_init(box_game_t *g, node_runner_t *runner, preset_t *preset_buf,
@@ -340,6 +342,11 @@ void box_game_set_port(box_game_t *g, expansion_box_t *xb);
 /* node.modules' text: the enabled simple outputs, then the modules in address order, whole
  * entries within 100 bytes; its length. */
 size_t box_game_modules_text(const box_game_t *g, char *out, size_t cap);
+
+/* node.outputs_disabled's text (decisions EXPL-13, EXPL-20): the simple outputs fitted but not
+ * enabled, then each module's output channels not enabled (its entry with only those ids), in
+ * address order, whole entries within 100 bytes; its length, 0 when none is. */
+size_t box_game_disabled_text(const box_game_t *g, char *out, size_t cap);
 
 /* The game as the output layer sees it, for outputs_tick: a field game (running, paused, its
  * mode's script halted, ended) or a game picked on the box; OUT_GAME_NONE otherwise. */

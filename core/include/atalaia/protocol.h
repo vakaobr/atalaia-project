@@ -248,6 +248,7 @@ enum {
     ATALAIA_EV_NODE_MODULES = 57,                 /* node.modules */
     ATALAIA_EV_NODE_MODULE_LOST = 58,             /* node.module_lost */
     ATALAIA_EV_OUTPUT_SWITCHED = 59,              /* output.switched */
+    ATALAIA_EV_NODE_OUTPUTS_DISABLED = 60,        /* node.outputs_disabled */
 };
 
 /* ---- Capability types ---- */

@@ -20,7 +20,8 @@
  *     node.modules entry follows;
  *   - tells the controller node.module_lost ({"modules": its entry, "reason": no_answer or
  *     bad_ident}) when a module goes during a running or paused game; node.modules itself is
- *     box_game.c's (the simple outputs' and the modules' entries in one text);
+ *     box_game.c's (the simple outputs' and the modules' entries in one text), as is
+ *     node.outputs_disabled (the channels left disabled: expansion_box_disabled_text);
  *   - logs each module found and lost, and each hit, on the box's log (the serial console).
  *
  * Platform-free: the bus is the driver's (expansion_esp.c on the ESP32, simulated modules on the
@@ -79,6 +80,13 @@ bool expansion_box_has_hit(const expansion_box_t *xb);
 
 /* The modules' node.modules entries, as expansion_modules_text. */
 size_t expansion_box_modules_text(const expansion_box_t *xb, char *out, size_t cap);
+
+/* node.outputs_disabled's entries for the modules (decision EXPL-20): per module, in address
+ * order, its output channels that their admin has not enabled (EXPI8-7: every one until then),
+ * in its node.modules form with only those ids ("5c:out4/1.0.0:siren,strobe"); whole entries
+ * only, at most EXP_MODULES_TEXT_MAX bytes; its length, 0 when every module channel is enabled
+ * (or the box has none, or no output layer). */
+size_t expansion_box_disabled_text(const expansion_box_t *xb, char *out, size_t cap);
 
 /* One JSON array of the modules for a status line: address, model, fw, caps, armed, counters. */
 size_t expansion_box_status_json(const expansion_box_t *xb, char *out, size_t cap);
