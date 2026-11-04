@@ -245,7 +245,11 @@ def cmd_notes(args: argparse.Namespace) -> int:
 `atalaia-modem-`, `atalaia-io-pod-`). Each comes as `-usb.zip` (flash it with esptool over USB, a README inside says
 how) and `-merged.bin` (one file for a browser flasher, written at address 0x0). The Field Box also has the plain
 `.bin` with its signed `.release.json`, what a controller or a box checks for an update over the air (the modem and
-the pod are not updated that way). Check what you downloaded against `SHA256SUMS`.
+the pod are not updated that way). The target module (an RP2040 board on a box's expansion port) has
+`atalaia-target-module-` (one plate) and `atalaia-target-module-2-` (two plates) `.uf2` files, and the I2C output
+module an `atalaia-output-module-` `.uf2` file (its default channel list: four relays, 30 s at most each; other loads
+take a build of their own): hold its BOOTSEL button, plug it into a computer and copy the file onto the drive that
+appears; a module is never updated over the air. Check what you downloaded against `SHA256SUMS`.
 
 **USB flash required once** when you come from v0.4.0 or earlier: the Field Box, modem and pod images of this release have a new partition table (4 MB OTA slots instead of 2 MB), and an update over the air cannot change the partition table. Flash the `-usb.zip` over USB once (write, no erase: the settings and the adoption stay; the cached game modes and the field's logo are fetched again). A box still on the old table refuses to run the new firmware and shows "Flash over USB" on its screen; one that gets it over the air from an older firmware goes back to the old one by itself. Later updates over the air work as before.
 

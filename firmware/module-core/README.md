@@ -7,7 +7,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 The module's side of the expansion port: portable C that answers a box over I2C as [protocol/expansion-port.md](../../protocol/expansion-port.md) ("expansion protocol v1") says, for every module that plugs into a box's M12 port. The target module (increment 8 of the draft RFC "The expansion port", on an RP2040 with pico-sdk), the I2C output module (increment 11) and a community module all build their firmware on it, so the register map, the event queue, the lease and the hard limits are written and tested once (decision EXP-15).
 
-**Status:** built and host-tested (increment 7, decisions EXPI7-1 to EXPI7-20). No module's firmware uses it yet, and nothing has run on an RP2040 or against a real box: the target module comes in increment 8.
+**Status:** built and host-tested (increment 7, decisions EXPI7-1 to EXPI7-20). The target module's firmware ([`firmware/target-module/`](../target-module/README.md), increment 8) is built on it, and the box's host tests and host box run it as their simulated modules (`firmware/esp32/test/module_sim.c`); nothing has run on an RP2040 or against a real box yet.
 
 ## What it does
 

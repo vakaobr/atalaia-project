@@ -23,13 +23,14 @@ segue e para o qual remete em todos os passos que as montagens partilham.
 > decisões EXP-1 a EXP-15, aprovadas por quem mantém o projeto em
 > 2026-11-03); o protocolo de registos que os módulos falam está em
 > [`protocol/expansion-port.md`](../../protocol/expansion-port.md). **Ainda
-> não se montou nenhuma porta a partir deste guia**, e **o firmware da caixa
-> ainda não usa a porta**: o controlador da porta está a ser escrito
-> (`firmware/esp32/main/expansion.c`, incremento 6 do plano do RFC) e só é
-> chamado pela tarefa de jogo da caixa a partir do **incremento 8**. Até lá,
-> uma porta pode ser montada e verificada com um multímetro e com as peças da
-> própria caixa ([secção 8](#8-verificações-e-testes)), mas nenhum módulo
-> responde. A tabela de pinos é verificada automaticamente contra as
+> não se montou nenhuma porta a partir deste guia**. O firmware da caixa usa a
+> porta desde o incremento 8 do plano do RFC: o controlador da porta
+> (`firmware/esp32/main/expansion.c`, incremento 6) corre na tarefa de jogo da
+> caixa, encontra módulos em 0x58-0x5F até 2 s depois de serem ligados e
+> lê-os; o firmware do módulo de alvo também está feito
+> ([guia do módulo de alvo](../target-addon/BUILD.pt.md)). Os dois estão
+> testados só num computador, ainda não numa porta real
+> ([secção 8](#8-verificações-e-testes)). A tabela de pinos é verificada automaticamente contra as
 > predefinições do firmware (`python3 tools/check_wiring.py`). Os passos
 > marcados **Verifica na primeira montagem** são questões em aberto; conta o
 > que encontrares numa issue. As fotografias serão juntadas depois da primeira
@@ -40,9 +41,9 @@ segue e para o qual remete em todos os passos que as montagens partilham.
 de uma máquina de fumo usam a **saída simples** (um GPIO, um interruptor de
 relé RC, uma tomada M8:
 [manual da Field Box, secção 9.10](../field-box/BUILD.pt.md#910-saída-simples-opcional)),
-o caminho preferido para saídas (EXP-31). A porta é para **entradas** e, mais
-tarde, para um módulo de saídas I2C numa caixa que precise de mais canais ou
-de confirmação.
+o caminho preferido para saídas (EXP-31). A porta é para **entradas** e para o
+[módulo de saídas I2C](../output-module/BUILD.pt.md), opcional, numa caixa que
+precise de mais canais ou de confirmação.
 
 ## Índice
 
@@ -109,9 +110,9 @@ Decidido (com a origem de cada decisão):
 
 Não decidido, ou ainda não feito:
 
-- **O firmware da caixa para a porta** (incrementos 6 e 8 do plano do RFC):
-  até ao incremento 8 a caixa não procura módulos, por isso nada do que se
-  ligue é lido.
+- **O firmware da caixa para a porta em hardware real** (incrementos 6 e 8 do
+  plano do RFC): feito e testado num computador, ainda não contra uma porta e
+  um módulo reais.
 - **Uma placa de circuito impresso** com a placa da porta (a placa de suporte
   posterior da fase 5); até lá, placa perfurada.
 - **Os resultados de bancada** da [secção 8](#8-verificações-e-testes): tempos
@@ -219,7 +220,7 @@ todos os endereços que a caixa usa ou procura:
 | 0x36 | Medidor de bateria MAX17048 | |
 | 0x3C | O OLED da placa | |
 | **0x58-0x5B** | **Módulos de entrada**: o módulo de alvo em **0x58**; os seus dois jumpers de solda somam 1-3 para um segundo, terceiro ou quarto | |
-| **0x5C-0x5F** | **Módulos de saída** (o futuro módulo de saídas I2C) em **0x5C**, jumpers 0x5D-0x5F | |
+| **0x5C-0x5F** | **Módulos de saída** (o [módulo de saídas I2C](../output-module/BUILD.pt.md)) em **0x5C**, jumpers 0x5D-0x5F | |
 
 **No máximo 4 módulos numa caixa**: o tempo do barramento (a consulta de cada
 módulo de entrada ocupa cerca de 5 % do barramento) e os 25 mA que cada um
@@ -327,16 +328,28 @@ montagem**.
 
 | Teste do RFC | O quê | Precisa de | Quando |
 | --- | --- | --- | --- |
-| 1 | Tempo de subida de SDA e SCL na outra ponta do cabo, 2 m de cabo, 100 kHz: **menos de 1 µs** (um osciloscópio). A estimativa: 2,2 kohm e cerca de 250 pF dão cerca de 0,5 µs. O teclado, o leitor NFC e o medidor continuam a funcionar com um módulo ligado | Osciloscópio; um módulo para a segunda parte | Tempo de subida: já. Com um módulo: **depois do incremento 8** |
-| 2 | Curto-circuito de SDA ao GND na outra ponta do cabo: o teclado da caixa continua a funcionar; a porta volta menos de um segundo depois de tirar o curto | O firmware da caixa (o teclado) | Já (o teclado); o módulo a voltar: **depois do incremento 8** |
-| 4 | Curto-circuito dos pinos 1 e 3 na outra ponta do cabo: a caixa não reinicia; o fusível aquece e recupera quando o curto desaparece. A corrente do módulo de alvo abaixo de 25 mA | Um módulo para a corrente | O curto: já. A corrente do módulo: **depois do incremento 8** |
+| 1 | Tempo de subida de SDA e SCL na outra ponta do cabo, 2 m de cabo, 100 kHz: **menos de 1 µs** (um osciloscópio). A estimativa: 2,2 kohm e cerca de 250 pF dão cerca de 0,5 µs. O teclado, o leitor NFC e o medidor continuam a funcionar com um módulo ligado | Osciloscópio; um módulo de alvo | Já |
+| 2 | Curto-circuito de SDA ao GND na outra ponta do cabo: o teclado da caixa continua a funcionar; a porta volta menos de um segundo depois de tirar o curto, e o módulo com ela | O firmware da caixa (o teclado); um módulo de alvo | Já |
+| 4 | Curto-circuito dos pinos 1 e 3 na outra ponta do cabo: a caixa não reinicia; o fusível aquece e recupera quando o curto desaparece. A corrente do módulo de alvo abaixo de 25 mA | Um módulo de alvo para a corrente | Já |
 | 9 | Tocar nos pinos da tomada e na carcaça do cabo depois de andar numa alcatifa ou num campo seco: a caixa continua | -- | Já |
-| 3 | 100 ciclos de ligar e desligar durante um jogo: a caixa não reinicia, o barramento não encrava, cada ligação é encontrada em 2 s | Um módulo e o controlador da porta da caixa | **Depois do incremento 8** |
-| 6 | Ruído: um módulo de alvo junto a uma sirene e um estroboscópio de 12 V a comutar durante 30 minutos; contar erros de CRC e consultas falhadas | Um módulo | **Depois do incremento 8** |
+| 3 | 100 ciclos de ligar e desligar durante um jogo: a caixa não reinicia, o barramento não encrava, cada ligação é encontrada em 2 s | Um módulo de alvo | Já (a linha do registo abaixo para cada ligação) |
+| 6 | Ruído: um módulo de alvo junto a uma sirene e um estroboscópio de 12 V a comutar durante 30 minutos; contar erros de CRC e consultas falhadas | Um módulo de alvo | Já (`@modules` antes e depois: os seus `polls`, e as linhas de perdido e encontrado do registo) |
 
-A linha do registo da caixa para um módulo encontrado na porta, a vista dos
-módulos na consola série, e o passo próprio da porta no BRING_UP vêm com o
-controlador da porta (**depois do incremento 8**).
+O que a caixa diz sobre a porta, no seu registo série (USB, 115200 baud;
+[BRING_UP.md](../../firmware/esp32/docs/BRING_UP.md), o passo da porta):
+
+| Linha | Quando |
+| --- | --- |
+| `expansion: 0x58 added: 58:target/1.0.0:hit` | Um módulo encontrado, ao arrancar ou até 2 s depois de ser ligado |
+| `expansion: 0x58 lost (no_answer)` | Um módulo que deixou de responder (25 leituras falhadas: 0,5 s para um alvo) |
+| `expansion: 0x58 lost (bad_ident)` | Outro módulo ligado no mesmo endereço |
+| `expansion: hit hit, strength 180` | Um impacto recebido durante um jogo (a placa de alvo armada pelo modo) |
+| `expansion: 0x58 dropped events (its queue was full)` | O módulo guardou mais de 16 impactos antes de a caixa os ler |
+
+`@modules` na consola série lista os módulos
+(`[{"address":"58","model":"target","fw":"1.0.0","caps":["hit"],"armed":0,"events":0,"polls":1234}]`),
+e num jogo a consola de GM mostra cada módulo como uma etiqueta debaixo da sua
+caixa.
 
 ## 9. Resolução de problemas
 
@@ -347,7 +360,8 @@ controlador da porta (**depois do incremento 8**).
 | O pino 1 mede 3,3 V ou mais | O díodo está em ponte ou falta | Corrige o caminho da alimentação: o pino 1 tem de vir através do díodo |
 | SDA ou SCL medem 0 V na tomada sem nada ligado | Um curto ao GND na tomada ou no TVS; ou o buffer está a manter a porta desligada porque uma linha está em baixo | Procura uma ponte de solda no adaptador do TVS e nos copos da tomada |
 | A caixa reinicia quando se liga um cabo | Um curto entre os pinos 1 e 3 no cabo, capacidade a mais no pino 1, ou falta o fusível | Confirma o cabo pino a pino; não pode haver nenhum condensador maior que 100 nF nos 3,3 V da porta |
-| Um módulo não é encontrado | **Esperado até ao incremento 8**: a caixa ainda não procura módulos. Depois disso: o seu endereço (0x58-0x5F), o cabo, a alimentação (cerca de 3,0 V na sua ponta) | -- |
+| Um módulo não é encontrado (nenhuma linha `expansion: ... added` em 2 s) | O seu endereço (0x58-0x5F; o expansor do teclado da caixa fica em 0x20-0x27), o cabo, a alimentação (cerca de 3,0 V na sua ponta), o seu firmware (gravado?) | Mede o pino 1 na ponta do módulo; grava o módulo outra vez; `@modules` na consola da caixa |
+| Um módulo vai e vem (`added`, `lost (no_answer)` uma e outra vez) | Um conector solto, um cabo longo ou sem blindagem, o fusível a disparar | Confirma o cabo pino a pino, e a tensão do pino 1 enquanto acontece |
 
 ---
 

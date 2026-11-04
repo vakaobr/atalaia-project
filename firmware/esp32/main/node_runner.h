@@ -13,6 +13,7 @@
 
 #include "atalaia/node.h"
 #include "command_dispatch.h"
+#include "expansion_box.h"
 #include "game_timer.h"
 #include "hal/hal.h"
 #include "outputs.h"
@@ -44,6 +45,9 @@ typedef struct {
     /* The box's outputs (outputs.h): a script's cap(fn) calls to them, and the game's end before
      * the mode's game.end handlers run (its grace). NULL: none. */
     outputs_t *outputs;
+    /* The expansion port (expansion_box.h): a script's cap("hit"):arm() and :disarm(). NULL: none.
+     */
+    expansion_box_t *port;
     /* Event recording for tests. */
     int event_count;
     char last_event_type[64];

@@ -165,7 +165,8 @@ typedef enum {
     TX_KEYS_ADOPT,
     /* the picker's "Outputs" entry: the simple outputs' settings at the box (outputs_admin.h) */
     TX_OUTPUTS_ITEM,
-    TX_OUTPUT_UP, /* %d: the output's number, %d: its GPIO */
+    TX_OUTPUT_UP,     /* %d: the output's number, %d: its GPIO */
+    TX_OUTPUT_I2C_UP, /* %d: the output's number, %s: its module and channel (5c/2) */
     TX_OUT_ENABLED,
     TX_OUT_DISABLED,
     TX_OUT_MAX_S, /* %lu: seconds */

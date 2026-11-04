@@ -48,8 +48,9 @@ meta:
   build:
     title: Guias de montagem · Atalaia
     description: >-
-      Como montar a caixa satélite e o módulo de E/S da Atalaia com peças à venda em qualquer loja,
-      o que está decidido para o módulo de alvo, e onde está o manual de montagem da Field Box.
+      Como montar a caixa satélite, o módulo de E/S, a porta de expansão, o módulo de alvo e o
+      módulo de saídas I2C da Atalaia com peças à venda em qualquer loja, como uma caixa liga uma sirene ou uma máquina de
+      fumo, e onde está o manual de montagem da Field Box.
   glossary:
     title: Glossário · Atalaia
     description: >-
@@ -389,10 +390,11 @@ modes:
     title: Janelas de Alvo
     text: >-
       Um alvo acende-se na cor de uma equipa ao acaso durante alguns segundos, e um tiro que lhe
-      acerte enquanto está aceso pontua para essa equipa. O jogo está escrito e testado em software;
-      o módulo de alvo de que precisa (uma placa com um sensor de impacto e um anel de luz) ainda
-      não está feito.
-    meta: Uma caixa com o módulo de alvo · ainda não disponível
+      acerte enquanto está aceso pontua para essa equipa. O jogo está escrito e testado em software,
+      de ponta a ponta com um alvo simulado; o módulo de alvo de que precisa (uma placa com um sensor
+      de impacto que se liga a uma caixa, cujas luzes mostram a janela) já tem guia de montagem e
+      firmware, mas ainda ninguém o montou nem o experimentou numa placa de alvo real.
+    meta: Uma caixa com o módulo de alvo · ainda não experimentado em hardware
   hacking_terminal:
     title: Hackeia o terminal
     text: >-
@@ -1029,7 +1031,8 @@ roadmap:
           extração; os pontos de controlo pontuam enquanto uma equipa os tiver; as posições ficam no
           controlador de campo e no telemóvel."
         - "As regras das Janelas de Alvo: um tiro enquanto o alvo mostra a cor de uma equipa pontua
-          para essa equipa. O módulo de alvo ainda não está feito."
+          para essa equipa. O firmware do módulo de alvo está escrito; ainda ninguém montou um
+          alvo."
         - "Utilitários geográficos no núcleo: distâncias e zonas para todos os scripts, idênticos em
           todas as plataformas."
     g_scenarios:
@@ -1205,7 +1208,8 @@ roadmap:
       - "As condições de entrada em produção do modo alojado (um acordo de subcontratação assinado por campo, os termos de partilha, um aviso preenchido) e cada campo a preencher o seu aviso e a sua avaliação de impacto. A assessoria jurídica do responsável do projeto aprovou as posições jurídicas a 30 de outubro de 2026; o modo alojado continua a não ser oferecido. Nada do trabalho de segurança, de rádio e jurídico de 30 de outubro foi experimentado numa placa ou num telemóvel reais: corre em software e no servidor de pré-visualização."
       - "Os testes em hardware: placas reais, um telemóvel com ATAK real, uma ligação 4G real, um
         cronógrafo real."
-      - O módulo de alvo, que as regras das Janelas de Alvo esperam.
+      - "O módulo de alvo numa placa de alvo real (o firmware está escrito), depois do que as
+        Janelas de Alvo passam a predefinição da Field Box."
       - "Experimentar o início de sessão da Apple com o fornecedor a sério, e o passo do nome de utilizador e a fusão de contas no servidor de testes."
       - "jogarairsoft.pt: o responsável do projeto escreveu-lhes a 28 de outubro de 2026 a propor uma integração (os eventos, equipas e APDs deles para nós; o nosso feed de jogos, perfis de campo, clubes públicos e resultados para eles). À espera da resposta; nada está prometido."
     gate: >-
@@ -1215,7 +1219,7 @@ roadmap:
     title: Comunidade
     short: >-
       Editor visual de modos, pacotes de modos assinados, o registo de modos como modelo, alemão e
-      chinês tradicional, guias de montagem. Todos os passos de software estão feitos.
+      chinês tradicional, guias de montagem, os módulos de alvo e de saídas da porta de expansão. Todos os passos de software estão feitos.
     done:
       - "<strong>O editor visual de modos</strong>: uma página do simulador onde se monta um modo
         com blocos (o que acontece quando uma equipa mantém o botão premido, temporizadores,
@@ -1251,8 +1255,17 @@ roadmap:
         O repositório do registo existe (criado a 26 de outubro de 2026) e a sua <a href="https://vakaobr.github.io/atalaia-modes/">página</a>
         lista os modos, ainda sem nenhum.
       - >-
-        <a href="{{ page.to.build }}">Guias de montagem</a> da caixa satélite, do módulo de E/S e do
-        módulo de alvo, em texto. Ainda não se montou nenhuma caixa com eles.
+        <a href="{{ page.to.build }}">Guias de montagem</a> da caixa satélite, do módulo de E/S, da
+        porta de expansão, do módulo de alvo e da saída simples (uma sirene ou fumo através de um
+        interruptor de relé RC), em texto. Ainda não se montou nenhuma caixa com eles.
+      - "<strong>A porta de expansão no firmware</strong>: uma caixa encontra um módulo ligado à sua
+        porta em 2&nbsp;s e entrega cada impacto ao script do modo, e o módulo de alvo tem firmware
+        próprio, com ficheiros UF2 nas versões publicadas. Testado no computador contra um módulo
+        simulado, ainda não numa porta nem numa placa de alvo reais."
+      - "<strong>O módulo de saídas I2C</strong>: até quatro relés ou MOSFETs na porta de uma caixa,
+        atrás de um isolador e com alimentação própria, com o seu firmware (um ficheiro UF2 nas
+        versões publicadas) e o seu guia de montagem. O firmware está testado só no computador,
+        nunca numa placa."
       - "<strong>Manuais de utilizador</strong> para quem joga, a organização, os marshals e quem opera a Field Box, em inglês e português."
       - "Manuais de montagem com a tabela de pinos de cada placa, um guia do firmware (transferir uma versão publicada ou compilá-la) e um guia de montagem do controlador, em inglês e português."
       - "A vista web do simulador tem todas as entradas que um modo usa: tags, teclado, impactos e comandos da organização, com descarga do registo de eventos."
@@ -1264,17 +1277,18 @@ roadmap:
     next:
       - "A revisão do alemão e do chinês: se jogas em alemão ou em chinês, ajuda-nos a revê-los. As
         traduções para outras línguas começam em docs/translations (em inglês)."
-      - "O hardware: a placa de suporte (PCB), uma placa feita que facilita a montagem, depois das
-        primeiras caixas montadas, fotos das montagens, conteúdo da comunidade feito num campo."
+      - "O hardware: os testes de bancada da porta de expansão e do módulo de alvo, a placa de
+        suporte (PCB), uma placa feita que facilita a montagem, depois das primeiras caixas
+        montadas, fotos das montagens, conteúdo da comunidade feito num campo."
     gate: Continua depois da primeira versão.
 
 build:
   title: Guias de montagem
   intro: >-
     Os dispositivos da Atalaia montam-se com peças à venda em qualquer loja de eletrónica, à volta
-    de uma placa ESP32, sem placa de circuito feita de propósito. Aqui estão os pinos e os esquemas de ligações da Field Box e os guias da caixa
-    satélite, do módulo de E/S e do módulo de alvo, em resumo; os guias completos, com todas as
-    verificações e as tabelas de problemas e soluções, estão no repositório (em inglês).
+    de uma placa ESP32, sem placa de circuito feita de propósito. Aqui estão os pinos e os esquemas de ligações da Field Box, a sua saída simples para uma sirene ou uma máquina de fumo, e os guias da caixa
+    satélite, do módulo de E/S, da porta de expansão, do módulo de alvo e do módulo de saídas I2C, em resumo; os guias completos, com todas as
+    verificações e as tabelas de problemas e soluções, estão no repositório (em português e em inglês).
     Para pôr o firmware numa placa, <a href="https://github.com/vakaobr/atalaia-project/releases">transfere uma versão publicada</a> ou compila-a: o <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/pt/firmware.md">guia do firmware</a> explica as duas formas. O controlador de campo tem o seu <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/pt/controller-setup.md">guia de montagem</a>. O modem de rádio tem o seu <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/pt/modem.md">guia do modem</a>.
   status: >-
     <strong>Nenhuma caixa foi montada a partir destes guias, e a Field Box ainda não tem caixa.</strong>
@@ -1293,6 +1307,54 @@ build:
   steps: Passos
   open: Ainda por decidir
   photo: "Fotografia a acrescentar depois da primeira montagem:"
+  after_bench: "Depois da bancada: o que precisa de hardware real"
+  simple_out:
+    title: "A saída simples: uma sirene, um estroboscópio ou o comando do fumo"
+    what: >-
+      Uma opção da Field Box e da caixa satélite, e a forma preferida de uma caixa ligar alguma
+      coisa: uma sirene, um estroboscópio, uma luz ou o comando de uma máquina de fumo, através de um
+      <strong>interruptor de relé RC</strong> à venda em qualquer loja (do tipo usado em modelos
+      telecomandados). Um GPIO envia um sinal de servo pela porta livre do conversor de nível:
+      2,0&nbsp;ms é ligado, 1,0&nbsp;ms é desligado, em rajadas de meio segundo que só o jogo em curso
+      renova. Se a caixa bloquear, reiniciar ou ficar sem energia, os impulsos param em 0,5&nbsp;s e o
+      interruptor abre o relé. O firmware tem-na desde a versão 0.7.0, como opção de compilação;
+      ainda não foi montada em hardware. O módulo de E/S recebe-a mais tarde.
+    needs:
+      switch: >-
+        <strong>Um interruptor de relé RC que abre o relé quando o sinal para</strong>: um
+        documentado, com segurança na perda de sinal, ou um genérico só depois da verificação na
+        bancada. Um que mantém o último estado nunca se usa. Os contactos do relé adequados à carga.
+      socket: >-
+        Uma <strong>tomada M8 de 3 pinos</strong> com a etiqueta «SAÍDA 1» (pino 1 sem ligação, pino 3
+        massa, pino 4 o sinal), uma resistência de 10&nbsp;kΩ que mantém o pino em baixo enquanto a
+        placa arranca, uma resistência de 330&nbsp;Ω para a tomada e um cabo de 3 fios até 2&nbsp;m.
+        Não é a tomada M12 da porta de expansão.
+      load: >-
+        <strong>A bateria da própria carga</strong>, com um fusível para o relé e um regulador de
+        5&nbsp;V (um «BEC» de modelismo) para o interruptor: a caixa só dá o sinal e a massa, nunca
+        energia.
+      firmware: >-
+        <strong>Um firmware compilado com a saída simples</strong>
+        (<code>python tools/docker_fw.py build --simple-out=on</code>). O pino segue a revisão da
+        placa: GPIO&nbsp;46 numa V4.3, GPIO&nbsp;5 numa V4.2. Uma segunda saída no GPIO&nbsp;45
+        (<code>--simple-out=on2</code>) só numa caixa sem o besouro piezoelétrico.
+      enable: >-
+        As saídas ficam desligadas até a administração do campo as ativar na caixa com o PIN de
+        administração e dar a cada uma a sua função (sirene, estroboscópio, fumo, luz, buzina) e o
+        tempo máximo ligada. A caixa desliga-as todas ao arrancar, numa pausa e quando o jogo acaba
+        (uma buzina de fim de jogo ainda pode tocar até 10&nbsp;s).
+    safety: >-
+      <strong>Só cargas de baixa tensão</strong> (no máximo 24&nbsp;V DC, recomendado 2&nbsp;A), diga o
+      relé o que disser. <strong>Nunca a rede elétrica, nunca pirotecnia</strong>; uma máquina de fumo
+      só através de uma entrada de comando de baixa tensão documentada. Proteção auditiva perto de
+      sirenes e buzinas, fumo nunca numa sala fechada sem autorização do recinto, e nada que pareça um
+      explosivo.
+    full: >-
+      Todos os passos e verificações: a secção 9.10 do
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.pt.md">manual de montagem</a> da Field Box, e a
+      verificação na bancada de cada interruptor RC antes do primeiro jogo, na
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/firmware/esp32/docs/BRING_UP.md#step-8b-simple-output-rc-relay-switch">lista de
+      arranque, passo 8b</a> (em inglês).
   pin:
     btn1: Botão de equipa 1 (a primeira equipa do jogo)
     btn2: Botão de equipa 2 (a segunda equipa)
@@ -1347,8 +1409,10 @@ build:
       conversor de nível, e cada módulo I2C tem de puxar as suas linhas para 3,3&nbsp;V, nunca para
       5&nbsp;V.
     pins: >-
-      <strong>Nunca ligues nada ao GPIO 5 nem ao 46</strong> (a entrada do rádio) <strong>nem aos
-      GPIO 34 e 38–42</strong> (o conector de GPS da placa).
+      <strong>Nunca ligues nada ao GPIO 5 nem ao 46</strong> (a entrada do rádio; a única exceção é
+      a <a href="#field-box-simple-output">saída simples</a>, no que a revisão da tua placa deixa
+      livre: o 46 numa V4.3, o 5 numa V4.2) <strong>nem aos GPIO 34 e 38–42</strong> (o conector de
+      GPS da placa).
     power_check: >-
       <strong>Nenhum jogo antes de medir a potência de emissão</strong>, como diz a lista de
       arranque: o firmware mantém o rádio dentro do limite legal com um ganho do amplificador que
@@ -1464,6 +1528,11 @@ build:
         Som, se quiseres: um besouro piezoelétrico passivo (o mais barato: toca os sons dos jogos
         como sequências curtas de tons, com uma opção do firmware; ainda não montado em hardware), o
         amplificador MAX98357A da Field Box e um altifalante pequeno, ou os dois.
+      simple_out: >-
+        Uma <a href="#field-box-simple-output">saída simples</a> é opcional: uma sirene, um
+        estroboscópio, uma luz ou o comando de uma máquina de fumo, ligados por um interruptor de relé
+        RC, como na Field Box. Um mestre ou um satélite que toque uma sirene não precisa de outra
+        caixa. Ainda não montada em hardware.
       box: >-
         Uma caixa de plástico IP65 de cor viva, com respiro e bucins, e rótulos «GAME PROP».
     free_pins: >-
@@ -1488,6 +1557,11 @@ build:
       wiring: >-
         Liga os botões (a GND quando premidos), o anel através do conversor de nível, o medidor e o
         amplificador opcional, pelos pinos acima.
+      simple_out: >-
+        Se montares a saída simples: a porta livre do conversor de nível a partir do GPIO&nbsp;46
+        (V4.3) ou 5 (V4.2), com 10&nbsp;kΩ para GND, e por 330&nbsp;Ω até ao pino 4 da tomada M8; o
+        interruptor alimentado pela bateria da carga, nunca pela caixa. O GPIO lê 10&nbsp;kΩ para GND,
+        e nada liga o pino 4 da tomada ao 3V3 nem aos 5&nbsp;V.
       check: >-
         Verifica com o multímetro, sem a célula: nenhum curto-circuito entre linhas, cada botão só
         quando premido, a polaridade do cabo de bateria da placa.
@@ -1574,8 +1648,10 @@ build:
     photo: o módulo acabado, com o interruptor da caixa, e o telemóvel ligado a ele.
     open:
       siren: >-
-        <strong>Uma sirene ou um estroboscópio à parte</strong>: o som do módulo é o seu amplificador;
-        comandar outras cargas não faz parte do firmware.
+        <strong>Uma sirene, um estroboscópio ou o comando do fumo</strong>: está prevista como a
+        <a href="#field-box-simple-output">saída simples</a> no GPIO&nbsp;33, livre no módulo, com o
+        módulo a manter as rajadas para que uma ligação perdida ao telemóvel a desligue. O firmware do
+        módulo recebe-a num passo mais tarde; não ligues ainda nenhuma a um módulo.
       phone_power: >-
         <strong>A alimentação pelo telemóvel</strong>: por cabo, o telemóvel alimenta o módulo e pode
         carregar-lhe a célula. Se deve fazê-lo, e quanta corrente um telemóvel dá, fica para
@@ -1632,57 +1708,283 @@ build:
       carga, porta errada, porta ocupada por outro programa, <code>dialout</code>, região diferente,
       <code>LINK waiting</code> ou <code>DOWN</code>, <code>RADIO FAULT</code>, tabela de partições errada):
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/pt/modem.md">Montar o modem de rádio</a>.
+  port:
+    title: Porta de expansão
+    status: >-
+      <strong>Desenhada, ainda não montada; o firmware da caixa já a usa.</strong> Já se pode montar
+      uma porta e verificá-la com o multímetro e as peças da própria caixa. Desde o incremento 8 do
+      plano da porta de expansão, a caixa corre o controlador da porta no seu jogo: encontra um módulo
+      até 2&nbsp;s depois de ligado, lê-o e mostra-o na lista. Está testado só no computador, contra um
+      módulo simulado, ainda não numa porta real.
+    what: >-
+      Uma tomada M12 estanque de 5 pinos na caixa, onde se ligam módulos por fora: o
+      <a href="#target-addon">módulo de alvo</a> agora, contactos e outros sensores mais tarde. É o
+      próprio barramento I2C da caixa (o do teclado, do leitor NFC, do medidor de bateria e do ecrã
+      pequeno) levado para fora do invólucro, atrás de uma pequena <strong>placa da porta</strong> que
+      impede que um cabo molhado, em curto-circuito ou carregado de estática deite a caixa abaixo. Não
+      usa nenhum GPIO, por isso nenhuma tabela de pinos muda. É opcional na Field Box, na caixa
+      satélite e no módulo de E/S: só uma caixa que leve um alvo ou um sensor precisa dela. Cerca de
+      <span class="nowrap">6–14&nbsp;€</span> em peças (a estimativa do projeto).
+    not_outputs: >-
+      Não serve para sirenes, estroboscópios ou fumo: esses usam a
+      <a href="#field-box-simple-output">saída simples</a>. A porta é para entradas e para o
+      <a href="#output-module">módulo de saídas I2C</a> numa caixa que precise de mais canais.
+    parts:
+      socket: >-
+        Uma tomada de painel M12 codificação A de 5 pinos <strong>fêmea</strong> (IP67; os contactos
+        ficam recolhidos, porque o pino 1 tem tensão) com tampa, e um cabo de extensão de sensor M12
+        codificação A de 5 polos, macho-fêmea, já feito, até 2&nbsp;m até ao módulo.
+      buffer: >-
+        Um <strong>buffer de ligação a quente TCA4307</strong> numa placa de breakout: junta a porta ao
+        barramento da caixa só quando os dois estão parados, e desliga-a quando um cabo em
+        curto-circuito ou molhado segura uma linha em baixo, para que o teclado, o leitor NFC, o
+        medidor e o ecrã continuem a funcionar.
+      tvs: >-
+        Uma <strong>matriz TVS de baixa capacidade</strong> (da classe USBLC6-2SC6, num adaptador) e
+        duas resistências de 100&nbsp;Ω, contra a eletricidade estática de uma mão ou de um cabo na
+        tomada.
+      fuse: >-
+        Um <strong>fusível rearmável de 50&nbsp;mA</strong> contra um curto-circuito entre os pinos 1
+        e 3, e um pequeno <strong>díodo Schottky</strong> (da classe BAT85) para que nada no cabo
+        alimente os 3,3&nbsp;V da caixa ao contrário: o módulo recebe cerca de 3,0&nbsp;V.
+      pullups: >-
+        Duas resistências de pull-up de 2,2&nbsp;kΩ do lado da porta (os módulos não têm nenhuma), uma
+        pequena placa perfurada e fio para os trilhos 3V3, GND, SDA e SCL da placa de interligação.
+    pins_title: Os pinos da porta
+    pins_intro: >-
+      A pinagem M12, com as cores habituais dos fios do cabo (confirma-as com o multímetro). SDA e SCL
+      são o barramento I2C da caixa, atrás do buffer.
+    pin_m12: Pino M12
+    pin:
+      p1: >-
+        Castanho: 3,3&nbsp;V (cerca de 3,0&nbsp;V depois do díodo), no máximo 25&nbsp;mA, só para a
+        lógica de um módulo
+      p2: "Branco: SDA, 100&nbsp;kHz"
+      p3: "Azul: massa"
+      p4: "Preto: SCL"
+      p5: >-
+        Cinzento: <strong>sem ligação</strong> nas duas pontas, nunca uma alimentação nem um sinal
+    addresses: >-
+      Os módulos respondem nos endereços 0x58–0x5F, longe de todas as peças da caixa: módulos de
+      entrada a partir de 0x58 (o alvo), módulos de saída a partir de 0x5C. Uma caixa aceita no máximo
+      quatro, mas a porta tem uma só tomada e ainda não há um repartidor desenhado, por isso o guia
+      monta um módulo por caixa.
+    steps:
+      socket: >-
+        Fura o buraco da tomada na lateral ou no fundo do invólucro, longe das antenas e da tomada da
+        saída simples, onde um cabo vindo do chão entre sem dobrar muito, e não virado para quem
+        dispara. Põe-lhe a etiqueta «EXPANSÃO 3,3&nbsp;V».
+      board: >-
+        Distribui a placa da porta numa placa perfurada de cerca de 3&nbsp;×&nbsp;4&nbsp;cm: o lado da
+        caixa numa ponta, o da tomada na outra, o buffer entre os dois e o TVS junto ao conector da
+        tomada.
+      breakout: >-
+        Mede primeiro as resistências de pull-up da própria placa de breakout: com elas, o barramento
+        da caixa ainda tem de ler entre 1 e 3,9&nbsp;kΩ para 3V3, e o lado da porta cerca de
+        2,2&nbsp;kΩ no total.
+      wiring: >-
+        Liga a alimentação (o 3V3 da placa de interligação, o díodo, o fusível, os 3,3&nbsp;V da
+        porta), os sinais pelo buffer, pelas resistências de 100&nbsp;Ω e pelo TVS, fios de massa
+        curtos, e os fios da tomada nas cores do cabo, com o fio do pino 5 cortado curto e isolado.
+      check: >-
+        Verifica com o multímetro, sem bateria e com o USB desligado: nenhum curto-circuito entre os
+        pinos 1 e 3, o pino 5 aberto, o díodo no sentido certo, cerca de 100&nbsp;Ω e 2,2&nbsp;kΩ onde
+        o guia diz.
+      power: >-
+        Primeira alimentação, sem nada ligado: cerca de 3,0&nbsp;V no pino 1, e o teclado, o leitor NFC
+        e o medidor a funcionar, também com o cabo de 2&nbsp;m ligado.
+      bench: >-
+        Os testes de bancada que já podes fazer: o tempo de subida na ponta do cabo (menos de
+        1&nbsp;µs, com um osciloscópio), o SDA em curto-circuito com o teclado ainda a funcionar, um
+        curto-circuito entre os pinos 1 e 3 sem a caixa reiniciar, e a eletricidade estática na
+        tomada. Conta-nos o que mediste numa issue no GitHub.
+    rules_title: Regras da porta
+    rules:
+      volts: >-
+        <strong>Só 3,3&nbsp;V, em todos os pinos, sempre</strong>: nem 5&nbsp;V nem a tensão da bateria
+        chegam alguma vez à porta, e o pino 5 fica sem ligação.
+      loads: >-
+        <strong>Nunca alimentes uma carga pela porta</strong>: os 25&nbsp;mA são para o processador e o
+        sensor de um módulo. Um só LED WS2812 já gasta até 60&nbsp;mA.
+      relays: >-
+        <strong>Nunca ligues uma placa de relés PCF8574 ou MCP23017 simples</strong>, nem nenhuma placa
+        I2C sem processador próprio: os relés ficariam ligados se a caixa bloqueasse, e ela responde
+        onde a caixa procura o teclado.
+      cap: >-
+        <strong>Tapa a tomada</strong> quando não tiver nada ligado, e passa o cabo pelo chão, nunca na
+        linha de tiro. Nada de nenhum dos lados da porta toca alguma vez a rede elétrica.
+    photo: a placa da porta acabada, dos dois lados, e a tomada numa caixa.
+    box_title: O que a caixa diz da porta
+    box: >-
+      No registo série (USB, 115200 baud), a caixa escreve uma linha quando encontra um módulo
+      (<code>expansion: 0x58 added: 58:target/1.0.0:hit</code>), quando um deixa de responder
+      (<code>expansion: 0x58 lost (no_answer)</code>) e por cada impacto durante um jogo.
+      <code>@modules</code> na consola série lista os módulos, e num jogo a consola da organização
+      mostra cada um como uma etiqueta debaixo da sua caixa. A lista de arranque do firmware tem o
+      passo da porta.
+    after:
+      tests: >-
+        <strong>Os testes de bancada da porta com um módulo</strong>: 100 ligações e desligações
+        durante um jogo a decorrer, cada ligação encontrada em 2&nbsp;s (teste 3), e 30 minutos ao lado
+        de uma sirene e de um estroboscópio de 12&nbsp;V a comutar, a contar os erros de CRC e as
+        leituras falhadas (teste 6). Podem fazer-se assim que houver um módulo de alvo montado; conta-nos
+        o que medires num issue.
+    open:
+      splitter: >-
+        <strong>Um repartidor</strong> para mais de um módulo numa caixa.
+      pcb: >-
+        <strong>Uma placa de circuito de suporte</strong> com a placa da porta (até lá, placa
+        perfurada), e um esquema de ligações da porta, que pode chegar depois da primeira montagem.
+    full: >-
+      O guia completo, com todas as peças, a montagem, os endereços, as verificações e a resolução de
+      problemas:
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/expansion-port/BUILD.pt.md">guia de montagem da porta de expansão</a>. As
+      decisões por trás dele estão no rascunho do RFC
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/rfcs/0000-expansion-port.md">The expansion port</a> (em inglês).
   target:
     title: Módulo de alvo
     status: >-
-      Ainda não se pode montar: o lado da caixa já está decidido, o módulo em si ainda não. Não
-      ligues uma placa de alvo a uma caixa a partir desta página.
+      <strong>Já se pode montar, e o firmware está pronto; ainda não foi experimentado numa placa de
+      alvo nem numa caixa reais.</strong> O incremento 8 do plano da porta de expansão escreveu o
+      firmware do módulo, fixou os seus pinos e pôs os ficheiros UF2 nas versões publicadas, e a caixa
+      já lê o módulo e entrega cada impacto ao script do modo: tudo testado só no computador, contra um
+      módulo simulado. Podes montar o alvo, gravá-lo e ligá-lo à porta de uma caixa já; o consumo, a
+      afinação do sensor e o divisor fixam-se na primeira montagem (mais abaixo). Ainda ninguém montou
+      um alvo a partir do guia.
     what: >-
-      Uma placa onde se dispara, com um sensor que sente cada impacto. Liga-se a uma caixa e
-      transforma-a num alvo que pontua, para as
-      <a href="{{ page.to.modes }}#target-windows">Janelas de Alvo</a>, cujas regras já estão
-      escritas e testadas no simulador; a janela aparece no anel de luz da própria caixa.
-    decided_title: O que está decidido
-    decided:
-      parts: >-
-        Uma placa de aço ou de policarbonato, um sensor piezoelétrico e um pequeno processador
-        próprio (da classe RP2040 ou ATtiny) para detetar os impactos. Cerca de
-        <span class="nowrap">20–30&nbsp;€</span> em peças (a estimativa do projeto).
+      Uma placa onde se dispara, com um sensor piezoelétrico que sente cada impacto e uma pequena
+      placa RP2040 própria (o <strong>módulo de alvo</strong>). Liga-se à
+      <a href="#expansion-port">porta de expansão</a> de uma caixa e transforma-a num alvo que
+      pontua, para as <a href="{{ page.to.modes }}#target-windows">Janelas de Alvo</a>, cujas regras
+      já estão escritas e testadas no simulador e, de ponta a ponta, com um alvo simulado; a janela
+      aparece no anel de luz da própria caixa, por isso o módulo não precisa de luzes. Qualquer caixa
+      com porta aceita um: uma Field Box, uma caixa satélite ou um módulo de E/S.
+    how: >-
+      O piezo, colado nas costas da placa, transforma um impacto num pico curto; o módulo encontra o
+      pico, a sua força de 0 a 255, e guarda até 16 impactos com a sua idade até a caixa os recolher. A
+      caixa lê-o a cada 20&nbsp;ms pela porta, cerca de 5&nbsp;% do barramento, por isso um impacto
+      chega ao jogo em cerca de 21&nbsp;ms, e nenhum conta duas vezes. Os scripts dos modos recebem
+      cada impacto como <code>hit.hit</code>, com a sua força, só enquanto decorre um jogo, e podem
+      armar e desarmar o alvo. Cerca de <span class="nowrap">10–15&nbsp;€</span> pelo módulo, mais a
+      placa de alvo, o cabo e a porta da caixa (as estimativas do projeto).
+    parts:
+      board: >-
+        Uma <strong>placa RP2040</strong>, da classe RP2040-Zero ou um Raspberry Pi Pico, a 48&nbsp;MHz
+        para caber nos 25&nbsp;mA da porta.
+      piezo: >-
+        Um <strong>disco piezoelétrico</strong> de 27–35&nbsp;mm (e alguns de reserva: partem-se), uma
+        almofada de borracha de 2–3&nbsp;mm e cola de contacto.
+      front_end: >-
+        O circuito do sensor: uma resistência de descarga de 1&nbsp;MΩ, duas resistências do divisor em
+        suportes (os valores escolhem-se em placas reais) e dois díodos Schottky da classe BAT85 que
+        mantêm a entrada do processador entre a massa e 3,3&nbsp;V.
+      mosfet: >-
+        Um <strong>MOSFET de canal P</strong> (da classe AO3401 ou SI2301) e uma resistência de
+        10&nbsp;kΩ: a proteção do módulo contra um cabo feito à mão ligado ao contrário.
+      address: >-
+        Dois jumpers de solda (ou um interruptor DIP de 2 posições) para o endereço: 0x58 com os dois
+        abertos, 0x59–0x5B para um segundo alvo na mesma caixa.
+      led: >-
+        Um LED de 3&nbsp;mm e uma resistência de 1&nbsp;kΩ: pisca enquanto a caixa pede ao módulo que se
+        mostre, para o encontrar no campo.
+      connector: >-
+        Um conector de painel M12 codificação A de 5 pinos <strong>macho</strong>, o cabo de extensão
+        M12 (no máximo 2&nbsp;m), um invólucro IP65 pequeno, placa perfurada e fio.
+      plate: Uma placa de aço ou de policarbonato, e um suporte.
+    pins_title: Os pinos do módulo
+    pins_intro: >-
+      Como o firmware do módulo os usa: os mesmos números de GPIO numa RP2040-Zero e num Pico. Todos
+      os outros pinos ficam por ligar.
+    pin_rp2040: Pino do RP2040
+    pin:
+      v3: >-
+        Alimentação, cerca de 3,0&nbsp;V: o pino 1 do M12 (castanho), pelo MOSFET. Num Pico, liga
+        também o 3V3_EN à massa
+      gnd: "Massa: o pino 3 do M12 (azul)"
+      sda: "SDA do I2C, sem pull-up: o pino 2 do M12 (branco)"
+      scl: "SCL do I2C, sem pull-up: o pino 4 do M12 (preto)"
+      adc0: "O circuito de entrada do piezo (ADC0)"
+      adc1: "O circuito de entrada de uma segunda placa de alvo (ADC1), só com o firmware de duas placas"
+      a0: "Jumper de endereço à massa: soma 1"
+      a1: "Jumper de endereço à massa: soma 2"
+      led: "O ânodo do LED; o cátodo por 1&nbsp;kΩ à massa"
+    steps:
       port: >-
-        Liga-se a um conector M12 estanque de 5 pinos na caixa que só leva 3,3&nbsp;V: os 3,3&nbsp;V
-        da placa, a massa e as duas linhas I2C; nada de 5&nbsp;V, e o quinto pino fica livre. Cabos
-        até 2&nbsp;m. O seu processador diz à caixa o que é, por isso a caixa não precisa de um
-        controlador novo para cada acessório.
+        Monta e verifica primeiro a <a href="#expansion-port">porta de expansão</a> da caixa.
+      supply: >-
+        A alimentação: o pino 1 do M12 pelo MOSFET até ao pino 3V3 da placa RP2040, nunca ao pino de
+        5&nbsp;V, VBUS, VSYS ou USB; o pino 3 à massa; o pino 5 cortado curto e isolado. Numa RP2040-Zero
+        o regulador da própria placa fica então sem alimentação; num Pico, liga o 3V3_EN à massa para
+        desligar o regulador.
+      piezo: >-
+        Cola o piezo, com a almofada, no centro das costas da placa de alvo; a resistência de descarga
+        entre os seus fios, e depois o divisor e os díodos a caminho do GP26 (o segundo circuito de
+        entrada de um módulo de duas placas vai ao GP27).
+      bus: >-
+        SDA (pino 2) ao GP4 e SCL (pino 4) ao GP5, sem resistências de pull-up no módulo; os jumpers de
+        endereço do GP2 e do GP3 à massa, os dois abertos para 0x58; o LED no GP14.
+      enclosure: >-
+        O invólucro atrás da placa de alvo, preso ao suporte e não à placa, o conector virado para o
+        lado contrário a quem dispara, e o cabo a descer e a seguir pelo chão até à caixa.
+      check: >-
+        Verifica com o multímetro, o módulo sem alimentação: nenhum curto-circuito entre os pinos 1 e
+        3, o pino 5 aberto, nenhum pull-up nos pinos 2 e 4, os dois BAT85 a ler como díodos, cerca de
+        1&nbsp;MΩ entre os fios do piezo.
+    flash_title: Gravar o módulo
+    flash_intro: >-
+      O firmware do módulo é um ficheiro UF2, gravado à mão por USB e nunca pelo ar, com o módulo
+      desligado da caixa: nunca ligues ao mesmo tempo o cabo USB e o cabo da porta.
+    flash:
+      download: >-
+        <strong>Obtém o ficheiro UF2</strong>: <code>atalaia-target-module-&lt;versão&gt;.uf2</code>
+        (<code>atalaia-target-module-2-&lt;versão&gt;.uf2</code> para duas placas) de uma
+        <a href="https://github.com/vakaobr/atalaia-project/releases">versão publicada</a>, a partir da
+        primeira depois da 0.7.0, e confirma-o com o <code>SHA256SUMS</code> da versão: os ficheiros
+        dos módulos não são assinados. Ou compila-o tu com
+        <code>python3 tools/docker_module.py build</code>.
+      boot: >-
+        <strong>Grava-o</strong>: carrega no botão BOOT da placa enquanto ligas o cabo USB a um
+        computador, arrasta o ficheiro UF2 para a unidade que aparece (<code>RPI-RP2</code>) e desliga o
+        cabo USB quando a placa reiniciar.
+      found: >-
+        <strong>Liga-o à porta da caixa</strong>: em 2&nbsp;s o registo série da caixa diz
+        <code>expansion: 0x58 added: 58:target/1.0.0:hit</code>, e <code>@modules</code> na consola
+        série lista o alvo.
+      armed: >-
+        <strong>Experimenta-o num jogo</strong>: começa as Janelas de Alvo na caixa; a placa fica
+        armada, e uma pancada nela regista <code>expansion: hit hit, strength &lt;n&gt;</code>.
+    after:
       power: >-
-        Pode tirar no máximo 25&nbsp;mA da caixa, através de um fusível rearmável: chega para o
-        processador e o sensor, não para luzes. As Janelas de Alvo acendem o anel de LED da própria
-        caixa; um módulo com luzes próprias precisa da sua própria bateria.
-      polling: >-
-        Sem linha de interrupção: a caixa lê o módulo por I2C a cada 20&nbsp;ms, cerca de 3&nbsp;%
-        do barramento, e um impacto chega ao jogo em cerca de 21&nbsp;ms no máximo. Nenhum pino da
-        caixa muda. O firmware da caixa já tem esta leitura, testada, à espera do módulo.
-      capability: >-
-        Os scripts dos modos recebem cada impacto com a sua força (de 0 a 255) e podem armar e
-        desarmar o alvo. O mesmo está definido para o módulo de E/S de um telemóvel.
-      mode: >-
-        As Janelas de Alvo acendem o alvo na cor de uma equipa ao acaso durante alguns segundos; um
-        impacto forte o suficiente nessa janela pontua para essa equipa.
-      next: >-
-        Seguem-se o firmware do próprio módulo, a caixa a usar a leitura da porta e o sensor afinado
-        em placas reais de aço e de policarbonato; depois, as Janelas de Alvo passam a ser um modo
-        que a caixa oferece.
+        <strong>O consumo e o 3V3 do módulo</strong>: menos de 25&nbsp;mA a 48&nbsp;MHz, com um
+        multímetro em série com o pino 1 (teste de bancada 4), e cerca de 3,0&nbsp;V no pino 3V3 com o
+        módulo a funcionar.
+      tuning: >-
+        <strong>O limiar, o tempo de espera e a escala de força</strong> em placas reais de aço e de
+        policarbonato, ao limite de potência do campo e com proteção dos olhos (teste de bancada 8). Os
+        valores de origem do firmware (um limiar de 300 em 4095, 50&nbsp;ms de espera) são só um ponto
+        de partida.
+      divider: >-
+        <strong>As duas resistências do divisor</strong>, escolhidas no mesmo teste (é por isso que
+        ficam em suportes): um impacto à distância bem acima do limiar, um impacto mesmo por cima do
+        piezo sem chegar aos díodos.
+      port: >-
+        <strong>Os testes da porta com um módulo</strong>: ligações e desligações durante um jogo e
+        ruído ao lado de uma sirene, na lista da <a href="#expansion-port">porta de expansão</a>.
+      preset: >-
+        <strong>As Janelas de Alvo como predefinição da Field Box</strong>, depois de o alvo ser testado
+        na bancada; até lá, um campo põe o modo numa caixa como qualquer outro. Mais tarde, com o
+        incremento 9, o módulo de E/S a emprestar um alvo a um telemóvel.
     open:
-      mcu: O processador (RP2040 ou ATtiny, dentro dos 25&nbsp;mA) e o seu firmware.
-      protocol: >-
-        O endereço I2C do módulo e como diz o que é; a forma de comunicar um impacto tem um
-        rascunho, que fica definitivo com o primeiro módulo.
-      checks: >-
-        As verificações da primeira montagem: as resistências de pull-up do barramento com
-        2&nbsp;m de cabo, o fusível, e a proteção do conector contra a eletricidade estática e a
-        água.
-      sensor: O circuito do sensor e a sua fixação, e a placa, o suporte e o ângulo.
-    safety_title: A segurança, quando houver alguma coisa para montar
+      plate: >-
+        <strong>A placa de alvo</strong>: o tipo de material, o tamanho, a espessura, o suporte e o
+        ângulo, a partir das primeiras montagens.
+      pcb: >-
+        <strong>Uma placa de circuito de suporte</strong> para o módulo; até lá, placa perfurada.
+    safety_title: A segurança, sempre que alguém dispara contra ele
     safety:
+      bench: >-
+        <strong>Na bancada</strong>: nunca ligues ao mesmo tempo o cabo USB do módulo e o cabo da
+        porta, e toca na massa da caixa antes de ligar um módulo.
       eyes: >-
         <strong>Proteção de olhos e cara</strong> para toda a gente ao alcance enquanto alguém
         dispara contra ele, também na bancada.
@@ -1691,15 +1993,161 @@ build:
         uma placa de aço para as mandar para o chão, nunca de frente para quem dispara.
       shield: >-
         <strong>Só a placa é alvo</strong>: nunca dispares contra a caixa, o cabo ou o conector, e
-        mantém a eletrónica atrás da placa ou numa caixa própria.
+        mantém a eletrónica atrás da placa ou num invólucro próprio.
       limits: >-
         <strong>Os limites de potência do campo</strong> valem para disparar contra alvos como contra
         quem joga.
     photo: o alvo acabado, a placa e o sensor, e a porta numa caixa.
     full: >-
-      O que está decidido, com os documentos por trás de cada decisão (em inglês):
-      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/target-addon/BUILD.pt.md">guia
-      do módulo de alvo</a>.
+      Todos os passos, verificações e decisões, e o que ainda espera pela bancada:
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/target-addon/BUILD.pt.md">guia de montagem do módulo de alvo</a>.
+  out_module:
+    title: Módulo de saídas I2C
+    status: >-
+      <strong>Desenhado, ainda não montado; posterior e opcional.</strong> O firmware está escrito
+      (incremento 11 do plano da porta de expansão) e testado só no computador: compila para o RP2040
+      e o seu ficheiro UF2 vem com as versões publicadas, mas nunca correu numa placa, e nenhuma
+      caixa comandou um módulo real. Ainda ninguém montou um módulo a partir do guia.
+    what: >-
+      Um módulo para a <a href="#expansion-port">porta de expansão</a> de uma caixa que comuta até
+      quatro cargas (uma sirene, um estroboscópio, uma buzina, a entrada remota de baixa tensão de uma
+      máquina de fumo) através de relés ou MOSFETs, a partir de <strong>uma alimentação
+      própria</strong>. Uma pequena placa RP2040 corre o seu firmware: a caixa só mantém uma saída
+      ligada enquanto continuar a escrever-lhe (todas as saídas desligam 1,5&nbsp;s depois de a caixa
+      parar), e o módulo guarda os seus próprios limites rígidos, um tempo máximo ligado e um tempo
+      mínimo desligado por canal, com uma segunda guarda independente. Cerca de
+      <span class="nowrap">25–35&nbsp;€</span> sem a alimentação e as cargas (a estimativa do
+      projeto).
+    how: >-
+      Um <strong>isolador I2C</strong> (da classe ISO1540 ou ADuM1250) passa o barramento através de
+      uma barreira: a massa da caixa e a massa do módulo nunca se ligam, por isso o pico de um relé, o
+      curto-circuito de uma carga ou uma bateria ligada ao contrário ficam do lado do módulo. O lado
+      da caixa do isolador é a única coisa nos 3,3&nbsp;V da porta (alguns mA); tudo o resto corre da
+      entrada própria do módulo, de 9–15&nbsp;V (uma bateria de 12&nbsp;V, ou a bateria da própria
+      sirene).
+    simple_first: >-
+      <strong>Usa primeiro a <a href="#field-box-simple-output">saída simples</a></strong>: para uma
+      sirene, um estroboscópio ou um comando de fumo é mais barata e mais simples, sem firmware
+      próprio. Este módulo é para uma caixa que precisa de mais canais do que os pinos livres que tem,
+      ou que quer saber se a alimentação das cargas está lá.
+    rules_title: Regras do módulo de saídas
+    rules:
+      mains: >-
+        <strong>Nunca à rede elétrica.</strong> Comuta apenas cargas de muito baixa tensão de
+        segurança (SELV): no máximo 24&nbsp;V DC e 2&nbsp;A por canal. Nada dentro dele, sobre ele ou
+        ligado a ele toca alguma vez em ligações de 230 ou 110&nbsp;V, nem através de um relé marcado
+        para isso; um aparelho de rede precisa de uma unidade de comutação de fabrico comercial,
+        certificada e fechada, com uma entrada de controlo de baixa tensão.
+      smoke: >-
+        <strong>Máquinas de fumo só através da sua entrada remota de baixa tensão
+        documentada</strong> (uma entrada de contacto ou um gatilho de baixa tensão escrito no manual do
+        fabricante), ou um aparelho de fumo a bateria feito para ser disparado por um contacto. Muitas
+        máquinas de fumo baratas de rede levam tensão de rede no cabo do comando: nunca lhes ligues um
+        relé, e nunca abras uma. Se o manual não o disser por escrito, a máquina não se usa.
+      pyro: >-
+        <strong>Nunca pirotecnia</strong>, ignitores ou granadas de fumo.
+      bare: >-
+        <strong>Nunca uma placa de relés PCF8574 ou MCP23017 sem processador</strong> na porta em vez
+        dele: não tem limite de tempo próprio, e um relé fica ligado se a caixa bloquear.
+    parts:
+      board: >-
+        Uma <strong>placa RP2040</strong>: um Raspberry Pi Pico ou uma RP2040-Zero.
+      isolator: >-
+        Uma placa com um <strong>isolador I2C</strong>, da classe ISO1540 ou ADuM1250, com duas
+        alimentações e duas massas separadas; as resistências de pull-up do lado da caixa saem (a placa
+        da porta tem-nas).
+      mosfet: >-
+        Um <strong>MOSFET de canal P</strong> (da classe AO3401 ou SI2301) e uma resistência de
+        10&nbsp;kΩ, para que um cabo feito à mão ligado ao contrário não alimente o isolador ao
+        contrário.
+      relays: >-
+        Uma placa de 4 relés com optoacopladores e <strong>disparo por nível alto</strong> (entrada
+        alta é relé ligado, ou um jumper de disparo posto em alto), bobinas de 5&nbsp;V, contactos de
+        pelo menos 2&nbsp;A a 30&nbsp;V DC, e um pull-down de 10&nbsp;kΩ em cada entrada, para que
+        todos os relés fiquem desligados enquanto a placa está em reset ou a ser gravada. Ou uma placa
+        de MOSFETs feita para lógica de 3,3&nbsp;V, para cargas DC comutadas muitas vezes, como
+        estroboscópios.
+      supply: >-
+        <strong>A alimentação própria</strong>: uma entrada de 9–15&nbsp;V DC, um fusível lento de
+        1&nbsp;A, um díodo Schottky da classe 1N5819 contra uma bateria ligada ao contrário, e um
+        conversor buck (da classe MP1584 ou LM2596) acertado para 5,0&nbsp;V, para a placa RP2040 e as
+        bobinas dos relés.
+      loads: >-
+        <strong>Para cada carga</strong>: a sua própria bateria e o seu próprio fusível de no máximo
+        2&nbsp;A, através dos contactos secos do relé (COM e NO), e um díodo de roda livre numa sirene
+        de motor, numa buzina ou em qualquer bobina.
+      connector: >-
+        Um conector de painel M12 codificação A de 5 pinos <strong>macho</strong> e o cabo M12 (no
+        máximo 2&nbsp;m), um invólucro IP65 de plástico de cerca de
+        150&nbsp;×&nbsp;110&nbsp;×&nbsp;70&nbsp;mm com bucins, um LED de estado, placa perfurada, fio e
+        etiquetas («SÓ SELV, NUNCA À REDE»).
+    pins_title: Os pinos do módulo
+    pins_intro: >-
+      Como o firmware do módulo os usa, nos pinos de um Pico ou de uma RP2040-Zero; os pinos do M12
+      vão só ao lado da caixa do isolador, e o seu pino 3 (a massa da caixa) a mais nada.
+    pin:
+      sda: "SDA do I2C: o lado do módulo do isolador (4,7&nbsp;kΩ aos seus 3,3&nbsp;V)"
+      scl: "SCL do I2C: o lado do módulo do isolador (4,7&nbsp;kΩ aos seus 3,3&nbsp;V)"
+      ch1: "OUT 1: a entrada IN1 da placa de relés, alto é ligado; 10&nbsp;kΩ à massa"
+      ch2: "OUT 2: IN2; 10&nbsp;kΩ à massa"
+      ch3: "OUT 3: IN3; 10&nbsp;kΩ à massa"
+      ch4: "OUT 4: IN4; 10&nbsp;kΩ à massa"
+      a0: "Jumper de endereço à massa: soma 1"
+      a1: "Jumper de endereço à massa: soma 2"
+      led: "O ânodo do LED de estado; o cátodo por 1&nbsp;kΩ à massa"
+      sense: "A medição da alimentação (opcional): um divisor de 100&nbsp;kΩ / 22&nbsp;kΩ a partir da bateria das cargas"
+    pins_more: >-
+      O endereço é 0x5C com os dois jumpers abertos (0x5D–0x5F com eles). Os 5&nbsp;V do conversor
+      buck vão ao VSYS do Pico ou ao pino de 5&nbsp;V da RP2040-Zero, o 3V3 da placa ao lado do módulo
+      do isolador.
+    flash_title: Gravar e primeiro arranque
+    flash:
+      download: >-
+        <strong>Obtém o ficheiro UF2</strong>: <code>atalaia-output-module-&lt;versão&gt;.uf2</code>
+        de uma <a href="https://github.com/vakaobr/atalaia-project/releases">versão publicada</a>, a
+        partir da primeira depois da 0.7.0, confirmado com o seu <code>SHA256SUMS</code> (não é
+        assinado). Traz a lista de canais de origem, quatro relés genéricos de no máximo 30&nbsp;s
+        cada, para um primeiro teste de bancada; para outras cargas, compila o teu com a lista de
+        canais do que está montado (<code>python3 tools/docker_module.py build</code>).
+      boot: >-
+        <strong>Grava-o</strong> com a alimentação desligada, o cabo M12 desligado e as cargas
+        desligadas: carrega no botão BOOT da placa enquanto a ligas ao USB de um computador, copia o
+        ficheiro UF2 para a unidade que aparece e desliga o USB.
+      first: >-
+        <strong>Primeira alimentação, cargas desligadas</strong>: nenhum relé faz clique, ao ligar nem
+        depois de 20 ciclos de alimentação, e o LED fica apagado (um piscar rápido quer dizer que o
+        firmware recusou a sua lista de canais).
+      box: >-
+        <strong>Numa caixa</strong>: a caixa encontra-o como <code>5c:out4/1.0.0</code>, e as suas
+        saídas ficam <strong>desligadas até a administração da caixa as ativar</strong> na caixa, com
+        a função e o tempo máximo ligado de cada canal; o teste de 1&nbsp;s da administração faz então
+        clique em cada relé, um de cada vez.
+    after:
+      lease: >-
+        <strong>Desligado em 1,5&nbsp;s</strong> com um relé ligado, de cada vez que a caixa perde a
+        alimentação, reinicia, ou o cabo é cortado ou desligado (teste de bancada 5, cronometrado em
+        vídeo).
+      isolator: >-
+        <strong>O isolador aos 3,0&nbsp;V da porta</strong>, o fundo da sua gama, e o nível baixo do
+        barramento através dele e do buffer da porta (com um osciloscópio); o consumo do módulo a
+        partir da porta (esperam-se alguns mA).
+      relays: >-
+        <strong>Os relés a atracar a partir de 3,3&nbsp;V</strong>, a corrente das bobinas, o consumo
+        da alimentação própria do módulo e o valor do fusível de entrada, a medição da alimentação
+        contra um multímetro, e o watchdog e a guarda numa placa real.
+      noise: >-
+        <strong>Ruído</strong>: uma sirene de 12&nbsp;V e um estroboscópio a comutar durante 30 minutos
+        ao lado da caixa e do cabo, a contar os erros de CRC e as leituras falhadas (teste de bancada
+        6).
+      smoke: >-
+        <strong>Fumo</strong>: um aparelho de fumo a bateria, ou uma máquina de fumo com uma entrada de
+        baixa tensão documentada, disparado pela explosão da Bomba e parado pelo «Desligar todas as
+        saídas» da organização e pelo fim do jogo (teste de bancada 10).
+    photo: o módulo acabado, os dois lados do isolador, e as etiquetas.
+    full: >-
+      Todas as peças, os dois lados, a alimentação, as cargas, os pinos, as verificações e o que
+      espera pela bancada:
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/output-module/BUILD.pt.md">guia de montagem do módulo de saídas I2C</a>.
 
 hub:
   title: Espaço da comunidade

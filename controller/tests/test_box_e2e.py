@@ -468,6 +468,66 @@ class FieldTests(unittest.TestCase):
         self.assertTrue(wait_for(lambda: self.pulses(box)[-1]["width"] == 1000, 5), box.lines[-8:])
         self.assertEqual(self.client.post(f"/api/v1/games/{gid}/end", headers=GM, json={}).status_code, 200)
 
+    def test_a_box_with_a_target_module(self):
+        """Draft RFC "The expansion port", increment 8, end to end: the host box runs the firmware's
+        port driver against a target module simulated on the real module core (firmware/module-core/).
+        HELLO lists `hit`, node.modules carries the module's entry and the controller's node list shows
+        it (with feedback), Target Windows arms the plate at game.start and a hit on it reaches the
+        mode's script as hit.hit (target.hit, a score), and a module pulled out during the game is
+        node.module_lost."""
+        box = self.box("alpha", "--module", "target")
+        r = self.client.post("/api/v1/games", headers=GM, json={
+            "name": "e2e", "mode_id": "org.atalaia.target_windows", "teams": ["red", "blue"],
+            "params": {"interval_s": 1, "window_s": 600, "hit_points": 5, "min_strength": 40,
+                       "multi_hit": True}})
+        self.assertEqual(r.status_code, 201, r.text)
+        gid = r.json()["id"]
+        nid = self.join(box, role="target")
+        self.assertTrue(wait_for(lambda: self.node(nid).get("fw_version") == "host", 5))
+        self.assertIn(10, self.node(nid)["capabilities"])  # hit (protocol/schema/capabilities.yaml)
+        self.assertTrue(wait_for(lambda: self.node(nid).get("modules") is not None, 6), box.lines[-8:])
+        self.assertEqual(self.node(nid)["modules"],
+                         [{"address": "58", "model": "target", "fw": "1.0.0", "caps": ["hit"], "feedback": True}])
+        mods = [e for e in self.client.get(f"/api/v1/games/{gid}/log", headers=READ).json()
+                if e["type"] == "node.modules"]
+        self.assertEqual(mods[0]["data"], {"modules": "58:target/1.0.0:hit"})
+        # Between games the plate is not armed: a hit is not even kept by the module.
+        box.send("hit 58 200")
+        self.assertTrue(wait_for(lambda: box.logged("module 58: hit 200 not kept"), 3), box.lines[-5:])
+
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
+        self.assertTrue(wait_for(lambda: box.status()["modules"][0]["armed"] == 1, 3), box.lines[-8:])
+        self.assertTrue(wait_for(lambda: any(l.startswith("SCREEN window") for l in box.lines), 5),
+                        box.lines[-8:])
+        box.send("hit 58 200")
+        self.assertTrue(wait_for(lambda: box.logged('input hit.hit {"strength":200}'), 3), box.lines[-8:])
+        self.assertTrue(wait_for(lambda: "target.hit" in self.log_types(gid, nid), 6), box.lines[-8:])
+        hit = next(e for e in self.client.get(f"/api/v1/games/{gid}/log", headers=READ).json()
+                   if e["type"] == "target.hit")
+        self.assertTrue(hit["data"]["window_open"])
+        self.assertTrue(wait_for(lambda: self.score(gid, "red") + self.score(gid, "blue") == 5, 6))
+        # A weak hit counts for nothing (min_strength 40), but still reaches the script.
+        box.send("hit 58 10")
+        self.assertTrue(wait_for(lambda: box.logged('input hit.hit {"strength":10}'), 3), box.lines[-8:])
+
+        # The cable is pulled out: gone after 25 failed reads (0.5 s), told as critical.
+        box.send("unplug 58")
+        self.assertTrue(wait_for(lambda: "node.module_lost" in self.log_types(gid, nid), 6), box.lines[-8:])
+        lost = next(e for e in self.client.get(f"/api/v1/games/{gid}/log", headers=READ).json()
+                    if e["type"] == "node.module_lost")
+        self.assertEqual(lost["data"], {"modules": "58:target/1.0.0:hit", "reason": "no_answer"})
+        self.assertTrue(wait_for(lambda: self.node(nid).get("modules") == [], 6), box.lines[-8:])
+        # Plugged in again: found within 2 s and armed at once (the mode armed "hit" at game.start).
+        box.send("plug 58")
+        self.assertTrue(wait_for(lambda: len(box.status()["modules"]) == 1
+                                 and box.status()["modules"][0]["armed"] == 1, 4), box.lines[-8:])
+        # node.modules again, with the module back, before the end.
+        self.assertTrue(wait_for(lambda: len(self.node(nid).get("modules") or []) == 1, 6), box.lines[-8:])
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/end", headers=GM, json={}).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 0, 10), box.lines[-8:])
+        self.assertTrue(wait_for(lambda: box.status()["modules"][0]["armed"] == 0, 3))
+
     def play_and_end(self, box: BoxHost, epoch: int) -> None:
         """One game with the box: it joins, each side hears the other (the controller registers the
         HELLO, the box gets its ACK), it starts and ends, and the box is free again."""
