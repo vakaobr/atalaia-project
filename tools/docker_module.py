@@ -2,14 +2,17 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Builds and tests the expansion port's module firmware in Docker (draft RFC "The expansion port",
-increment 8), for machines without GCC for Arm or pico-sdk.
+increments 8 and 11), for machines without GCC for Arm or pico-sdk.
 
-    python tools/docker_module.py build     the target module's UF2 files ->
+    python tools/docker_module.py build     the modules' UF2 files ->
                                             firmware/target-module/build/atalaia_target_module.uf2
-                                            (one plate) and atalaia_target_module_2.uf2 (two plates)
-    python tools/docker_module.py test      the target module's host tests and the module core's
-                                            (firmware/module-core/), as CI runs them
-    python tools/docker_module.py clean     delete firmware/target-module/build/ and the build volume
+                                            (one plate) and atalaia_target_module_2.uf2 (two plates);
+                                            firmware/output-module/build/atalaia_output_module.uf2
+                                            (the I2C output module, its default channel list)
+    python tools/docker_module.py test      the target module's and the output module's host tests
+                                            and the module core's (firmware/module-core/), as CI
+                                            runs them
+    python tools/docker_module.py clean     delete both build/ folders and the build volume
 
 The image (tools/dev/module/Dockerfile: Ubuntu 24.04 pinned by digest, GCC for Arm from its
 packages, pico-sdk 2.2.0 and picotool 2.2.0 pinned by tag and commit) is built on the first run
@@ -35,6 +38,7 @@ IMAGE = "atalaia-module"
 LABEL = "org.atalaia.dockerfile"
 VOLUME = "atalaia-module-build" + os.environ.get("ATALAIA_VOLUME_SUFFIX", "")
 OUT = REPO / "firmware" / "target-module" / "build"
+OUTPUT_OUT = REPO / "firmware" / "output-module" / "build"
 # (TARGET_PLATES, the UF2's name)
 VARIANTS = ((1, "atalaia_target_module"), (2, "atalaia_target_module_2"))
 
@@ -65,8 +69,10 @@ def run(script: str) -> int:
 
 
 def build_script() -> str:
-    """The commands of CI's target-module job: each variant's UF2 into firmware/target-module/build/."""
-    steps = ["set -e", "mkdir -p firmware/target-module/build"]
+    """The commands of CI's target-module job: each target variant's UF2 into
+    firmware/target-module/build/, the output module's (its default channel list: a builder with other
+    loads builds their own, firmware/output-module/README.md) into firmware/output-module/build/."""
+    steps = ["set -e", "mkdir -p firmware/target-module/build firmware/output-module/build"]
     for plates, name in VARIANTS:
         steps += [
             f"cmake -S firmware/target-module -B /build/target-module-{plates} -G Ninja "
@@ -74,7 +80,12 @@ def build_script() -> str:
             f"cmake --build /build/target-module-{plates}",
             f"cp /build/target-module-{plates}/{name}.uf2 firmware/target-module/build/",
         ]
-    steps.append("cd firmware/target-module/build && sha256sum *.uf2")
+    steps += [
+        "cmake -S firmware/output-module -B /build/output-module -G Ninja -DCMAKE_BUILD_TYPE=Release",
+        "cmake --build /build/output-module",
+        "cp /build/output-module/atalaia_output_module.uf2 firmware/output-module/build/",
+        "sha256sum firmware/target-module/build/*.uf2 firmware/output-module/build/*.uf2",
+    ]
     return " && ".join(steps)
 
 
@@ -84,6 +95,9 @@ def test_script() -> str:
         "cmake -S firmware/target-module -B /build/target-module-host -G Ninja -DTARGET_MODULE_HOST_TESTS=ON",
         "cmake --build /build/target-module-host",
         "ctest --test-dir /build/target-module-host --output-on-failure",
+        "cmake -S firmware/output-module -B /build/output-module-host -G Ninja -DOUTPUT_MODULE_HOST_TESTS=ON",
+        "cmake --build /build/output-module-host",
+        "ctest --test-dir /build/output-module-host --output-on-failure",
         "cmake -S firmware/module-core -B /build/module-core -G Ninja -DCMAKE_BUILD_TYPE=Debug",
         "cmake --build /build/module-core",
         "ctest --test-dir /build/module-core --output-on-failure",
@@ -97,6 +111,8 @@ def build() -> int:
     if code == 0:
         print("\nTarget module: firmware/target-module/build/atalaia_target_module.uf2 "
               "(two plates: atalaia_target_module_2.uf2); to flash it, see firmware/target-module/README.md")
+        print("Output module: firmware/output-module/build/atalaia_output_module.uf2 (the default channel "
+              "list); see firmware/output-module/README.md")
     return code
 
 
@@ -107,10 +123,11 @@ def test() -> int:
 
 
 def clean() -> int:
-    if OUT.exists():
-        shutil.rmtree(OUT)
+    for out in (OUT, OUTPUT_OUT):
+        if out.exists():
+            shutil.rmtree(out)
     subprocess.run(["docker", "volume", "rm", "-f", VOLUME], capture_output=True)
-    print(f"Removed {OUT.relative_to(REPO)} and the volume {VOLUME}")
+    print(f"Removed {OUT.relative_to(REPO)}, {OUTPUT_OUT.relative_to(REPO)} and the volume {VOLUME}")
     return 0
 
 

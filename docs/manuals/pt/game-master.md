@@ -412,6 +412,17 @@ Uma caixa pode levar um **alvo** na sua porta de expansão: uma placa com um sen
 
 Ainda não testado em hardware: o alvo e o seu firmware estão feitos e testados só num computador.
 
+### Alvos
+
+Uma caixa pode levar um **alvo** na sua porta de expansão: uma placa com um sensor que sente cada impacto ([manual da Field Box](field-box.md#um-alvo-na-porta-de-expansão)). *Janelas de Alvo* é o modo para ele (papel **target**).
+
+- **Antes do jogo**, liga o alvo à caixa e depois deixa a caixa entrar. O separador **Caixas** mostra-o como uma etiqueta debaixo da caixa: **target 1.0.0: hit**. Uma caixa cujo papel precisa de um sensor de impacto e não o tem faz a verificação de arranque dizê-lo (**Falta a uma caixa o que o seu papel precisa: box-4 (target): hit**); vê o cabo antes de **Começar mesmo assim**.
+- **Durante o jogo** cada impacto chega ao modo: em *Janelas de Alvo*, um impacto enquanto a caixa mostra a cor de uma equipa dá a essa equipa os **Pontos por um tiro na janela**, e o **Registo** diz **Um alvo foi atingido**. Os impactos só contam enquanto o jogo decorre (não em pausa). **Impacto mais fraco que conta** (0-255) ignora toques leves; o valor certo depende da placa de alvo, acerta-o num jogo de teste.
+- **Se um alvo desaparecer** (um cabo puxado, um conector partido), o **Registo** diz **box-4 perdeu um módulo: 58:target/1.0.0:hit (deixou de responder)** e a sua etiqueta desaparece. Ligado outra vez, conta logo.
+- Uma caixa com dois alvos chama-lhes **hit** e **hit.2**.
+
+Ainda não testado em hardware: o alvo e o seu firmware estão feitos e testados só num computador.
+
 ### O separador Caixas
 
 Cada caixa mostra o **N.º**, o **Nome** (com uma etiqueta por cada módulo ou saída que a caixa tem, por exemplo **siren · não verificado**, e por cada saída instalada mas não ativada, **horn · instalada, não ativada pela administração da caixa**), o **Papel**, a **Dona** (equipa), o **Nível**, a **Bateria** (com **fraca** abaixo de 20%), o **Sinal**, a **Última notícia**, o **Firmware** e a **Época**. Uma caixa de que não há notícias mostra **sem notícias**. Podes mudar a equipa dona de uma caixa com a lista. Alguns modos juntam botões, por exemplo a recarga de um kit de ligaduras.
