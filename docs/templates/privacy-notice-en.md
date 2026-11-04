@@ -309,6 +309,17 @@ after the game ended, on the controller and on the site server. Team and
 squad results without player ids (no member lists; a squad under 3 players
 is folded into its team) are kept **365 days** (section 7).
 
+**[FIELD CHOICE:] Sharing game results with other fields of a hosted hub**
+(off by default). If the field's administrator turns it on, the hub
+operator keeps, for the staff of the other fields of the same hub that also
+share theirs, a copy of each ended game's mode, start and end time, each
+team's final score, the winning team and the field's name. **No player
+identifier, name, account, event or member list is shared**, nor the names
+the field gives a game or a team. The copy is removed when the field turns
+sharing off, and never kept longer than the field keeps the game's results
+(365 days). [LAWYER: confirm whether this needs a basis or a mention beyond
+this paragraph, and whether the sharing fields need terms between them.]
+
 Basis: (f) running the games and keeping their history
 [LAWYER: confirm].
 

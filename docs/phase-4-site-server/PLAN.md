@@ -1452,7 +1452,10 @@ registration page, WREG-*); the pages and feeds answer `HEAD`
 ticket box and the registered and walk-in counts. Not built here: the app's
 screens (account login, the field's games, registering, keeping and sending the
 ticket; the app's Dart ticket codec is built), `[sync] push_walkins` and the
-guest registrations it implies (S16-13).
+guest registrations it implies (S16-13). *(The app's screens were built with
+plan phase 17 on 2026-10-20, 21b5b5d4: `app/lib/site/site_screens.dart`, with
+`SiteGameScreen`, `TicketScreen` and `KeptTicketsScreen`. `[sync] push_walkins`
+is still not built.)*
 
 *App screens built 2026-10-20 with plan phase 17 (decisions S17-9 to S17-16):*
 *Participante › Inscrições online* logs in to the field's site server (password,
@@ -1535,7 +1538,9 @@ field's name.
 ADR-P4-3 and RESEARCH section 8 as amended (P4R12): device health from
 synced `node.online`, `battery.low`, `node.offline` events and node
 STATE (battery, firmware, RSSI, last seen); a firmware catalogue (list
-only: OTA is not built yet); the remote GM: a site-server user with the
+only: OTA is not built yet; since 2026-10-21 the field controller updates its
+boxes over the air itself, da8d39a3, and the site server's catalogue stays a
+list); the remote GM: a site-server user with the
 `gm` role on the field sees the live game through the controller's
 WebSocket and sends commands back on it, only when the controller sets
 `[sync] remote_gm = true`, limited to start, pause, resume, end, GM
@@ -1564,7 +1569,10 @@ The site server gained `wsproto` so uvicorn serves the stream at all (S19-1).
 Not built: the remote ATAK relay that decision M9-10 had deferred here (S19-10;
 built on 2026-10-21 as a Phase 4 follow-up, decisions FU5-*),
 positions in the remote view (S19-7), a GM web page on the site server and the
-console's screen for the log (S19-11). Tests: `test_devices.py`,
+console's screen for the log (S19-11). *(All three built since: positions in the
+remote view 2026-10-28 (PKD-5, 4807c125), the site server's GM page 2026-10-21
+and its pushed view 2026-10-28 (FU9, 22490ba8, 405c6075), the console's log
+2026-10-26 (be9321a8, `controller/console/src/components/remote-gm-log.js`).)* Tests: `test_devices.py`,
 `test_firmware.py`, `test_remote_gm.py`, `test_remote_gm_e2e.py` (the real
 controller under uvicorn) and the controller's `test_remote_gm.py`.
 
@@ -1726,7 +1734,7 @@ The staged gate test plan below.
 | A2 | The GM console (Preact + HTM, CSP, class components) | **Built.** `controller/console/src/`, Playwright tests | 8, 9, 16 |
 | A3 | `field.*` and `state.field{}` in the core | **Built.** `field.nodes/owner/send/score/common_owner` | 1, 5, 6, 7 |
 | A4 | The Android prop shell (Flutter, `dart:ffi`, kiosk) | **Built in software** (phase 3 D-F); not run on a phone | 4, 5 |
-| A5 | The player app with role views | **Built in software** (Android; iOS not built) | 8, 16 |
+| A5 | The player app with role views | **Built in software** (Android; iOS not built; iOS built since 2026-10-26, aa9c05d3, `app/ios/`) | 8, 16 |
 | A6 | GPS reports from the app | **Built:** `POST /api/v1/positions`, kept on the controller, filtered by role; **no `gps.fix` events** | 5, 9 |
 | A7 | NFC squad identification | **Changed:** player tags carry player and team, not squad (P4R3) | -- |
 | A8 | Chrono check-in in the app | **Built:** signed per-reading records, `POST /api/v1/chrono/readings`, marshal keys from the phone | 14 |

@@ -42,6 +42,7 @@ jobs:
       registry: ${{ steps.filter.outputs.registry }}
       firmware_test: ${{ steps.filter.outputs.firmware_test }}
       esp32: ${{ steps.filter.outputs.esp32 }}
+      module_core: ${{ steps.filter.outputs.module_core }}
     steps:
       - name: Everything except on an ordinary pull request
         id: scope
@@ -226,6 +227,11 @@ jobs:
               - 'tools/firmware_release.py'
               - 'tools/gen_box_fonts.py'
               - 'tools/oled_logo.py'
+            module_core:
+              - *shared
+              - 'firmware/module-core/**'
+              - 'tools/protogen.py'
+              - 'tools/expansion_vectors.py'
       - name: Everything when the filter could not say
         id: gate
         env:
@@ -1027,6 +1033,30 @@ jobs:
         run: |
           python3 -m pip install --require-hashes --no-deps --only-binary ":all:" -r tools/ci-yaml-requirements.txt
           python3 tools/gen_mode_gifs.py --check --frames-exe /tmp/fw-test/mode_gif_frames
+
+  module-core:
+    # The expansion port's module core (firmware/module-core/, draft RFC "The expansion port",
+    # increment 7): every vector of protocol/vectors/expansion.json and the state machine's edges,
+    # built with warnings as errors, then again under AddressSanitizer and UBSan.
+    name: Expansion module core host tests
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.module_core == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and test
+        run: |
+          cmake -S firmware/module-core -B /tmp/module-core -DCMAKE_BUILD_TYPE=Debug
+          cmake --build /tmp/module-core
+          ctest --test-dir /tmp/module-core --output-on-failure
+      - name: Under AddressSanitizer and UBSan
+        run: |
+          cmake -S firmware/module-core -B /tmp/module-core-asan -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
+          cmake --build /tmp/module-core-asan
+          ctest --test-dir /tmp/module-core-asan --output-on-failure
 
   dco:
     name: Check DCO sign-off

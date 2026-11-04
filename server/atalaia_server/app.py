@@ -45,7 +45,7 @@ from fastapi.responses import JSONResponse
 
 from . import __version__, atak_pki, integrations, personal_data, privacy_notice, quotas, tenancy, tenant_watch
 from .api import (app_links, atak, auth, branding, chrono, clubs, devices, export, feedback, fields, firmware, games,
-                  hub_share as hub_share_api, health, history, integrations as integrations_api, me, registration_import,
+                  hub_history as hub_history_api, hub_share as hub_share_api, health, history, integrations as integrations_api, me, registration_import,
                   registrations, privacy as privacy_api, remote_gm, scenarios, login_methods, oidc_relay, account_merge, scheduling, sync)
 from .atak_relay import AtakRelay
 from .body_limit import BodyLimitMiddleware
@@ -173,6 +173,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(me.router)
     app.include_router(privacy_api.router)  # the published privacy notice (CONS-1)
     app.include_router(hub_share_api.router)  # chrono sharing across a hosted hub's tenants (SVX-2)
+    app.include_router(hub_history_api.router)  # game history shared by a hosted hub's fields that opt in (HUBH-*)
     app.include_router(games.router)
     app.include_router(chrono.router)
     app.include_router(sync.router)

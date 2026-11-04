@@ -461,6 +461,7 @@ const SECTIONS = {
     remote: (r) => r.has('admin') || r.has('gm'),
     atak: (r) => r.has('admin') || r.has('gm'),
     chrono: (r) => r.has('admin') || r.has('gm') || r.has('marshal'),
+    hubhistory: (r) => r.has('admin') || r.has('gm') || r.has('marshal'),
     roles: (r) => r.has('admin') || r.has('gm'),
     synckeys: (r) => r.has('admin'),
     branding: (r) => r.has('admin') || r.has('gm'),

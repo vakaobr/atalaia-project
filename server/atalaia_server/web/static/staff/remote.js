@@ -5,8 +5,9 @@
 // (GET /api/v1/fields/{field}/remote-gm/stream, server-sent events read with fetch and the bearer token; decision
 // FU9-6) and, while no stream delivers (the browser cannot read one, the connection failed), polled every few
 // seconds (GET .../remote-gm, the field's gm in a TOTP session), the commands the site server
-// may send (start, pause, resume, end, a GM message, a mode command the live game declares; POST
-// .../remote-gm/commands, answered with the controller's own result) and the remote GM log (GET
+// may send (start, pause, resume, end, a GM message, a mode command the live game declares, and every output of
+// the game off, never on: draft RFC "The expansion port", EXP-27; POST .../remote-gm/commands, answered with the
+// controller's own result) and the remote GM log (GET
 // .../remote-gm/log, the field's admin or gm). Both stop while the tab is hidden. With the view come the live game's
 // players' positions as a list (PKD-5): the controller sends them whenever players share them, the site server
 // relays them in memory and keeps none.
@@ -25,6 +26,8 @@ const CAN = {
     pause: (s) => s === 'running',
     resume: (s) => s === 'paused',
     end: (s) => s === 'running' || s === 'paused',
+    // Off is the safe direction: in any state of a live game (the controller refuses an ended one).
+    outputs_off: (s) => s !== 'ended',
 };
 const RETRY_S = 30;          // after a failed stream, until the next try (the polling covers the time)
 const STALE_MS = 45000;      // a stream silent this long (the server sends a line every 15 s) is replaced
@@ -102,6 +105,10 @@ function commandForm(entry) {
             },
         });
     }
+    // The console's "All outputs off" (outputs-panel.js): no confirm, since it only ever makes things safer.
+    buttons.outputs_off = el('button', {
+        type: 'button', class: 'danger', text: t('cmd_outputs_off'), onclick: () => send(entry, 'outputs_off', {}),
+    });
     buttons.message = el('button', {
         type: 'button', text: t('cmd_message'),
         onclick: () => {
@@ -127,6 +134,7 @@ function commandForm(entry) {
     const form = el('fieldset', { class: 'commands' }, el('legend', { text: t('commands') }),
         el('div', { class: 'row' }, el('label', { for: reasonId, text: t('reason') }), reason),
         el('p', { class: 'buttons' }, buttons.start, ' ', buttons.pause, ' ', buttons.resume, ' ', buttons.end),
+        el('p', { class: 'buttons outputs' }, buttons.outputs_off, ' ', el('span', { class: 'hint', text: t('outputs_off_hint') })),
         el('div', { class: 'row' }, el('label', { for: messageId, text: t('message_text') }), message), buttons.message,
         modeRow);
     Object.assign(entry, { form, buttons, mode, node, modeRow, message, reason });
