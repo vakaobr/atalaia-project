@@ -9,7 +9,8 @@
 // 1. find the field on an interactive OpenStreetMap map (tile-map.js), or over an open orthophoto where
 //    there is one (the *Mapa* / *Ortofoto* switch, MF-54 to MF-57: the DGT's in mainland Portugal, and
 //    since MF-65 IGN España's, IGN France's and PDOK's, since MF-73 those of Belgium's regions,
-//    Luxembourg, Switzerland, eleven German Länder, Poland and Czechia, ortho-sources.js): the level's current map
+//    Luxembourg, Switzerland, eleven German Länder, Poland and Czechia, since MF-94 Austria's basemap.at,
+//    ortho-sources.js): the level's current map
 //    position, else the GM's own location when the browser already allows it (MF-41, MF-42), a typed
 //    "latitude, longitude", *Use my location*, or a place's name searched with OpenStreetMap's
 //    Nominatim (MF-44 to MF-46; place-search.js);
@@ -401,22 +402,30 @@ class FieldMap extends Component {
             let used = null;
             let notice = osm.url === OVERPASS_URL ? '' : t('fieldmap.osm_from', { host: overpassHost(osm.url) });
             let failed = '';
+            let partial = '';
             for (const source of sources) {
                 this.setState({ busy: 'ortho', orthoName: source.name });
+                // MF-96: a WMTS-only source says how many of its tiles had no picture (the coverage's edge).
+                const report = {};
                 try {
-                    photo = await fetchOrthophoto(bounds, frame, source);
+                    photo = await fetchOrthophoto(bounds, frame, source, fetch, report);
                 } catch (e) {
                     failed = t('fieldmap.ortho_failed', { name: source.name, detail: this.mapError(e) });
                     break;
                 }
                 if (photo) {
                     used = source;
+                    if (report.missing) {
+                        partial = t('fieldmap.ortho_partial', { name: source.name, missing: report.missing,
+                                                                tiles: report.tiles });
+                    }
                     break;
                 }
             }
             if (sources.length && !photo) {
                 notice = `${notice} ${failed || t('fieldmap.no_ortho', { name: sources[0].name })}`.trim();
             }
+            if (partial) notice = `${notice} ${partial}`.trim();
             this.setState({ busy: 'draw' });
             const credit = used ? used.imageCredit : '';
             const canvas = drawField(elements, bounds, frame, photo, credit);

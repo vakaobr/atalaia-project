@@ -3334,3 +3334,12 @@ for _lang, _texts in _NO_NOTICE.items():
     _clash = set(STRINGS[_lang]) & set(_texts)
     assert not _clash, sorted(_clash)
     STRINGS[_lang].update(_texts)
+
+# HUBH-*: the page for the game history shared between a hosted hub's fields (``/staff/fields/<field>/hub-history``);
+# every key is new.
+from .staff_i18n_hubhistory import STAFF as _HUB_HISTORY  # noqa: E402
+
+for _lang, _texts in _HUB_HISTORY.items():
+    _clash = set(STRINGS[_lang]) & set(_texts)
+    assert not _clash, sorted(_clash)
+    STRINGS[_lang].update(_texts)

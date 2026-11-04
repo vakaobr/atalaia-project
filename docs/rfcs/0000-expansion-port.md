@@ -6,7 +6,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 # RFC 0000: The expansion port, the simple output, and their first modules
 
 - **Author(s):** The Atalaia contributors (design requested by the maintainer on 2026-11-03)
-- **Status:** Draft (2026-11-03): a design for the maintainer to approve; nothing in it is built yet. Decisions are numbered **EXP-1** to **EXP-38** in this file. Updated the same day with the maintainer's decision EXP-31: two output paths, the single-GPIO simple output preferred
+- **Status:** Draft (2026-11-03): a design for the maintainer to approve; its open questions were approved on 2026-11-03, and increments 1 to 6 of section 8's plan are built (each in `docs/phase-5-community/STATUS.md`; the port driver of 6 is not yet called by the game task). Decisions are numbered **EXP-1** to **EXP-38** in this file. Updated the same day with the maintainer's decision EXP-31: two output paths, the single-GPIO simple output preferred
 - **Discussion:** the pull request that adds this file
 - **Replaces, once accepted:** the target addon's open items (P5J-9, P5J-21) and the draft report format of P5J-19; revisits P5J-7 (no outputs on the pod)
 
@@ -190,8 +190,8 @@ Bus budget at 100 kHz (90 µs per byte with its acknowledge):
 #### Frames
 
 All multi-byte numbers are little-endian. Every frame ends with a **CRC-8**
-(polynomial 0x07, initial value 0x00, no reflection: the stub's
-`target_addon_crc8`). A write's CRC covers the address byte as sent (address
+(polynomial 0x07, initial value 0x00, no reflection: the old stub's
+`target_addon_crc8`, now the driver's `expansion_crc8`). A write's CRC covers the address byte as sent (address
 shifted left, write bit 0), so a frame that reaches the wrong module because a
 bit of the address flipped is refused. A read's CRC covers the bytes read.
 
@@ -905,7 +905,8 @@ CHANGELOG, and runs the component's tests, as every change does.
 - **Modes:** `cap("siren")` on a box without one does nothing, so modes can
   call outputs unconditionally.
 - **The draft target report of P5J-19** is replaced; nothing was built against
-  it. `target_addon.c` and its test go when the new driver comes (increment 6).
+  it. `target_addon.c` and its test went with increment 6, the new driver
+  (`firmware/esp32/main/expansion.c`).
 - **The M12 port's wiring** (P5J-15 to P5J-21) is unchanged; the box gains the
   buffer and the protection on its side (EXP-4).
 

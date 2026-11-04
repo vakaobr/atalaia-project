@@ -28,6 +28,7 @@ from typing import Any, Callable, Optional
 
 from . import tag as player_tag
 from .mode import COMMAND_NAME, MODE_ID_MAX, Mode, ModeError, mode_from_text
+from .screens import LANGS, ScreenError, box_data, find_screen, render_screen
 from .sim import CONTROLLER, HOLD_STEP_MS, SimError, Simulation
 
 SPEEDS = (1, 2, 5, 10, 30, 60)
@@ -152,6 +153,7 @@ class LiveGame:
         self._lock = threading.RLock()
         self.generation = 0  # changes on every reset, so viewers start over
         self.reloads = 0  # changes on every reload: the editor knows its mode is the one running
+        self._screen_sources: dict[tuple[Path, int, int], bytes] = {}  # templates read, by mtime
         self._reset()
 
     # -- state shared with the web view --
@@ -410,8 +412,36 @@ class LiveGame:
 
     # -- the view --
 
-    def snapshot(self, since: int = 0) -> dict[str, Any]:
-        """Everything the page shows; events from index `since` onwards."""
+    def _drawn(self, screen: Optional[dict[str, Any]], lang: str) -> Optional[dict[str, Any]]:
+        """The render model of the node's last screen (screens.render_screen), as the Field Box
+        draws it with its language `lang` ("" for a box with none set): None when the mode has no
+        template of that name (a built-in C screen, drawn as its name and data), {"error": ...}
+        for one the core refuses."""
+        if screen is None or not screen["args"]:
+            return None
+        name = screen["args"][0]
+        data = screen["args"][1] if len(screen["args"]) > 1 and isinstance(screen["args"][1], dict) else {}
+        path = find_screen(self.sim.mode.screen_folders, name)
+        if path is None:
+            return None
+        try:
+            stat = path.stat()
+            key = (path, stat.st_mtime_ns, stat.st_size)
+            source = self._screen_sources.get(key)
+            if source is None:
+                source = path.read_bytes()
+                if len(self._screen_sources) > 64:
+                    self._screen_sources.clear()
+                self._screen_sources[key] = source
+            return render_screen(self.sim.core, source, box_data(data, lang, self.sim.time_ms // 1000),
+                                 self.sim.params)
+        except (OSError, ScreenError, ValueError, TypeError) as exc:
+            return {"template": name, "error": str(exc)}
+
+    def snapshot(self, since: int = 0, lang: str = "") -> dict[str, Any]:
+        """Everything the page shows; events from index `since` onwards. `lang` is the box
+        language the screens are drawn in (one of screens.LANGS, else none)."""
+        lang = lang if lang in LANGS else ""
         with self._lock:
             sim = self.sim
             nodes = []
@@ -435,6 +465,8 @@ class LiveGame:
                     "mem": vnode.runtime.mem_used,
                     "scores": {t: vnode.runtime.score(t) for t in sim.teams},
                     "screen": screen,
+                    # The screen's template drawn as the box draws it (None: a built-in screen).
+                    "drawn": self._drawn(screen, lang),
                     "audio": audio,
                     "outputs": list(outputs.values()),
                     # The box's switched outputs (a siren, smoke), as its output layer has them now.

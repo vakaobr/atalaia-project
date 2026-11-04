@@ -88,6 +88,14 @@ class Mode:
     # For a composed mode led by a scenario: the scenario's parameters, which only its field.lua
     # reads, so no node's join carries them.
     scenario_params: frozenset[str] = frozenset()
+    # For a composed mode: the folders of its parts, main mode first, where a box looks for a
+    # screen template (screen_template_find). Empty: the mode's own folder.
+    part_paths: tuple[Path, ...] = ()
+
+    @property
+    def screen_folders(self) -> tuple[Path, ...]:
+        """Where ui.screen(name) finds `assets/screens/<name>.yaml`, in the order a box looks."""
+        return self.part_paths or (self.path,)
 
     @property
     def tests(self) -> list[Path]:
@@ -493,6 +501,7 @@ def compose(main: Mode, modifiers: list[Mode]) -> Mode:
         role_parts=role_parts,
         main_id=SEPARATOR.join(m.id for m in runs),
         scenario_params=frozenset(scenario.params) if scenario is not None else frozenset(),
+        part_paths=tuple(m.path for m in parts),
     )
 
 
