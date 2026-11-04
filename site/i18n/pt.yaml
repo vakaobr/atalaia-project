@@ -947,6 +947,13 @@ roadmap:
         - "A consola de GM pode enviar as definições de um módulo de E/S pelo rádio: as cores dos quatro botões, o brilho do anel de LEDs, o volume e se o interruptor da caixa avisa. O módulo autentica o comando como qualquer outro, guarda as definições na sua flash e responde; o controlador volta a enviá-lo até ouvir a resposta. Antes, eram definidas quando o firmware era compilado. Em software e contra o código do módulo num computador, não experimentado com um módulo a sério."
         - "Emparelhar um telemóvel com um módulo de E/S por Bluetooth pede um código de 6 dígitos que o módulo mostra no seu ecrã pequeno, para que ninguém se meta entre os dois; um telemóvel emparelhado à maneira antiga é chamado uma vez a emparelhar de novo, e o botão PRG do módulo esquece todos os telemóveis. Em software e em testes num computador, não experimentado com um módulo a sério."
         - "A penalização de uma caixa de um dispositivo Android passa a chegar ao controlador, pela ligação Wi-Fi e pela ligação de rádio. Em software."
+        - "O módulo de E/S empresta ao telemóvel as suas saídas simples (uma sirene ou o comando de uma
+          máquina de fumo através de um interruptor de relé RC, no GPIO 33 e depois no 1) e a sua porta de
+          expansão: os impactos de um módulo de alvo, e os relés de um módulo de saídas num módulo de E/S
+          compilado para os emprestar. O jogo no telemóvel liga-os com as regras de uma caixa, o módulo
+          desliga-os quando o telemóvel se vai, e a consola de GM mostra as saídas e os módulos de um
+          dispositivo. No firmware e contra o código do módulo num computador, não experimentado com um
+          módulo a sério."
     g_controller:
       title: O telemóvel como controlador de campo
       items:
@@ -1319,7 +1326,8 @@ build:
       2,0&nbsp;ms é ligado, 1,0&nbsp;ms é desligado, em rajadas de meio segundo que só o jogo em curso
       renova. Se a caixa bloquear, reiniciar ou ficar sem energia, os impulsos param em 0,5&nbsp;s e o
       interruptor abre o relé. O firmware tem-na desde a versão 0.7.0, como opção de compilação;
-      ainda não foi montada em hardware. O módulo de E/S recebe-a mais tarde.
+      ainda não foi montada em hardware. O firmware do módulo de E/S também a tem, no GPIO&nbsp;33 (e no 1): vê o
+      <a href="#io-pod">módulo de E/S</a>.
     needs:
       switch: >-
         <strong>Um interruptor de relé RC que abre o relé quando o sinal para</strong>: um
@@ -1374,6 +1382,8 @@ build:
     buzzer: >-
       Besouro piezoelétrico passivo, opcional (um pino de arranque: o seu circuito mantém-no em baixo; opção do firmware, ainda não montado em hardware)
     tamper: Interruptor da caixa, para GND
+    pod_out1: Saída simples 1, opcional (por uma porta livre do 74AHCT125)
+    pod_out2: Saída simples 2, opcional (o pino da tensão da bateria da placa, que o módulo não usa)
     log: >-
       Saída do registo (UART0 TX): só para o RX de um adaptador USB-série de 3,3&nbsp;V, na bancada
     disp_mosi: >-
@@ -1607,6 +1617,25 @@ build:
       Tirando a placa, todas as peças são opcionais: o módulo diz ao telemóvel o que tem, e o
       telemóvel só usa isso. O botão 1 é a primeira equipa do jogo, como numa Field Box. Uma caixa
       aberta chega à consola da organização como alerta de violação.
+    outputs: >-
+      <strong>Saídas simples</strong>, opcionais: uma sirene, um estroboscópio, uma luz ou o comando
+      de uma máquina de fumo através de um interruptor de relé RC, ligadas como a
+      <a href="#field-box-simple-output">saída simples</a> da Field Box mas no GPIO&nbsp;33 (uma segunda
+      no GPIO&nbsp;1, com ou sem o besouro piezoelétrico). Um módulo de E/S não tem PIN de
+      administração, por isso é ao incluir a saída no firmware que ela fica ativa, com o seu uso
+      (sirene, estroboscópio, fumo, luz, buzina) e o seu tempo máximo ligada. O jogo no telemóvel liga-a
+      com as regras de uma caixa, e o módulo desliga-a sozinho: logo que a ligação ao telemóvel cai, e ao
+      fim de 1,5&nbsp;s quando o telemóvel deixa de falar.
+    port: >-
+      <strong>A porta de expansão</strong>, opcional: a tomada M12 e a
+      <a href="#expansion-port">placa da porta</a> da Field Box no barramento I2C do módulo
+      (GPIO&nbsp;17 e 18). Os impactos de um <a href="#target-addon">módulo de alvo</a> chegam ao jogo no
+      telemóvel enquanto este corre. Os relés de um módulo de saídas só são emprestados ao jogo por um
+      módulo de E/S compilado para os emprestar (desligado por omissão), e o módulo desliga-os quando o
+      telemóvel se vai. Um módulo de E/S com todas as peças tem pouco espaço para se descrever ao
+      telemóvel: empresta as saídas que cabem, as primeiras, e mantém as outras desligadas. As saídas e a
+      porta estão no firmware do módulo e foram testadas só num computador: nenhum módulo de E/S ligou
+      ainda um relé a sério nem sentiu uma placa a sério.
     parts:
       same: >-
         As peças da Field Box, menos o ecrã: a placa, os botões (até quatro), o teclado e o seu
@@ -1621,8 +1650,14 @@ build:
         um cabo USB-C OTG para o telemóvel.
       uart: >-
         Só na bancada: um adaptador USB-série de 3,3&nbsp;V para ler o registo do módulo.
+      simple_out: >-
+        Opcional, por cada saída simples: um interruptor de relé RC que abre quando o sinal pára, uma
+        porta livre do 74AHCT125, 10&nbsp;kΩ e 330&nbsp;Ω e uma tomada M8, como na Field Box.
+      port: >-
+        Opcional: a tomada M12 e a placa da porta de expansão, como na Field Box.
     free_pins: >-
-      O módulo não usa os outros pinos do ecrã da Field Box (GPIO 1, 3 e 33): deixa-os sem ligação.
+      O GPIO&nbsp;33 e o 1, livres no módulo, levam as saídas simples opcionais; o GPIO&nbsp;3, e um
+      pino de saída que não uses, ficam sem ligação. A porta de expansão não usa nenhum GPIO próprio.
     diagram_ref: >-
       A ligação do módulo é a da Field Box sem o ecrã: segue os <a href="#field-box-wiring">esquemas de ligações da Field Box</a> e deixa de fora o ecrã e os seus fios. Um esquema próprio ainda não existe.
     steps:
@@ -1635,8 +1670,11 @@ build:
         GND. O módulo só o vigia depois de o ler fechado uma vez, por isso um módulo sem interruptor
         nunca dá alarme.
       flash: >-
-        Compila o firmware do módulo (<code>python tools/docker_fw.py pod</code>) e grava-o a partir
-        da pasta <code>build-pod</code>, como o da Field Box.
+        Compila o firmware do módulo (<code>python tools/docker_fw.py pod</code>; junta
+        <code>--simple-out=on</code> para uma saída, <code>on2</code> para duas, e
+        <code>--module-outputs=on</code> para emprestar os relés de um módulo de saídas) e grava-o a partir
+        da pasta <code>build-pod</code>, como o da Field Box. O registo de arranque lista cada saída que
+        empresta.
       log: >-
         Lê o registo no GPIO 43 com o adaptador USB-série: a porta USB-C leva a ligação do módulo ao
         telemóvel, não o registo.
@@ -1648,11 +1686,10 @@ build:
         qualquer jogo.
     photo: o módulo acabado, com o interruptor da caixa, e o telemóvel ligado a ele.
     open:
-      siren: >-
-        <strong>Uma sirene, um estroboscópio ou o comando do fumo</strong>: está prevista como a
-        <a href="#field-box-simple-output">saída simples</a> no GPIO&nbsp;33, livre no módulo, com o
-        módulo a manter as rajadas para que uma ligação perdida ao telemóvel a desligue. O firmware do
-        módulo recebe-a num passo mais tarde; não ligues ainda nenhuma a um módulo.
+      bench: >-
+        <strong>Saídas e módulos num módulo de E/S a sério</strong>: as saídas simples e a porta de
+        expansão estão no firmware do módulo e foram testadas num computador, ainda não com um relé, uma
+        placa ou um telemóvel a sério; a bancada vem a seguir.
       phone_power: >-
         <strong>A alimentação pelo telemóvel</strong>: por cabo, o telemóvel alimenta o módulo e pode
         carregar-lhe a célula. Se deve fazê-lo, e quanta corrente um telemóvel dá, fica para
@@ -1660,10 +1697,11 @@ build:
       enclosure: >-
         <strong>A caixa</strong>, e a forma de levar o telemóvel e o módulo juntos.
       settings: >-
-        <strong>As definições a partir do telemóvel</strong>: as cores dos botões, o número de LED e o
-        resto definem-se, por agora, ao compilar o firmware.
+        <strong>As definições</strong>: a consola de GM pode enviar pelo rádio as cores dos botões, o
+        brilho do anel, o volume e se o interruptor da caixa avisa; o número de LED, os pinos e as saídas
+        definem-se ao compilar o firmware.
     full: >-
-      O guia completo (em inglês):
+      O guia completo:
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/io-pod/BUILD.pt.md">guia
       de montagem do módulo de E/S</a>, e as verificações do módulo com um telemóvel na
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/firmware/esp32/docs/BRING_UP.md">lista

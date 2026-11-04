@@ -63,18 +63,20 @@ typedef struct {
  * field output.switched itself). May be NULL. */
 void pod_outputs_init(pod_outputs_t *po, const outputs_ops_t *ops);
 
-/* True for the id of an enabled output: its CMDs go to pod_outputs_command. */
+/* True for the id of an enabled output that the last IDENT did not leave out (withheld, for want
+ * of room: pod_port_ident_sent): its CMDs go to pod_outputs_command. */
 bool pod_outputs_owns(const pod_outputs_t *po, const char *cap_id);
 
 /*
  * The enabled outputs' descriptors added to IDENT's capability array json (len bytes, "[...]",
  * NUL-terminated, in a buffer of cap): a simple output {"id":"siren","type":"output",
  * "feedback":false}, without "feedback" unless feedback; a module's output channel (the expansion
- * port, pod_port.h) {"id":"strobe","type":"output"}. Returns the new length, or 0 when they do not
- * fit (json is then unchanged).
+ * port, pod_port.h) {"id":"strobe","type":"output"}. In the output layer's order (the simple
+ * outputs, then a module's), the last `trim` left out (IDENT's room: pod.h, POD_IDENT_TRIM).
+ * Returns the new length, or 0 when they do not fit (json is then unchanged).
  */
 size_t pod_outputs_append(const pod_outputs_t *po, char *json, size_t len, size_t cap,
-                          bool feedback);
+                          bool feedback, int trim);
 
 /* A CMD for one of the outputs. False for a method an output does not have; a known method
  * with bad arguments, or one the rules refuse, is true (acted on: refused, logged, counted). */

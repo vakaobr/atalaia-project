@@ -95,6 +95,14 @@ static void enable_module_outputs(pod_port_t *pp)
         c->set.enabled = true;
         c->set.max_on_s =
             pp->cfg.module_max_on_s < c->module_max_s ? pp->cfg.module_max_on_s : c->module_max_s;
+        if (pp->trimmed) {
+            /* The last IDENT had no room for every output: one found since comes after them, so
+             * it waits for the next IDENT to say whether it is lent (EXPI9-27). */
+            c->withheld = true;
+            say(pp, "module %02x channel %u enabled as %s, at most %lu s; lent once IDENT has room",
+                c->addr, (unsigned)c->mch + 1u, c->id, (unsigned long)c->set.max_on_s);
+            continue;
+        }
         say(pp, "module %02x channel %u lent to the phone as %s, at most %lu s", c->addr,
             (unsigned)c->mch + 1u, c->id, (unsigned long)c->set.max_on_s);
     }
@@ -145,13 +153,14 @@ static size_t append_hits(const pod_port_t *pp, char *json, size_t len, size_t c
     return len + n;
 }
 
-void pod_port_ident_caps(pod_port_t *pp, const pod_caps_t *caps, pod_ident_level_t level, char *out,
-                         size_t cap)
+int pod_port_ident_caps(pod_port_t *pp, const pod_caps_t *caps, pod_ident_level_t level, int trim,
+                        char *out, size_t cap)
 {
     pp->tell = true; /* the modules EVT follows every IDENT */
+    pp->listing = 0;
     size_t n = caps != NULL ? pod_caps_descriptors(caps, out, cap, level == POD_IDENT_FULL) : 0;
     if (n == 0) {
-        if (cap < 3) return;
+        if (cap < 3) return 0;
         snprintf(out, cap, "[]");
         n = 2;
     }
@@ -161,12 +170,104 @@ void pod_port_ident_caps(pod_port_t *pp, const pod_caps_t *caps, pod_ident_level
         size_t with = append_hits(pp, out, n, cap, level == POD_IDENT_FULL);
         if (with > 0) n = with;
     }
-    if (level < POD_IDENT_NO_OUTPUTS && pp->po != NULL) {
-        pod_outputs_append(pp->po, out, n, cap, level == POD_IDENT_FULL);
+    if (level < POD_IDENT_NO_PORT && pp->po != NULL) {
+        int all = outputs_enabled_count(&pp->po->out);
+        int skip = level == POD_IDENT_TRIM && trim > 0 ? trim : 0;
+        if (skip > all) skip = all;
+        if (skip < all &&
+            pod_outputs_append(pp->po, out, n, cap, level == POD_IDENT_FULL, skip) > 0) {
+            pp->listing = all - skip;
+        }
+    }
+    return pp->listing;
+}
+
+void pod_port_ident_sent(pod_port_t *pp, pod_ident_level_t level)
+{
+    if (pp->po == NULL) return;
+    outputs_t *o = &pp->po->out;
+    int lend = level < POD_IDENT_LEVELS ? pp->listing : 0;
+    char left[POD_PORT_TEXT_MAX + 1] = "";
+    size_t ll = 0;
+    int k = 0, out_count = 0;
+    bool back = false;
+    /* The enabled outputs in IDENT's order: the first `lend` were listed (pod_outputs_append). */
+    for (int i = 0; i < o->count; i++) {
+        out_channel_t *c = &o->ch[i];
+        if (!c->set.enabled) continue;
+        bool withhold = k++ >= lend;
+        if (!withhold) {
+            back = back || c->withheld;
+            c->withheld = false;
+            continue;
+        }
+        /* Not in the IDENT the phone has: off now, and never switched until one lists it. */
+        if (!c->withheld && c->on) {
+            outputs_switch(o, c->id, OUT_ACT_OFF, 0, 0, 0, OUT_SRC_FIELD);
+            say(pp, "output %s was on: off, left out of IDENT", c->id);
+        }
+        c->withheld = true;
+        out_count++;
+        int w = snprintf(left + ll, sizeof(left) - ll, "%s%s", ll ? ", " : "", c->id);
+        if (w > 0 && ll + (size_t)w < sizeof(left)) ll += (size_t)w;
+    }
+    pp->trimmed = out_count > 0;
+    if (out_count > 0) {
+        say(pp, "IDENT has no room for %d output(s), not lent (off, refused): %s", out_count, left);
+    } else if (back) {
+        say(pp, "IDENT lends every output again");
     }
 }
 
 /* ---- What the field learns -------------------------------------------------------------- */
+
+/* A module's output channel that the last IDENT left out (pod_port_ident_sent). */
+static bool withheld(const pod_port_t *pp, uint8_t addr, int ch)
+{
+    if (pp->po == NULL) return false;
+    const outputs_t *o = &pp->po->out;
+    for (int i = o->simple; i < o->count; i++) {
+        const out_channel_t *c = &o->ch[i];
+        if (c->module && c->addr == addr && c->mch == ch) return c->withheld;
+    }
+    return false;
+}
+
+/* The modules' entries, as expansion_modules_text writes them, without the withheld channels (a
+ * module left with none is left out). */
+static size_t modules_text(const pod_port_t *pp, char *out, size_t cap)
+{
+    out[0] = '\0';
+    size_t len = 0;
+    for (int a = EXP_ADDR_FIRST; a <= EXP_ADDR_LAST; a++) {
+        const exp_module_t *m = expansion_module(&pp->xb.exp, (uint8_t)a);
+        if (m == NULL) continue;
+        char entry[EXP_MODULES_TEXT_MAX + 1];
+        size_t n = expansion_module_text(m, entry, sizeof(entry));
+        if (n == 0) continue;
+        if (pp->trimmed) {
+            char model[8];
+            expansion_model_name(m->ident.model, model, sizeof(model));
+            int w = snprintf(entry, sizeof(entry), "%02x:%s/%u.%u.%u:", m->addr, model,
+                             m->ident.fw[0], m->ident.fw[1], m->ident.fw[2]);
+            n = w > 0 ? (size_t)w : 0;
+            bool any = false;
+            for (int c = 0; c < m->ident.channels && n > 0 && n < sizeof(entry); c++) {
+                if (!(m->usable & (1u << c)) || withheld(pp, m->addr, c)) continue;
+                w = snprintf(entry + n, sizeof(entry) - n, "%s%s", any ? "," : "", m->cap[c]);
+                n = w > 0 ? n + (size_t)w : 0;
+                any = true;
+            }
+            if (!any || n == 0 || n >= sizeof(entry)) continue;
+        }
+        size_t need = n + (len > 0 ? 1 : 0);
+        if (len + need > EXP_MODULES_TEXT_MAX || len + need + 1 > cap) continue; /* whole only */
+        if (len > 0) out[len++] = ';';
+        memcpy(out + len, entry, n + 1);
+        len += n;
+    }
+    return len;
+}
 
 size_t pod_port_modules_text(const pod_port_t *pp, char *out, size_t cap)
 {
@@ -176,7 +277,7 @@ size_t pod_port_modules_text(const pod_port_t *pp, char *out, size_t cap)
     size_t len = pp->po != NULL ? outputs_modules_text(&pp->po->out, out, limit + 1) : 0;
     if (!pp->on) return len;
     char mods[EXP_MODULES_TEXT_MAX + 1];
-    size_t n = expansion_box_modules_text(&pp->xb, mods, sizeof(mods));
+    size_t n = modules_text(pp, mods, sizeof(mods));
     /* Whole entries only, the modules' after the simple outputs' (as box_game.c). */
     for (char *entry = mods; n > 0 && *entry;) {
         char *semi = strchr(entry, ';');
@@ -201,7 +302,7 @@ size_t pod_port_max_on_json(const pod_port_t *pp, char *out, size_t cap)
         const outputs_t *o = &pp->po->out;
         for (int i = 0; i < o->count; i++) {
             const out_channel_t *c = &o->ch[i];
-            if (!c->set.enabled) continue;
+            if (!c->set.enabled || c->withheld) continue;
             int w = snprintf(out + len, cap - len, "%s\"%s\":%lu", len > 1 ? "," : "", c->id,
                              (unsigned long)c->set.max_on_s);
             if (w < 0 || len + (size_t)w + 2 > cap) return 0;

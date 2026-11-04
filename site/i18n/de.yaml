@@ -971,6 +971,12 @@ roadmap:
         - "Die GM-Konsole kann die Einstellungen eines I/O-Pods per Funk schicken: die Farben der vier Knöpfe, die Helligkeit des LED-Rings, die Lautstärke und ob der Gehäuseschalter meldet. Der Pod prüft den Befehl wie jeden anderen, speichert die Einstellungen in seinem Flash und antwortet; der Controller sendet ihn erneut, bis er eine Antwort hört. Vorher wurden sie beim Bauen der Firmware festgelegt. In Software und gegen den Code des Pods auf einem Computer, nicht mit einem echten Pod probiert."
         - "Das Koppeln eines Handys mit einem I/O-Pod per Bluetooth verlangt einen 6-stelligen Code, den der Pod auf seinem kleinen Display zeigt, damit sich niemand dazwischenschalten kann; ein auf die alte Art gekoppeltes Handy wird einmal gebeten, neu zu koppeln, und die PRG-Taste des Pods vergisst alle Handys. In Software und in Tests auf einem Computer, nicht mit einem echten Pod ausprobiert."
         - "Die Strafe einer Box eines Android-Props erreicht den Controller jetzt, über die WLAN-Verbindung und die Funkverbindung. In Software."
+        - "Der I/O-Pod leiht dem Handy seine einfachen Ausgänge (eine Sirene oder die Fernbedienung einer
+          Nebelmaschine über einen RC-Relaisschalter, an GPIO 33, dann 1) und seinen Erweiterungsanschluss:
+          die Treffer eines Ziel-Addons und die Relais eines I2C-Ausgangsmoduls an einem Pod, der dafür
+          gebaut ist. Das Spiel auf dem Handy schaltet sie mit den Regeln einer Box, der Pod schaltet sie ab,
+          wenn das Handy weg ist, und die GM-Konsole zeigt die Ausgänge und Module eines Props. In der
+          Firmware und gegen den Code des Pods auf einem Computer, nicht mit einem echten Pod probiert."
     g_controller:
       title: Das Handy als Feld-Controller
       items:
@@ -1355,8 +1361,8 @@ build:
       2,0&nbsp;ms heißt an, 1,0&nbsp;ms aus, in Halbsekunden-Paketen, die nur das laufende Spiel
       erneuert. Hängt die Box, startet sie neu oder verliert sie den Strom, hören die Impulse
       innerhalb von 0,5&nbsp;s auf und der Schalter öffnet sein Relais. Die Firmware kann das seit
-      Version 0.7.0, als Build-Option; in Hardware gebaut ist es noch nicht. Der I/O-Pod bekommt es
-      später.
+      Version 0.7.0, als Build-Option; in Hardware gebaut ist es noch nicht. Die Firmware des I/O-Pods
+      hat es auch, an GPIO&nbsp;33 (und 1): siehe <a href="#io-pod">I/O-Pod</a>.
     needs:
       switch: >-
         <strong>Ein RC-Relaisschalter, der sein Relais öffnet, wenn das Signal ausbleibt</strong>: ein
@@ -1412,6 +1418,8 @@ build:
     buzzer: >-
       Passiver Piezo-Summer, optional (ein Boot-Strapping-Pin: seine Schaltung hält ihn auf Low; Firmware-Option, noch nicht in Hardware gebaut)
     tamper: Gehäuseschalter, nach GND
+    pod_out1: Einfacher Ausgang 1, optional (über ein freies Gatter des 74AHCT125)
+    pod_out2: Einfacher Ausgang 2, optional (der Akkuspannungs-Pin des Boards, den der Pod nicht nutzt)
     log: >-
       Log-Ausgang (UART0 TX): nur an den RX eines USB-Seriell-Adapters mit 3,3&nbsp;V, auf der
       Werkbank
@@ -1646,6 +1654,25 @@ build:
       Außer dem Board ist jedes Teil optional: Der Pod sagt dem Handy, was er hat, und das Handy
       nutzt nur das. Taster 1 ist das erste Team des Spiels, wie bei einer Field Box. Ein geöffnetes
       Gehäuse erreicht die GM-Konsole als Manipulationsalarm.
+    outputs: >-
+      <strong>Einfache Ausgänge</strong>, optional: eine Sirene, ein Blitzlicht, eine Lampe oder die
+      Fernbedienung einer Nebelmaschine über einen RC-Relaisschalter, verdrahtet wie der
+      <a href="#field-box-simple-output">einfache Ausgang</a> der Field Box, aber an GPIO&nbsp;33 (ein
+      zweiter an GPIO&nbsp;1, mit oder ohne Piezo-Summer). Ein Pod hat keine Admin-PIN, also schaltet
+      erst das Einbauen in die Firmware den Ausgang frei, mit seinem Zweck (Sirene, Blitzlicht, Nebel,
+      Lampe, Hupe) und seiner längsten Einschaltzeit. Das Spiel auf dem Handy schaltet ihn mit den
+      Regeln einer Box, und der Pod schaltet ihn selbst ab: sofort, wenn die Verbindung zum Handy
+      abreißt, und nach 1,5&nbsp;s, wenn das Handy nichts mehr sagt.
+    port: >-
+      <strong>Der Erweiterungsanschluss</strong>, optional: die M12-Buchse und die
+      <a href="#expansion-port">Anschlussplatine</a> der Field Box am I2C-Bus des Pods (GPIO&nbsp;17 und
+      18). Die Treffer eines <a href="#target-addon">Ziel-Addons</a> erreichen das Spiel auf dem Handy,
+      solange es läuft. Die Relais eines I2C-Ausgangsmoduls leiht nur ein Pod dem Spiel, der dafür gebaut
+      ist (standardmäßig aus), und der Pod schaltet sie ab, wenn das Handy weg ist. Ein Pod mit allen
+      Teilen hat wenig Platz, um sich dem Handy zu beschreiben: Er leiht so viele Ausgänge, wie passen,
+      die ersten, und hält die anderen aus. Die Ausgänge und der Anschluss sind in der Pod-Firmware und
+      nur auf einem Computer getestet: Noch kein Pod hat ein echtes Relais geschaltet oder eine echte
+      Platte gespürt.
     parts:
       same: >-
         Die Teile der Field Box ohne Display: das Board, die Taster (bis zu vier), das Tastenfeld mit
@@ -1660,9 +1687,17 @@ build:
         und ein USB-C-OTG-Kabel für das Handy.
       uart: >-
         Nur auf der Werkbank: ein USB-Seriell-Adapter mit 3,3&nbsp;V, um das Log des Pods zu lesen.
+      simple_out: >-
+        Optional, für jeden einfachen Ausgang: ein RC-Relaisschalter, der öffnet, wenn sein Signal
+        aufhört, ein freies Gatter des 74AHCT125, 10&nbsp;kΩ und 330&nbsp;Ω und eine M8-Buchse, wie bei der
+        Field Box.
+      port: >-
+        Optional: die M12-Buchse und die Anschlussplatine des Erweiterungsanschlusses, wie bei der
+        Field Box.
     free_pins: >-
-      Die übrigen Display-Pins der Field Box (GPIO 1, 3 und 33) nutzt der Pod nicht: Lass sie
-      unbeschaltet.
+      GPIO&nbsp;33 und 1, am Pod frei, tragen die optionalen einfachen Ausgänge; GPIO&nbsp;3 und ein
+      Ausgangspin, den du nicht nutzt, bleiben unbeschaltet. Der Erweiterungsanschluss belegt keinen
+      eigenen GPIO.
     diagram_ref: >-
       Die Verdrahtung des Pods ist die der Field Box ohne Display: Folge den <a href="#field-box-wiring">Schaltplänen der Field Box</a> und lass das Display samt seinen Leitungen weg. Ein eigener Schaltplan existiert noch nicht.
     steps:
@@ -1675,8 +1710,11 @@ build:
         zwischen GPIO 47 und GND an. Der Pod überwacht ihn erst, nachdem er ihn einmal geschlossen
         gelesen hat; ein Pod ohne Schalter schlägt also nie Alarm.
       flash: >-
-        Bau die Pod-Firmware (<code>python tools/docker_fw.py pod</code>) und flash sie aus dem
-        Ordner <code>build-pod</code>, wie die der Field Box.
+        Bau die Pod-Firmware (<code>python tools/docker_fw.py pod</code>; dazu
+        <code>--simple-out=on</code> für einen Ausgang, <code>on2</code> für zwei und
+        <code>--module-outputs=on</code>, um die Relais eines Ausgangsmoduls zu leihen) und flash sie aus dem
+        Ordner <code>build-pod</code>, wie die der Field Box. Das Boot-Log nennt jeden Ausgang, den er
+        leiht.
       log: >-
         Lies sein Log an GPIO 43 mit dem USB-Seriell-Adapter: Die USB-C-Buchse trägt die Verbindung
         des Pods zum Handy, nicht das Log.
@@ -1687,12 +1725,10 @@ build:
         Mach die Inbetriebnahme-Prüfungen des Pods, auch die Sendeleistung des Funks vor jedem Spiel.
     photo: der fertige Pod mit seinem Gehäuseschalter und dem verbundenen Handy.
     open:
-      siren: >-
-        <strong>Eine Sirene, ein Blitzlicht oder eine Nebel-Fernbedienung</strong>: geplant als
-        <a href="#field-box-simple-output">einfacher Ausgang</a> am freien GPIO&nbsp;33 des Pods,
-        wobei der Pod die Impulspakete weiterschickt, sodass eine verlorene Verbindung zum Handy ihn
-        abschaltet. Die Pod-Firmware bekommt ihn in einem späteren Schritt; schließ noch keinen an
-        einen Pod an.
+      bench: >-
+        <strong>Ausgänge und Module an einem echten Pod</strong>: Die einfachen Ausgänge und der
+        Erweiterungsanschluss sind in der Pod-Firmware und auf einem Computer getestet, noch nicht mit einem
+        echten Relais, einer echten Platte oder einem echten Handy; als Nächstes kommt der Labortest.
       phone_power: >-
         <strong>Strom vom Handy</strong>: Am Kabel versorgt das Handy den Pod und lädt womöglich
         seine Zelle. Ob es das soll und wie viel Strom ein Handy liefert, wird beim ersten Aufbau
@@ -1700,8 +1736,9 @@ build:
       enclosure: >-
         <strong>Das Gehäuse</strong>, und wie Handy und Pod zusammen getragen werden.
       settings: >-
-        <strong>Einstellungen vom Handy aus</strong>: Tasterfarben, LED-Zahl und der Rest werden
-        vorerst beim Bauen der Firmware festgelegt.
+        <strong>Einstellungen</strong>: Die GM-Konsole kann per Funk die Farben der Taster, die Helligkeit
+        des Rings, die Lautstärke und ob der Gehäuseschalter meldet schicken; die LED-Zahl, die Pins und
+        die Ausgänge werden beim Bauen der Firmware festgelegt.
     full: >-
       Die vollständige Anleitung (auf Englisch und Portugiesisch):
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/io-pod/BUILD.md">Bauanleitung

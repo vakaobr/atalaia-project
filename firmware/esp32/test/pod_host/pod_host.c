@@ -537,13 +537,22 @@ static bool command(void *ctx, const atalaia_proxy_msg_t *m)
     return pod_caps_command(&caps, m);
 }
 
-static void ident(void *ctx, atalaia_proxy_ident_t *id, pod_ident_level_t level)
+static int ident(void *ctx, atalaia_proxy_ident_t *id, pod_ident_level_t level, int trim)
 {
     (void)ctx;
     snprintf(id->fw_version, sizeof(id->fw_version), "host-pod");
-    pod_port_ident_caps(&port, &caps, level, id->caps_json, sizeof(id->caps_json));
+    int listed =
+        pod_port_ident_caps(&port, &caps, level, trim, id->caps_json, sizeof(id->caps_json));
     id->has_battery = battery >= 0;
     id->battery_pct = battery >= 0 ? (uint8_t)battery : 0;
+    return listed;
+}
+
+static void ident_sent(void *ctx, pod_ident_level_t level, int trim)
+{
+    (void)ctx;
+    (void)trim;
+    pod_port_ident_sent(&port, level);
 }
 
 static bool emit(void *ctx, const char *cap, const char *event, const char *data)
@@ -887,7 +896,8 @@ int main(int argc, char **argv)
     pod_audio_t audio = {hw_tone, hw_stop, hw_volume, NULL};
     pod_caps_init(&caps, &cfg, &hal, &audio);
     build_cfg = caps.cfg;
-    pod_io_t io = {link_write, now, command, ident, link_active, log_line, NULL, config_cmd};
+    pod_io_t io = {link_write, now,  command,    ident,     link_active,
+                   log_line,   NULL, config_cmd, ident_sent};
     modem_io_t rio = {
         .radio_send = radio_send,
         .set_channel = set_channel,
