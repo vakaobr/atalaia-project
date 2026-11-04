@@ -258,9 +258,10 @@ int outputs_enabled_count(const outputs_t *o);
 size_t outputs_modules_text(const outputs_t *o, char *out, size_t cap);
 
 /* node.outputs_disabled's text (decision EXPL-13) for the simple outputs: those fitted that their
- * admin has not enabled, in node.modules' form ("g45:servo:horn", at most OUT_MODULES_MAX bytes);
- * its length, 0 when every one is enabled (or the box has none). A module's channels left disabled
- * are in their module's entry (expansion_box_disabled_text, EXPL-20). */
+ * admin has not enabled, and an I/O pod's withheld ones (decision PROPC-7), in node.modules' form
+ * ("g45:servo:horn", at most OUT_MODULES_MAX bytes); its length, 0 when every one is enabled and
+ * lent (or the box has none). A module's channels left disabled are in their module's entry
+ * (expansion_box_disabled_text, EXPL-20). */
 size_t outputs_disabled_text(const outputs_t *o, char *out, size_t cap);
 
 /* What channel index shows now (true: on). */

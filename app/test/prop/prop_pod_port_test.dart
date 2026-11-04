@@ -10,7 +10,10 @@
 // and the module's channels; its EVT pod.modules gives the prop node.modules
 // and the longest ons; the mode's arm reaches the plate only while the game
 // runs and its hits reach the mode; the mode's pulse switches the module's
-// relay, and the session's end turns it off.
+// relay, and the session's end turns it off. A pod with every part has no
+// room in IDENT for the module's last three channels: it withholds them, and
+// the prop tells the controller node.outputs_disabled with them (decision
+// PROPC-6).
 
 @Timeout(Duration(minutes: 3))
 library;
@@ -124,6 +127,8 @@ void main() {
           '5c:out4/1.0.0:siren.2,strobe,smoke,out.4',
         ),
       );
+      // Every output lent: node.outputs_disabled's empty text.
+      expect(s.log, contains('node.outputs_disabled (none)'));
 
       // The mode arms the plate before the game: kept, not told; a hit is not
       // felt.
@@ -165,6 +170,51 @@ void main() {
       loop.cancel();
       await s.close();
       await pod.wait('MODULE 5c outputs=0x00', from: mark);
+    } finally {
+      loop?.cancel();
+      await s.close();
+      await pod.stop();
+    }
+  });
+
+  test('a pod with every part withholds the out4\'s last three channels: '
+      'node.outputs_disabled names them', () async {
+    final pod = await HostPod.start(
+      args: ['--no-radio', '--module', 'out4', '--module-outputs'],
+    );
+    final node = FakeRunningNode();
+    final mode = ModeCatalog.builtin().compose('org.atalaia.domination');
+    final s = PropSession(
+      setup: PropSetup(
+        mode: mode,
+        role: 'zone',
+        teams: const ['red', 'blue'],
+        params: mode.resolveParams(const {}, const ['red', 'blue']),
+      ),
+      runner: FakeNodeRunner(node),
+      device: FakeDevice(),
+      texts: texts,
+      clock: GameClock.manual,
+    );
+    Timer? loop;
+    try {
+      await s.open();
+      await s.attachPod(PodClient(await SocketPodTransport.usb(pod)));
+      loop = turning(s);
+      await eventually(
+        () => s.log.contains('node.modules 5c:out4/1.0.0:siren'),
+        'node.modules with the lent channel',
+      );
+      expect(s.outputs.ids, ['siren']);
+      expect(
+        s.log,
+        contains('node.outputs_disabled 5c:out4/1.0.0:strobe,smoke,out.4'),
+      );
+      // node.outputs_disabled goes just before node.modules, as on a box.
+      final at = s.log.indexOf(
+        'node.outputs_disabled 5c:out4/1.0.0:strobe,smoke,out.4',
+      );
+      expect(s.log.indexOf('node.modules 5c:out4/1.0.0:siren'), at + 1);
     } finally {
       loop?.cancel();
       await s.close();

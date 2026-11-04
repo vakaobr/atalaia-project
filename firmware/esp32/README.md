@@ -502,7 +502,9 @@ linked; a change of what IDENT lends sends IDENT again. IDENT's compaction gains
 the outputs. The outputs go one at a time, the last first (`POD_IDENT_TRIM`, decisions EXPI9-27 and
 EXPI9-28): the pod logs which ones it left out, and a left-out output is **withheld** until an IDENT
 lists it again: turned off at once if it was on, refused (its CMD names no capability, and the output
-layer refuses it as disabled), and left out of `pod.modules` (`pod_port_ident_sent`). A pod with
+layer refuses it as disabled), and left out of `pod.modules`' text (`pod_port_ident_sent`); the EVT
+names it in `withheld` instead (`pod_port_withheld_text`, decision PROPC-6), which the phone sends as
+`node.outputs_disabled`, so the console shows it as a box's output fitted but not enabled. A pod with
 every part and an out4 module lends one of the four channels (vector `pod_full_out4_trimmed`); with a
 target too, none fits (236 bytes before the outputs, 22 for each). Size (ESP-IDF 5.3.2, 2026-11-04): 710,096 bytes with one simple output and the module
 outputs on (17 % of the slot); 0 warnings.

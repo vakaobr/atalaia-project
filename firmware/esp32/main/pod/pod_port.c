@@ -269,18 +269,12 @@ static size_t modules_text(const pod_port_t *pp, char *out, size_t cap)
     return len;
 }
 
-size_t pod_port_modules_text(const pod_port_t *pp, char *out, size_t cap)
+/* Appends src's entries ("a;b;c") to out (len bytes so far) one by one, whole entries only, while
+ * out stays within limit bytes: the modules' after the simple outputs' (as box_game.c). */
+static size_t append_entries(char *out, size_t len, size_t limit, const char *src)
 {
-    if (cap == 0) return 0;
-    out[0] = '\0';
-    size_t limit = cap - 1 < POD_PORT_TEXT_MAX ? cap - 1 : POD_PORT_TEXT_MAX;
-    size_t len = pp->po != NULL ? outputs_modules_text(&pp->po->out, out, limit + 1) : 0;
-    if (!pp->on) return len;
-    char mods[EXP_MODULES_TEXT_MAX + 1];
-    size_t n = modules_text(pp, mods, sizeof(mods));
-    /* Whole entries only, the modules' after the simple outputs' (as box_game.c). */
-    for (char *entry = mods; n > 0 && *entry;) {
-        char *semi = strchr(entry, ';');
+    for (const char *entry = src; *entry;) {
+        const char *semi = strchr(entry, ';');
         size_t el = semi != NULL ? (size_t)(semi - entry) : strlen(entry);
         size_t need = el + (len > 0 ? 1 : 0);
         if (len + need > limit) break;
@@ -292,6 +286,32 @@ size_t pod_port_modules_text(const pod_port_t *pp, char *out, size_t cap)
         entry = semi + 1;
     }
     return len;
+}
+
+size_t pod_port_modules_text(const pod_port_t *pp, char *out, size_t cap)
+{
+    if (cap == 0) return 0;
+    out[0] = '\0';
+    size_t limit = cap - 1 < POD_PORT_TEXT_MAX ? cap - 1 : POD_PORT_TEXT_MAX;
+    size_t len = pp->po != NULL ? outputs_modules_text(&pp->po->out, out, limit + 1) : 0;
+    if (!pp->on) return len;
+    char mods[EXP_MODULES_TEXT_MAX + 1];
+    if (modules_text(pp, mods, sizeof(mods)) == 0) return len;
+    return append_entries(out, len, limit, mods);
+}
+
+size_t pod_port_withheld_text(const pod_port_t *pp, char *out, size_t cap)
+{
+    if (cap == 0) return 0;
+    out[0] = '\0';
+    if (pp->po == NULL) return 0;
+    size_t limit = cap - 1 < POD_PORT_TEXT_MAX ? cap - 1 : POD_PORT_TEXT_MAX;
+    /* The box's own node.outputs_disabled builders: a withheld channel counts as not enabled. */
+    size_t len = outputs_disabled_text(&pp->po->out, out, limit + 1);
+    if (!pp->on) return len;
+    char mods[EXP_MODULES_TEXT_MAX + 1];
+    if (expansion_box_disabled_text(&pp->xb, mods, sizeof(mods)) == 0) return len;
+    return append_entries(out, len, limit, mods);
 }
 
 size_t pod_port_max_on_json(const pod_port_t *pp, char *out, size_t cap)
@@ -321,35 +341,61 @@ size_t pod_port_status_json(const pod_port_t *pp, char *out, size_t cap)
     return (size_t)snprintf(out, cap, "[]");
 }
 
+/* What was told (or found with nothing to tell), so that only a change is told again. */
+static void keep_told(pod_port_t *pp, const char *text, const char *max_on, bool has_withheld,
+                      const char *withheld)
+{
+    pp->told = true;
+    snprintf(pp->told_text, sizeof(pp->told_text), "%s", text);
+    snprintf(pp->told_max, sizeof(pp->told_max), "%s", max_on);
+    pp->told_has_withheld = has_withheld;
+    snprintf(pp->told_withheld, sizeof(pp->told_withheld), "%s", withheld);
+}
+
 /* The modules EVT: after an IDENT, and when what it says changes while a phone is on a link. */
 static void tell_modules(pod_port_t *pp)
 {
     char text[POD_PORT_TEXT_MAX + 1], max_on[sizeof(pp->told_max)];
+    char withheld[POD_PORT_TEXT_MAX + 1];
     pod_port_modules_text(pp, text, sizeof(text));
     if (pod_port_max_on_json(pp, max_on, sizeof(max_on)) == 0)
         snprintf(max_on, sizeof(max_on), "{}");
-    bool changed = strcmp(text, pp->told_text) != 0 || strcmp(max_on, pp->told_max) != 0;
+    pod_port_withheld_text(pp, withheld, sizeof(withheld));
+    /* "withheld" (decision PROPC-6) only from a pod with an output fitted, as a box sends
+     * node.outputs_disabled (EXPL-15), and once more, empty, from one that lost its last output
+     * after telling some (EXPL-21). */
+    bool fitted = pp->po != NULL && pp->po->out.count > 0;
+    bool has_withheld = fitted || pp->told_withheld[0] != '\0';
+    bool lent_changed = strcmp(text, pp->told_text) != 0 || strcmp(max_on, pp->told_max) != 0;
+    bool changed = lent_changed || has_withheld != pp->told_has_withheld ||
+                   strcmp(withheld, pp->told_withheld) != 0;
     if (pp->told && !pp->tell && !changed) return;
-    if (text[0] == '\0' && !pp->said) {
+    if (text[0] == '\0' && withheld[0] == '\0' && !pp->said) {
         /* Nothing to tell and nothing told before: a pod without outputs or modules says nothing
          * new, as a box (box_game.c). */
         pp->tell = false;
-        pp->told = true;
-        snprintf(pp->told_text, sizeof(pp->told_text), "%s", text);
-        snprintf(pp->told_max, sizeof(pp->told_max), "%s", max_on);
+        keep_told(pp, text, max_on, has_withheld, withheld);
         return;
     }
-    if (pp->told && changed && !pp->tell && pp->ops.ident_changed != NULL) {
-        /* What IDENT lends changed too (a module found or lost, a channel renamed): IDENT first. */
+    if (pp->told && lent_changed && !pp->tell && pp->ops.ident_changed != NULL) {
+        /* What IDENT lends changed too (a module found or lost, a channel renamed): IDENT first.
+         * The withheld outputs alone are no part of IDENT. */
         pp->ops.ident_changed(pp->ops.ctx);
     }
     pp->tell = false;
-    char data[POD_PORT_TEXT_MAX + sizeof(max_on) + 32];
-    snprintf(data, sizeof(data), "{\"modules\":\"%s\",\"max_on_s\":%s}", text, max_on);
+    char tail[POD_PORT_TEXT_MAX + 16] = "";
+    if (has_withheld) snprintf(tail, sizeof(tail), ",\"withheld\":\"%s\"", withheld);
+    char data[2 * POD_PORT_TEXT_MAX + sizeof(max_on) + 48];
+    snprintf(data, sizeof(data), "{\"modules\":\"%s\",\"max_on_s\":%s%s}", text, max_on, tail);
     bool sent = emit(pp, "pod", "modules", data);
+    if (!sent && has_withheld) {
+        /* Too big for one EVT (a pod with many outputs): the two texts (at most 100 bytes each
+         * always fit); the phone keeps its 30 s. */
+        snprintf(data, sizeof(data), "{\"modules\":\"%s\"%s}", text, tail);
+        sent = emit(pp, "pod", "modules", data);
+    }
     if (!sent) {
-        /* Too big for one EVT (a pod with many outputs): the text alone; the phone keeps its 30 s.
-         */
+        /* The text alone. */
         snprintf(data, sizeof(data), "{\"modules\":\"%s\"}", text);
         sent = emit(pp, "pod", "modules", data);
     }
@@ -357,11 +403,10 @@ static void tell_modules(pod_port_t *pp)
         pp->tell = true; /* tried again at the next tick (IDENT is not sent again for it) */
         return;
     }
-    pp->told = true;
-    pp->said = pp->said || text[0] != '\0';
-    snprintf(pp->told_text, sizeof(pp->told_text), "%s", text);
-    snprintf(pp->told_max, sizeof(pp->told_max), "%s", max_on);
+    pp->said = pp->said || text[0] != '\0' || withheld[0] != '\0';
+    keep_told(pp, text, max_on, has_withheld, withheld);
     say(pp, "told the phone its modules: %s", text[0] ? text : "(none)");
+    if (withheld[0] != '\0') say(pp, "told the phone its outputs not lent: %s", withheld);
 }
 
 void pod_port_tick(pod_port_t *pp, bool phone_on, uint32_t now_ms)

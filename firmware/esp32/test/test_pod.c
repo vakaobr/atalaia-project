@@ -2025,7 +2025,8 @@ static void test_port_outputs(void)
     (void)t;
 
     /* Without --module-outputs (the build's default) the module's channels are not lent; the text
-     * still lists them, as a box's node.modules does. */
+     * still lists them, as a box's node.modules does, and "withheld" names them, as a box's
+     * node.outputs_disabled names a module's channels its admin has not enabled (PROPC-7). */
     setup_port(&cfg);
     plug("out4", 0x5C);
     start_port(false, 30);
@@ -2040,7 +2041,8 @@ static void test_port_outputs(void)
     atalaia_proxy_msg_t m;
     CHECK(nth_evt(POD_LINK_USB, "pod", "modules", 0, &m) &&
           strcmp(m.data_json, "{\"modules\":\"5c:out4/1.0.0:siren,strobe,smoke,out.4\","
-                              "\"max_on_s\":{}}") == 0);
+                              "\"max_on_s\":{},"
+                              "\"withheld\":\"5c:out4/1.0.0:siren,strobe,smoke,out.4\"}") == 0);
     out_cmd("siren", "pulse", "{\"ms\":1000}", 1);
     CHECK(pod.count.cmd_unknown == 1);
 
@@ -2066,8 +2068,11 @@ static void test_port_outputs(void)
     advance(10);
     CHECK(nth_evt(POD_LINK_USB, "pod", "modules", 0, &m) &&
           strcmp(m.data_json,
-                 "{\"modules\":\"58:target/1.0.0:hit;59:target/1.0.0:hit.2\",\"max_on_s\":{}}") ==
+                 "{\"modules\":\"58:target/1.0.0:hit;59:target/1.0.0:hit.2\",\"max_on_s\":{},"
+                 "\"withheld\":\"g33:servo:siren;5c:out4/1.0.0:siren.2,strobe,smoke,out.4\"}") ==
               0);
+    CHECK(logged("told the phone its outputs not lent: g33:servo:siren;"
+                 "5c:out4/1.0.0:siren.2,strobe,smoke,out.4"));
 }
 
 /* The EVT pod.modules' data, the last one on USB ("" for none). */
@@ -2103,8 +2108,14 @@ static void test_port_ident_trim(void)
         logged("sent with 3 output(s) left out") &&
         logged("IDENT has no room for 3 output(s), not lent (off, refused): strobe, smoke, out.4"));
     advance(10);
-    CHECK(strcmp(last_modules(),
-                 "{\"modules\":\"5c:out4/1.0.0:siren\",\"max_on_s\":{\"siren\":30}}") == 0);
+    /* pod.modules: the lent channel in the text, the three others as "withheld" (PROPC-6); the
+     * data are the vector's pod_modules_withheld. */
+    const proxy_frame_vector_t *wv = frame_vector("pod_modules_withheld");
+    atalaia_proxy_msg_t want;
+    CHECK(wv != NULL && atalaia_proxy_msg_decode(wv->payload, wv->payload_len, &want));
+    CHECK(strcmp(last_modules(), want.data_json) == 0);
+    CHECK(strcmp(last_modules(), "{\"modules\":\"5c:out4/1.0.0:siren\",\"max_on_s\":{\"siren\":30},"
+                                 "\"withheld\":\"5c:out4/1.0.0:strobe,smoke,out.4\"}") == 0);
 
     /* Never switchable: the CMD names no capability, the output layer refuses it, the module's
      * relays stay open. */
@@ -2136,7 +2147,8 @@ static void test_port_ident_trim(void)
           logged("output siren was on: off, left out of IDENT"));
     module_sim_state(o4, clock_ms, &bits, NULL);
     CHECK(bits == 0);
-    CHECK(strcmp(last_modules(), "{\"modules\":\"58:target/1.0.0:hit\",\"max_on_s\":{}}") == 0);
+    CHECK(strcmp(last_modules(), "{\"modules\":\"58:target/1.0.0:hit\",\"max_on_s\":{},"
+                                 "\"withheld\":\"5c:out4/1.0.0:siren,strobe,smoke,out.4\"}") == 0);
     unknown = pod.count.cmd_unknown;
     out_cmd("siren", "on", "{\"ms\":5000}", 4);
     advance(60);
@@ -2150,10 +2162,87 @@ static void test_port_ident_trim(void)
         phone_send_vector(POD_LINK_USB, "cmd_ping");
     }
     CHECK(last_level == POD_IDENT_TRIM && last_trim == 3 && pod_outputs_owns(&outs, "siren"));
-    CHECK(strcmp(last_modules(),
-                 "{\"modules\":\"5c:out4/1.0.0:siren\",\"max_on_s\":{\"siren\":30}}") == 0);
+    CHECK(strcmp(last_modules(), want.data_json) == 0);
     module_sim_state(o4, clock_ms, &bits, NULL);
     CHECK(bits == 0);
+
+    /* The out4 unplugged: no output is fitted any more; the last EVT says so once, "withheld"
+     * empty (a box that lost its last output tells node.outputs_disabled empty once, EXPL-21). */
+    phone[POD_LINK_USB].frames = 0; /* room for the frames that follow */
+    plugged[0x5C - EXP_ADDR_FIRST] = false;
+    advance(EXP_LOST_AFTER * EXP_POLL_OUTPUT_MS + 500); /* a module with no input: polled less */
+    CHECK(nth_evt(POD_LINK_USB, "pod", "module_lost", 0, &want) && outs.out.count == 0);
+    /* The EVT that follows the loss says "withheld" empty; the one after the IDENT it brings
+     * (a pod with no output fitted) no longer carries it. */
+    atalaia_proxy_msg_t m;
+    CHECK(nth_evt(POD_LINK_USB, "pod", "modules", 1, &m) &&
+          strcmp(m.data_json, "{\"modules\":\"\",\"max_on_s\":{},\"withheld\":\"\"}") == 0);
+    CHECK(strcmp(last_modules(), "{\"modules\":\"\",\"max_on_s\":{}}") == 0);
+    int evts = count_evt(POD_LINK_USB, "pod", "modules");
+    advance(2000);
+    CHECK(count_evt(POD_LINK_USB, "pod", "modules") == evts);
+}
+
+static void test_port_withheld(void)
+{
+    /* PROPC-6: four buttons, the ring and the case leave IDENT room for an out4's four channels:
+     * every one lent, "withheld" empty. A target plugged in takes the room of the last channel,
+     * which pod.modules then names as withheld; unplugged, it is lent again and "withheld" is
+     * empty again. */
+    pod_caps_config_t cfg = full_config();
+    cfg.keypad = cfg.nfc = cfg.audio = false;
+    setup_port(&cfg);
+    plug("out4", 0x5C);
+    start_port(true, 30);
+    advance(10);
+    fw = "0.8.0";
+    phone_send_vector(POD_LINK_USB, "cmd_ident");
+    advance(10);
+    CHECK(last_level == POD_IDENT_FULL && pod_outputs_owns(&outs, "out.4"));
+    CHECK(strcmp(last_modules(), "{\"modules\":\"5c:out4/1.0.0:siren,strobe,smoke,out.4\","
+                                 "\"max_on_s\":{\"siren\":30,\"strobe\":30,\"smoke\":30,"
+                                 "\"out.4\":30},\"withheld\":\"\"}") == 0);
+    char text[POD_PORT_TEXT_MAX + 1];
+    CHECK(pod_port_withheld_text(&port, text, sizeof(text)) == 0 && text[0] == '\0');
+
+    plug("target", 0x58);
+    for (int k = 0; k < 6; k++) {
+        advance(400);
+        phone_send_vector(POD_LINK_USB, "cmd_ping");
+    }
+    CHECK(last_level == POD_IDENT_TRIM && last_trim == 1 && !pod_outputs_owns(&outs, "out.4"));
+    CHECK(strcmp(last_modules(),
+                 "{\"modules\":\"58:target/1.0.0:hit;5c:out4/1.0.0:siren,strobe,smoke\","
+                 "\"max_on_s\":{\"siren\":30,\"strobe\":30,\"smoke\":30},"
+                 "\"withheld\":\"5c:out4/1.0.0:out.4\"}") == 0);
+    CHECK(pod_port_withheld_text(&port, text, sizeof(text)) == strlen("5c:out4/1.0.0:out.4") &&
+          strcmp(text, "5c:out4/1.0.0:out.4") == 0);
+    CHECK(logged("told the phone its outputs not lent: 5c:out4/1.0.0:out.4"));
+
+    /* Lent again: "withheld" clears. */
+    plugged[0x58 - EXP_ADDR_FIRST] = false;
+    for (int k = 0; k < 8; k++) {
+        advance(400);
+        phone_send_vector(POD_LINK_USB, "cmd_ping");
+    }
+    CHECK(pod_outputs_owns(&outs, "out.4"));
+    CHECK(strcmp(last_modules(), "{\"modules\":\"5c:out4/1.0.0:siren,strobe,smoke,out.4\","
+                                 "\"max_on_s\":{\"siren\":30,\"strobe\":30,\"smoke\":30,"
+                                 "\"out.4\":30},\"withheld\":\"\"}") == 0);
+
+    /* A pod without outputs (a target alone) never adds "withheld" (a box without outputs sends
+     * no node.outputs_disabled, EXPL-15): test_port_hits' EVTs. A simple output withheld is in
+     * the box's form, "g33:servo:siren" (test_port_outputs). The text keeps whole entries within
+     * 100 bytes: */
+    setup_port(&cfg);
+    for (int i = 0; i < EXP_MODULES_MAX; i++) plug("out4", (uint8_t)(EXP_ADDR_FIRST + i));
+    start_port(false, 30);
+    advance(10);
+    /* Four out4 modules: the first two entries (85 bytes); the third would pass 100, so it is
+     * left out whole. */
+    CHECK(pod_port_withheld_text(&port, text, sizeof(text)) == 85);
+    CHECK(strcmp(text, "58:out4/1.0.0:siren,strobe,smoke,out.4;"
+                       "59:out4/1.0.0:siren.2,strobe.2,smoke.2,out.4.2") == 0);
 }
 
 void run_pod_tests(void)
@@ -2176,4 +2265,5 @@ void run_pod_tests(void)
     test_port_hits();
     test_port_outputs();
     test_port_ident_trim();
+    test_port_withheld();
 }

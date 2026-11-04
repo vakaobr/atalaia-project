@@ -2782,6 +2782,27 @@
         {"request": {"method": "GET", "path": "/api/v1/games/${gid}/start-check", "token": "read"}, "status": 200, "json": {"missing_caps": [], "warnings": [], "ok": true}},
         {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm"}, "status": 200, "json": {"state": "running"}}
       ]
+    },
+    {
+      "name": "PROPC a phone prop whose I/O pod withholds its siren (no room in IDENT): the prop's node.outputs_disabled, from the pod's EVT pod.modules, gives the node list's outputs_disabled and the start check's note, as for a box; the empty text clears them (PROPC-6, EXPI9-29)",
+      "join_key": "6465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f80818283",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Smoke", "mode_id": "org.atalaia.bomb", "assignments": {"7": "bomb"}}}, "status": 201, "save": {"gid": "id"}},
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {"node_id": 7}}, "status": 200, "save": {"text": "text"}},
+        {"join_decode": "${text}", "json": {"node_id": 7}, "save": {"key": "game_key"}},
+        {"prop_connect": "p", "node_id": 7, "key": "${key}", "welcome": {"type": "welcome", "node_id": 7}},
+        {"prop_send": "p", "json": {"type": "hello", "node_name": "telemovel-7", "fw_version": "app-0.8.0", "core_version": "0.8.0", "tier": 0, "capabilities": [1, 2, 3, 4, 5, 11], "battery_pct": 81}},
+        {"prop_send": "p", "json": {"type": "event", "event": {"seq": 1, "t": 0, "type": "node.outputs_disabled", "data": {"modules": "g1:servo:siren"}}}},
+        {"prop": "p", "messages": [{"type": "ack", "seq": 1, "event_type": "node.outputs_disabled"}]},
+        {"prop_send": "p", "json": {"type": "event", "event": {"seq": 2, "t": 0, "type": "node.modules", "data": {"modules": "g33:servo:horn"}}}},
+        {"prop": "p", "messages": [{"type": "ack", "seq": 2, "event_type": "node.modules"}]},
+        {"request": {"method": "GET", "path": "/api/v1/nodes", "token": "read"}, "status": 200, "json": {"$contains": [{"node_id": 7, "modules": [{"address": "g33", "caps": ["horn"]}], "outputs_disabled": [{"address": "g1", "model": "servo", "caps": ["siren"], "feedback": false}]}]}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/start-check", "token": "read"}, "status": 200, "json": {"missing": [], "missing_caps": [], "warnings": [{"code": "outputs", "node": 7, "name": "telemovel-7", "role": "bomb", "capabilities": ["smoke", "siren"], "text": "$any"}], "not_checked": [{"node": 7, "name": "telemovel-7", "role": "bomb", "capability": "horn", "text": "$any"}], "outputs_disabled": [{"node": 7, "name": "telemovel-7", "role": "bomb", "capabilities": ["siren"], "text": "$any"}], "ok": true}},
+        {"prop_send": "p", "json": {"type": "event", "event": {"seq": 3, "t": 0, "type": "node.outputs_disabled", "data": {"modules": ""}}}},
+        {"prop": "p", "messages": [{"type": "ack", "seq": 3, "event_type": "node.outputs_disabled"}]},
+        {"request": {"method": "GET", "path": "/api/v1/nodes", "token": "read"}, "status": 200, "json": {"$contains": [{"node_id": 7, "outputs_disabled": []}]}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/start-check", "token": "read"}, "status": 200, "json": {"outputs_disabled": [], "ok": true}}
+      ]
     }
   ],
   "s7": {
