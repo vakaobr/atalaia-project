@@ -916,6 +916,20 @@ static void follow_link_state(box_game_t *g)
     }
 }
 
+/* node.outputs_disabled (decision EXPL-13): with node.modules, by a box that has an output fitted,
+ * the ones its admin has not enabled (the empty text when none is), so the GM's console can tell
+ * "fitted, not enabled" from "none fitted". Its own event: an older controller refuses it alone. */
+static void tell_outputs_disabled(box_game_t *g)
+{
+    if (g->outputs == NULL || g->outputs->count == 0) return;
+    char text[OUT_MODULES_MAX + 1];
+    outputs_disabled_text(g->outputs, text, sizeof(text));
+    char data[OUT_MODULES_MAX + 16];
+    snprintf(data, sizeof(data), "{\"modules\":\"%s\"}", text);
+    field_link_send_box_event(&g->link, "node.outputs_disabled", data, g->runner->game_time_ms);
+    if (text[0] != '\0') say(g, "told the controller its outputs not enabled: %s", text);
+}
+
 /* node.modules (EXP-21): once the link's HELLO is acknowledged, the box's enabled simple outputs;
  * nothing when it has none (a box without outputs says nothing new). */
 static void tell_modules(box_game_t *g)
@@ -924,6 +938,7 @@ static void tell_modules(box_game_t *g)
     if (g->phase != BOX_JOINED && g->phase != BOX_PLAYING) return;
     g->modules_told = true;
     if (g->outputs == NULL) return;
+    tell_outputs_disabled(g);
     char text[OUT_MODULES_MAX + 1];
     if (outputs_modules_text(g->outputs, text, sizeof(text)) == 0) return;
     char data[OUT_MODULES_MAX + 16];

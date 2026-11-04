@@ -523,6 +523,24 @@ size_t outputs_modules_text(const outputs_t *o, char *out, size_t cap)
     return len;
 }
 
+size_t outputs_disabled_text(const outputs_t *o, char *out, size_t cap)
+{
+    if (cap == 0) return 0;
+    out[0] = '\0';
+    size_t len = 0;
+    size_t limit = cap - 1 < OUT_MODULES_MAX ? cap - 1 : OUT_MODULES_MAX;
+    for (int i = 0; i < o->count; i++) {
+        const out_channel_t *c = &o->ch[i];
+        if (c->set.enabled) continue;
+        char entry[48];
+        int n = snprintf(entry, sizeof(entry), "%sg%d:servo:%s", len ? ";" : "", c->gpio, c->id);
+        if (n < 0 || len + (size_t)n > limit) break;
+        memcpy(out + len, entry, (size_t)n + 1);
+        len += (size_t)n;
+    }
+    return len;
+}
+
 bool outputs_level(const outputs_t *o, int index)
 {
     return index >= 0 && index < o->count && o->ch[index].level;

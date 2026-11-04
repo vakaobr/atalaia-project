@@ -23,8 +23,9 @@
  *     for OUT_GRACE_MS after the end the mode's game.end handler and the field may pulse an output
  *     (an end-of-game horn), never past that grace; the admin's 1 s test only while no game runs.
  *
- * What it tells: output.switched (each start, and an off before its time, with its source) and a
- * box's node.modules text (its simple outputs: "g46:servo:siren"); outputs that the game state
+ * What it tells: output.switched (each start, and an off before its time, with its source), a
+ * box's node.modules text (its simple outputs: "g46:servo:siren") and the outputs fitted but not
+ * enabled (node.outputs_disabled, EXPL-13: "g45:servo:horn"); outputs that the game state
  * turns off send nothing (the game's own state says why).
  *
  * Platform-free: the shell gives the clock (outputs_tick every game-task turn), the events (the
@@ -209,6 +210,11 @@ int outputs_enabled_count(const outputs_t *o);
 /* node.modules' text for the box's enabled simple outputs ("g46:servo:siren;g45:servo:horn",
  * at most OUT_MODULES_MAX bytes); its length, 0 when there is none. */
 size_t outputs_modules_text(const outputs_t *o, char *out, size_t cap);
+
+/* node.outputs_disabled's text (decision EXPL-13): the simple outputs fitted that their admin has
+ * not enabled, in node.modules' form ("g45:servo:horn", at most OUT_MODULES_MAX bytes); its length,
+ * 0 when every output is enabled (or the box has none). */
+size_t outputs_disabled_text(const outputs_t *o, char *out, size_t cap);
 
 /* What channel index shows now (true: on). */
 bool outputs_level(const outputs_t *o, int index);
