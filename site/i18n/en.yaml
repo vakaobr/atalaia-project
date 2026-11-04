@@ -158,8 +158,9 @@ why:
     text: >-
       Game modes are short <a href="{{ page.to.glossary }}#glossary-lua">Lua scripts</a>, small text files of rules, with
       a settings file: easy to read, change and share, and no mode needs code of its own in the boxes'
-      built-in software. For now the boxes carry their modes built in; sending a new one without
-      reflashing (reinstalling) that software is still to come.
+      built-in software. The boxes carry their modes built in, and between games a box can get a
+      signed new mode from the field controller without reflashing (reinstalling) that software:
+      built, not yet tried on a real box.
   open:
     title: Open protocol and API
     text: >-
@@ -185,9 +186,9 @@ how:
     at the base that runs the game and keeps the score. Phones connect to it over Wi-Fi, and
     scoreboards, stream overlays and map apps such as <a href="{{ page.to.glossary }}#glossary-atak">ATAK</a> through its
     API. An optional <a href="{{ page.to.glossary }}#glossary-site-server">site server</a> on the internet keeps accounts
-    and history. The controller, its API and the organisers' console are built and tested on a
-    computer, not yet on the field; of the site server only the skeleton and the accounts exist so
-    far (logins with two-factor codes and per-field roles; no game data yet).
+    and history. The controller, its API and the organisers' console are built and play with real
+    boxes on the bench, not yet on the field; the site server is built too and runs on a test
+    server, not yet at a real field.
   core: >-
     Under the hood, every device that runs game modes uses the same
     <a href="{{ page.to.glossary }}#glossary-core">shared core</a>, written in C11, and the same Lua modes; only a thin
@@ -1881,16 +1882,16 @@ glossary:
       that hears every box over the radio, runs the rules that span several boxes, keeps the
       official score and serves the organisers' console to their phones. If it fails, the boxes
       keep playing and another capable device takes over, and a single box can run a game without
-      one. It is built (phase&nbsp;2) and tested on a computer, not yet on a field; running it on an
-      Android device is still to come.
+      one. It is built (phase&nbsp;2) and plays with real boxes on the bench, not yet on a field; on
+      an Android device it is built in software (phase&nbsp;3), not yet tried on a real phone.
   server:
     id: glossary-site-server
     term: Site server
     text: >-
       An optional computer, at the field or rented online, that keeps what lasts beyond one game:
       player accounts, game history, the chrono registry and the services behind the player app.
-      Games never wait for it. It comes in phase 4, and the community hub plans hosted ones, at
-      cost, for clubs without IT support.
+      Games never wait for it. It is built (phase&nbsp;4) and runs on a test server, not yet at a
+      real field, and the community hub plans hosted ones, at cost, for clubs without IT support.
   open_source:
     id: glossary-open-source
     term: Open source and free software

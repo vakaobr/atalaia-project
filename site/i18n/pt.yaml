@@ -164,9 +164,10 @@ why:
     text: >-
       Os modos de jogo são pequenos <a href="{{ page.to.glossary }}#glossario-lua">scripts Lua</a>, ficheiros de texto com
       as regras, mais um ficheiro de definições: fáceis de ler, mudar e partilhar, e nenhum modo
-      precisa de código próprio no software que vem dentro das caixas. Por agora as caixas trazem
-      os modos já incluídos; enviar um modo novo sem voltar a gravar esse software ainda está por
-      fazer.
+      precisa de código próprio no software que vem dentro das caixas. As caixas trazem os modos já
+      incluídos e, entre jogos, uma caixa pode receber do controlador de campo um modo novo
+      assinado sem voltar a gravar esse software: já está feito, ainda não experimentado numa caixa
+      a sério.
   open:
     title: Protocolo e API abertos
     text: >-
@@ -196,9 +197,8 @@ how:
     <a href="{{ page.to.glossary }}#glossario-atak">ATAK</a>, pela sua API. Um
     <a href="{{ page.to.glossary }}#glossario-servidor-do-site">servidor do site</a>, opcional e na internet, guarda as
     contas e o histórico. O controlador, a sua API e a consola da organização já estão feitos e
-    testados num computador, ainda não no campo; do servidor do site só existem, por agora, o
-    esqueleto e as contas (entrada com códigos de dois fatores e funções por campo; ainda sem dados
-    de jogos).
+    jogam com caixas a sério na bancada, ainda não no campo; o servidor do site também já está
+    feito e corre num servidor de testes, ainda não num campo a sério.
   core: >-
     Por dentro, todos os aparelhos que correm modos de jogo usam o mesmo
     <a href="{{ page.to.glossary }}#glossario-nucleo">núcleo partilhado</a>, escrito em C11, e os mesmos modos em Lua; só
@@ -1952,16 +1952,18 @@ glossary:
       que ouve todas as caixas pelo rádio, corre as regras que envolvem várias caixas, guarda a
       pontuação oficial e serve a consola da organização aos telemóveis. Se falhar, as caixas
       continuam a jogar e outro aparelho capaz toma o lugar, e uma caixa sozinha também consegue
-      correr um jogo sem ele. Já está feito (fase&nbsp;2) e testado num computador, ainda não num
-      campo; pô-lo a correr num aparelho Android ainda está por fazer.
+      correr um jogo sem ele. Já está feito (fase&nbsp;2) e joga com caixas a sério na bancada, ainda
+      não num campo; num aparelho Android já está feito em software (fase&nbsp;3), ainda não
+      experimentado num telemóvel a sério.
   server:
     id: glossario-servidor-do-site
     term: Servidor do site
     text: >-
       Um computador opcional, no campo ou alugado na internet, que guarda o que dura para lá de um
       jogo: contas de jogadores, histórico, o registo de cronografagem e os serviços por trás da app
-      de jogador. Nenhum jogo fica à espera dele. Chega na fase 4, e o espaço da comunidade prevê
-      servidores alojados, a preço de custo, para clubes sem apoio informático.
+      de jogador. Nenhum jogo fica à espera dele. Já está feito (fase&nbsp;4) e corre num servidor de
+      testes, ainda não num campo a sério, e o espaço da comunidade prevê servidores alojados, a
+      preço de custo, para clubes sem apoio informático.
   open_source:
     id: glossario-codigo-aberto
     term: Código aberto e software livre
