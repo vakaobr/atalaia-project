@@ -14,6 +14,57 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.8.0](https://github.com/vakaobr/atalaia-project/compare/v0.7.0...v0.8.0) (2026-11-04)
+
+### ⚠ BREAKING CHANGES
+
+* **release:** firmware built from this commit refuses releases signed
+
+### Features
+
+* **app:** a phone prop's HELLO lists its capability types (PROPC-1 to PROPC-6) ([#77](https://github.com/vakaobr/atalaia-project/issues/77)) ([0014847](https://github.com/vakaobr/atalaia-project/commit/001484780f3de648c4d5dd36ab6b55bdb0ec0350))
+* **app:** link the pod again from the game's admin menu ([#82](https://github.com/vakaobr/atalaia-project/issues/82)) ([5a4cc7e](https://github.com/vakaobr/atalaia-project/commit/5a4cc7edd0d412b1c8acc88d26187f2c489ca656))
+* **app:** the player's chrono records and the sharing consent per field ([#80](https://github.com/vakaobr/atalaia-project/issues/80)) ([19c17e9](https://github.com/vakaobr/atalaia-project/commit/19c17e9549d9816c93ed22b1774fdfa65edc0d0f))
+* **app:** the prop's game screen shows the pod pairing again and the stopped tries ([#79](https://github.com/vakaobr/atalaia-project/issues/79)) ([e6a5b20](https://github.com/vakaobr/atalaia-project/commit/e6a5b20c9c5486919114de1d1d9f5f89ca2cb9ee))
+* **console:** Baden-Württemberg's orthophotos from LGL's WMTS ([#85](https://github.com/vakaobr/atalaia-project/issues/85)) ([ca6a531](https://github.com/vakaobr/atalaia-project/commit/ca6a53113ea1a36d934c75168cad2880dee03793))
+* **console:** orthophotos from WMTS tiles (basemap.at) ([#72](https://github.com/vakaobr/atalaia-project/issues/72)) ([7db1253](https://github.com/vakaobr/atalaia-project/commit/7db1253f7576a8b66e6ad2548444f59e81d90b43))
+* **controller:** push walk-ins to the site server as guests (opt-in) ([#81](https://github.com/vakaobr/atalaia-project/issues/81)) ([c9b84f2](https://github.com/vakaobr/atalaia-project/commit/c9b84f2a6d1c68e55aaf9427b670998a18eca77b))
+* **firmware:** the box calls its expansion port driver, and the target module's firmware (increment 8) ([#62](https://github.com/vakaobr/atalaia-project/issues/62)) ([505de71](https://github.com/vakaobr/atalaia-project/commit/505de718b4e5e8a6c51d795440a8b94249524f1f))
+* **firmware:** the expansion port's driver, box side (increment 6) ([#68](https://github.com/vakaobr/atalaia-project/issues/68)) ([136a42e](https://github.com/vakaobr/atalaia-project/commit/136a42e960238d3ad3b4899c9ebad40c7a0a5f08))
+* **firmware:** the expansion port's module core (increment 7) ([#73](https://github.com/vakaobr/atalaia-project/issues/73)) ([92359f4](https://github.com/vakaobr/atalaia-project/commit/92359f40ac1124a98aa97be59041f29307ee1257))
+* **firmware:** the I/O pod pairs over Bluetooth with a passkey on its OLED ([#84](https://github.com/vakaobr/atalaia-project/issues/84)) ([3066952](https://github.com/vakaobr/atalaia-project/commit/3066952e11cd2a062fd6f4c594f5a3f14fbafc05))
+* **firmware:** the I2C output module (increment 11) ([#65](https://github.com/vakaobr/atalaia-project/issues/65)) ([3f9522b](https://github.com/vakaobr/atalaia-project/commit/3f9522ba60e7ad811fd25b2dc4a9877e37145aa1))
+* **modes:** output blocks in the mode editor (expansion port, increment 4 leftover) ([#70](https://github.com/vakaobr/atalaia-project/issues/70)) ([9d29bbd](https://github.com/vakaobr/atalaia-project/commit/9d29bbd5382ece8d53a7a85b30f73f9c27990495))
+* **pod:** a pod's withheld outputs shown like a box's disabled ones (PROPC-6) ([#86](https://github.com/vakaobr/atalaia-project/issues/86)) ([c116451](https://github.com/vakaobr/atalaia-project/commit/c11645119d40fba7e7340edfc52ce48684404ff1))
+* **pod:** lend as many outputs as fit in IDENT, and the pod on the build page ([#71](https://github.com/vakaobr/atalaia-project/issues/71)) ([df1bb89](https://github.com/vakaobr/atalaia-project/commit/df1bb894cca3b16633f65b6281cbda17bbdfd47a))
+* **pod:** simple outputs on the I/O pod for phone props (increment 9, first half) ([#83](https://github.com/vakaobr/atalaia-project/issues/83)) ([de70f76](https://github.com/vakaobr/atalaia-project/commit/de70f76644853ee9966dd0c4b6ea6edc1440f2a8))
+* **pod:** the I/O pod's expansion port lent to phone props (increment 9, second half) ([#69](https://github.com/vakaobr/atalaia-project/issues/69)) ([0e7b0d4](https://github.com/vakaobr/atalaia-project/commit/0e7b0d4de37483452e541919e994768400fc76c1))
+* **protocol:** node.outputs_disabled, a box's outputs fitted but not enabled (EXPL-12) ([#63](https://github.com/vakaobr/atalaia-project/issues/63)) ([6c958f7](https://github.com/vakaobr/atalaia-project/commit/6c958f751f35c8623da408b7d472bf5540d7826d))
+* **release:** trust only the root and the next CI release keys ([#58](https://github.com/vakaobr/atalaia-project/issues/58)) ([741bf96](https://github.com/vakaobr/atalaia-project/commit/741bf969ebc8961d0b5efe1963c7ebe5f791c975))
+* **server:** fields of a hub can opt in to share their game history ([#74](https://github.com/vakaobr/atalaia-project/issues/74)) ([8d6cded](https://github.com/vakaobr/atalaia-project/commit/8d6cdeddc2754e024d36932fdbb5076745b48a18))
+* **server:** register for a game on the field's web pages ([#76](https://github.com/vakaobr/atalaia-project/issues/76)) ([b3d1370](https://github.com/vakaobr/atalaia-project/commit/b3d13704aff57fbba8387e8336719c0f3fb7bc29))
+* **simulator:** draw each box's screen template in the web view ([#61](https://github.com/vakaobr/atalaia-project/issues/61)) ([51ee1e9](https://github.com/vakaobr/atalaia-project/commit/51ee1e96282d9242021693e370838697ac4138b5))
+* **tools:** check_wiring.py checks the I/O pod's pins on the build page ([#75](https://github.com/vakaobr/atalaia-project/issues/75)) ([753caba](https://github.com/vakaobr/atalaia-project/commit/753caba43b5fbc289278a1cad1cd50fbf37bb5a4))
+
+
+### Bug Fixes
+
+* **app:** the pod's automatic reconnect pairs again once, then stops ([#78](https://github.com/vakaobr/atalaia-project/issues/78)) ([05b6ae9](https://github.com/vakaobr/atalaia-project/commit/05b6ae92e14304ba2a2274d35ab0758dc7baab3c))
+* **ci:** boot the Android emulator cold again, without the cached snapshot ([#57](https://github.com/vakaobr/atalaia-project/issues/57)) ([78169c9](https://github.com/vakaobr/atalaia-project/commit/78169c9ebd601e69d772be89a4723e10ac91fee0))
+* **console:** scroll the field-map preview into view once its image has a size ([#53](https://github.com/vakaobr/atalaia-project/issues/53)) ([897054d](https://github.com/vakaobr/atalaia-project/commit/897054d0eec61bd96263b47eb39df1ae1e83b209))
+
+
+### Documentation
+
+* correct "not built" lines the code has since built ([#60](https://github.com/vakaobr/atalaia-project/issues/60)) ([140701a](https://github.com/vakaobr/atalaia-project/commit/140701ac80dcf33362a174ad4650d15fb43a3e38))
+* drop the duplicated log entries from the stacked merges and free disk for the emulator job ([#87](https://github.com/vakaobr/atalaia-project/issues/87)) ([5867a1a](https://github.com/vakaobr/atalaia-project/commit/5867a1af8d63919f82c6fe3dfe4a1ab939cb5397))
+* **hardware:** the expansion port's build guide and a buildable target addon (increment 10) ([#59](https://github.com/vakaobr/atalaia-project/issues/59)) ([5707204](https://github.com/vakaobr/atalaia-project/commit/57072044422014da4e8fcb1e17c6db055546c0a4))
+* **hardware:** the Satellite's GPIO 5/46 rule names the simple output's exception ([#67](https://github.com/vakaobr/atalaia-project/issues/67)) ([494a29e](https://github.com/vakaobr/atalaia-project/commit/494a29e3949cdea3712e0095932f87dd58755234))
+* **site:** the build page shows the expansion port, the target addon and the simple output (increment 10) ([382cf91](https://github.com/vakaobr/atalaia-project/commit/382cf918ef5441610676021c1a0601e47b6961a4))
+* **site:** the target and output modules on the build page (increments 8 and 11) ([#66](https://github.com/vakaobr/atalaia-project/issues/66)) ([b8819c6](https://github.com/vakaobr/atalaia-project/commit/b8819c6f3df4cbac9eb41bd0b4097353dd85d2c1))
+
+### Details
+
 - **`check_wiring.py` checks the I/O pod's pins on the project page's build page** (decisions WIRE-1 to WIRE-4, answering SITE9-2; `tools/check_wiring.py`, `site/src/build.html`, the generated build pages, `site/README.md`, `tools/README.md`): the cells of the page's pod section (`<section id="io-pod">`) are checked against the pod build's defaults, Kconfig with `firmware/esp32/sdkconfig.defaults` and `sdkconfig.pod` over it, as the pod guide's table already was (which now reads the same files instead of naming `ATALAIA_POD_MODE`); every other cell keeps the Field Box's. The pod's two simple outputs, GPIO 33 and 1, become marked cells (`data-kconfig`), and the section must keep a marked cell for each of its pins, so a wrong number or a dropped mark fails the check with the section named. The build page's target section no longer says the pod will lend a target "later": the pod already lends a target addon's hits to a phone's game (increment 9), tested on a computer only (pt, en, de and zh-TW; SITE9-4). The decisions file gains the rows the release key rotation's entries cite (KRT-1 to KRT-12, reconstructed from the sources; KRT-0 was already there).
 
 - **The project page's I/O pod after increment 9: its simple outputs and its expansion port** (decisions SITE9-1 to SITE9-7; `site/src/build.html`, `site/i18n/pt.yaml`, `en.yaml`, `de.yaml` and `zh-tw.yaml`, the generated pages, `README.md`): the build page's I/O pod section says what the pod now drives: simple outputs on GPIO 33, then 1 (wired as the Field Box's, enabled by building them in, off when the phone goes) and the expansion port (a target's hits; an output module's relays only on a pod built to lend them, as many as fit in its description to the phone), with two parts bullets, two pin rows, the build options in the flash step, and the open item that said "do not wire one to a pod yet" (SITEB-2) replaced by what waits for the bench. The Field Box simple output's "the I/O pod gets it later", the pod's settings item (the GM console pushes four over the radio) and the Portuguese "(em inglês)" before a Portuguese guide are corrected; the roadmap's props list and README's phase 3 lines name the pod's outputs and port. In software and on a computer only, as the page says.
@@ -64,6 +115,7 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 - **The simulator's web view draws each box's screen from its template** (`simulator/atalaia_sim/screens.py` `render_screen`, `web/app.js`, decisions SIMS-1 to SIMS-8): a node's card showed only the screen's name and data; it now draws the mode's `assets/screens/<name>.yaml` at the Field Box's 320x240, laid out with the numbers of the box's LVGL renderer (a centred column 4 px apart, rows 6 px apart, `fill`, the 14/20/28/48 fonts, a 200x12 bar), with every text, `visible:`, bar value and colour worked out by the core's own parser and evaluator through ctypes, and the data a box adds (`lang`, and `held`/`age`/`live` from `since`). *Box language* in the top bar shows the templates in English, Portuguese, German or Chinese. Screens with no template (`code_entry`, a built-in `final_score`) still show as their name and data; the outputs of increment 4 are drawn beside the screen as before. New tests draw every built-in mode's screens with the data its own tests send, in every language, without a failed expression (`test_screen_render.py`), and check the page in Chromium (`editor_tests/test_web_view.py`).
 
 - **"Not built" lines the code has since built are corrected** (decisions SD-4 to SD-16 in `docs/review/decisions-to-review.md`; `docs/phase-1-single-box/SRE.md`, `docs/phase-2-field-network/STATUS.md`, `docs/phase-3-android-players/{ADR,PLAN,STATUS}.md`, `docs/phase-4-site-server/{PLAN,STATUS}.md`, `docs/phase-5-community/ADR.md`, `modes/README.md`, `site/README.md`, `site/i18n/*.yaml`): each line was checked against the code, and what is built is struck through or annotated with its date and commit, never deleted; among them the GM console's remote GM log (built 2026-10-26), the I/O pod's settings over the radio (PF15, built 2026-10-28), the editor's *Test in the simulator* (2026-10-22), phase 1's SRE defects B-1 to B-4 (fixed in the firmware's first commit) and hosted mode now waiting for its go-live checklist rather than the legal review. The project page in four languages no longer calls the site server, the phone controller and sending a box a new mode "still to come".
+
 ## [0.7.0](https://github.com/vakaobr/atalaia-project/compare/v0.6.1...v0.7.0) (2026-11-03)
 
 ### Features
