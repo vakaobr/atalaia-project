@@ -340,25 +340,34 @@ parseReport(List<int> body) {
 }
 
 /// The project's release keys (docs/community/keys.md): root
-/// 424d053af5cdbc35, held offline, CI 32b3c815ac30ad43, which signs the
-/// GitHub releases, and the next CI key a4f6002b0122b131, which takes over
-/// from it (firmware/esp32/docs/RELEASE_SIGNING.md, "Rotating the CI key").
-/// The default of a phone controller's release keys, as the Pi's
-/// `PROJECT_RELEASE_KEYS` in config.py and the boxes' firmware.
+/// 424d053af5cdbc35, held offline, and the CI key a4f6002b0122b131 (the next
+/// CI key of the 2026-11 rotation), which signs the GitHub releases
+/// (firmware/esp32/docs/RELEASE_SIGNING.md, "Rotating the CI key"; the first
+/// CI key, 32b3c815ac30ad43, was dropped at its step 3). The default of a
+/// phone controller's release keys, as the Pi's `PROJECT_RELEASE_KEYS` in
+/// config.py and the boxes' firmware.
 const projectReleaseKeys = [
   '5tzPkN0AJSn+g34CP59linCRf/fcaWFc7GAAg7qzYNc=',
-  'rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw=',
   '76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=',
 ];
 
-/// Earlier defaults of [projectReleaseKeys]. The settings store the list
-/// even when nobody changed it, so a phone that saved one of these exactly
-/// takes the current default instead (a list someone edited is kept): its
-/// controller then accepts the releases the next CI key signs.
+/// Earlier defaults of [projectReleaseKeys], oldest first. The settings store
+/// the list even when nobody changed it, so a phone that saved one of these
+/// exactly takes the current default instead (a list someone edited is
+/// kept): its controller then trusts the next CI key and no longer the first
+/// CI key 32b3c815ac30ad43.
 const earlierProjectReleaseKeys = [
+  // Up to v0.6.1: root and the first CI key.
   [
     '5tzPkN0AJSn+g34CP59linCRf/fcaWFc7GAAg7qzYNc=',
     'rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw=',
+  ],
+  // v0.7.0, the CI key rotation's transition release: root, the first CI key
+  // and the next CI key.
+  [
+    '5tzPkN0AJSn+g34CP59linCRf/fcaWFc7GAAg7qzYNc=',
+    'rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw=',
+    '76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=',
   ],
 ];
 
