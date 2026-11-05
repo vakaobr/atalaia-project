@@ -200,7 +200,8 @@ class Reinvite:
         """Tells the consoles what changed (outside the inviter's own calls)."""
         pending, self._pending_emit = self._pending_emit, set()
         if "boxes" in pending:
-            self.ctl._emit({"type": "boxes", "boxes": self.boxes()["boxes"]})
+            # With the games a box is stuck in, so the console's list follows them live (STUCK-45).
+            self.ctl._emit({"type": "boxes", "boxes": self.boxes()["boxes"], **self.stuck_view()})
         if "invites" in pending and self.ctl.game is not None:
             gid = self.ctl.game["id"]
             invites = self.invites(gid)
@@ -279,7 +280,7 @@ class Reinvite:
                     **self.stuck_view()}
 
     def stuck_view(self) -> dict[str, Any]:
-        """``stuck``: per ended game a box was heard still in, {game, last_heard_s, nodes, rssi,
+        """``stuck``: per ended game a box was heard still in, {game, name, last_heard_s, nodes, rssi,
         game_over_resent}; ``stuck_reports``: the modem's reports of other games' packets;
         ``stuck_watch``: whether the modem can report them (its IDENT says "games")."""
         stuck = self.ctl.stuck

@@ -612,6 +612,83 @@ class StuckGameTests(GameOverTests):
         self.modem.other_game(77, 4)
         self.assertEqual(self.drain(10), 0)
 
+    # --- the GM's Release (decisions STUCK-40 to STUCK-47) ---------------------------------------
+
+    def release(self, gid: int):
+        return self.client.post(f"/api/v1/boxes/stuck/{gid}/release", headers=GM)
+
+    def test_the_gms_release_says_the_games_game_over_now(self):
+        gid, key = self.ended_game_with_a_stuck_box()
+        self.box.start()
+        self.modem.other_game(gid, 4)
+        self.drain(65)  # the automatic burst is over, the next one is a minute away
+        [stuck] = self.client.get("/api/v1/boxes", headers=GM).json()["stuck"]
+        self.assertEqual((stuck["game"], stuck["name"], stuck["game_over_resent"]),
+                         (gid, self.store.game(gid)["name"], 1))
+        self.messages.clear()
+        with self.assertLogs("atalaia.reinvite", "INFO") as logs:
+            r = self.release(gid)
+        self.assertEqual((r.status_code, r.json()), (200, {"game": gid, "game_over_frame": "sent"}))
+        self.assertIn(f"game {gid}: released by the GM; GAME_OVER sent again", logs.output[0])
+        self.assertEqual(self.frames(), [{"kind": "game_over", "game_id": gid, "key_tag": ff.key_tag(key)}])
+        # The consoles hear of it on the stream, with the stuck list.
+        [msg] = [m for m in self.messages if m["type"] == "boxes"]
+        self.assertEqual((msg["stuck"][0]["game_over_resent"], msg["stuck_watch"]), (2, True))
+        while self.modem.fields:
+            self.box.on_frame(self.modem.fields.pop(0), self.ctrl.now_ms())
+        self.assertEqual(self.box.phase, "ended")
+
+    def test_release_has_a_short_rate_limit(self):
+        gid, _ = self.ended_game_with_a_stuck_box()
+        self.assertEqual(self.release(gid).json()["game_over_frame"], "sent")  # not heard: allowed too
+        r = self.release(gid)  # its GAME_OVERs are still being said
+        self.assertEqual(r.status_code, 429, r.text)
+        self.assertEqual(self.drain(9), lobby.GAME_OVER_REPEATS)  # the first one included
+        self.assertEqual(self.release(gid).status_code, 429)  # under 10 s since the burst started
+        self.drain(1.1)
+        self.assertEqual(self.release(gid).json()["game_over_frame"], "sent")
+
+    def test_release_refuses_what_it_cannot_end(self):
+        gid, _ = self.ended_game_with_a_stuck_box()
+        self.assertEqual(self.release(9999).status_code, 404)
+        live = self.game()
+        self.assertEqual(self.release(live).status_code, 409)  # not over
+        self.store.delete_setting(f"key_tag:{gid}")
+        self.assertEqual(self.release(gid).json(), {"game": gid, "game_over_frame": "no_tag"})
+        self.assertEqual(self.drain(10), 0)
+
+    def test_release_without_a_radio(self):
+        gid, _ = self.ended_game_with_a_stuck_box()
+        self.modem.has_field_frames = False
+        self.assertEqual(self.release(gid).json()["game_over_frame"], "no_radio")
+
+    def test_release_with_a_game_live_on_another_channel_is_refused(self):
+        gid, _ = self.ended_game_with_a_stuck_box()
+        self.store.set_setting("radio.channel_hz", "868100000")
+        self.game()  # live on 868.1 MHz; the stuck box's game was on 869.525 MHz
+        r = self.release(gid)
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("another channel", r.text)
+        self.assertEqual(self.drain(10), 0)
+
+    def test_release_from_a_standby_is_refused(self):
+        from atalaia_sim import join
+        gid, _ = self.ended_game_with_a_stuck_box()
+        payload = join.encode({"game_id": 77, "game_key": bytes(range(16)), "node_id": 3, "controller_id": 1,
+                               "channel_hz": 869_525_000, "max_hops": 2, "teams": ["red", "blue"],
+                               "mode_id": DOMINATION, "role": "standby", "game_seed": 1, "params": None,
+                               "kind": "controller"}, JOIN_KEY)
+        self.ctrl.join_as_standby(join.to_text(payload))
+        self.assertEqual(self.release(gid).status_code, 409)
+        self.ctrl.end_game(77)
+        self.assertEqual(self.release(77).status_code, 409)  # a game it followed: the primary's
+        self.assertEqual(self.drain(10), 0)
+
+    def test_release_needs_the_gm_token(self):
+        gid, _ = self.ended_game_with_a_stuck_box()
+        self.assertEqual(self.client.post(f"/api/v1/boxes/stuck/{gid}/release",
+                                          headers={"Authorization": "Bearer read-secret"}).status_code, 403)
+
 
 NEW_HZ, OLD_HZ, OLDER_HZ = 869_925_000, 869_525_000, 868_100_000
 

@@ -122,7 +122,7 @@ In a stand-alone game the box has no game key. It **refuses player tags**. Modes
 
 ### D. Take a box out of its game
 
-A box that was switched off when its game ended never hears the end. Switched on again, it is still in that game: it shows the game's screen and refuses every invite and join card. A box never leaves a game on its own when the controller goes silent. The controller frees it by itself when its USB radio modem runs the firmware of this release or later and the box is on the channel the modem listens on (the field's): it hears the box, says again that its game is over, and within about a minute the box shows the game's last screen, then **READY**. With an older modem, or if the box stays in the game, take it out at the box, with the admin PIN:
+A box that was switched off when its game ended never hears the end. Switched on again, it is still in that game: it shows the game's screen and refuses every invite and join card. A box never leaves a game on its own when the controller goes silent. The controller frees it by itself when its USB radio modem runs the firmware of this release or later and the box is on the channel the modem listens on (the field's): it hears the box, says again that its game is over, and within about a minute the box shows the game's last screen, then **READY**. The organisers see such a box in the console's **Boxes** tab, under **Stuck in an ended game**, and **Release** tells it at once. With an older modem, or if the box stays in the game, take it out at the box, with the admin PIN:
 
 1. Hold `*` for 3 seconds. The press itself still goes to the game, as one `*`.
 2. **Enter the admin PIN.** `#` confirms. `*` deletes; with nothing typed, `*` goes back to the game.
