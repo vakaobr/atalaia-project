@@ -39,6 +39,7 @@ import '../protocol/field_frame.dart';
 import '../protocol/radio_region.dart';
 import '../security/bytes.dart';
 import 'controller_engine.dart';
+import 'controller_stuck.dart';
 
 const announceMinMs = 60000;
 const inviteRetryMs = 6000;
@@ -49,6 +50,11 @@ const _gapMs = 50; // between the controller's frames, on top of their air
 const _partGapMs = 150; // between an invite's parts (the box re-arms)
 const gameOverRepeats = 3;
 const gameOverGapMs = 4000;
+
+// RELEASE (RFC 0001 Amendment 28, proposed; lobby.py RELEASE_REPEATS): every
+// box in a game other than the live one that it joined before the frame's
+// time leaves it. Said this many times, gameOverGapMs apart.
+const releaseRepeats = 3;
 
 // MOVE (RFC 0001 Amendment 19, lobby.py): the field's channel changed. Said on
 // the old channel three times; a sweep says it twice on each earlier channel.
@@ -168,6 +174,17 @@ class _GameOver {
   int sent = 0;
 }
 
+/// A RELEASE on its way (lobby.py `ReleaseOrder`): the live game (0: none)
+/// and the time it says, on the channel the radio is on.
+class _Release {
+  _Release(this.liveGame, this.timeS, this.nextMs);
+  final int liveGame;
+  final int timeS;
+  int left = releaseRepeats;
+  int nextMs;
+  int sent = 0;
+}
+
 /// A MOVE on its way: sent on [channelHz] (where the boxes still listen),
 /// naming the new channel [toHz] and its revision [rev].
 class _Move {
@@ -224,6 +241,7 @@ class FieldInviter {
   final _fresh = <String, (int, int)>{};
   final _gamesOver = <_GameOver>[];
   final _moves = <_Move>[];
+  final _releases = <_Release>[];
   _Move?
   _change; // the MOVEs of the field's own change of channel (not a sweep's)
   int? lastSweep;
@@ -241,8 +259,15 @@ class FieldInviter {
         : (sent: c.sent, telling: _moves.any((m) => identical(m, c)));
   }
 
-  /// A GAME_OVER or a MOVE is still to be sent.
-  bool get ordersPending => _gamesOver.isNotEmpty || _moves.isNotEmpty;
+  /// A GAME_OVER, a MOVE or a RELEASE is still to be sent.
+  bool get ordersPending =>
+      _gamesOver.isNotEmpty || _moves.isNotEmpty || _releases.isNotEmpty;
+
+  /// [gameId]'s GAME_OVERs are still being said.
+  bool gameOverPending(int gameId) => _gamesOver.any((g) => g.gameId == gameId);
+
+  /// A RELEASE is still being said.
+  bool get releasing => _releases.isNotEmpty;
 
   /// Called once no GAME_OVER or MOVE is left to send (after `tune(null)`):
   /// the controller's next step, a DISCOVER on the field's channel.
@@ -427,6 +452,21 @@ class FieldInviter {
       ..add(_GameOver(gameId, keyTag, channelHz, nowMs));
   }
 
+  /// Says [releaseRepeats] times, [gameOverGapMs] apart, that [liveGame]
+  /// (0: none) is live and it is [timeS] (Unix seconds): every box in another
+  /// game it joined before then leaves it (RFC 0001 Amendment 28). A newer
+  /// one replaces one still being said.
+  void release(int liveGame, int timeS, int nowMs) {
+    validateFieldMessage({
+      'kind': 'release',
+      'live_game': liveGame,
+      'time': timeS,
+    });
+    _releases
+      ..clear()
+      ..add(_Release(liveGame, timeS, nowMs));
+  }
+
   /// Says [repeats] times, [gapMs] apart, on [channelHz] (where the boxes
   /// still listen) that the field has moved to [toHz] (revision [rev]): the
   /// change itself, or one channel of a sweep.
@@ -565,18 +605,22 @@ class FieldInviter {
     return true;
   }
 
-  /// Sends the next GAME_OVER or MOVE that is due; true if the radio was used.
+  /// Sends the next GAME_OVER, MOVE or RELEASE that is due; true if the
+  /// radio was used.
   bool _tickGameOver(int nowMs) {
     final done = <Object>[
       for (final g in _gamesOver)
         if (g.left == 0 && nowMs >= g.nextMs) g,
       for (final m in _moves)
         if (m.left == 0 && nowMs >= m.nextMs) m,
+      for (final r in _releases)
+        if (r.left == 0 && nowMs >= r.nextMs) r,
     ];
     if (done.isNotEmpty) {
       _gamesOver.removeWhere(done.contains);
       _moves.removeWhere(done.contains);
-      if (_gamesOver.isEmpty && _moves.isEmpty) {
+      _releases.removeWhere(done.contains);
+      if (!ordersPending) {
         tune?.call(null);
         onOrdersDone?.call();
       }
@@ -586,44 +630,57 @@ class FieldInviter {
         if (g.left > 0 && nowMs >= g.nextMs) g,
       for (final m in _moves)
         if (m.left > 0 && nowMs >= m.nextMs) m,
+      for (final r in _releases)
+        if (r.left > 0 && nowMs >= r.nextMs) r,
     ];
     if (due.isEmpty || nowMs < busyUntil) return false;
     final order = due.first;
     final t = tune;
-    final channel = order is _Move
-        ? order.channelHz
-        : (order as _GameOver).channelHz;
+    // A RELEASE goes on the channel the radio is on (null: the field's, or
+    // the live game's), as lobby.py's ReleaseOrder.
+    final channel = switch (order) {
+      final _Move m => m.channelHz,
+      final _GameOver g => g.channelHz,
+      _ => null,
+    };
     if (t != null && !t(channel)) {
-      if (order is _Move) {
-        _moves.remove(order);
-      } else {
-        _gamesOver.remove(order as _GameOver);
-      }
+      _moves.remove(order);
+      _gamesOver.remove(order);
+      _releases.remove(order);
       return false;
     }
     final Map<String, Object?> msg;
     final int gap;
-    if (order is _Move) {
-      msg = {'kind': 'move', 'channel_hz': order.toHz, 'rev': order.rev};
-      gap = order.gapMs;
-    } else {
-      final go = order as _GameOver;
-      msg = {'kind': 'game_over', 'game_id': go.gameId, 'key_tag': go.keyTag};
-      gap = gameOverGapMs;
+    switch (order) {
+      case final _Move m:
+        msg = {'kind': 'move', 'channel_hz': m.toHz, 'rev': m.rev};
+        gap = m.gapMs;
+      case final _GameOver go:
+        msg = {'kind': 'game_over', 'game_id': go.gameId, 'key_tag': go.keyTag};
+        gap = gameOverGapMs;
+      case final _Release r:
+        msg = {'kind': 'release', 'live_game': r.liveGame, 'time': r.timeS};
+        gap = gameOverGapMs;
+      default:
+        return false;
     }
     final frame = encodeFieldFrame(key, msg, nonces.next());
     final sent = send(frame) != null;
     final air = airtimeMs(frame.length).toInt();
     busyUntil = nowMs + air + _gapMs;
-    if (order is _Move) {
-      if (sent) order.sent++;
-      order.left--;
-      order.nextMs = nowMs + air + (order.left > 0 ? gap : _gapMs);
-    } else {
-      final go = order as _GameOver;
-      if (sent) go.sent++;
-      go.left--;
-      go.nextMs = nowMs + air + (go.left > 0 ? gap : _gapMs);
+    switch (order) {
+      case final _Move m:
+        if (sent) m.sent++;
+        m.left--;
+        m.nextMs = nowMs + air + (m.left > 0 ? gap : _gapMs);
+      case final _GameOver go:
+        if (sent) go.sent++;
+        go.left--;
+        go.nextMs = nowMs + air + (go.left > 0 ? gap : _gapMs);
+      case final _Release r:
+        if (sent) r.sent++;
+        r.left--;
+        r.nextMs = nowMs + air + (r.left > 0 ? gap : _gapMs);
     }
     return true;
   }
@@ -714,8 +771,10 @@ class InviteException implements Exception {
   String toString() => message;
 }
 
-/// The phone controller's free boxes, invites and GAME_OVER (reinvite.py
-/// `Reinvite`), on the engine's radio. Made only with a field join key.
+/// The phone controller's free boxes, invites, GAME_OVER and RELEASE
+/// (reinvite.py `Reinvite`), on the engine's radio, with the boxes stuck in
+/// an ended game ([stuck], controller_stuck.dart). Made only with a field
+/// join key.
 class ControllerBoxes {
   ControllerBoxes(this.engine, {Random? random}) {
     if (engine.joinKey.length != 32) {
@@ -726,10 +785,13 @@ class ControllerBoxes {
       ..tune = _tune
       ..onOrdersDone = _ordersDone;
     engine.boxes = this;
+    // Boxes still in a game that is over (controller_stuck.dart).
+    stuck = ControllerStuck(engine, this);
   }
 
   final ControllerEngine engine;
   late final FieldInviter inviter;
+  late final ControllerStuck stuck;
   final _pending = <String>{};
   int? _tuned; // the channel a GAME_OVER or a MOVE took the radio to
   bool _discoverAfter = false; // a DISCOVER on the field's channel after a MOVE
@@ -811,6 +873,20 @@ class ControllerBoxes {
     return true;
   }
 
+  /// RELEASE (RFC 0001 Amendment 28): every box in a game other than
+  /// [liveGame] (0: none) that it joined before [timeS] leaves it, three
+  /// times on the channel the radio is on (the field's, or the live game's).
+  /// False without a radio that carries field frames.
+  bool release(int liveGame, int timeS) {
+    final m = engine.modem;
+    if (m == null || !m.isUp || !m.hasFieldFrames) return false;
+    inviter
+      ..release(liveGame, timeS, engine.nowMs())
+      ..tick(engine.nowMs()); // the first one at once
+    _flush();
+    return true;
+  }
+
   /// The field's channel changed: says so on the old one (MOVE, three times,
   /// RFC 0001 Amendment 19) before the radio goes to the new one, then asks the
   /// boxes there. False when it cannot (no radio with field frames): the caller
@@ -874,7 +950,9 @@ class ControllerBoxes {
     final pending = Set.of(_pending);
     _pending.clear();
     if (pending.contains('boxes')) {
-      engine.emit({'type': 'boxes', 'boxes': boxes()['boxes']});
+      // With the games a box is stuck in, so the console's list follows them
+      // live (STUCK-45).
+      engine.emit({'type': 'boxes', 'boxes': boxes()['boxes'], ...stuckView()});
     }
     final g = engine.liveGame;
     if (pending.contains('invites') && g != null) {
@@ -884,6 +962,13 @@ class ControllerBoxes {
       // A box fetching its modes, or one that could not (slice S7b).
       engine.modeFetch?.onInvites(list);
     }
+  }
+
+  /// What the box list shows changed (a game a box is stuck in): the
+  /// consoles are told.
+  void refreshBoxes() {
+    _pending.add('boxes');
+    _flush();
   }
 
   /// A box's mode fetch changed whether its HELLO joined it
@@ -963,8 +1048,20 @@ class ControllerBoxes {
       'field_frames': m != null && m.hasFieldFrames,
       'ignored': inviter.ignored,
       'stale': inviter.stale,
+      ...stuckView(),
     };
   }
+
+  /// `stuck`: per ended game a box was heard still in, {game, name,
+  /// last_heard_s, nodes, rssi, game_over_resent}; `stuck_reports`: the
+  /// radio's reports of other games' packets; `stuck_watch`: whether the
+  /// radio can report them (a USB modem whose IDENT says "games"; never an
+  /// I/O pod), reinvite.py `stuck_view`.
+  Map<String, Object?> stuckView() => {
+    'stuck': stuck.public(),
+    'stuck_reports': stuck.reports,
+    'stuck_watch': engine.modem?.hasOtherGames ?? false,
+  };
 
   /// The live game's invites as the console shows them: not *joined* while
   /// a box's mode fetch has not ended in its HELLO (slice S7b).

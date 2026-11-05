@@ -6,8 +6,8 @@
 // game a box is still in. "Release every box not in this game" asks first, then
 // POST /api/v1/boxes/release: every box of the field on this channel that is in a game other than
 // the live one (any game, with none live), joined before now, ends it as on a game over. Shown to
-// the GM in Settings, on a controller that reports stuck boxes (`stuck_watch` in GET /api/v1/boxes;
-// not a phone controller).
+// the GM in Settings, on a controller that reports stuck boxes (`stuck_watch` in GET /api/v1/boxes:
+// a Pi, or a phone controller since STUCK-60).
 
 import { html, Component, createRef, t } from '../ui.js';
 

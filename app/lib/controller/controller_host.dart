@@ -608,6 +608,11 @@ class ControllerHost {
       'pod': boot.pod,
       'radio_kind': radioKind,
       'field_frames': modem?.hasFieldFrames ?? false,
+      // Boxes still in an ended game (controller_stuck.dart): whether the
+      // radio reports them; null without the field join key.
+      'stuck_watch': engine.stuck == null
+          ? null
+          : modem?.hasOtherGames ?? false,
       'game': game,
       'stream_clients': api.hub.clientCount,
       'mqtt_clients': broker.clientCount,

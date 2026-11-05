@@ -17,7 +17,10 @@
 ///     rebooted forgot them);
 ///   - a PING every [pingInterval]; after [maxMissed] unanswered the radio
 ///     is down until a STATUS comes back;
-///   - RX, TX_ACK, FIELD_RX, FIELD_ACK and ERROR to the callbacks;
+///   - RX, TX_ACK, FIELD_RX, FIELD_ACK, OTHER_GAME and ERROR to the
+///     callbacks; WATCH_GAMES again on every IDENT that says `games` (RFC
+///     0001 Amendment 27: other games' packets, for a box still in an ended
+///     game, controller_stuck.dart);
 ///   - MEASURE for the channel scan (slice S7a's controller_channel.dart),
 ///     answered by NOISE or an ERROR whose message starts with "MEASURE",
 ///     as radio_modem.py `measure`; the modem's IDENT says `measure`.
@@ -49,6 +52,7 @@ abstract final class ModemFrame {
   static const fieldTx = 0x09;
   static const fieldRx = 0x0a;
   static const fieldAck = 0x0b;
+  static const otherGame = 0x0c;
 }
 
 /// FIELD_ACK's statuses (the modem's TX statuses, 8 busy while a MEASURE runs).
@@ -82,6 +86,7 @@ class SerialModem extends ControllerModem {
   _Measure? _measuring;
   String? _lang; // the screen language to give the modem (setLanguage)
   var _langSent = false; // the modem holds a language of ours
+  var _watchGames = false; // other games' packets asked for (watchGames)
 
   @override
   String get state => _state;
@@ -114,6 +119,26 @@ class SerialModem extends ControllerModem {
     }
     _lang = code == null || code.isEmpty ? null : code.toLowerCase();
     if (isUp && hasLanguage) _sendLanguage();
+  }
+
+  /// The firmware reports packets of other games (IDENT `games`: WATCH_GAMES
+  /// and OTHER_GAME, RFC 0001 Amendment 27).
+  @override
+  bool get hasOtherGames => _ident?['games'] == true;
+
+  /// WATCH_GAMES (opcode 10): kept, and sent again on every IDENT (a modem
+  /// forgets it on every reboot); never to a modem whose IDENT lacks
+  /// `games` (it would answer ERROR unknown_cmd), as radio_modem.py.
+  @override
+  void watchGames(bool on) {
+    _watchGames = on;
+    if (_ident != null) _sendWatch();
+  }
+
+  void _sendWatch() {
+    if (hasOtherGames) {
+      _write(ModemFrame.cmd, [RadioOp.watchGames, if (_watchGames) 1 else 0]);
+    }
   }
 
   static final _langCode = RegExp(r'^[A-Za-z0-9-]{0,8}$');
@@ -215,6 +240,15 @@ class SerialModem extends ControllerModem {
         // A modem that identifies itself shows its build's language until told.
         _langSent = false;
         if (hasLanguage && _lang != null) _sendLanguage();
+        if (_watchGames) _sendWatch();
+      case ModemFrame.otherGame:
+        final OtherGame other;
+        try {
+          other = OtherGame.decode(p);
+        } on FormatException {
+          return; // malformed: the link goes on
+        }
+        onOtherGame?.call(other);
       case ModemFrame.rx:
         if (p.length < 9 + 4) return;
         final RfHeader header;

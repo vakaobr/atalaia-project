@@ -85,6 +85,7 @@ import 'controller_scenarios.dart';
 import 'controller_schedule.dart';
 import 'controller_signed_modes.dart';
 import 'controller_store.dart';
+import 'controller_stuck.dart';
 import 'field_controller.dart';
 
 /// What the Pi controller answers with 400 (and its subclasses' codes).
@@ -464,6 +465,10 @@ class ControllerEngine {
   /// and firmware updates; each set by its constructor (the first two only
   /// with a field join key, as the Pi's reinvite and pairing).
   ControllerBoxes? boxes;
+
+  /// Boxes still in a game that is over (controller_stuck.dart, decisions
+  /// STUCK-1 on): set by [ControllerBoxes]'s constructor.
+  ControllerStuck? stuck;
   ControllerPairing? pairing;
   ControllerAdoption? adoption;
   ControllerFirmware? firmware;
@@ -1539,9 +1544,11 @@ class ControllerEngine {
   /// GAME_OVER to the game's boxes over the field radio (engine.py
   /// `_tell_game_over`): "sent", "no_tag" (no key tag kept), "no_join_key"
   /// or "no_radio" (no radio, or one that carries no field frames).
+  /// The key's tag stays (the last [keyTagsKept] games), so a box still in
+  /// the game is told again (controller_stuck.dart).
   String _tellGameOver(Map<String, Object?> game, String? tag) {
     final id = game['id']! as int;
-    store.deleteSetting('key_tag:$id');
+    pruneKeyTags(store);
     if (game['joined'] == true) return 'standby';
     final b = boxes;
     final String told;
@@ -2530,10 +2537,11 @@ class ControllerEngine {
       store.saveScores(id, fc.totalScores);
       _saveGameTime(force: true);
     }
-    store
-      ..forgetGameKey(id)
-      ..deleteSetting('key_tag:$id');
+    store.forgetGameKey(id);
     final out = _setState(id, 'ended', {'ended_at': _wall()});
+    // Its tag stays, bounded; a standby's game is never told again
+    // (controller_stuck.dart refuses it).
+    pruneKeyTags(store);
     _deactivate();
     return publicGame(store.game(id) ?? out);
   }

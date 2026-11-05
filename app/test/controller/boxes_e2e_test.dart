@@ -111,6 +111,7 @@ void main() {
   Future<ControllerEngine> phone({
     List<String> firmwareKeys = const [],
     bool viaPod = false,
+    String store = 'controller',
   }) async {
     final ControllerModem m;
     final Future<void> Function() begin;
@@ -142,7 +143,7 @@ void main() {
     modem = m;
     final e = engine = ControllerEngine(
       config: ControllerConfig(persistGameKey: persistGameKey),
-      store: FileControllerStore(Directory('${tmp.path}/controller')),
+      store: FileControllerStore(Directory('${tmp.path}/$store')),
       core: core,
       modem: m,
     )..joinKey = joinKey;
@@ -329,6 +330,91 @@ void main() {
       );
     },
   );
+
+  test('a box switched off when its game ended is freed when it comes back '
+      '(STUCK-60)', () async {
+    // The Pi's test_box_e2e.py twin (decisions STUCK-1 to STUCK-19, RFC 0001
+    // Amendment 27): the host modem reports the ended game's packets
+    // (OTHER_GAME), the phone says its GAME_OVER again, the box leaves it.
+    final e = await phone();
+    final m = modem!;
+    expect(m.hasOtherGames, isTrue);
+    final gid = game(e);
+    final b = await box('alpha', args: ['--announce-ms', '400']);
+    await join(e, b);
+    e.startGame(gid, force: true);
+    expect(await waitFor(() async => (await b.status())['phase'] == 2), isTrue);
+    await b.kill(); // the battery dies
+    expect(e.endGame(gid)['game_over_frame'], 'sent');
+    expect(
+      await waitFor(
+        () => !e.boxes!.inviter.ordersPending,
+        timeout: const Duration(seconds: 15),
+      ),
+      isTrue,
+    ); // all three, unheard
+    await b.boot(); // a fresh battery: still in the ended game
+    expect(
+      await waitFor(
+        () => b.logged('game $gid is over (said by a field controller)'),
+        timeout: const Duration(seconds: 20) + loadSlack,
+      ),
+      isTrue,
+      reason: '${b.lines.reversed.take(8)}',
+    );
+    expect(
+      await waitFor(() async => (await b.status())['available'] == true),
+      isTrue,
+    );
+    final listed = e.boxes!.boxes();
+    expect(listed['stuck_watch'], isTrue);
+    expect(
+      [
+        for (final x in listed['stuck']! as List)
+          ((x as Map)['game'], x['game_over_resent']),
+      ],
+      [(gid, 1)],
+    );
+  });
+
+  test('RELEASE frees a box of a game the phone lost, not the live game\'s '
+      '(STUCK-61)', () async {
+    // The Pi's test_box_e2e.py twin (RFC 0001 Amendment 28): the phone is
+    // reinstalled (a new store) while a box is in its game; RELEASE, sealed
+    // with the field key, frees it; a box in the new live game plays on.
+    var e = await phone();
+    final lost = game(e);
+    final a = await box('alpha', args: ['--announce-ms', '400']);
+    await join(e, a);
+    e.startGame(lost, force: true);
+    expect(await waitFor(() async => (await a.status())['phase'] == 2), isTrue);
+    // The box takes its game's first TIME: that is its join time.
+    await Future<void>.delayed(const Duration(seconds: 3));
+    await a.kill();
+    await crash();
+    e = await phone(store: 'reinstalled');
+    final live = game(e);
+    final b2 = await box('bravo', args: ['--announce-ms', '400']);
+    await join(e, b2);
+    await a.boot(); // still in the lost game
+    expect(await waitFor(() => a.logged('rejoined the stored game')), isTrue);
+    await Future<void>.delayed(const Duration(seconds: 1));
+    final out = e.stuck!.releaseField();
+    expect([out['live_game'], out['release_frame']], [live, 'sent']);
+    expect(
+      await waitFor(
+        () => a.logged('released by a field controller'),
+        timeout: const Duration(seconds: 15) + loadSlack,
+      ),
+      isTrue,
+      reason: '${a.lines.reversed.take(8)}',
+    );
+    expect(
+      await waitFor(() async => (await a.status())['available'] == true),
+      isTrue,
+    );
+    expect((await b2.status())['game_id'], live); // named: it stays
+  });
 
   test("the USB radio modem measures noise for S7a's channel scan", () async {
     await phone();
