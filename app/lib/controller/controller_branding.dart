@@ -942,6 +942,8 @@ class ControllerBranding {
   int purge({bool force = false, double? now}) {
     final t = now ?? engine.wallSeconds();
     if (!force && t - _lastPurge < _purgeEveryS) return 0;
+    // A wrong or just-jumped clock deletes nothing (controller_clock.dart).
+    if (!engine.clock.purgeAllowed()) return 0;
     _lastPurge = t;
     final used = referenced();
     var gone = 0;

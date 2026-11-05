@@ -4392,6 +4392,8 @@ class ControllerCheckin {
   Map<String, int>? purge({bool force = false}) {
     final now = _wall();
     if (!force && now - _lastPurge < 600) return null;
+    // A wrong or just-jumped clock deletes nothing (controller_clock.dart).
+    if (!engine.clock.purgeAllowed()) return null;
     _lastPurge = now;
     final endedBefore = now - config.retentionDays * 86400;
     var erased = 0, declarations = 0;

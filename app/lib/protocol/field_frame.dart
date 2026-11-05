@@ -78,7 +78,7 @@ const _kInvite = 4, _kPart = 5, _kParts = 6, _kChunk = 7;
 const _kGame = 4, _kKeyTag = 5;
 // MOVE (RFC 0001 Amendment 19): the field's new channel (Hz) and a revision.
 const _kChannel = 4, _kRev = 5;
-// RELEASE (RFC 0001 Amendment 28, proposed): the live game (0: none) and the
+// RELEASE (RFC 0001 Amendment 28): the live game (0: none) and the
 // sender's wall clock in Unix seconds.
 const _kLiveGame = 4, _kTime = 5;
 

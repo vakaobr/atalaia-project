@@ -20,7 +20,8 @@
 /// minute per game. GAME_OVER can only end a game that is over, so a report
 /// forged from a header in the clear can cost some air, never a game. An I/O
 /// pod passes no OTHER_GAME on: with it (or an older modem) `stuck_watch` is
-/// false and the console says to update the modem's firmware.
+/// false, and the console's hint fits the radio (`radio_kind`, STUCK-64):
+/// update an older modem's firmware, or use a USB radio modem for a pod.
 ///
 /// A standby never sends it (its games run on the primary). What was heard is
 /// kept for the console (`stuck` in GET /api/v1/boxes, and the stream's
@@ -58,13 +59,6 @@ const stuckForgetMs = 2 * 3600000;
 
 /// The ended games whose key tag the controller keeps.
 const keyTagsKept = 50;
-
-/// The earliest wall clock a phone can honestly show (decision STUCK-62):
-/// the Pi's wallclock.py `RELEASE_DATE`, 2026-11-01 00:00 UTC (a test keeps
-/// the two equal). A clock under the floor less [clockToleranceS] is not
-/// plausible, as the Pi's ClockGuard.
-const clockFloorS = 1793491200;
-const clockToleranceS = 60;
 
 /// A game a box was heard still in.
 class StuckGame {
@@ -258,8 +252,9 @@ class ControllerStuck {
         "primary's boxes out of its game",
       );
     }
-    final wall = engine.wallSeconds();
-    if (!clockPlausible(wall)) {
+    // The engine's clock guard (controller_clock.dart, the Pi's
+    // wallclock.py; decision STUCK-62 as changed by the maintainer).
+    if (!engine.clock.plausible()) {
       throw ControllerError.conflict(
         "the controller's clock is not set: set it first, so that the boxes "
         'can tell this RELEASE from an older one',
@@ -273,26 +268,12 @@ class ControllerStuck {
       final wait = (releaseFieldMs - (now - last) + 999) ~/ 1000;
       throw _tooSoon('a RELEASE was sent a moment ago; try again in $wait s');
     }
-    final timeS = min(0xffffffff, wall.floor());
+    final timeS = min(0xffffffff, engine.wallSeconds().floor());
     if (!boxes.release(liveId, timeS)) {
       return {'live_game': liveId, 'time': timeS, 'release_frame': 'no_radio'};
     }
     fieldReleasedMs = now;
     return {'live_game': liveId, 'time': timeS, 'release_frame': 'sent'};
-  }
-
-  /// Whether [wallS] can be the right time (wallclock.py `plausible`): not
-  /// under [clockFloorS], nor under the newest time in the store's games,
-  /// less [clockToleranceS].
-  bool clockPlausible(double wallS) {
-    var floor = clockFloorS.toDouble();
-    for (final g in _store.games()) {
-      for (final k in const ['created_at', 'started_at', 'ended_at']) {
-        final v = g[k];
-        if (v is num && v > floor) floor = v.toDouble();
-      }
-    }
-    return wallS >= floor - clockToleranceS;
   }
 
   /// The games a box was heard still in, the most recent first, with their

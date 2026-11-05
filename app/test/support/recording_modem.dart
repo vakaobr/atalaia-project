@@ -190,6 +190,10 @@ class RecordingModem extends ControllerModem {
   @override
   bool get hasOtherGames => games;
 
+  /// "modem", or "pod" to stand for an I/O pod (the console's hint, STUCK-64).
+  @override
+  String kind = 'modem';
+
   @override
   void watchGames(bool on) => watching.add(on);
 

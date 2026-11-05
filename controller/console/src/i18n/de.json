@@ -1498,6 +1498,7 @@
     "intro": "Diese Boxen wurden noch in einem Spiel gehört, das vorbei ist (sie waren ausgeschaltet, als es endete). Der Controller sendet das GAME_OVER dieses Spiels höchstens einmal pro Minute erneut; Freigeben sendet es sofort.",
     "empty": "Keine Box in einem beendeten Spiel gehört.",
     "no_watch": "Das Funkmodem kann Boxen in einem beendeten Spiel nicht melden: Aktualisiere seine Firmware. Bis dahin nimm eine solche Box an der Box selbst aus dem Spiel: * 3 s lang halten für „Spiel verlassen“ im Admin-Menü, oder @leave <Admin-PIN> auf ihrer USB-Konsole eingeben.",
+    "no_watch_pod": "Ein I/O-Pod kann Boxen in einem beendeten Spiel nicht melden: Damit der Controller sie selbst freigibt, nutze ein USB-Funkmodem mit aktueller Firmware. Bis dahin nimm eine solche Box an der Box selbst aus dem Spiel: * 3 s lang halten für „Spiel verlassen“ im Admin-Menü, oder @leave <Admin-PIN> auf ihrer USB-Konsole eingeben.",
     "game": "Spiel",
     "nodes": "Gehörte Knoten",
     "signal": "Signal",
