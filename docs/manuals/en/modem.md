@@ -239,6 +239,8 @@ sudo journalctl -u atalaia-controller -n 50 | grep -i modem
 
 You should see `atalaia.modem INFO modem link up` and, just before it, `atalaia.modem INFO modem: {...}`: the modem's identity, with its `fw_version` and its `region`. A failure shows as `cannot open the modem at /dev/ttyACM0: ...`, `modem missed ping 1 of 3` or `modem link lost; reconnecting`.
 
+The identity of a modem built from this release on also says `"games": true`: the modem then tells the controller when it hears a box still in a game that is over (one that was switched off when its game ended), and the controller frees it by telling it again that the game is over. An older modem logs `the radio modem's firmware cannot report boxes still in an ended game` once; flash this image to get the automatic recovery, or take such a box out at the box (its admin menu's **Leave the game**, or `@leave` over USB: [Field Box manual](field-box.md#d-take-a-box-out-of-its-game)).
+
 **In the GM console** ([Game master manual, section 3](game-master.md#3-open-the-gm-console)): the pill at the top right says **Radio: up**. `connecting` and `down` are not yet working, and **no modem** means the setting is empty. If the modem drops, an alert says **Radio down: the USB modem does not answer.**, and **Radio back.** when it returns. The **Controller** tab lists **Radio**, **Modem** (the modem's firmware and version) and **Modem reconnects**: a count that keeps rising means a bad cable, port or power.
 
 **Two more checks, in the console's Settings:**

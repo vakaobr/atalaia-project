@@ -47,6 +47,9 @@ typedef enum {
     MODEM_FRAME_FIELD_TX = 0x09,  /* host -> modem: id (u16) + a whole field frame to send */
     MODEM_FRAME_FIELD_RX = 0x0A,  /* modem -> host: a field frame heard + rssi + snr */
     MODEM_FRAME_FIELD_ACK = 0x0B, /* modem -> host: id (u16) + status, the outcome of a FIELD_TX */
+    /* A packet of another game heard (protocol/usb-modem.md, RFC 0001 Amendment 27): its game id
+     * and source from the header in the clear, rssi, snr. Only after WATCH_GAMES on. */
+    MODEM_FRAME_OTHER_GAME = 0x0C, /* modem -> host: game_id (u16) + source (u16) + rssi + snr */
 } modem_frame_type_t;
 
 /* CMD opcodes (first payload byte of a CMD frame). */
@@ -63,7 +66,14 @@ typedef enum {
                                         reply NOISE when done */
     MODEM_CMD_SET_LANG = 0x09,       /* the language of the modem's own screen: 0-8 ASCII bytes
                                         (a code like "pt", "zh-tw"; none: the build's default) */
+    MODEM_CMD_WATCH_GAMES = 0x0A, /* on u8 (0 or 1): report packets of other games (OTHER_GAME) */
 } modem_cmd_t;
+
+/* OTHER_GAME: its payload length, and at most one report per game id in this time. The modem
+ * remembers MODEM_OTHER_GAMES game ids; a new one while all are within the time is not reported. */
+#define MODEM_OTHER_GAME_LEN 6
+#define MODEM_OTHER_GAME_MS  10000u
+#define MODEM_OTHER_GAMES    8
 
 /* Longest language code of a SET_LANG, without the opcode. */
 #define MODEM_LANG_MAX 8

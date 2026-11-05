@@ -34,6 +34,8 @@ FIELD_TX = 0x09   # controller -> modem: id (2) + a whole field frame
 FIELD_RX = 0x0A   # modem -> controller: a field frame heard + rssi + snr
 FIELD_ACK = 0x0B  # modem -> controller: id (2) + status (TX_STATUS)
 FIELD_FRAME_MAX = 217
+# Another game's packet heard (RFC 0001 Amendment 27, IDENT "games": true), after WATCH_GAMES on.
+OTHER_GAME = 0x0C  # modem -> controller: game_id (2) + source (2) + rssi + snr
 
 # CMD opcodes
 CMD_PING = 0x01
@@ -46,6 +48,7 @@ CMD_IDENT = 0x07
 CMD_MEASURE = 0x08
 CMD_SET_LANG = 0x09  # the language of the modem's own screen (IDENT "lang": true)
 LANG_MAX = 8
+CMD_WATCH_GAMES = 0x0A  # on (1): report packets of other games in OTHER_GAME (IDENT "games": true)
 
 MEASURE_CAD = 0x01
 MEASURE_DWELL_MIN_MS = 10
@@ -263,6 +266,27 @@ def decode_field_rx(payload: bytes) -> tuple[bytes, int, int]:
     return payload[:-2], rssi, snr
 
 
+@dataclass
+class OtherGame:
+    """An OTHER_GAME frame: a packet of another game heard; its game id and source are the header's,
+    in the clear (the modem holds no key for that game, so nothing is authenticated)."""
+
+    game_id: int
+    source: int
+    rssi: int
+    snr: int
+
+
+def decode_other_game(payload: bytes) -> OtherGame:
+    if len(payload) != 6:
+        raise FrameError("OTHER_GAME is 6 bytes")
+    return OtherGame(*struct.unpack(">HHbb", payload))
+
+
+def watch_games_payload(on: bool) -> bytes:
+    return bytes([CMD_WATCH_GAMES, 1 if on else 0])
+
+
 def decode_field_ack(payload: bytes) -> tuple[int, str]:
     if len(payload) != 3:
         raise FrameError("FIELD_ACK is 3 bytes")
@@ -273,4 +297,4 @@ def decode_field_ack(payload: bytes) -> tuple[int, str]:
 def frame_name(frame_type: int) -> Optional[str]:
     return {IDENT: "IDENT", RX: "RX", TX: "TX", TX_ACK: "TX_ACK", CMD: "CMD", STATUS: "STATUS",
             ERROR: "ERROR", NOISE: "NOISE", FIELD_TX: "FIELD_TX", FIELD_RX: "FIELD_RX",
-            FIELD_ACK: "FIELD_ACK"}.get(frame_type)
+            FIELD_ACK: "FIELD_ACK", OTHER_GAME: "OTHER_GAME"}.get(frame_type)

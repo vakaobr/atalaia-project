@@ -24,9 +24,10 @@ KEY = bytes(range(16))
 class Ports:
     """A factory handing out FakeSerial ports; can be told to fail."""
 
-    def __init__(self, mute: bool = False, lang: bool = False) -> None:
+    def __init__(self, mute: bool = False, lang: bool = False, games: bool = False) -> None:
         self.mute = mute
         self.lang = lang
+        self.games = games
         self.fail = False
         self.opened: list[FakeSerial] = []
         self.lock = threading.Lock()
@@ -35,7 +36,7 @@ class Ports:
         with self.lock:
             if self.fail:
                 raise OSError("no such device")
-            port = FakeSerial(mute=self.mute, lang=self.lang)
+            port = FakeSerial(mute=self.mute, lang=self.lang, games=self.games)
             self.opened.append(port)
             return port
 
@@ -126,6 +127,47 @@ class RadioModemTests(unittest.TestCase):
             self.assertFalse(ports.current.frames(mf.CMD, mf.CMD_SET_LANG))
         finally:
             modem.stop()
+
+    def test_other_games_are_watched_on_a_modem_that_can(self):
+        """WATCH_GAMES (RFC 0001 Amendment 27): sent after an IDENT that says "games", again after every
+        IDENT (a rebooted modem forgot it); its OTHER_GAME reports reach the controller."""
+        ports = Ports(games=True)
+        heard: list[mf.OtherGame] = []
+        modem, _ = make(ports, on_other_game=heard.append)
+        modem.watch_games(True)  # before start: kept for the port
+        modem.start()
+        try:
+            self.assertTrue(modem.wait_up(2))
+            first = ports.current
+            self.assertTrue(wait_for(lambda: first.frames(mf.CMD, mf.CMD_WATCH_GAMES) == [b"\x0a\x01"]))
+            self.assertTrue(modem.has_other_games)
+            first.push(mf.OTHER_GAME, bytes([0, 240, 0, 5, 0xBA, 4]))
+            self.assertTrue(wait_for(lambda: heard == [mf.OtherGame(240, 5, -70, 4)]))
+            first.push(mf.IDENT, b'{"fw":"atalaia-modem","fw_version":"fake","games":true}')  # it rebooted
+            self.assertTrue(wait_for(lambda: len(first.frames(mf.CMD, mf.CMD_WATCH_GAMES)) == 2))
+            first.push(mf.OTHER_GAME, b"\x00\xf0")  # malformed: logged, the link goes on
+            modem.watch_games(False)
+            self.assertTrue(wait_for(lambda: first.frames(mf.CMD, mf.CMD_WATCH_GAMES)[-1] == b"\x0a\x00"))
+        finally:
+            modem.stop()
+
+    def test_an_older_modem_is_never_asked_and_it_is_logged_once(self):
+        ports = Ports()  # its IDENT has no "games"
+        modem, _ = make(ports)
+        modem.watch_games(True)
+        with self.assertLogs("atalaia.modem", "WARNING") as logs:
+            modem.start()
+            try:
+                self.assertTrue(modem.wait_up(2))
+                self.assertTrue(wait_for(lambda: modem.ident is not None))
+                ports.current.push(mf.IDENT, b'{"fw":"atalaia-modem","fw_version":"fake"}')
+                modem.watch_games(True)
+                self.assertTrue(wait_for(lambda: len(ports.current.frames(mf.CMD, mf.CMD_IDENT)) >= 1))
+            finally:
+                modem.stop()
+        self.assertFalse(modem.has_other_games)
+        self.assertFalse(ports.current.frames(mf.CMD, mf.CMD_WATCH_GAMES))
+        self.assertEqual(sum("cannot report boxes still in an ended game" in line for line in logs.output), 1)
 
     def test_three_missed_pings_reconnect(self):
         ports = Ports(mute=True)

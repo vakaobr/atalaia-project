@@ -652,6 +652,11 @@ class Store:
                 best = max(best, float(row["t"]))
         return best
 
+    def setting_keys(self, prefix: str) -> list[str]:
+        """The keys of the settings that start with ``prefix``."""
+        rows = self._exec("SELECT key FROM settings WHERE substr(key, 1, ?) = ?", (len(prefix), prefix)).fetchall()
+        return [r["key"] for r in rows]
+
     def delete_setting(self, key: str) -> None:
         self._exec("DELETE FROM settings WHERE key = ?", (key,))
 
