@@ -36,6 +36,9 @@ class ScriptedModem implements PodTransport {
   @override
   Future<void> close() async => _in.close();
 
+  /// A frame from the modem.
+  void push(int type, List<int> payload) => _in.add(encodeFrame(type, payload));
+
   void ident({required bool lang}) => _in.add(
     encodeFrame(
       ModemFrame.ident,

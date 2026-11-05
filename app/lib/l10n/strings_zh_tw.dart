@@ -860,6 +860,8 @@ const Map<String, String> zhTwStrings = {
   'ctl.radio_up': '無線電已啟用',
   'ctl.radio_down': '無線電未啟用',
   'ctl.radio_connecting': '正在連接無線電…',
+  'ctl.stuck_no_watch_modem': '這個 USB 無線電數據機的韌體無法回報仍在已結束遊戲中的盒子：請更新它，讓控制器自動讓這些盒子離開遊戲。在那之前，請在盒子上讓它離開遊戲：按住 * 3 秒開啟管理選單的「離開遊戲」，或在它的 USB 主控台輸入 @leave <管理 PIN>。',
+  'ctl.stuck_no_watch_pod': 'I/O 模組無法回報仍在已結束遊戲中的盒子。要讓控制器自動讓它們離開遊戲，請使用韌體為最新版的 USB 無線電數據機。在那之前，請在盒子上讓它離開遊戲：按住 * 3 秒開啟管理選單的「離開遊戲」，或在它的 USB 主控台輸入 @leave <管理 PIN>。',
   'ctl.pod_forget': '解除連接模組',
   'ctl.codes': '存取碼',
   'ctl.codes_hint': '控制台會要求其中一個。主辦的存取碼可以操控遊戲：不要給玩家看。',

@@ -1038,6 +1038,8 @@ const Map<String, String> deStrings = {
   'ctl.radio_up': 'Funk aktiv',
   'ctl.radio_down': 'Funk ausgefallen',
   'ctl.radio_connecting': 'Funk wird verbunden…',
+  'ctl.stuck_no_watch_modem': 'Die Firmware dieses USB-Funkmodems kann Boxen in einem beendeten Spiel nicht melden: Aktualisiere sie, damit der Controller sie selbst freigibt. Bis dahin nimm eine solche Box an der Box selbst aus dem Spiel: * 3 s lang halten für „Spiel verlassen“ im Admin-Menü, oder @leave <Admin-PIN> auf ihrer USB-Konsole eingeben.',
+  'ctl.stuck_no_watch_pod': 'Ein I/O-Pod kann Boxen in einem beendeten Spiel nicht melden. Damit der Controller sie selbst freigibt, nutze ein USB-Funkmodem mit aktueller Firmware. Bis dahin nimm eine solche Box an der Box selbst aus dem Spiel: * 3 s lang halten für „Spiel verlassen“ im Admin-Menü, oder @leave <Admin-PIN> auf ihrer USB-Konsole eingeben.',
   'ctl.pod_forget': 'Pod entkoppeln',
   'ctl.codes': 'Zugangscodes',
   'ctl.codes_hint':

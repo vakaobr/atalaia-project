@@ -59,6 +59,8 @@ abstract final class RadioOp {
   static const measure = 8;
   static const setLang =
       9; // the language of a USB modem's own OLED (IDENT `lang`)
+  static const watchGames =
+      10; // a USB modem reports other games' packets (IDENT `games`)
 }
 
 const int capabilitiesMax = 16;

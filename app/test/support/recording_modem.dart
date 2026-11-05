@@ -178,6 +178,26 @@ class RecordingModem extends ControllerModem {
     return fields.length;
   }
 
+  // --- other games' packets (RFC 0001 Amendment 27), as the Pi's FakeModem:
+  // kept apart from [log] too.
+
+  /// The modem's IDENT says `"games": true`.
+  bool games = true;
+
+  /// What WATCH_GAMES asked, in order.
+  final watching = <bool>[];
+
+  @override
+  bool get hasOtherGames => games;
+
+  @override
+  void watchGames(bool on) => watching.add(on);
+
+  /// A packet of [gameId] from [source] heard, as its OTHER_GAME reaches the
+  /// controller.
+  void otherGame(int gameId, int source, {int rssi = -70, int snr = 4}) =>
+      onOtherGame?.call(OtherGame(gameId, source, rssi, snr));
+
   /// The noise per channel: (90th percentile in dBm, CAD detections of 10);
   /// -118 dBm and none when not given (the Pi's FakeModem).
   final noise = <int, (int, int)>{};

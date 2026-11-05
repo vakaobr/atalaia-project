@@ -130,6 +130,21 @@ abstract class ControllerModem {
 
   /// The outcome of a [sendField] (ok, duty_cycle, invalid...).
   void Function(int id, String status)? onFieldAck;
+
+  // --- other games' packets (RFC 0001 Amendment 27, decisions STUCK-1+) ----
+
+  /// The radio reports packets of other games (a USB modem whose IDENT says
+  /// `"games": true`, WATCH_GAMES and OTHER_GAME). An I/O pod never does.
+  bool get hasOtherGames => false;
+
+  /// Asks the radio to report packets of other games ([onOtherGame]); kept
+  /// and sent again whenever the radio identifies itself. A radio that
+  /// cannot is never asked.
+  void watchGames(bool on) {}
+
+  /// A packet of another game heard: its game id and source as the header
+  /// has them in the clear (not authenticated), with its RSSI and SNR.
+  void Function(OtherGame other)? onOtherGame;
   // --- the noise scan (slice S7a, controller_channel.dart) -----------------
 
   /// Whether the radio has a radio chip (radio_modem.py's IDENT
@@ -177,6 +192,40 @@ abstract class ControllerModem {
       Future.error(
         MeasureException('unknown_cmd', 'this radio cannot measure'),
       );
+}
+
+/// An OTHER_GAME report (protocol/usb-modem.md, modem_framing.py
+/// `OtherGame`): a packet of another game the radio heard. The radio holds
+/// no key for that game, so nothing in it is authenticated.
+class OtherGame {
+  const OtherGame(this.gameId, this.source, this.rssi, this.snr);
+
+  /// OTHER_GAME's payload: game id and source (uint16 BE), RSSI and SNR
+  /// (int8). Throws [FormatException] unless it is 6 bytes.
+  factory OtherGame.decode(List<int> p) {
+    if (p.length != 6) throw const FormatException('OTHER_GAME is 6 bytes');
+    int i8(int b) => b >= 128 ? b - 256 : b;
+    return OtherGame(p[0] << 8 | p[1], p[2] << 8 | p[3], i8(p[4]), i8(p[5]));
+  }
+
+  final int gameId;
+  final int source;
+  final int rssi;
+  final int snr;
+
+  @override
+  bool operator ==(Object other) =>
+      other is OtherGame &&
+      other.gameId == gameId &&
+      other.source == source &&
+      other.rssi == rssi &&
+      other.snr == snr;
+
+  @override
+  int get hashCode => Object.hash(gameId, source, rssi, snr);
+
+  @override
+  String toString() => 'OtherGame($gameId, $source, $rssi, $snr)';
 }
 
 /// A MEASURE the radio refused or could not finish (radio_modem.py
