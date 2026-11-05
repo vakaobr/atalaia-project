@@ -678,7 +678,11 @@ section 11 (`%FLASH%`, `COM5`).
    @wifi <your network> <its password>
    ```
 
-   The log shows `join key: stored`, `field: joined game ...` and `field Wi-Fi: stored`.
+   The log shows `join key: stored`, `field: joined game ...` and `field Wi-Fi: stored (network
+   "...")`. A network name or password with spaces goes in double quotes, with `\"` for a quote
+   and `\\` for a backslash inside: `@wifi "My Field" "pass word"`. An unclosed quote, a name
+   over 32 bytes or a password that is not 8-63 characters or 64 hex digits is refused with
+   `field Wi-Fi: refused: ...` and nothing is stored.
 6. **Upload B** in the console's *Boxes* tab (*Firmware updates*: the `.bin` and its
    `.release.json`). It is listed as `0.3.1-bench.1`, `heltec_v4_3`, signed by the bench key.
 7. **Update:** on the serial console `@update 0.3.1-bench.1 <release id>`. Expected: the OLED

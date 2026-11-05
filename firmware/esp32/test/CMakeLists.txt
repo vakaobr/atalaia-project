@@ -180,6 +180,7 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/box_game.c
     ${SHELL_DIR}/box_lobby.c
     ${SHELL_DIR}/serial_console.c
+    ${SHELL_DIR}/wifi_args.c
     ${SHELL_DIR}/fw_update.c
     ${SHELL_DIR}/fw_layout.c
     ${SHELL_DIR}/mode_package.c
@@ -256,6 +257,7 @@ set(TEST_SOURCES
     test_box_game.c
     test_box_text.c
     test_serial_console.c
+    test_wifi_args.c
     test_board_fem.c
     test_screen_template.c
     test_pod.c

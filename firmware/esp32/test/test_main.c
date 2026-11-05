@@ -51,6 +51,7 @@ int main(void)
     run_box_game_tests();
     run_box_text_tests();
     run_serial_console_tests();
+    run_wifi_args_tests();
     run_board_fem_tests();
     run_screen_template_tests();
     run_pod_tests();
