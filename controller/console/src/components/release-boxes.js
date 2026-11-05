@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The field-wide RELEASE (RFC 0001 Amendment 28, proposed; decisions STUCK-50 to STUCK-59): for a
+// The field-wide RELEASE (RFC 0001 Amendment 28; decisions STUCK-50 to STUCK-59): for a
 // controller that lost a game entirely (reinstalled, its database lost), no GAME_OVER can name the
 // game a box is still in. "Release every box not in this game" asks first, then
 // POST /api/v1/boxes/release: every box of the field on this channel that is in a game other than

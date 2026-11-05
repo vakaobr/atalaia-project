@@ -75,9 +75,17 @@ abstract interface class ControllerStore {
 class MemoryControllerStore implements ControllerStore {
   MemoryControllerStore({double Function()? wallSeconds})
     : _wall =
-          wallSeconds ?? (() => DateTime.now().microsecondsSinceEpoch / 1e6);
+          wallSeconds ?? (() => DateTime.now().microsecondsSinceEpoch / 1e6),
+      wallGiven = wallSeconds != null;
 
-  final double Function() _wall;
+  double Function() _wall;
+
+  /// Whether the wall clock was given; without one the engine gives its own
+  /// (the system clock with the GM's correction, controller_clock.dart).
+  final bool wallGiven;
+
+  /// The wall clock of `received_at` and `last_seen`.
+  set wallSeconds(double Function() wall) => _wall = wall;
   final _games = <int, Map<String, Object?>>{};
   final _keys = <int, Uint8List>{};
   final _events = <int, List<Map<String, Object?>>>{};

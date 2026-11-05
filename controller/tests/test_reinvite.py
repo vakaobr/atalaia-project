@@ -546,6 +546,7 @@ class StuckGameTests(GameOverTests):
         [stuck] = listed["stuck"]
         self.assertEqual((stuck["game"], stuck["nodes"], stuck["rssi"], stuck["game_over_resent"]), (gid, [4], -70, 1))
         self.assertEqual((stuck["last_heard_s"], listed["stuck_reports"], listed["stuck_watch"]), (21, 1, True))
+        self.assertEqual(listed["radio_kind"], "modem")  # the console's hint fits a USB radio modem (STUCK-64)
         self.assertIn("boxes", {m["type"] for m in self.messages})
 
     def test_at_most_once_a_minute_per_game(self):
@@ -635,7 +636,7 @@ class StuckGameTests(GameOverTests):
         self.assertEqual(self.frames(), [{"kind": "game_over", "game_id": gid, "key_tag": ff.key_tag(key)}])
         # The consoles hear of it on the stream, with the stuck list.
         [msg] = [m for m in self.messages if m["type"] == "boxes"]
-        self.assertEqual((msg["stuck"][0]["game_over_resent"], msg["stuck_watch"]), (2, True))
+        self.assertEqual((msg["stuck"][0]["game_over_resent"], msg["stuck_watch"], msg["radio_kind"]), (2, True, "modem"))
         while self.modem.fields:
             self.box.on_frame(self.modem.fields.pop(0), self.ctrl.now_ms())
         self.assertEqual(self.box.phase, "ended")
@@ -741,6 +742,24 @@ class ReleaseFieldTests(GameOverTests):
         other.on_frame(frame, self.ctrl.now_ms())
         self.assertEqual(other.phase, "joined")
         self.assertIn("release refused", other.log[-1])
+
+    def test_time_and_release_carry_the_same_corrected_clock(self):
+        """A box's join time is the wall_s of its game's first TIME and RELEASE's time is compared with it
+        (Amendment 28's replay rule): both are wallclock.now(), with the GM's correction (STUCK-68)."""
+        import time as _time
+        from atalaia_sim.packet import time_decode
+        wallclock._offset = 3600.0  # a GM set the clock an hour forward
+        self.addCleanup(wallclock.reset)
+        gid = self.game()
+        self.ctrl.start_game(gid, force=True)
+        times = [time_decode(p)["wall_s"] for _, p in self.modem.of("TIME")]
+        self.assertTrue(times)
+        self.assertLessEqual(abs(times[0] - int(_time.time() + 3600)), 2)
+        self.ctrl.end_game(gid, "done")
+        out = self.release_all().json()
+        self.assertEqual(out["release_frame"], "sent")
+        self.assertLessEqual(abs(out["time"] - int(wallclock.now())), 1)
+        self.assertGreaterEqual(out["time"], times[-1])
 
     def test_release_with_no_game_live_names_none(self):
         self.assertEqual(self.release_all().json()["live_game"], 0)

@@ -1498,6 +1498,7 @@
     "intro": "Estas caixas foram ouvidas ainda num jogo que já terminou (estavam desligadas quando acabou). O controlador volta a enviar o GAME_OVER desse jogo no máximo uma vez por minuto; Libertar envia-o agora.",
     "empty": "Nenhuma caixa ouvida ainda num jogo terminado.",
     "no_watch": "O modem de rádio não consegue dizer que caixas ficaram num jogo terminado: atualiza o seu firmware. Até lá, tira a caixa do jogo na própria caixa: mantém * premido 3 s para o menu de administração, “Sair do jogo”, ou escreve @leave <PIN de administração> na sua consola USB.",
+    "no_watch_pod": "Um módulo de E/S não consegue dizer que caixas ficaram num jogo terminado: para que o controlador as liberte sozinho, usa um modem de rádio USB com o firmware atualizado. Até lá, tira a caixa do jogo na própria caixa: mantém * premido 3 s para o menu de administração, “Sair do jogo”, ou escreve @leave <PIN de administração> na sua consola USB.",
     "game": "Jogo",
     "nodes": "Nós ouvidos",
     "signal": "Sinal",

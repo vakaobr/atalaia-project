@@ -475,6 +475,16 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("tab-nodes").click()
         expect(page.get_by_test_id("stuck-no-watch")).to_contain_text("update its firmware")
         expect(page.get_by_test_id("stuck-no-watch")).to_contain_text("@leave")
+        # A phone controller with an I/O pod as its radio (STUCK-64 as changed by the maintainer): the
+        # hint says to use a USB radio modem, not to update the pod's firmware.
+        view = reinvite.stuck_view
+        reinvite.stuck_view = lambda: {**view(), "radio_kind": "pod"}
+        self.addCleanup(setattr, reinvite, "stuck_view", view)
+        page.reload()
+        page.get_by_test_id("tab-nodes").click()
+        expect(page.get_by_test_id("stuck-no-watch")).to_contain_text("An I/O pod cannot report")
+        expect(page.get_by_test_id("stuck-no-watch")).to_contain_text("use a USB radio modem")
+        expect(page.get_by_test_id("stuck-no-watch")).not_to_contain_text("update its firmware")
 
     def test_release_every_box_not_in_this_game(self):
         """RFC 0001 Amendment 28 (decisions STUCK-50 to STUCK-59): for a controller that lost a game, Settings
@@ -4740,7 +4750,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v21').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v22').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js", "/console/labels.js", "/console/qr-svg.js"):

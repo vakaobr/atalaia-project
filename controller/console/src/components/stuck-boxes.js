@@ -8,11 +8,12 @@
 // minute. This list shows those games from GET /api/v1/boxes (`stuck`, kept live by the stream's
 // `boxes` message): the game, the node ids heard, how long ago, the signal and how many times its
 // GAME_OVER was sent again, with a Release button that sends it now
-// (POST /api/v1/boxes/stuck/{game}/release). A modem that cannot report them (`stuck_watch` false)
-// gets a hint: update its firmware, and take such a box out at the box (the admin menu's "Leave the
-// game", or @leave). A controller that does not report them at all (no `stuck_watch`: an older Pi or
-// phone controller) shows nothing; a phone controller reports them since STUCK-60 (with an I/O pod
-// as its radio, `stuck_watch` is false).
+// (POST /api/v1/boxes/stuck/{game}/release). A radio that cannot report them (`stuck_watch` false)
+// gets a hint that fits it (`radio_kind`, STUCK-64 as changed by the maintainer): an older USB radio
+// modem, update its firmware; an I/O pod (a phone controller's), use a USB radio modem; both, take
+// such a box out at the box (the admin menu's "Leave the game", or @leave). A controller that does
+// not report them at all (no `stuck_watch`: an older Pi or phone controller) shows nothing; a phone
+// controller reports them since STUCK-60 (with an I/O pod as its radio, `stuck_watch` is false).
 
 import { html, Component, t } from '../ui.js';
 
@@ -68,7 +69,7 @@ export class StuckBoxes extends Component {
         if (compact && !stuck.length && info.stuck_watch) return null;
         return html`<section class=${compact ? 'stuck' : 'card stuck'} data-testid="stuck-boxes" aria-labelledby="stuck-h">
             <h3 id="stuck-h">${t('stuck.title')}</h3>
-            ${!info.stuck_watch && html`<p class="warning small" data-testid="stuck-no-watch">${t('stuck.no_watch')}</p>`}
+            ${!info.stuck_watch && html`<p class="warning small" data-testid="stuck-no-watch">${t(info.radio_kind === 'pod' ? 'stuck.no_watch_pod' : 'stuck.no_watch')}</p>`}
             ${stuck.length === 0
                 ? info.stuck_watch && html`<p class="muted small" data-testid="stuck-empty">${t('stuck.empty')}</p>`
                 : html`<p class="muted small">${t('stuck.intro')}</p>

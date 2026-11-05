@@ -23,7 +23,7 @@ on the old channel, MOVE_REPEATS times, where the field is now (the new channel 
 only rises); a free box takes it, listens there and announces itself. A sweep says it again on each
 earlier channel for the boxes that were away, which a GM's DISCOVER starts.
 
-RELEASE (RFC 0001 Amendment 28, proposed) is for a controller that lost the game entirely (a new
+RELEASE (RFC 0001 Amendment 28) is for a controller that lost the game entirely (a new
 database): no key tag names the game a box is stuck in. It says "game L is live (0: none), it is now
 T", RELEASE_REPEATS times; a box in a game other than L that it joined before T (the wall clock of the
 first TIME it took in that game, which the box keeps) ends it as on GAME_OVER. A RELEASE recorded and

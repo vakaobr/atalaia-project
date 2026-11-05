@@ -10,7 +10,7 @@ the game id and its key's tag, for a controller that lost the game's key;
 decision OT-13), and says that the field has moved to another channel (MOVE: the new channel
 and a revision that only rises, RFC 0001 Amendment 19), and frees every box in a game other than
 the live one (RELEASE: the live game id or 0, and the controller's wall clock, for a controller that
-lost the game entirely; RFC 0001 Amendment 28, proposed). On air::
+lost the game entirely; RFC 0001 Amendment 28). On air::
 
     header (9: game_id 0, source 0, seq 0, hop_limit 0, type 9) | nonce (13) | body | MIC (8)
 
