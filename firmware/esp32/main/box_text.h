@@ -163,6 +163,12 @@ typedef enum {
     TX_ADOPT_AGAIN_UP,
     TX_ADOPT_WARNING,
     TX_KEYS_ADOPT,
+    /* the menu over a field game: "Leave the game" (preset_ui.h; decisions STUCK-20 to STUCK-33) */
+    TX_LEAVE_ITEM,
+    TX_LEAVE_AGAIN_UP,
+    TX_LEAVE_WARNING,
+    TX_KEYS_LEAVE,
+    TX_ADMIN_UP, /* that menu's header */
     /* the picker's "Outputs" entry: the simple outputs' settings at the box (outputs_admin.h) */
     TX_OUTPUTS_ITEM,
     TX_OUTPUT_UP,     /* %d: the output's number, %d: its GPIO */
@@ -205,6 +211,9 @@ typedef enum {
     TXO_KEYS_SETUP,
     TXO_CHANGE_FIELD,
     TXO_CHANGE_FIELD_Q,
+    TXO_LEAVE_GAME,
+    TXO_LEAVE_Q,
+    TXO_ADMIN,
     TXO_OUTPUT,  /* %d: the output's number, %d: its GPIO */
     TXO_OUT_ON,  /* enabled, in the header's right corner */
     TXO_OUT_OFF, /* disabled */

@@ -166,6 +166,9 @@
  *                               "outputs": each simple output's id, GPIO, enabled, on, pulsing
  *                               (a module's channel: "gpio": -1 and its "module"), and
  *                               "modules": the expansion port's modules
+ *   @leave <PIN>                the box leaves its game by hand, as a GAME_OVER for it would
+ *                               (main/box_game.c, decisions STUCK-20 to STUCK-33; the PIN is
+ *                               --admin-pin's, counted with its waits)
  *   @outputs                    one "LOG outputs: ..." line: the simple outputs' settings
  *   @output <n> enable|disable|test <PIN>, @output <n> function <name> <PIN>,
  *   @output <n> max <seconds> <PIN>
@@ -1513,6 +1516,7 @@ int main(int argc, char **argv)
                 char key;
                 const char *command = NULL;
                 serial_input_t in = serial_console_feed(&console, buf[i], &key, &command);
+                static char leave_reply[160];
                 if (in == SERIAL_COMMAND) {
                     if (strncmp(command, "join ", 5) == 0) {
                         box_join_result_t r = box_game_join_text(&game, command + 5);
@@ -1549,6 +1553,10 @@ int main(int argc, char **argv)
                                                   sizeof(reply_out));
                         }
                         out("LOG %s", reply_out);
+                    } else if (box_game_leave_command(&game, &guard, false, command, leave_reply,
+                                                      sizeof(leave_reply))) {
+                        /* "@leave <PIN>": out of the game by hand, as a release build. */
+                        out("LOG %s", leave_reply);
                     } else if (strncmp(command, "tag ", 4) == 0) {
                         out("LOG tag %s",
                             box_game_tag_text(&game, command + 4) ? "read" : "not read");

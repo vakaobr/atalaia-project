@@ -31,6 +31,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "admin_pin.h"
 #include "atalaia/field_frame.h"
 #include "atalaia/join.h"
 #include "atalaia/tag.h"
@@ -407,6 +408,35 @@ box_join_result_t box_game_join_invited(box_game_t *g, const uint8_t *payload, s
 /* Internal to box_game.c and box_lobby.c: the field said this box's game is over (a GAME_OVER
  * field frame for its game id and key tag, decision OT-13): it ends exactly as on CMD end. */
 void box_game_end_by_field(box_game_t *g);
+
+/* ---- Leaving a game by hand (decisions STUCK-20 to STUCK-33) ------------------------ */
+
+/* True while the box may be taken out of its game at the box: joined, being played (paused
+ * too), or fetching its modes. Not between games, nor in a game already over (BOX_ENDED: it
+ * leaves on its own once its last events are acknowledged, or after BOX_END_LINGER_MS). */
+bool box_game_can_leave(const box_game_t *g);
+
+/*
+ * The box leaves its game by hand: the admin menu's "Leave the game", "@leave <admin PIN>" on the
+ * USB console (how: "admin menu", "console"; the caller has checked the PIN). It does exactly
+ * what a GAME_OVER field frame for its game does (decision OT-13): a game joined or played ends as
+ * on CMD end (the mode's game over, the stored join erased, then announcing itself and "Ready",
+ * BN-10 to BN-13), and is kept as played to its end, so the box never joins it again (BN-19); a
+ * mode fetch stops. Nothing else changes: the adoption, the join key, the Wi-Fi, the admin PIN and
+ * the modes stay. The box's log says that it left by hand, and how; the controller, if it still
+ * hears the box, sees its STATE "ended" (no new event: no wire change). False when not in a game.
+ */
+bool box_game_leave(box_game_t *g, const char *how);
+
+/*
+ * "@leave" on the USB console, gated as "@joinkey" (admin_pin_gate_serial, decision SR-40): a
+ * release build (open false) wants the admin PIN as its last word ("@leave <PIN>"), counted with
+ * its waits; a bench build (open true) takes "@leave" alone. Refused without touching the PIN
+ * while the box is in no game. cmd is the line without the '@'. Returns false if it is not that
+ * command; otherwise *reply holds one line for the console.
+ */
+bool box_game_leave_command(box_game_t *g, admin_pin_t *pin, bool open, const char *cmd,
+                            char *reply, size_t cap);
 
 /*
  * An NFC tag read while a game runs (joined or stand-alone): the node gets

@@ -249,6 +249,8 @@ Then a box with no field shows **PAIR THIS BOX** and a 6-digit code ([section 6]
 
 The box keeps its adoption and its field key. It replaces what the page asks for. The bench build has no setup page.
 
+**Take a box out of its game.** A box that was switched off when its game ended comes back in that game: its log refuses every join (`join: a game is being played`) and USB adoption (`busy`). Do not erase it. On the USB console type `@leave` and the admin PIN, then Enter. The box answers `leave: game N is over on this box; it is free for the next game`: it ends the game as the controller's end would, never joins that game again, and keeps its adoption, its join key, its Wi-Fi, its admin PIN and its modes. A wrong PIN counts toward the waits below. It works in a running game too. A box with a keypad has the same in its admin menu: hold `*` 3 seconds ([Field Box manual](field-box.md#d-take-a-box-out-of-its-game)). The bench build takes `@leave` alone.
+
 **Forgotten PIN.** After five wrong PINs the box makes you wait 1, 2, 4... up to 60 minutes. The wait survives a restart. If you really lost the PIN, erase the settings ([section 8](#8-a-box-that-does-not-boot)).
 
 Not yet tested on a real board: the setup page and the screens above. The page was tested on a computer and in the emulator.

@@ -25,6 +25,13 @@
  * PRESET_UI_STATE_OUTPUTS_REQUESTED, which the shell answers with the outputs screen
  * (outputs_admin.h: enable, function, max on, the 1 s test; decision EXP-28), and then sets the
  * state back to PRESET_UI_STATE_PRESET_LIST. Behind the same admin PIN as every game.
+ *
+ * With the leave entry on (preset_ui_enable_leave: the menu the shell opens over a field game,
+ * with no games and no other entry; decisions STUCK-20 to STUCK-33), the list ends with "Leave
+ * the game": '#' on it asks once more ('#' again confirms, '*' goes back) and then the state is
+ * PRESET_UI_STATE_LEAVE_REQUESTED, which the shell answers by ending the box's game as a
+ * GAME_OVER for it would (box_game_leave). Behind the same admin PIN. In that menu '*' with no
+ * digit typed closes it (PRESET_UI_STATE_CLOSED: the game's screen again).
  */
 #ifndef ATALAIA_PRESET_UI_H
 #define ATALAIA_PRESET_UI_H
@@ -50,6 +57,9 @@ typedef enum {
     PRESET_UI_STATE_ADOPT_CONFIRM,     /* "Change field?" */
     PRESET_UI_STATE_ADOPT_REQUESTED,   /* confirmed: the shell shows a pairing code */
     PRESET_UI_STATE_OUTPUTS_REQUESTED, /* "Outputs": the shell shows the outputs screen */
+    PRESET_UI_STATE_LEAVE_CONFIRM,     /* "Leave the game?" */
+    PRESET_UI_STATE_LEAVE_REQUESTED,   /* confirmed: the shell ends the box's game */
+    PRESET_UI_STATE_CLOSED,            /* the menu over a game was closed with '*' */
 } preset_ui_state_t;
 
 typedef struct {
@@ -68,7 +78,8 @@ typedef struct {
     bool no_pin;         /* the last '#' met a box with no admin PIN set */
     bool setup_entry;    /* the list ends with "Wi-Fi setup" (entry preset_count + 1) */
     bool adopt_entry;    /* and with "Adopt to another field" after it */
-    bool outputs_entry;  /* and with "Outputs" last */
+    bool outputs_entry;  /* and with "Outputs" after it */
+    bool leave_entry;    /* and with "Leave the game" last (the menu over a field game) */
 } preset_ui_t;
 
 /* Adds (or removes) the list's last entry, "Wi-Fi setup". Off by default. */
@@ -79,6 +90,10 @@ void preset_ui_enable_adopt(preset_ui_t *ui, bool on);
 
 /* Adds (or removes) the list's last entry, "Outputs". Off by default. */
 void preset_ui_enable_outputs(preset_ui_t *ui, bool on);
+
+/* Adds (or removes) the list's last entry, "Leave the game", and lets '*' with no digit typed
+ * close the menu. Off by default. */
+void preset_ui_enable_leave(preset_ui_t *ui, bool on);
 
 /* The box's admin PIN check (admin_pin.h), shared with adoption. */
 void preset_ui_set_guard(preset_ui_t *ui, admin_pin_t *guard);
@@ -111,12 +126,13 @@ uint32_t preset_ui_timer_duration(const preset_ui_t *ui);
  * timer_adjust or start_confirm; see screen_renderer.h). labels[i] is the
  * label of list entry i + 1; labels may be NULL when label_count is 0. The
  * list screen holds the current page only, with "page" and "pages" when there
- * is more than one.
+ * is more than one, and "admin":true in the menu over a game (preset_ui_enable_leave).
  * Returns false in PRESET_UI_STATE_GAME_STARTED, PRESET_UI_STATE_SETUP_REQUESTED,
- * PRESET_UI_STATE_ADOPT_REQUESTED and PRESET_UI_STATE_OUTPUTS_REQUESTED, which have no picker
- * screen. PRESET_UI_STATE_SETUP_CONFIRM is
- * the "start_confirm" template with "setup":true, PRESET_UI_STATE_ADOPT_CONFIRM the same with
- * "adopt":true.
+ * PRESET_UI_STATE_ADOPT_REQUESTED, PRESET_UI_STATE_OUTPUTS_REQUESTED,
+ * PRESET_UI_STATE_LEAVE_REQUESTED and PRESET_UI_STATE_CLOSED, which have no picker screen.
+ * PRESET_UI_STATE_SETUP_CONFIRM is the "start_confirm" template with "setup":true,
+ * PRESET_UI_STATE_ADOPT_CONFIRM the same with "adopt":true, PRESET_UI_STATE_LEAVE_CONFIRM with
+ * "leave":true.
  */
 bool preset_ui_screen(const preset_ui_t *ui, const char *const *labels, int label_count,
                       screen_update_t *out);

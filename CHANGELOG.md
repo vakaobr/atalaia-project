@@ -14,6 +14,8 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+- **A Field Box stuck in a game that ended while it was off leaves it at the box, with the admin PIN** (decisions STUCK-20 to STUCK-33; `firmware/esp32/main/box_game.c`, `box_game.h`, `preset_ui.c`, `preset_ui.h`, `shell.c`, `box_text.c`, `box_text.h`, `screen_renderer.c`, `oled_view.c`; `firmware/esp32/test/test_box_game.c`, `test_preset_ui.c`, `test_screens.c`, `test_oled_screens.c`, `box_host/box_host.c`, new screen references; `docs/manuals/en` and `pt`: `field-box.md`, `firmware.md`, `game-master.md`; `firmware/esp32/docs/BRING_UP.md`; `protocol/field-frames.md`): holding `*` for 3 s during a field game opens the admin PIN, then **Leave the game** (pt **Sair do jogo**, de **Spiel verlassen**, zh-TW **離開遊戲**) and a confirmation; `@leave <admin PIN>` on the USB console does the same, gated as `@joinkey` (the PIN's count and waits apply; a bench build takes `@leave` alone). The box ends its game exactly as a GAME_OVER for it would (the mode's game over, then announcing itself and Ready), keeps it as played to its end so it never joins it again, and keeps its adoption, join key, Wi-Fi, admin PIN and modes; a new join is taken at once. It also works in a running game, so a GM can pull a box out. No wire change: the box's log says it left by hand, and the controller sees its STATE "ended". Before, the only way out was erasing NVS and the storage partition over USB. Tested on a computer only.
+
 ## [0.8.0](https://github.com/vakaobr/atalaia-project/compare/v0.7.0...v0.8.0) (2026-11-04)
 
 ### ⚠ BREAKING CHANGES

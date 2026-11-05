@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "box_text.h"
+#include "admin_pin.h"
 #include "check.h"
 #include "preset_ui.h"
 
@@ -343,8 +344,98 @@ static void test_adopt_entry(void)
     CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_ADOPT_CONFIRM);
 }
 
+/* The menu over a field game (decisions STUCK-20 to STUCK-33): the admin PIN through the box's
+ * check (a wrong one counted), then "Leave the game" alone, asked once more; '*' with nothing
+ * typed closes it. The picker between games never lists it. */
+static void test_leave_entry(void)
+{
+    static const char *const labels[] = {"Bomb", "Domination"};
+    preset_ui_t ui;
+    screen_update_t su;
+    admin_pin_t guard;
+    admin_pin_init(&guard, NULL, "4711");
+
+    /* Between games: no "Leave the game", whatever else is on. */
+    preset_ui_init(&ui, NULL, 2);
+    preset_ui_set_guard(&ui, &guard);
+    preset_ui_enable_setup(&ui, true);
+    preset_ui_enable_adopt(&ui, true);
+    preset_ui_enable_outputs(&ui, true);
+    enter_keys(&ui, "4711#");
+    CHECK(preset_ui_screen(&ui, labels, 2, &su));
+    CHECK(strstr(su.data_json, "Leave") == NULL);
+    enter_keys(&ui, "5#"); /* "Outputs" is still the last entry */
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_OUTPUTS_REQUESTED);
+    /* '*' with nothing typed changes nothing there. */
+    preset_ui_init(&ui, NULL, 2);
+    preset_ui_set_guard(&ui, &guard);
+    enter_keys(&ui, "***");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_PIN_ENTRY);
+
+    /* Over a game: a wrong PIN is refused and counted, as everywhere else. */
+    preset_ui_init(&ui, NULL, 0);
+    preset_ui_set_guard(&ui, &guard);
+    preset_ui_enable_leave(&ui, true);
+    enter_keys(&ui, "1111#");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_PIN_ENTRY && ui.pin_error);
+    CHECK(guard.failures == 1);
+    enter_keys(&ui, "4711#");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_PRESET_LIST && guard.failures == 0);
+    CHECK(preset_ui_screen(&ui, NULL, 0, &su));
+    CHECK(strcmp(su.template_name, "preset_select") == 0);
+    CHECK(strcmp(su.data_json,
+                 "{\"presets\":[\"Leave the game\"],\"selected\":1,\"admin\":true}") == 0);
+    box_lang_set(BOX_LANG_PT);
+    CHECK(preset_ui_screen(&ui, NULL, 0, &su));
+    CHECK(strstr(su.data_json, "\"Sair do jogo\"") != NULL);
+    box_lang_set(BOX_LANG_EN);
+    CHECK(preset_ui_handle_key(&ui, '#'));
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_LEAVE_CONFIRM);
+    CHECK(preset_ui_screen(&ui, NULL, 0, &su));
+    CHECK(strcmp(su.template_name, "start_confirm") == 0);
+    CHECK(strcmp(su.data_json, "{\"leave\":true}") == 0);
+    /* '*' goes back; only '#' confirms. */
+    enter_keys(&ui, "*");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_PRESET_LIST);
+    enter_keys(&ui, "#");
+    CHECK(!preset_ui_handle_key(&ui, '5'));
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_LEAVE_CONFIRM);
+    enter_keys(&ui, "#");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_LEAVE_REQUESTED);
+    CHECK(!preset_ui_screen(&ui, NULL, 0, &su));
+    CHECK(!preset_ui_handle_key(&ui, '#'));
+
+    /* '*' deletes a digit first, and with none typed closes the menu. */
+    preset_ui_init(&ui, NULL, 0);
+    preset_ui_set_guard(&ui, &guard);
+    preset_ui_enable_leave(&ui, true);
+    enter_keys(&ui, "47*");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_PIN_ENTRY && ui.pin_pos == 1);
+    enter_keys(&ui, "*");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_PIN_ENTRY && ui.pin_pos == 0);
+    enter_keys(&ui, "*");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_CLOSED);
+    CHECK(!preset_ui_screen(&ui, NULL, 0, &su));
+    CHECK(guard.failures == 0); /* nothing was checked */
+
+    /* Behind it all, the other entries keep their places. */
+    preset_ui_init(&ui, NULL, 1);
+    preset_ui_set_guard(&ui, &guard);
+    preset_ui_enable_outputs(&ui, true);
+    preset_ui_enable_leave(&ui, true);
+    enter_keys(&ui, "4711#2#");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_OUTPUTS_REQUESTED);
+    preset_ui_init(&ui, NULL, 1);
+    preset_ui_set_guard(&ui, &guard);
+    preset_ui_enable_outputs(&ui, true);
+    preset_ui_enable_leave(&ui, true);
+    enter_keys(&ui, "4711#3#");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_LEAVE_CONFIRM);
+}
+
 void run_preset_ui_tests(void)
 {
+    test_leave_entry();
     test_adopt_entry();
     test_setup_entry();
     test_setup_entry_pages();

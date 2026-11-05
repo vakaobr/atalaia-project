@@ -497,6 +497,17 @@ and two boards at least 1 m apart, both antennas fitted.
 6. Range: walk the box away until the console marks it offline; with a
    third box joined half-way, the far box's captures reach the console
    again through the middle box's relay.
+7. A box stuck in an ended game (decisions STUCK-20 to STUCK-33): join the box, start the
+   game, switch the box off, end the game in the console, switch the box on. It comes back
+   in the game (`resumed game`) and refuses a new `@join` (`join: a game is being played`).
+   Type `@leave <admin PIN>` (on the bench build `@leave` alone): the log shows `field:
+   game <id>: left by hand at the box (console), as on a game over` and `leave: game <id> is
+   over on this box; it is free for the next game`, the screen the mode's game over, then
+   Ready after 30 s; a new game's `@join` is taken at once and the old game's text is refused
+   (`a game this box has played already`). The join key, the adoption and the Wi-Fi stay
+   (`@lobby` shows the same device id). On a box with a keypad, the same from the admin
+   menu: hold `*` 3 s during the game, the admin PIN and `#`, *Leave the game*, `#`, `#`.
+   A release build counts a wrong PIN in `@leave <wrong>` (`refused: admin PIN (wrong)`).
 
 ## Step 10b2: Invited into the next game over the radio (two boards on the desk)
 
