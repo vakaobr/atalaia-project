@@ -446,6 +446,30 @@ static int store_save_field_move(void *ctx, uint32_t channel_hz, uint32_t rev)
     return write_file("field_move", b, sizeof(b));
 }
 
+/* When the box joined its game (RFC 0001 Amendment 28): the file "join_time", the game key's tag
+ * (8 bytes) and the wall clock of its first TIME (4, big-endian). */
+static int store_load_join_time(void *ctx, uint8_t tag[ATALAIA_FF_TAG_SIZE], uint32_t *wall_s)
+{
+    (void)ctx;
+    uint8_t b[ATALAIA_FF_TAG_SIZE + 4];
+    if (read_file("join_time", b, sizeof(b)) != (int)sizeof(b)) return -1;
+    memcpy(tag, b, ATALAIA_FF_TAG_SIZE);
+    *wall_s = (uint32_t)b[8] << 24 | (uint32_t)b[9] << 16 | (uint32_t)b[10] << 8 | b[11];
+    return 0;
+}
+
+static int store_save_join_time(void *ctx, const uint8_t tag[ATALAIA_FF_TAG_SIZE], uint32_t wall_s)
+{
+    (void)ctx;
+    uint8_t b[ATALAIA_FF_TAG_SIZE + 4];
+    memcpy(b, tag, ATALAIA_FF_TAG_SIZE);
+    b[8] = (uint8_t)(wall_s >> 24);
+    b[9] = (uint8_t)(wall_s >> 16);
+    b[10] = (uint8_t)(wall_s >> 8);
+    b[11] = (uint8_t)wall_s;
+    return write_file("join_time", b, sizeof(b));
+}
+
 /* The screens' language, the last game's (join key 15): the file "lang". */
 static int store_load_lang(void *ctx, char *code, size_t cap)
 {
@@ -1406,6 +1430,8 @@ int main(int argc, char **argv)
                              .save_field_move = store_save_field_move,
                              .load_lang = store_load_lang,
                              .save_lang = store_save_lang,
+                             .load_join_time = store_load_join_time,
+                             .save_join_time = store_save_join_time,
                              .ctx = NULL};
     box_shell_ops_t shell = {.screen = shell_screen,
                              .log = shell_log,

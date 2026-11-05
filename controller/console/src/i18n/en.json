@@ -1493,25 +1493,42 @@
     "pending_note_one": "{n} declared replica not chronographed yet.",
     "back": "Back"
   },
-    "stuck": {
-      "title": "Stuck in an ended game",
-      "intro": "These boxes were heard still in a game that is over (they were switched off when it ended). The controller sends that game's GAME_OVER again at most once a minute; Release sends it now.",
-      "empty": "No box heard still in an ended game.",
-      "no_watch": "The radio modem cannot report boxes still in an ended game: update its firmware. Until then, take such a box out at the box: hold * for 3 s for the admin menu's “Leave the game”, or type @leave <admin PIN> on its USB console.",
-      "game": "Game",
-      "nodes": "Nodes heard",
-      "signal": "Signal",
-      "resent": "Resent",
-      "release": "Release",
-      "release_hint": "Send this game's GAME_OVER now, so that its boxes leave it",
-      "released": "GAME_OVER of “{game}” sent: its boxes leave the game and announce themselves free.",
-      "not_released": "GAME_OVER of “{game}” not sent: {why}.",
-      "why": {
-        "no_radio": "the radio modem is not connected or does not carry field frames",
-        "no_join_key": "this controller has no field join key",
-        "no_tag": "the controller kept no key tag for that game"
-      }
-    },
+  "stuck": {
+    "title": "Stuck in an ended game",
+    "intro": "These boxes were heard still in a game that is over (they were switched off when it ended). The controller sends that game's GAME_OVER again at most once a minute; Release sends it now.",
+    "empty": "No box heard still in an ended game.",
+    "no_watch": "The radio modem cannot report boxes still in an ended game: update its firmware. Until then, take such a box out at the box: hold * for 3 s for the admin menu's “Leave the game”, or type @leave <admin PIN> on its USB console.",
+    "game": "Game",
+    "nodes": "Nodes heard",
+    "signal": "Signal",
+    "resent": "Resent",
+    "release": "Release",
+    "release_hint": "Send this game's GAME_OVER now, so that its boxes leave it",
+    "released": "GAME_OVER of “{game}” sent: its boxes leave the game and announce themselves free.",
+    "not_released": "GAME_OVER of “{game}” not sent: {why}.",
+    "why": {
+      "no_radio": "the radio modem is not connected or does not carry field frames",
+      "no_join_key": "this controller has no field join key",
+      "no_tag": "the controller kept no key tag for that game"
+    }
+  },
+  "release_all": {
+    "title": "Boxes left in a lost game",
+    "intro": "For a controller that lost a game (reinstalled, or its data lost): no GAME_OVER can name that game, so its boxes stay in it. Release tells every box of this field on this channel that is in a game other than “{game}” to leave it, as on a game over. A box that joined its game after now is not affected.",
+    "intro_none": "For a controller that lost a game (reinstalled, or its data lost): no GAME_OVER can name that game, so its boxes stay in it. With no game live, Release tells every box of this field on this channel that is in a game to leave it, as on a game over. A box that joined its game after now is not affected.",
+    "button": "Release every box not in this game",
+    "button_none": "Release every box in a game",
+    "question": "Release every box of this field that is in another game?",
+    "warning": "Their games end on them for good. A game run at the same time by another controller of this field, on this channel, loses its boxes too.",
+    "yes": "Release",
+    "back": "Back",
+    "sent": "RELEASE sent: boxes in another game leave it and announce themselves free.",
+    "not_sent": "RELEASE not sent: {why}.",
+    "why": {
+      "no_radio": "the radio modem is not connected or does not carry field frames",
+      "no_join_key": "this controller has no field join key"
+    }
+  },
   "clock": {
     "wrong": "The controller's clock is wrong.",
     "reason_before_release": "It says {now}, which is before this software was released ({floor}). A Raspberry Pi 4 has no clock of its own and starts from an old time after a power cut.",

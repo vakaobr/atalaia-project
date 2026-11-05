@@ -185,6 +185,16 @@ size_t atalaia_ff_body_encode(const atalaia_ff_msg_t *m, uint8_t *buf, size_t ca
         mc_put_uint(&w, ATALAIA_FF_K_REV);
         mc_put_uint(&w, m->rev);
         break;
+    case ATALAIA_FF_RELEASE:
+        if (m->live_game == 0xFFFF || m->time_s == 0) return 0;
+        mc_put_map(&w, 3);
+        mc_put_uint(&w, ATALAIA_FF_K_KIND);
+        mc_put_uint(&w, m->kind);
+        mc_put_uint(&w, ATALAIA_FF_K_LIVE_GAME);
+        mc_put_uint(&w, m->live_game);
+        mc_put_uint(&w, ATALAIA_FF_K_TIME);
+        mc_put_uint(&w, m->time_s);
+        break;
     default: return 0;
     }
     return w.ok ? w.pos : 0;
@@ -226,6 +236,7 @@ static bool read_text_field(mc_reader_t *r, char *out, size_t cap)
      BIT(ATALAIA_FF_K_CHUNK))
 #define GAME_OVER_KEYS (BIT(ATALAIA_FF_K_KIND) | BIT(ATALAIA_FF_K_GAME) | BIT(ATALAIA_FF_K_KEY_TAG))
 #define MOVE_KEYS      (BIT(ATALAIA_FF_K_KIND) | BIT(ATALAIA_FF_K_CHANNEL) | BIT(ATALAIA_FF_K_REV))
+#define RELEASE_KEYS   (BIT(ATALAIA_FF_K_KIND) | BIT(ATALAIA_FF_K_LIVE_GAME) | BIT(ATALAIA_FF_K_TIME))
 #define KNOWN_KEYS     0x7FEu /* keys 1-10: a key another kind uses is not "unknown" */
 
 bool atalaia_ff_body_decode(const uint8_t *buf, size_t len, atalaia_ff_msg_t *m)
@@ -264,6 +275,10 @@ bool atalaia_ff_body_decode(const uint8_t *buf, size_t len, atalaia_ff_msg_t *m)
         allowed = MOVE_KEYS;
         required = MOVE_KEYS;
         break;
+    case ATALAIA_FF_RELEASE:
+        allowed = RELEASE_KEYS;
+        required = RELEASE_KEYS;
+        break;
     default: return false;
     }
     uint32_t seen = BIT(ATALAIA_FF_K_KIND);
@@ -291,6 +306,14 @@ bool atalaia_ff_body_decode(const uint8_t *buf, size_t len, atalaia_ff_msg_t *m)
                 m->channel_hz = (uint32_t)v;
             } else {
                 m->rev = (uint32_t)v;
+            }
+        } else if (m->kind == ATALAIA_FF_RELEASE) {
+            if (key == ATALAIA_FF_K_LIVE_GAME) {
+                ok = read_uint_max(&r, 0xFFFE, &v);
+                m->live_game = (uint16_t)v;
+            } else {
+                ok = read_uint_max(&r, 0xFFFFFFFFu, &v) && v != 0;
+                m->time_s = (uint32_t)v;
             }
         } else if (key == ATALAIA_FF_K_DEVICE) {
             ok = read_fixed(&r, m->device_id, ATALAIA_FF_DEVICE_SIZE);

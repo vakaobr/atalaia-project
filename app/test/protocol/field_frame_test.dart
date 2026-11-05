@@ -96,11 +96,29 @@ void main() {
           reason: '$bad',
         );
       }
-      // Kind 6 is still unknown.
+      // Kind 7 is still unknown.
       expect(
-        () => decodeFieldBody(h('a30106041a33da00880503')),
+        () => decodeFieldBody(h('a30107041a33da00880503')),
         throwsA(isA<FieldFrameException>()),
       );
+    });
+
+    test('RELEASE (RFC 0001 Amendment 28): the live game and a time', () {
+      final msg = {'kind': 'release', 'live_game': 0, 'time': 1793000000};
+      expect(plain(decodeFieldBody(encodeFieldBody(msg))), msg);
+      for (final bad in [
+        {'live_game': 65535},
+        {'live_game': -1},
+        {'time': 0},
+        {'time': 4294967296},
+        {'time': '1793000000'},
+      ]) {
+        expect(
+          () => encodeFieldBody({...msg, ...bad}),
+          throwsA(isA<FieldFrameException>()),
+          reason: '$bad',
+        );
+      }
     });
 
     test('frames and bodies that must be refused', () {
@@ -119,7 +137,7 @@ void main() {
         );
       }
       final bodies = cases(v, 'invalid_bodies');
-      expect(bodies, hasLength(49));
+      expect(bodies, hasLength(58));
       for (final c in bodies) {
         expect(
           () => decodeFieldBody(h(c['body'])),

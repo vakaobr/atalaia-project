@@ -4,7 +4,7 @@
  *
  * Field frames (protocol/field-frames.md, RFC 0001 Amendment 7): what travels
  * on a field's radio outside any game, between boxes that have no game and the
- * field controllers. Five kinds, in one message type (FIELD, 9):
+ * field controllers. Six kinds, in one message type (FIELD, 9):
  *
  *   ANNOUNCE  box -> controllers   "I am free": device id, a fresh token, name, last role
  *   DISCOVER  controller -> boxes  "who is free?": free boxes answer with an ANNOUNCE
@@ -13,6 +13,9 @@
  *                                  (decision OT-13; for a controller that lost the game's key)
  *   MOVE      controller -> boxes  "the field is on channel C now (revision R)": a free box listens
  *                                  there (RFC 0001 Amendment 19)
+ *   RELEASE   controller -> boxes  "game L is live (or none), it is now T": every box in a game
+ *                                  other than L that it joined before T leaves it (RFC 0001
+ *                                  Amendment 28, proposed; for a controller that lost the game)
  *
  * On air:
  *
@@ -65,6 +68,7 @@ typedef enum {
     ATALAIA_FF_INVITE = 3,
     ATALAIA_FF_GAME_OVER = 4, /* RFC 0001 Amendment 7, addendum of 2026-10-22 */
     ATALAIA_FF_MOVE = 5,      /* RFC 0001 Amendment 19: the field's channel changed */
+    ATALAIA_FF_RELEASE = 6,   /* RFC 0001 Amendment 28: boxes not in the live game leave theirs */
 } atalaia_ff_kind_t;
 
 /* What a box answers to an invite (ANNOUNCE key 10). */
@@ -103,6 +107,9 @@ enum {
     /* MOVE */
     ATALAIA_FF_K_CHANNEL = 4, /* the field's channel, Hz */
     ATALAIA_FF_K_REV = 5,     /* rises with every change of channel */
+    /* RELEASE */
+    ATALAIA_FF_K_LIVE_GAME = 4, /* the sender's live game, 0 = none */
+    ATALAIA_FF_K_TIME = 5,      /* the sender's wall clock, Unix seconds */
 };
 
 typedef struct {
@@ -130,6 +137,9 @@ typedef struct {
     /* MOVE */
     uint32_t channel_hz; /* 1-0xFFFFFFFF; the box checks it against its region */
     uint32_t rev;        /* 1-0xFFFFFFFF; a box takes only one above the last it took */
+    /* RELEASE */
+    uint16_t live_game; /* 0-65534: 0 = no game live */
+    uint32_t time_s;    /* 1-0xFFFFFFFF: the sender's wall clock (Unix seconds) */
 } atalaia_ff_msg_t;
 
 /* HKDF-SHA256 (RFC 5869): extract with salt (NULL or empty: 32 zero bytes), then

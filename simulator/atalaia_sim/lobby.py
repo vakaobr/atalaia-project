@@ -23,6 +23,12 @@ on the old channel, MOVE_REPEATS times, where the field is now (the new channel 
 only rises); a free box takes it, listens there and announces itself. A sweep says it again on each
 earlier channel for the boxes that were away, which a GM's DISCOVER starts.
 
+RELEASE (RFC 0001 Amendment 28, proposed) is for a controller that lost the game entirely (a new
+database): no key tag names the game a box is stuck in. It says "game L is live (0: none), it is now
+T", RELEASE_REPEATS times; a box in a game other than L that it joined before T (the wall clock of the
+first TIME it took in that game, which the box keeps) ends it as on GAME_OVER. A RELEASE recorded and
+played back after the box joined a newer game is older than that join, so it changes nothing.
+
 The same timings as the firmware: an idle box announces 2-20 s after its
 game ends (spread, so a field's boxes do not all talk at once), then at an
 interval that keeps its announcements within ANNOUNCE_SHARE of its
@@ -74,6 +80,7 @@ SWEEP_MIN_MS = 60_000        # at most one sweep a minute (a sub-band of 0.1 % h
 SWEEP_AIR_SHARE = 0.05
 SWEEP_CAP_BELOW_DUTY = 0.10
 SWEEP_WINDOW_MS = 3_600_000
+RELEASE_REPEATS = 3          # a RELEASE (Amendment 28) goes this many times, GAME_OVER_GAP_MS apart
 MOVE_FRAME_BYTES = 45        # the longest MOVE on the air (41-45 bytes: the revision varies)
 MOVE_ANNOUNCE_MS = (6_000, 15_000)  # a box that moved announces itself on the new channel after the
                                     # controller's three MOVEs are over (it is still on the old channel until
@@ -157,6 +164,9 @@ class IdleBox:
         self.next_announce: Optional[int] = now_ms + self.rng.randint(*FIRST_ANNOUNCE_MS)
         self.queue: list[tuple[int, dict[str, Any]]] = []  # (due_ms, announce fields)
         self.move_rev = 0  # the highest MOVE revision taken (kept in NVS on the box)
+        # The wall clock of the first TIME of the current game (kept in NVS on the box with the game
+        # key's tag), None until one: a RELEASE must be newer (Amendment 28).
+        self.joined_wall_s: Optional[int] = None
 
     def _fresh(self) -> bytes:
         return bytes(self.rng.getrandbits(8) for _ in range(ff.TOKEN_SIZE))
@@ -191,6 +201,7 @@ class IdleBox:
             return result
         self.game = j
         self.phase = "joined"
+        self.joined_wall_s = None  # known at the game's first TIME
         # Key 16: a box that lacks parts fetches them now, and says HELLO only once it has them.
         self.fetching = missing_parts(j, self.installed)
         self.channel_hz = j["channel_hz"]
@@ -211,6 +222,26 @@ class IdleBox:
         if msg["game_id"] != self.game["game_id"] or msg["key_tag"] != ff.key_tag(self.game["game_key"]):
             return False
         self.log.append(f"game {msg['game_id']} is over (said by a field controller)")
+        self.end(now_ms)
+        return True
+
+    def heard_time(self, wall_s: int) -> None:
+        """A TIME of the box's game: the first one's wall clock is the join's time (Amendment 28)."""
+        if self.phase in ("joined", "playing") and self.joined_wall_s is None and wall_s:
+            self.joined_wall_s = wall_s
+
+    def on_release(self, msg: dict[str, Any], now_ms: int) -> bool:
+        """RELEASE (Amendment 28): a box in a game other than the live one leaves it, as on GAME_OVER,
+        if it joined that game before the RELEASE's time; with no TIME of its game heard, it does not."""
+        if self.phase not in ("joined", "playing") or self.game is None:
+            return False
+        if msg["live_game"] and msg["live_game"] == self.game["game_id"]:
+            return False
+        if self.joined_wall_s is None or msg["time"] <= self.joined_wall_s:
+            self.log.append(f"release refused: game {self.game['game_id']} joined at {self.joined_wall_s}, "
+                            f"the release is of {msg['time']}")
+            return False
+        self.log.append(f"game {self.game['game_id']} released by a field controller (live game {msg['live_game']})")
         self.end(now_ms)
         return True
 
@@ -292,6 +323,9 @@ class IdleBox:
             return
         if msg["kind"] == "move":
             self.on_move(msg, now_ms)
+            return
+        if msg["kind"] == "release":
+            self.on_release(msg, now_ms)
             return
         if msg["kind"] == "discover":
             gap = self._interval() // 4
@@ -423,6 +457,19 @@ class GameOver:
 
 
 @dataclass
+class ReleaseOrder:
+    """A RELEASE on its way (Amendment 28): the live game (0: none), the time it says, on the channel
+    the modem is on (None: the field's, or the live game's)."""
+
+    live_game: int
+    time_s: int
+    channel_hz: Optional[int] = None
+    left: int = RELEASE_REPEATS
+    next_ms: int = 0
+    sent: int = 0
+
+
+@dataclass
 class MoveOrder:
     """A MOVE on its way: sent on channel_hz (where the boxes still listen), naming the new one."""
 
@@ -461,6 +508,7 @@ class Inviter:
         self.on_change: Optional[Callable[[str], None]] = None  # "boxes" or "invites"
         self.games_over: list[GameOver] = []
         self.moves: list[MoveOrder] = []
+        self.releases: list[ReleaseOrder] = []
         self.last_sweep: Optional[int] = None
         self.sweep_log: list[tuple[int, str, int]] = []  # (ms, sub-band, microseconds of air) of the sweeps' MOVEs
         # Why the last sweep() was refused by the hourly cap (sweep_refusal()), else None.
@@ -568,6 +616,14 @@ class Inviter:
         self.games_over.append(go)
         return go
 
+    def release(self, live_game: int, time_s: int, now_ms: int) -> ReleaseOrder:
+        """Says RELEASE_REPEATS times, GAME_OVER_GAP_MS apart, that ``live_game`` (0: none) is live and it
+        is ``time_s``: every box in another game it joined before then leaves it (Amendment 28)."""
+        ff.validate({"kind": "release", "live_game": live_game, "time": time_s})
+        order = ReleaseOrder(live_game, time_s, next_ms=now_ms)
+        self.releases = [order]  # a newer one replaces one still being said
+        return order
+
     def move(self, channel_hz: Optional[int], to_hz: int, rev: int, now_ms: int, *, repeats: int = MOVE_REPEATS,
              start_ms: Optional[int] = None, gap_ms: int = MOVE_GAP_MS) -> MoveOrder:
         """Says ``repeats`` times, ``gap_ms`` apart, on ``channel_hz`` (where the boxes still listen) that the
@@ -648,29 +704,35 @@ class Inviter:
 
     def _tick_game_over(self, now_ms: int) -> bool:
         """Sends the next GAME_OVER or MOVE that is due; True if the radio was used."""
-        orders: list = [*self.games_over, *self.moves]
+        orders: list = [*self.games_over, *self.moves, *self.releases]
         done = [o for o in orders if o.left == 0 and now_ms >= o.next_ms]
         if done:
             self.games_over = [g for g in self.games_over if g not in done]
             self.moves = [m for m in self.moves if m not in done]
-            if not self.games_over and not self.moves:
+            self.releases = [r for r in self.releases if r not in done]
+            if not self.games_over and not self.moves and not self.releases:
                 if self.tune is not None:
                     self.tune(None)
                 if self.on_orders_done is not None:
                     self.on_orders_done()
-        due = [o for o in [*self.games_over, *self.moves] if o.left > 0 and now_ms >= o.next_ms]
+        due = [o for o in [*self.games_over, *self.moves, *self.releases] if o.left > 0 and now_ms >= o.next_ms]
         if not due or now_ms < self.busy_until:
             return False
         order = due[0]
         if self.tune is not None and not self.tune(order.channel_hz):
             if isinstance(order, MoveOrder):
                 self.moves.remove(order)
+            elif isinstance(order, ReleaseOrder):
+                self.releases.remove(order)
             else:
                 self.games_over.remove(order)
             return False
         if isinstance(order, MoveOrder):
             msg = {"kind": "move", "channel_hz": order.to_hz, "rev": order.rev}
             gap = order.gap_ms
+        elif isinstance(order, ReleaseOrder):
+            msg = {"kind": "release", "live_game": order.live_game, "time": order.time_s}
+            gap = GAME_OVER_GAP_MS
         else:
             msg = {"kind": "game_over", "game_id": order.game_id, "key_tag": order.key_tag}
             gap = GAME_OVER_GAP_MS

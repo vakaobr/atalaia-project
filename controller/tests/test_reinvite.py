@@ -17,10 +17,12 @@ from __future__ import annotations
 import random
 import tempfile
 import unittest
+from unittest import mock
 
 from fastapi.testclient import TestClient
 
 from support import CORE, FakeModem, config
+from atalaia_controller import wallclock
 from atalaia_controller.api import Auth, create_app
 from atalaia_controller.engine import Conflict, Controller, StartBlocked
 from atalaia_controller.store import Store
@@ -688,6 +690,94 @@ class StuckGameTests(GameOverTests):
         gid, _ = self.ended_game_with_a_stuck_box()
         self.assertEqual(self.client.post(f"/api/v1/boxes/stuck/{gid}/release",
                                           headers={"Authorization": "Bearer read-secret"}).status_code, 403)
+
+
+class ReleaseFieldTests(GameOverTests):
+    """RFC 0001 Amendment 28 (decisions STUCK-50 to STUCK-59): a controller that lost the game a box is
+    stuck in (a new database) has no key tag to name it; RELEASE, sealed with the field key, names the
+    live game (or none) and the controller's wall clock, and every box in another game it joined before
+    then leaves it, as on GAME_OVER."""
+
+    ended_game_with_a_stuck_box = StuckGameTests.ended_game_with_a_stuck_box
+    drain = StuckGameTests.drain
+
+    def release_all(self):
+        return self.client.post("/api/v1/boxes/release", headers=GM)
+
+    def test_release_frees_a_box_of_a_game_this_controller_does_not_know(self):
+        gid, _ = self.ended_game_with_a_stuck_box()
+        self.box.heard_time(int(wallclock.now()) - 60)  # the box took its game's first TIME a minute ago
+        self.store.delete_setting(f"key_tag:{gid}")  # as good as a lost database: nothing names the game
+        live = self.game()
+        with self.assertLogs("atalaia.reinvite", "WARNING") as logs:
+            r = self.release_all()
+        self.assertEqual(r.status_code, 200, r.text)
+        out = r.json()
+        self.assertEqual((out["live_game"], out["release_frame"]), (live, "sent"))
+        self.assertLessEqual(abs(out["time"] - int(wallclock.now())), 1)
+        self.assertIn(f"RELEASE: every box in a game other than {live}", logs.output[0])
+        self.assertEqual(self.frames(), [{"kind": "release", "live_game": live, "time": out["time"]}])
+        frame = self.modem.fields.pop(0)
+        self.box.on_frame(frame, self.ctrl.now_ms())
+        self.assertEqual(self.box.phase, "ended")
+        self.assertIn(f"game {gid} released by a field controller (live game {live})", self.box.log[-1])
+        self.assertEqual(self.drain(10), lobby.RELEASE_REPEATS - 1)  # three in all
+
+    def test_a_box_of_the_live_game_and_an_older_release_change_nothing(self):
+        live = self.game(assignments={"4": "zone"})
+        self.box.join(bytes.fromhex(self.ctrl.issue_join({"role": "zone"}, node_id=4)["payload_hex"]))
+        self.box.start()
+        self.box.heard_time(int(wallclock.now()))
+        self.assertEqual(self.release_all().json()["release_frame"], "sent")
+        frame = self.modem.fields.pop(0)
+        self.box.on_frame(frame, self.ctrl.now_ms())
+        self.assertEqual(self.box.phase, "playing")  # named: the live game's box
+        # The same frame, recorded, reaches a box that joined another game since: older than that join.
+        other = lobby.IdleBox(JOIN_KEY, "other")
+        self.assertEqual(other.join(bytes.fromhex(self.ctrl.issue_join({"role": "zone"}, node_id=5)["payload_hex"])),
+                         "accepted")
+        other.game["game_id"] = 999
+        other.heard_time(int(wallclock.now()) + 3600)
+        other.on_frame(frame, self.ctrl.now_ms())
+        self.assertEqual(other.phase, "joined")
+        self.assertIn("release refused", other.log[-1])
+
+    def test_release_with_no_game_live_names_none(self):
+        self.assertEqual(self.release_all().json()["live_game"], 0)
+        self.assertEqual(self.frames()[0]["live_game"], 0)
+
+    def test_release_has_a_rate_limit(self):
+        self.assertEqual(self.release_all().status_code, 200)
+        self.assertEqual(self.release_all().status_code, 429)  # still being said
+        self.drain(10)
+        self.assertEqual(self.release_all().status_code, 429)  # under 30 s since
+        self.drain(21)
+        self.assertEqual(self.release_all().status_code, 200)
+
+    def test_release_without_a_radio(self):
+        self.modem.has_field_frames = False
+        self.assertEqual(self.release_all().json()["release_frame"], "no_radio")
+        self.assertEqual(self.modem.fields, [])
+
+    def test_release_needs_a_plausible_clock(self):
+        with mock.patch.object(self.ctrl.clock_guard, "plausible", return_value=False):
+            r = self.release_all()
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("clock", r.text)
+        self.assertEqual(self.modem.fields, [])
+
+    def test_release_from_a_standby_is_refused(self):
+        from atalaia_sim import join
+        payload = join.encode({"game_id": 77, "game_key": bytes(range(16)), "node_id": 3, "controller_id": 1,
+                               "channel_hz": 869_525_000, "max_hops": 2, "teams": ["red", "blue"],
+                               "mode_id": DOMINATION, "role": "standby", "game_seed": 1, "params": None,
+                               "kind": "controller"}, JOIN_KEY)
+        self.ctrl.join_as_standby(join.to_text(payload))
+        self.assertEqual(self.release_all().status_code, 409)
+        self.assertEqual(self.modem.fields, [])
+
+    def test_release_needs_the_gm_token(self):
+        self.assertEqual(self.client.post("/api/v1/boxes/release", headers=READ).status_code, 403)
 
 
 NEW_HZ, OLD_HZ, OLDER_HZ = 869_925_000, 869_525_000, 868_100_000

@@ -21,6 +21,12 @@
  * whose key it no longer has (a restart without persist_game_key): the box ends
  * the game as on CMD end. A GAME_OVER for another game, or for its game id under
  * another key (an old game's, played back), changes nothing.
+ *
+ * And RELEASE (RFC 0001 Amendment 28, proposed), from a controller that lost the game entirely (a
+ * new database): "game L is live (0: none), it is now T". A box in a game other than L that it
+ * joined before T (the wall clock of the first TIME it took in its game, kept across a reboot)
+ * ends it as on GAME_OVER. One recorded and played back after the box joined a newer game is older
+ * than that join, so it changes nothing; a box that never heard a TIME of its game refuses it.
  */
 #include <stdarg.h>
 #include <stdio.h>
@@ -351,6 +357,30 @@ static void on_game_over(box_game_t *g, const atalaia_ff_msg_t *m)
     box_game_end_by_field(g);
 }
 
+/* "Game L is live (0: none), it is now T" (RFC 0001 Amendment 28): a box in another game leaves
+ * it, as on GAME_OVER, when it joined that game before T. The join's time is the wall clock of
+ * the first TIME the box took in it (box_game_join_time, kept across a reboot): a RELEASE that is
+ * not newer is refused, so one recorded and played back once the box is in a newer game changes
+ * nothing; with no TIME heard there is nothing to compare, and it is refused too. A box fetching
+ * its modes is not on its game's link yet (and keeps nothing over a reboot): left alone. */
+static void on_release(box_game_t *g, const atalaia_ff_msg_t *m)
+{
+    box_lobby_t *l = &g->lobby;
+    if (g->phase != BOX_JOINED && g->phase != BOX_PLAYING) return;    /* free, over, or fetching */
+    if (m->live_game != 0 && m->live_game == g->join.game_id) return; /* the live game's box */
+    uint32_t joined = box_game_join_time(g);
+    if (joined == 0 || m->time_s <= joined) {
+        l->releases_refused++;
+        say(g, "release refused: game %u was joined at %lu, the release is of %lu", g->join.game_id,
+            (unsigned long)joined, (unsigned long)m->time_s);
+        return;
+    }
+    l->releases_taken++;
+    say(g, "game %u released by a field controller (live game %u), as on a game over",
+        g->join.game_id, m->live_game);
+    box_game_end_by_field(g);
+}
+
 /* The stored idle channel and MOVE revision, read once (the first time anything needs them): a join
  * that resumes after a reboot must not write the channel over a revision it has not read yet. */
 static void load_move(box_game_t *g)
@@ -441,6 +471,7 @@ bool box_lobby_on_packet(box_game_t *g, const uint8_t *pkt, size_t len)
     case ATALAIA_FF_INVITE: on_invite(g, &m); break;
     case ATALAIA_FF_GAME_OVER: on_game_over(g, &m); break;
     case ATALAIA_FF_MOVE: on_move(g, &m); break;
+    case ATALAIA_FF_RELEASE: on_release(g, &m); break;
     default: break; /* other boxes' announcements */
     }
     memset(&m, 0, sizeof(m));

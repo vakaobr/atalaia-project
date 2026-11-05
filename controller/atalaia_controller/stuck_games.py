@@ -32,6 +32,7 @@ log = logging.getLogger("atalaia.stuck")
 
 RESEND_MS = 60_000           # one GAME_OVER burst per game in this time at most
 RELEASE_MS = 10_000          # the GM's Release: one burst per game in this time at most (STUCK-44)
+RELEASE_FIELD_MS = 30_000    # the field-wide RELEASE (Amendment 28): one burst in this time at most
 FORGET_MS = 2 * 3_600_000    # a game not heard of for this long leaves the list (as a free box)
 KEY_TAGS_KEPT = 50           # the ended games whose key tag the controller keeps
 
@@ -59,6 +60,8 @@ class StuckGames:
         self.resend_ms = RESEND_MS
         self.release_ms = RELEASE_MS
         self.released: dict[int, int] = {}  # game id -> when the GM last released a game not in the list
+        self.release_field_ms = RELEASE_FIELD_MS
+        self.field_released_ms: Optional[int] = None  # when the last field-wide RELEASE started
 
     def on_report(self, other: "OtherGame") -> None:
         """OTHER_GAME from the modem (its own thread)."""
@@ -147,6 +150,41 @@ class StuckGames:
                 self.released[game_id] = now
             reinvite.refresh_boxes()
             return {"game": game_id, "game_over_frame": "sent"}
+
+    def release_field(self) -> dict[str, Any]:
+        """The field-wide RELEASE (POST /api/v1/boxes/release, RFC 0001 Amendment 28, decisions STUCK-50
+        to STUCK-59), for a controller that lost the game a box is stuck in (a new database: no key
+        tag, so no GAME_OVER can name it): every box in a game other than the live one (or any game,
+        with none live) that it joined before now leaves it. ``release_frame``: "sent", "no_radio" or
+        "no_join_key". Refused: a standby (409), a wall clock that is not plausible (409: the boxes
+        compare its time with their join's), and while one is being said or within RELEASE_FIELD_MS
+        of the last (429)."""
+        from . import wallclock
+        from .engine import Conflict, TooSoon
+        with self.ctl._lock:
+            live = self.ctl.game
+            if live is not None and live.get("joined"):
+                raise Conflict("this controller follows a game as a standby: a RELEASE would take the "
+                               "primary's boxes out of its game")
+            if not self.ctl.clock_guard.plausible():
+                raise Conflict("the controller's clock is not set: set it first, so that the boxes can "
+                               "tell this RELEASE from an older one")
+            live_id = live["id"] if live is not None else 0
+            reinvite = self.ctl.reinvite
+            if reinvite is None:
+                return {"live_game": live_id, "release_frame": "no_join_key"}
+            now = self.ctl.now_ms()
+            if reinvite.inviter.releases:
+                raise TooSoon("a RELEASE is being sent now")
+            last = self.field_released_ms
+            if last is not None and now - last < self.release_field_ms:
+                wait = (self.release_field_ms - (now - last) + 999) // 1000
+                raise TooSoon(f"a RELEASE was sent a moment ago; try again in {wait} s")
+            time_s = min(0xFFFFFFFF, int(wallclock.now()))
+            if not reinvite.release(live_id, time_s):
+                return {"live_game": live_id, "time": time_s, "release_frame": "no_radio"}
+            self.field_released_ms = now
+            return {"live_game": live_id, "time": time_s, "release_frame": "sent"}
 
     def public(self) -> list[dict[str, Any]]:
         """The games a box was heard still in, the most recent first, with their names."""

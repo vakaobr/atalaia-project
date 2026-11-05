@@ -398,6 +398,39 @@ static const uint8_t ff_valid_10_frame[] = {
     0x06, 0xd3, 0xe8, 0xda, 0x90, 0x60, 0xe7, 0xbc, 0x83,
 };
 #define ff_valid_10_frame_len sizeof(ff_valid_10_frame)
+static const uint8_t ff_valid_11_body[] = {
+    0xa3, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
+    0x40,
+};
+#define ff_valid_11_body_len sizeof(ff_valid_11_body)
+static const uint8_t ff_valid_11_nonce[] = {
+    0x31, 0x04, 0x53, 0xd4, 0x49, 0xa7, 0xf0, 0xb0, 0x00, 0x00, 0x01, 0x00,
+    0x0b,
+};
+#define ff_valid_11_nonce_len sizeof(ff_valid_11_nonce)
+static const uint8_t ff_valid_11_frame[] = {
+    0x2a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x31, 0x04, 0x53,
+    0xd4, 0x49, 0xa7, 0xf0, 0xb0, 0x00, 0x00, 0x01, 0x00, 0x0b, 0x23, 0xde,
+    0x98, 0x32, 0x17, 0x55, 0x37, 0x09, 0xce, 0x3c, 0x70, 0xe4, 0x01, 0x2f,
+    0x83, 0xe9, 0x92, 0x2c, 0xfb, 0x63, 0xee,
+};
+#define ff_valid_11_frame_len sizeof(ff_valid_11_frame)
+static const uint8_t ff_valid_12_body[] = {
+    0xa3, 0x01, 0x06, 0x04, 0x00, 0x05, 0x1a, 0xff, 0xff, 0xff, 0xff,
+};
+#define ff_valid_12_body_len sizeof(ff_valid_12_body)
+static const uint8_t ff_valid_12_nonce[] = {
+    0x31, 0x04, 0x53, 0xd4, 0x49, 0xa7, 0xf0, 0xb0, 0x00, 0x00, 0x01, 0x00,
+    0x0c,
+};
+#define ff_valid_12_nonce_len sizeof(ff_valid_12_nonce)
+static const uint8_t ff_valid_12_frame[] = {
+    0x2a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x31, 0x04, 0x53,
+    0xd4, 0x49, 0xa7, 0xf0, 0xb0, 0x00, 0x00, 0x01, 0x00, 0x0c, 0x94, 0xaa,
+    0x84, 0xbb, 0xde, 0x96, 0xf2, 0xd3, 0xd4, 0xce, 0xa4, 0x49, 0x59, 0x0f,
+    0x6c, 0x0d, 0x09, 0xb8, 0xca,
+};
+#define ff_valid_12_frame_len sizeof(ff_valid_12_frame)
 
 typedef struct {
     const char *name;
@@ -421,6 +454,8 @@ static const ff_valid_vector_t ff_valid_vectors[] = {
     {"game_over_last_game_id", {.kind = ATALAIA_FF_GAME_OVER, .key_tag = {0x56, 0xc4, 0xe1, 0xd0, 0x29, 0x97, 0x26, 0xc2}, .game_id = 65534}, ff_valid_8_body, ff_valid_8_body_len, ff_valid_8_nonce, ff_valid_8_frame, ff_valid_8_frame_len},
     {"move", {.kind = ATALAIA_FF_MOVE, .channel_hz = 869925000u, .rev = 3u}, ff_valid_9_body, ff_valid_9_body_len, ff_valid_9_nonce, ff_valid_9_frame, ff_valid_9_frame_len},
     {"move_largest", {.kind = ATALAIA_FF_MOVE, .channel_hz = 4294967295u, .rev = 4294967295u}, ff_valid_10_body, ff_valid_10_body_len, ff_valid_10_nonce, ff_valid_10_frame, ff_valid_10_frame_len},
+    {"release", {.kind = ATALAIA_FF_RELEASE, .live_game = 4242, .time_s = 1793000000u}, ff_valid_11_body, ff_valid_11_body_len, ff_valid_11_nonce, ff_valid_11_frame, ff_valid_11_frame_len},
+    {"release_no_live_game", {.kind = ATALAIA_FF_RELEASE, .live_game = 0, .time_s = 4294967295u}, ff_valid_12_body, ff_valid_12_body_len, ff_valid_12_nonce, ff_valid_12_frame, ff_valid_12_frame_len},
 };
 #define FF_VALID_VECTOR_COUNT (sizeof(ff_valid_vectors) / sizeof(ff_valid_vectors[0]))
 
@@ -566,11 +601,12 @@ static const ff_bad_vector_t ff_bad_frames[] = {
 #define FF_BAD_FRAME_COUNT (sizeof(ff_bad_frames) / sizeof(ff_bad_frames[0]))
 
 static const uint8_t ff_bad_body_0[] = {
-    0xa1, 0x01, 0x06,
+    0xa1, 0x01, 0x07,
 };
 #define ff_bad_body_0_len sizeof(ff_bad_body_0)
 static const uint8_t ff_bad_body_1[] = {
-    0xa3, 0x01, 0x06, 0x04, 0x1a, 0x33, 0xda, 0x00, 0x88, 0x05, 0x03,
+    0xa3, 0x01, 0x07, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
+    0x40,
 };
 #define ff_bad_body_1_len sizeof(ff_bad_body_1)
 static const uint8_t ff_bad_body_2[] = {
@@ -831,27 +867,69 @@ static const uint8_t ff_bad_body_45[] = {
 };
 #define ff_bad_body_45_len sizeof(ff_bad_body_45)
 static const uint8_t ff_bad_body_46[] = {
+    0xa2, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92,
+};
+#define ff_bad_body_46_len sizeof(ff_bad_body_46)
+static const uint8_t ff_bad_body_47[] = {
+    0xa2, 0x01, 0x06, 0x05, 0x1a, 0x6a, 0xdf, 0x02, 0x40,
+};
+#define ff_bad_body_47_len sizeof(ff_bad_body_47)
+static const uint8_t ff_bad_body_48[] = {
+    0xa3, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x00,
+};
+#define ff_bad_body_48_len sizeof(ff_bad_body_48)
+static const uint8_t ff_bad_body_49[] = {
+    0xa3, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1b, 0x00, 0x00, 0x00,
+    0x01, 0x00, 0x00, 0x00, 0x00,
+};
+#define ff_bad_body_49_len sizeof(ff_bad_body_49)
+static const uint8_t ff_bad_body_50[] = {
+    0xa3, 0x01, 0x06, 0x04, 0x19, 0xff, 0xff, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
+    0x40,
+};
+#define ff_bad_body_50_len sizeof(ff_bad_body_50)
+static const uint8_t ff_bad_body_51[] = {
+    0xa3, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x48, 0x45, 0xaa, 0xb1,
+    0xd2, 0x5d, 0x35, 0x15, 0xd2,
+};
+#define ff_bad_body_51_len sizeof(ff_bad_body_51)
+static const uint8_t ff_bad_body_52[] = {
+    0xa4, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
+    0x40, 0x02, 0x48, 0x5a, 0x17, 0xc0, 0xde, 0x0b, 0x0e, 0x12, 0x34,
+};
+#define ff_bad_body_52_len sizeof(ff_bad_body_52)
+static const uint8_t ff_bad_body_53[] = {
+    0xa4, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
+    0x40, 0x03, 0x48, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+};
+#define ff_bad_body_53_len sizeof(ff_bad_body_53)
+static const uint8_t ff_bad_body_54[] = {
+    0xa4, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
+    0x40, 0x07, 0x41, 0x01,
+};
+#define ff_bad_body_54_len sizeof(ff_bad_body_54)
+static const uint8_t ff_bad_body_55[] = {
     0xa6, 0x01, 0x01, 0x02, 0x48, 0x5a, 0x17, 0xc0, 0xde, 0x0b, 0x0e, 0x12,
     0x34, 0x03, 0x48, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x04,
     0x63, 0x62, 0x6f, 0x78, 0x05, 0x00, 0x18, 0x20, 0x01,
 };
-#define ff_bad_body_46_len sizeof(ff_bad_body_46)
-static const uint8_t ff_bad_body_47[] = {
+#define ff_bad_body_55_len sizeof(ff_bad_body_55)
+static const uint8_t ff_bad_body_56[] = {
     0xa5, 0x01, 0x01, 0x02, 0x48, 0x5a, 0x17, 0xc0, 0xde, 0x0b, 0x0e, 0x12,
     0x34, 0x03, 0x48, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x04,
     0x63, 0x62, 0x6f, 0x78, 0x05, 0x00, 0x00,
 };
-#define ff_bad_body_47_len sizeof(ff_bad_body_47)
-static const uint8_t ff_bad_body_48[] = {
+#define ff_bad_body_56_len sizeof(ff_bad_body_56)
+static const uint8_t ff_bad_body_57[] = {
     0xa6, 0x01, 0x01, 0x02, 0x48, 0x5a, 0x17, 0xc0, 0xde, 0x0b, 0x0e, 0x12,
     0x34, 0x03, 0x48, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x04,
     0x63, 0x62, 0x6f, 0x78, 0x05, 0x00, 0x05, 0x00,
 };
-#define ff_bad_body_48_len sizeof(ff_bad_body_48)
+#define ff_bad_body_57_len sizeof(ff_bad_body_57)
 
 static const ff_bad_vector_t ff_bad_bodies[] = {
     {"unknown_kind", ff_bad_body_0, ff_bad_body_0_len, "body"},
-    {"unknown_kind_6_with_move_keys", ff_bad_body_1, ff_bad_body_1_len, "body"},
+    {"unknown_kind_7_with_release_keys", ff_bad_body_1, ff_bad_body_1_len, "body"},
     {"kind_not_first", ff_bad_body_2, ff_bad_body_2_len, "body"},
     {"not_a_map", ff_bad_body_3, ff_bad_body_3_len, "body"},
     {"announce_without_name", ff_bad_body_4, ff_bad_body_4_len, "body"},
@@ -896,9 +974,18 @@ static const ff_bad_vector_t ff_bad_bodies[] = {
     {"move_with_a_token", ff_bad_body_43, ff_bad_body_43_len, "body"},
     {"move_with_an_announce_key", ff_bad_body_44, ff_bad_body_44_len, "body"},
     {"move_with_an_invite_key", ff_bad_body_45, ff_bad_body_45_len, "body"},
-    {"key_32", ff_bad_body_46, ff_bad_body_46_len, "body"},
-    {"trailing_byte", ff_bad_body_47, ff_bad_body_47_len, "body"},
-    {"duplicate_key", ff_bad_body_48, ff_bad_body_48_len, "body"},
+    {"release_without_time", ff_bad_body_46, ff_bad_body_46_len, "body"},
+    {"release_without_live_game", ff_bad_body_47, ff_bad_body_47_len, "body"},
+    {"release_time_0", ff_bad_body_48, ff_bad_body_48_len, "body"},
+    {"release_time_too_big", ff_bad_body_49, ff_bad_body_49_len, "body"},
+    {"release_live_game_65535", ff_bad_body_50, ff_bad_body_50_len, "body"},
+    {"release_time_as_bytes", ff_bad_body_51, ff_bad_body_51_len, "body"},
+    {"release_with_a_device", ff_bad_body_52, ff_bad_body_52_len, "body"},
+    {"release_with_a_token", ff_bad_body_53, ff_bad_body_53_len, "body"},
+    {"release_with_an_invite_key", ff_bad_body_54, ff_bad_body_54_len, "body"},
+    {"key_32", ff_bad_body_55, ff_bad_body_55_len, "body"},
+    {"trailing_byte", ff_bad_body_56, ff_bad_body_56_len, "body"},
+    {"duplicate_key", ff_bad_body_57, ff_bad_body_57_len, "body"},
 };
 #define FF_BAD_BODY_COUNT (sizeof(ff_bad_bodies) / sizeof(ff_bad_bodies[0]))
 
