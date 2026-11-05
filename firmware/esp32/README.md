@@ -318,7 +318,10 @@ decrypts with AES-CCM (mbedtls, hardware AES), drops flood copies and replays wi
 enforces the duty cycle of the channel's sub-band, measures the noise on
 a channel when asked (MEASURE, only while no game is configured), carries
 field frames as they are, with or without a game (FIELD_TX, FIELD_RX,
-FIELD_ACK: it never holds the field join key), and
+FIELD_ACK: it never holds the field join key), reports another game's
+packets when the controller asks (WATCH_GAMES, OTHER_GAME: the header's game id
+and source, once per game id in 10 s; RFC 0001 Amendment 27, so a box still in
+an ended game is told again), and
 keeps the game key in RAM only; it has no
 Lua, game screens or presets (~480 KB image, ~190 KB of it LVGL and the
 fonts for its own OLED). The log console stays on UART0

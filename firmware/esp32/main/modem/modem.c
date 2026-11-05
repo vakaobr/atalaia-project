@@ -114,18 +114,32 @@ void modem_set_default_lang(modem_t *m, const char *code)
     if (lang_code_ok(code, n)) lang_copy(m->lang_default, code, n);
 }
 
+static int ident_json(const modem_t *m, char *json, size_t cap, int version_max)
+{
+    return snprintf(json, cap,
+                    "{\"fw\":\"atalaia-modem\",\"fw_version\":\"%.*s\",\"core_version\":\"%s\","
+                    "\"framing\":%d,\"radio\":\"%s\",\"payload_max\":%d,\"epoch_window\":%u,"
+                    "\"measure\":%s,\"field\":true,\"pair\":true,\"lang\":true,\"region\":\"%s\","
+                    "\"games\":true}",
+                    version_max, m->fw_version != NULL ? m->fw_version : "unknown",
+                    atalaia_version(), MODEM_PROTOCOL_VERSION, m->radio_present ? "sx1262" : "none",
+                    ATALAIA_RF_PAYLOAD_MAX, (unsigned)m->epoch_window,
+                    m->radio_present && m->io.measure_start != NULL ? "true" : "false",
+                    radio_region_code(m->region));
+}
+
 void modem_send_ident(modem_t *m)
 {
     char json[MODEM_FRAME_PAYLOAD_MAX];
-    int n = snprintf(json, sizeof(json),
-                     "{\"fw\":\"atalaia-modem\",\"fw_version\":\"%s\",\"core_version\":\"%s\","
-                     "\"framing\":%d,\"radio\":\"%s\",\"payload_max\":%d,\"epoch_window\":%u,"
-                     "\"measure\":%s,\"field\":true,\"pair\":true,\"lang\":true,\"region\":\"%s\"}",
-                     m->fw_version != NULL ? m->fw_version : "unknown", atalaia_version(),
-                     MODEM_PROTOCOL_VERSION, m->radio_present ? "sx1262" : "none",
-                     ATALAIA_RF_PAYLOAD_MAX, (unsigned)m->epoch_window,
-                     m->radio_present && m->io.measure_start != NULL ? "true" : "false",
-                     radio_region_code(m->region));
+    int version_max = (int)strlen(m->fw_version != NULL ? m->fw_version : "unknown");
+    if (version_max > MODEM_FRAME_PAYLOAD_MAX) version_max = MODEM_FRAME_PAYLOAD_MAX;
+    int n = ident_json(m, json, sizeof(json), version_max);
+    if (n >= (int)sizeof(json)) {
+        /* A development build's long version (with its commit and suffix): cut to what fits,
+         * so the IDENT and every capability in it still go whole. */
+        version_max -= n - (int)sizeof(json) + 1;
+        n = version_max > 0 ? ident_json(m, json, sizeof(json), version_max) : -1;
+    }
     if (n > 0 && (size_t)n < sizeof(json)) {
         send_frame(m, MODEM_FRAME_IDENT, (const uint8_t *)json, (size_t)n);
     }
@@ -322,6 +336,14 @@ static void handle_cmd(modem_t *m, const uint8_t *p, size_t len)
         break;
     case MODEM_CMD_IDENT: modem_send_ident(m); return;
     case MODEM_CMD_MEASURE: cmd_measure(m, p, len); return;
+    case MODEM_CMD_WATCH_GAMES:
+        if (len != 2 || p[1] > 1) {
+            send_error(m, MODEM_ERR_BAD_PARAMS, "WATCH_GAMES: 0 or 1");
+            return;
+        }
+        m->watch_games = p[1] == 1;
+        memset(m->other, 0, sizeof(m->other));
+        break;
     case MODEM_CMD_SET_LANG: {
         /* The payload's bytes after the opcode, which a C string must not hold. */
         char code[MODEM_LANG_MAX + 2];
@@ -474,6 +496,39 @@ void modem_on_tx_result(modem_t *m, uint32_t tag, modem_tx_status_t status)
 
 /* ---- RX: radio -> host ---------------------------------------------------- */
 
+/*
+ * Another game's packet (RFC 0001 Amendment 27): with WATCH_GAMES on, its game id and source,
+ * read from the header in the clear (the modem has no key for that game, so nothing is
+ * authenticated), go to the host in OTHER_GAME, at most once per game id in
+ * MODEM_OTHER_GAME_MS. The controller uses it to tell a box still in a game that is over.
+ */
+static void report_other_game(modem_t *m, const atalaia_header_t *hdr, int8_t rssi, int8_t snr)
+{
+    if (!m->watch_games || hdr->game_id == 0 || hdr->game_id == 0xFFFF ||
+        !ATALAIA_VF_ENC(hdr->version_flags)) {
+        return;
+    }
+    uint32_t t = now(m);
+    modem_other_game_t *slot = NULL;
+    for (size_t i = 0; i < MODEM_OTHER_GAMES; i++) {
+        modem_other_game_t *o = &m->other[i];
+        if (o->game_id == hdr->game_id) {
+            if (t - o->at_ms < MODEM_OTHER_GAME_MS) return; /* reported a moment ago */
+            slot = o;
+            break;
+        }
+        if (slot == NULL && (o->game_id == 0 || t - o->at_ms >= MODEM_OTHER_GAME_MS)) slot = o;
+    }
+    if (slot == NULL) return; /* every slot reported within the time: a busy air waits */
+    slot->game_id = hdr->game_id;
+    slot->at_ms = t;
+    uint8_t buf[MODEM_OTHER_GAME_LEN] = {
+        (uint8_t)(hdr->game_id >> 8), (uint8_t)hdr->game_id, (uint8_t)(hdr->source >> 8),
+        (uint8_t)hdr->source,         (uint8_t)rssi,         (uint8_t)snr};
+    m->count.other_game++;
+    send_frame(m, MODEM_FRAME_OTHER_GAME, buf, sizeof(buf));
+}
+
 void modem_on_air_rx(modem_t *m, const uint8_t *pkt, size_t len, int8_t rssi, int8_t snr)
 {
     /* A field frame: to the host as it is, with or without a game configured. */
@@ -486,13 +541,16 @@ void modem_on_air_rx(modem_t *m, const uint8_t *pkt, size_t len, int8_t rssi, in
         send_frame(m, MODEM_FRAME_FIELD_RX, frame, len + 2);
         return;
     }
-    if (!m->configured || len < ATALAIA_RF_HEADER_SIZE + ATALAIA_RF_MIC_SIZE ||
-        len > RADIO_MAX_PKT_LEN) {
+    if (len < ATALAIA_RF_HEADER_SIZE + ATALAIA_RF_MIC_SIZE || len > RADIO_MAX_PKT_LEN) {
         m->count.rx_dropped++;
         return;
     }
     atalaia_header_t hdr;
-    if (!atalaia_header_decode(pkt, &hdr) || hdr.game_id != m->game_id ||
+    bool header_ok = atalaia_header_decode(pkt, &hdr);
+    if (header_ok && (!m->configured || hdr.game_id != m->game_id)) {
+        report_other_game(m, &hdr, rssi, snr); /* between games, or during another game */
+    }
+    if (!m->configured || !header_ok || hdr.game_id != m->game_id ||
         !ATALAIA_VF_ENC(hdr.version_flags) || hdr.source == m->node_id) {
         /* Another game, unencrypted, or our own packet relayed back. */
         m->count.rx_dropped++;

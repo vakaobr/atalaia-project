@@ -76,6 +76,7 @@ from .config import Config
 from .modem_framing import RxPacket
 from .modes import ModeRegistry, resolve_params
 from .store import Store, epoch_tag
+from .stuck_games import StuckGames, prune_key_tags
 
 log = logging.getLogger("atalaia.controller")
 
@@ -454,6 +455,8 @@ class Controller:
 
         # Free boxes and invites between games (reinvite.py); needs the field join key.
         self.reinvite: Optional[Reinvite] = Reinvite(self) if join_key else None
+        # Boxes still in a game that is over, told so again (stuck_games.py, STUCK-1 to STUCK-19).
+        self.stuck: Optional[StuckGames] = StuckGames(self) if join_key else None
         # Unadopted boxes paired by the code they show (pairing.py, protocol/adoption.md).
         self.pairing: Optional[Pairing] = Pairing(self) if join_key else None
         if modem is not None:
@@ -464,6 +467,11 @@ class Controller:
             if self.reinvite is not None:
                 modem.on_field_rx = self._on_field_rx
                 modem.on_field_ack = self._on_field_ack
+            if self.stuck is not None and hasattr(modem, "watch_games"):
+                # Another game's packets: a box still in a game that is over (RFC 0001 Amendment 27).
+                # An older modem never gets the command; the link logs once that it cannot.
+                modem.on_other_game = self.stuck.on_report
+                modem.watch_games(True)
         self._restore()
         self._tell_modem_language()
 
@@ -1798,8 +1806,9 @@ class Controller:
         """GAME_OVER to the game's boxes over the field radio (decisions OT-7, OT-13): "sent",
         "no_tag" (a game this controller made before it kept key tags), "no_join_key" or
         "no_radio". Always after a game this controller ran ends, besides its CMD end; the only
-        way to its boxes when the controller restarted without the game's key."""
-        self.store.delete_setting(f"key_tag:{game['id']}")
+        way to its boxes when the controller restarted without the game's key. The key's tag stays
+        (the last KEY_TAGS_KEPT games), so a box still in the game is told again (stuck_games.py)."""
+        prune_key_tags(self.store)
         if game.get("joined"):
             return "standby"  # a standby's game may still run on its primary: never ended from here
         if tag is None:
@@ -1820,9 +1829,9 @@ class Controller:
             self.store.save_scores(game_id, self.fc.total_scores)
             self._save_game_time(force=True)
         self.store.update_game(game_id, game_key=None)
-        self.store.delete_setting(f"key_tag:{game_id}")
         log.info("standby: left game %d (%s)", game_id, reason)
         out = self._set_state(game_id, "ended", ended_at=self._wall())
+        prune_key_tags(self.store)  # its tag stays, bounded; a standby's game is never told again
         self._deactivate()
         return self.public_game(self.store.game(game_id) or out)
 

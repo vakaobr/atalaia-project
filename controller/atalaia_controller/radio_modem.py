@@ -74,6 +74,7 @@ class RadioModem:
         on_error: Optional[Callable[[str, str], None]] = None,
         on_field_rx: Optional[Callable[[bytes, int, int], None]] = None,
         on_field_ack: Optional[Callable[[int, str], None]] = None,
+        on_other_game: Optional[Callable[[mf.OtherGame], None]] = None,
     ) -> None:
         self.url = url
         self.ping_interval = ping_interval
@@ -89,6 +90,11 @@ class RadioModem:
         self.on_field_rx = on_field_rx
         self.on_field_ack = on_field_ack
         self._field_id = 0
+        # Another game's packets (RFC 0001 Amendment 27): reported once asked (watch_games), so a
+        # box still in an ended game can be told so again.
+        self.on_other_game = on_other_game
+        self._watch_games = False
+        self._watch_unsupported_logged = False
 
         self.state = CLOSED
         self.ident: Optional[dict[str, Any]] = None
@@ -182,6 +188,27 @@ class RadioModem:
         if self._lang is not None or self._lang_sent:
             self._write(mf.CMD, mf.set_lang_payload(self._lang or ""))
             self._lang_sent = self._lang is not None
+
+    @property
+    def has_other_games(self) -> bool:
+        """The modem's firmware reports packets of other games (IDENT "games": true, WATCH_GAMES)."""
+        return (self.ident or {}).get("games") is True
+
+    def watch_games(self, on: bool) -> None:
+        """Asks the modem to report packets of other games (OTHER_GAME). Kept and sent again whenever
+        the modem identifies itself (it forgets on every reboot); a modem whose IDENT has no "games"
+        is never sent it, and that is logged once."""
+        self._watch_games = on
+        if self.is_up and self.ident is not None:
+            self._send_watch()
+
+    def _send_watch(self) -> None:
+        if self.has_other_games:
+            self._write(mf.CMD, mf.watch_games_payload(self._watch_games))
+        elif self._watch_games and not self._watch_unsupported_logged:
+            self._watch_unsupported_logged = True
+            log.warning("the radio modem's firmware cannot report boxes still in an ended game "
+                        "(no \"games\" in its IDENT): update it to free them automatically")
 
     def request_status(self, timeout: float = 5.0, retry_s: float = 1.0) -> Optional[dict[str, Any]]:
         """Sends STATUS and returns the modem's answer to it (None after ``timeout``).
@@ -397,6 +424,10 @@ class RadioModem:
                 frame, rssi, snr = mf.decode_field_rx(payload)
                 if self.on_field_rx:
                     self.on_field_rx(frame, rssi, snr)
+            elif frame_type == mf.OTHER_GAME:
+                other = mf.decode_other_game(payload)
+                if self.on_other_game:
+                    self.on_other_game(other)
             elif frame_type == mf.FIELD_ACK:
                 tx_id, status = mf.decode_field_ack(payload)
                 if self.on_field_ack:
@@ -420,6 +451,8 @@ class RadioModem:
                 self._lang_sent = False
                 if self.has_language and self._lang is not None:
                     self._send_language()
+                if self._watch_games:
+                    self._send_watch()
             elif frame_type == mf.NOISE:
                 self._measure_result = mf.decode_noise(payload)
                 self._measure_done.set()

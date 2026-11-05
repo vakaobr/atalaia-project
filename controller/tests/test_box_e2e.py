@@ -271,6 +271,37 @@ class FieldTests(unittest.TestCase):
         self.assertTrue(wait_for(lambda: listed(), 8))
         self.assertEqual(listed()[0]["last_game"], gid)
 
+    def test_a_box_switched_off_when_its_game_ended_is_freed_when_it_comes_back(self):
+        """The bench finding of 2026-11-05 (decisions STUCK-1 to STUCK-19, RFC 0001 Amendment 27): a box
+        switched off when its game ends never hears the three GAME_OVERs; switched on, it rejoins the ended
+        game and refused every join. Now the C host modem reports that game's packets (OTHER_GAME), the
+        controller says its GAME_OVER again, and the box leaves the game and announces itself free."""
+        gid = self.game()
+        box = self.box("alpha", "--announce-ms", "400")
+        self.join(box)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
+        self.assertTrue(wait_for(lambda: self.modem.has_other_games, 5))
+        box.kill()  # the battery dies
+        r = self.client.post(f"/api/v1/games/{gid}/end", headers=GM, json={})
+        self.assertEqual((r.status_code, r.json()["game_over_frame"]), (200, "sent"))
+        self.assertTrue(wait_for(lambda: not self.ctrl.reinvite.inviter.games_over, 15))  # all three, unheard
+        since = len(box.lines)
+        box.start()  # a fresh battery: still in the ended game
+        self.assertTrue(box.wait_logged("rejoined the stored game", since))
+        self.assertTrue(box.wait_logged(f"game {gid} is over (said by a field controller)", since, 15), box.lines[-8:])
+        self.assertTrue(wait_for(lambda: box.status()["available"], 5))
+        device = box.status()["device_id"]
+
+        def boxes() -> dict:
+            return self.client.get("/api/v1/boxes", headers=GM).json()
+        self.assertTrue(wait_for(lambda: any(b["device_id"] == device for b in boxes()["boxes"]), 8))
+        [entry] = [b for b in boxes()["boxes"] if b["device_id"] == device]
+        self.assertEqual(entry["last_game"], gid)
+        listed = boxes()
+        self.assertTrue(listed["stuck_watch"])
+        self.assertEqual([(s["game"], s["game_over_resent"]) for s in listed["stuck"]], [(gid, 1)])
+
     def test_join_play_reboot_end(self):
         gid = self.game()
         box = self.box("alpha")

@@ -83,6 +83,33 @@ class ModemHostTests(unittest.TestCase):
         self.assertTrue(wait_for(lambda: len(self.errors) >= 2))
         self.assertEqual({code for code, _ in self.errors}, {"bad_params"})
 
+    def test_other_games_over_the_c_modem(self):
+        """RFC 0001 Amendment 27 against the C logic: IDENT says "games"; after WATCH_GAMES another game's
+        packet is reported (game id, source, rssi), between games and during a game, once per game id in
+        10 s; the configured game's packets still come as RX."""
+        heard: list[mf.OtherGame] = []
+        self.modem.on_other_game = heard.append
+        self.assertTrue(wait_for(lambda: self.modem.has_other_games))
+        stuck = node_packet(bytes(range(16, 32)), 240, 5, 1, 2, "HELLO", hello_encode(
+            {"node_name": "z", "platform": 2, "fw_version": "x", "core_version": "y", "tier": 0,
+             "capabilities": [0], "transports": 1, "epoch": 2}))
+        self.host.hear(stuck)  # not asked yet: dropped, as before
+        self.modem.watch_games(True)
+        self.assertTrue(wait_for(lambda: (self.modem.status or {}).get("cmd") == mf.CMD_WATCH_GAMES))
+        self.host.hear(stuck)
+        self.assertTrue(wait_for(lambda: len(heard) == 1))
+        self.assertEqual((heard[0].game_id, heard[0].source), (240, 5))
+        self.host.hear(stuck)  # within 10 s: not again
+        self.configure()
+        ours = node_packet(KEY, GAME, 7, 1, 0, "STATE", state_encode({"phase": 1}))
+        self.host.hear(ours)
+        self.assertTrue(wait_for(lambda: len(self.rx) == 1))
+        self.assertEqual(len(heard), 1)
+        other = node_packet(bytes(range(16, 32)), 241, 6, 1, 0, "STATE", state_encode({"phase": 1}))
+        self.host.hear(other)  # during a game: another game's is reported too
+        self.assertTrue(wait_for(lambda: len(heard) == 2))
+        self.assertEqual(heard[1].game_id, 241)
+
     def test_c_encrypts_python_decrypts(self):
         self.configure(epoch=3)
         payload = time_encode({"game_time_ms": 1234, "game_state": 1, "duration_ms": 0,

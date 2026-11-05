@@ -1015,6 +1015,23 @@ CMD opcode **9, `update`**: the controller offers a box a firmware release. Its 
 
 **Reason:** no node could switch anything, although the design specification lists an `output` capability (section 7) and "smoke, sirens, lights" driven by game events (section 11); the maintainer's examples are a smoke machine fired when an outdoor Bomb explodes and a Master box's siren when one team holds every Satellite. A field script reaches a box only by CMD; one generic opcode with a named function keeps a mode's logic independent of which box or which output path carries it.
 
+## Amendment 27 (2026-11-05, proposed): The USB modem reports other games' packets, so a box still in an ended game hears its GAME_OVER again
+
+**Status:** proposed and built with decisions STUCK-1 to STUCK-19 (the maintainer chose this on 2026-11-05: "option 1"); for review.
+
+**Supersedes:** nothing on air. It adds one command and one frame type to the USB modem's link ([protocol/usb-modem.md](../../protocol/usb-modem.md)) and a second occasion for Amendment 7's GAME_OVER.
+
+**Change:**
+
+1. **WATCH_GAMES** (USB CMD opcode `0x0A`, one byte: 0 or 1) and **OTHER_GAME** (USB frame type `0x0C`: game id (2), source (2), rssi (1), snr (1)). With it on, a packet heard that is not a field or pair frame, carries the encrypted bit and a game id from 1 to 65534, but is not of the configured game (no game configured, or another game's id during one), is reported with its header's game id and source, which are in the clear; nothing is authenticated, since the modem has no key for that game. At most one report per game id every 10 s, with 8 game ids remembered: at most 8 reports per 10 s whatever the air carries. RAM only (off after every boot); IDENT says `"games": true`.
+2. **The controller** asks for it after every IDENT that says so. For a reported game id that is one of the games it ran and ended (not one it followed as a standby) and whose key's tag it still keeps (`key_tag:<game>`, now kept after the end for the last 50 games, so also after a restart without the key), it sends that game's GAME_OVER again as at the end: three times, 4 s apart, on the game's channel (dropped with a game live on another channel), at most once a minute per game. A standby never does.
+
+**Compatibility:** framing stays version 1. A modem from before has no `games` in IDENT and is never sent WATCH_GAMES; it reports nothing, and a stuck box is taken out at the box (the admin menu's *Leave the game* or `@leave`, decisions STUCK-20 to STUCK-33). A controller from before never sends WATCH_GAMES, so the new modem stays silent. Boxes are unchanged: they already obey GAME_OVER. The I/O pod passes no OTHER_GAME to its phone (its links carry frame types up to FIELD_ACK); the Android field controller does not send WATCH_GAMES yet.
+
+**Security:** a report can be forged with any header in the clear. The worst it does is make the controller send a GAME_OVER of one of its ended games (about 0.28 s of air, at most once a minute per game), which can only end a game that is over (Amendment 7's addendum).
+
+**Reason:** found on the bench on 2026-11-05: a box switched off when its game ended (a dead battery, in a real game) never hears the three GAME_OVERs, comes back still in the game and refuses every join; only erasing it over USB freed it. The modem dropped that game's packets before the controller could see them (another game, or no game configured), so the controller could not tell.
+
 ## Open questions
 
 - Per-node session keys (HKDF-derived from the game key) would limit
