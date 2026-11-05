@@ -161,6 +161,7 @@ jobs:
               - 'controller/console/src/**'
               - 'controller/templates/**'
               - 'controller/atalaia_controller/api.py'
+              - 'controller/atalaia_controller/wallclock.py' # its RELEASE_DATE is checked against the app's (STUCK-62)
               - 'controller/tests/fixtures/**'
               - 'controller/tests/scenarios/**'
               - 'registry/apds/**'
