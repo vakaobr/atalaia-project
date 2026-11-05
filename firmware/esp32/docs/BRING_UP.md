@@ -764,6 +764,10 @@ is in [README.md](../README.md#the-modems-oled).
    PIN*; until a PIN is set the keypad picker shows *No admin PIN set* and adoption to
    another field answers `no_pin`. A box set up before has none if its PIN was one of those:
    type `@admin-pin <PIN>` on its USB console (`@admin-pin <PIN> <new PIN>` changes it).
+   The field Wi-Fi password follows the console's `@wifi` rule (`wifi_pass_valid`, decision
+   WIFI-7): none for an open network, 8-63 characters, or exactly 64 hex digits; a 64-character
+   password that is not all hex digits, or a 65th character, is refused with *The field Wi-Fi
+   password is 8-63 characters, 64 hex digits, or none* and nothing is saved.
 6. Verify: node reboots into normal mode.
 
 ## Step 12: Full Game Test (2 Hours) -- Phase 1 Gate

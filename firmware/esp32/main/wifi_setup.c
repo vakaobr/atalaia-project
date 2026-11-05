@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "admin_pin.h"
+#include "wifi_args.h"
 
 /* ------------------------------------------------------------------ */
 /* URL-encoded form parsing (platform-independent)                     */
@@ -98,10 +99,12 @@ static const char *const messages[WS_MSG_COUNT][BOX_LANG_COUNT] = {
                          "A chave de ligação ao campo tem 64 algarismos hexadecimais",
                          "Der Feld-Join-Schlüssel hat 64 Hex-Ziffern",
                          "場地加入金鑰是 64 位十六進位數字"},
-    [WS_MSG_WIFI_PASS] = {"The field Wi-Fi password is 8-64 characters, or none",
-                          "A palavra-passe do Wi-Fi do campo tem 8 a 64 caracteres, ou nenhuma",
-                          "Das WLAN-Passwort des Felds hat 8-64 Zeichen, oder keins",
-                          "場地 Wi-Fi 密碼需為 8 到 64 個字元，或不設密碼"},
+    [WS_MSG_WIFI_PASS] =
+        {"The field Wi-Fi password is 8-63 characters, 64 hex digits, or none",
+         "A palavra-passe do Wi-Fi do campo tem 8 a 63 caracteres, 64 algarismos hexadecimais, "
+         "ou nenhuma",
+         "Das WLAN-Passwort des Felds hat 8-63 Zeichen, 64 Hex-Ziffern, oder keins",
+         "場地 Wi-Fi 密碼需為 8 到 63 個字元、64 位十六進位數字，或不設密碼"},
     [WS_MSG_SAVED] = {"Saved. Rebooting...", "Guardado. A reiniciar...", "Gespeichert. Neustart...",
                       "已儲存，正在重新啟動..."},
 };
@@ -127,6 +130,13 @@ const char *wifi_setup_pin_problem_in(box_lang_t lang, const char *pin)
 const char *wifi_setup_pin_problem(const char *pin)
 {
     return wifi_setup_pin_problem_in(BOX_LANG_EN, pin);
+}
+
+const char *wifi_setup_wifi_pass_problem_in(box_lang_t lang, const char *pass)
+{
+    /* The console's rule (wifi_args.h, decision WIFI-7 as changed on 2026-11-05). */
+    if (pass != NULL && wifi_pass_valid(pass)) return NULL;
+    return wifi_setup_msg(lang, WS_MSG_WIFI_PASS);
 }
 
 /* A tag of Accept-Language ("pt-PT", "zh-TW", "en;q=0.8"): its language if the box has it
@@ -421,14 +431,13 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     }
 
     /* The field Wi-Fi a firmware update uses (protocol/firmware-update.md), optional. */
-    char wifi_ssid[33], wifi_pass[65];
+    /* One byte more than the longest password, so one that is too long is seen, not cut. */
+    char wifi_ssid[WIFI_SSID_MAX + 1], wifi_pass[WIFI_PASS_MAX + 2];
     bool have_wifi =
         parse_form_field(buf, "wifissid", wifi_ssid, sizeof(wifi_ssid)) && wifi_ssid[0] != '\0';
     if (!parse_form_field(buf, "wifipass", wifi_pass, sizeof(wifi_pass))) wifi_pass[0] = '\0';
-    size_t np = strlen(wifi_pass);
-    if (have_wifi && np > 0 && np < 8) {
-        return send_problem(req, lang, wifi_setup_msg(lang, WS_MSG_WIFI_PASS));
-    }
+    const char *pass_problem = have_wifi ? wifi_setup_wifi_pass_problem_in(lang, wifi_pass) : NULL;
+    if (pass_problem != NULL) return send_problem(req, lang, pass_problem);
 
     /* Write to config store. */
     if (have_wifi) {

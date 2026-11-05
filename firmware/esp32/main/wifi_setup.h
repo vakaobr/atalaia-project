@@ -75,6 +75,13 @@ const char *wifi_setup_msg(box_lang_t lang, wifi_setup_msg_t msg);
 const char *wifi_setup_pin_problem_in(box_lang_t lang, const char *pin);
 
 /*
+ * Why the form's field Wi-Fi password is refused, in a language, or NULL: the console's
+ * "@wifi" rule (wifi_pass_valid, wifi_args.h): none (an open network), 8-63 characters,
+ * or 64 hex digits (decision WIFI-7, changed by the maintainer on 2026-11-05).
+ */
+const char *wifi_setup_wifi_pass_problem_in(box_lang_t lang, const char *pass);
+
+/*
  * The captive portal's DNS answer to one query packet: every A (and ANY) question for any name
  * is answered with ip (a 30 s TTL), every other type (AAAA, ...) with no answer (NOERROR, so a
  * phone falls back to A). Writes into out (cap bytes) and returns its length, or 0 for a packet
