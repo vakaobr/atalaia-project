@@ -1493,6 +1493,25 @@
     "pending_note_one": "{n} angemeldete Replik noch nicht gechront.",
     "back": "Zurück"
   },
+    "stuck": {
+      "title": "In einem beendeten Spiel hängengeblieben",
+      "intro": "Diese Boxen wurden noch in einem Spiel gehört, das vorbei ist (sie waren ausgeschaltet, als es endete). Der Controller sendet das GAME_OVER dieses Spiels höchstens einmal pro Minute erneut; Freigeben sendet es sofort.",
+      "empty": "Keine Box in einem beendeten Spiel gehört.",
+      "no_watch": "Das Funkmodem kann Boxen in einem beendeten Spiel nicht melden: Aktualisiere seine Firmware. Bis dahin nimm eine solche Box an der Box selbst aus dem Spiel: * 3 s lang halten für „Spiel verlassen“ im Admin-Menü, oder @leave <Admin-PIN> auf ihrer USB-Konsole eingeben.",
+      "game": "Spiel",
+      "nodes": "Gehörte Knoten",
+      "signal": "Signal",
+      "resent": "Erneut gesendet",
+      "release": "Freigeben",
+      "release_hint": "Das GAME_OVER dieses Spiels jetzt senden, damit seine Boxen es verlassen",
+      "released": "GAME_OVER von „{game}“ gesendet: Seine Boxen verlassen das Spiel und melden sich frei.",
+      "not_released": "GAME_OVER von „{game}“ nicht gesendet: {why}.",
+      "why": {
+        "no_radio": "das Funkmodem ist nicht verbunden oder überträgt keine Feld-Frames",
+        "no_join_key": "dieser Controller hat keinen Beitrittsschlüssel des Felds",
+        "no_tag": "der Controller hat für dieses Spiel kein Schlüssel-Tag behalten"
+      }
+    },
   "clock": {
     "wrong": "Die Uhr des Controllers geht falsch.",
     "reason_before_release": "Sie zeigt {now}, also vor der Veröffentlichung dieser Software ({floor}). Ein Raspberry Pi 4 hat keine eigene Uhr und startet nach einem Stromausfall mit einer alten Zeit.",

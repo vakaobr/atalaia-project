@@ -33,6 +33,7 @@ which browsers cannot give headers, takes it in the ``Sec-WebSocket-Protocol`` h
     GET  /api/v1/games/{id}/start-check    the roles the game needs, those joined, missing, warnings
     GET  /api/v1/boxes                     GM: free boxes heard over the radio (protocol/field-frames.md)
     POST /api/v1/boxes/discover            GM: ask the free boxes to announce themselves now
+    POST /api/v1/boxes/stuck/{game}/release GM: an ended game's GAME_OVER now, for a box still in it
     GET|POST /api/v1/games/{id}/invites    GM: invites into the live game / invite boxes
                                            {"boxes": [{"device_id", "role"?, "name"?}]}
     GET  /api/v1/games/{id}/score          current totals
@@ -640,6 +641,13 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     @app.post("/api/v1/boxes/discover", dependencies=[Depends(require_gm)])
     def boxes_discover() -> dict[str, Any]:
         return need_reinvite().discover()
+
+    @app.post("/api/v1/boxes/stuck/{game_id}/release", dependencies=[Depends(require_gm)])
+    def boxes_stuck_release(game_id: int) -> dict[str, Any]:
+        """The GM's Release: an ended game's GAME_OVER now (stuck_games.py, STUCK-40 to STUCK-47)."""
+        if controller.stuck is None:
+            return {"game": game_id, "game_over_frame": "no_join_key"}
+        return controller.stuck.release(game_id)
 
     @app.get("/api/v1/games/{game_id}/invites", dependencies=[Depends(require_gm)])
     def invites(game_id: int) -> dict[str, Any]:

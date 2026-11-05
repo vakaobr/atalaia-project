@@ -435,6 +435,47 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("game-ended")).to_be_visible()
         self.assertEqual(ctrl.store.game(game["id"])["state"], "ended")
 
+    def test_boxes_stuck_in_an_ended_game_and_the_release_button(self):
+        """Decisions STUCK-40 to STUCK-47: a box switched off when its game ended comes back still in it;
+        the C host modem reports its packets (OTHER_GAME), the controller sends the GAME_OVER again and
+        the Boxes tab lists the game live from the stream; Release sends it again at once."""
+        ctrl = self.field.bundle.controller
+        reinvite = ctrl.reinvite
+        game = self.field.create_game("Sábado", start=True)
+        key = ctrl.game_key(game["id"])
+        self.assertEqual(self.field.http.post(f"/api/v1/games/{game['id']}/end", json={}).status_code, 200)
+        self.assertTrue(wait_for(lambda: not reinvite.inviter.games_over, 20))  # the end's three GAME_OVERs
+        page = self.console()
+        page.get_by_test_id("tab-nodes").click()
+        expect(page.get_by_test_id("stuck-empty")).to_contain_text("Nenhuma caixa ouvida")
+        # The box comes back still in the ended game: its STATE is heard by the modem.
+        self.field.host.transmitted_all()
+        self.field.host.hear(node_packet(key, game["id"], BOX, 40, 1, "STATE", state_encode(
+            {"owner_team": 0, "phase": 1, "game_time_ms": 5000, "counters": {}, "epoch": 1})))
+        row = page.get_by_test_id(f"stuck-row-{game['id']}")
+        expect(row).to_contain_text("Sábado")
+        expect(row).to_contain_text(str(BOX))
+        expect(page.get_by_test_id(f"stuck-resent-{game['id']}")).to_have_text("1")
+        expect(page.get_by_test_id("stuck-no-watch")).to_have_count(0)
+        # Release: once the automatic burst is over (and without the short rate limit, for the test).
+        self.assertTrue(wait_for(lambda: not reinvite.inviter.games_over, 20))
+        ctrl.stuck.release_ms = 0
+        self.field.host.transmitted_all()
+        page.get_by_test_id(f"stuck-release-{game['id']}").click()
+        expect(page.get_by_test_id("toast")).to_contain_text("enviado")
+        expect(page.get_by_test_id(f"stuck-resent-{game['id']}")).to_have_text("2")
+        fkey = ff.field_key(JOIN_KEY)
+        sent = [ff.decode(fkey, f) for f in self.field.host.transmitted_all(0.5) if ff.is_frame(f)]
+        self.assertIn({"kind": "game_over", "game_id": game["id"], "key_tag": ff.key_tag(key)}, sent)
+        # A modem whose firmware cannot report them: the hint, in English.
+        modem = self.field.bundle.modem
+        modem.ident = {**modem.ident, "games": False}
+        page.get_by_test_id("lang").select_option("en")
+        page.reload()
+        page.get_by_test_id("tab-nodes").click()
+        expect(page.get_by_test_id("stuck-no-watch")).to_contain_text("update its firmware")
+        expect(page.get_by_test_id("stuck-no-watch")).to_contain_text("@leave")
+
     def ready_game_with_the_dialog(self, lang: str = "en", **spec):
         """A Hold-All game (min_zones 2 by default) waiting for its zone box (node 7), and the
         console with the invite dialog open."""
@@ -4675,7 +4716,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v19').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v20').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js", "/console/labels.js", "/console/qr-svg.js"):

@@ -29,6 +29,7 @@
 import { html, Component, createRef, t, api } from '../ui.js';
 import { gameRoles } from './preset-builder.js';
 import { DiscoverResult } from './radio-settings.js';
+import { StuckBoxes } from './stuck-boxes.js';
 
 const DONE = new Set(['joined']);
 const FETCH_ACTIVE = new Set(['sent', 'fetching', 'installed']);
@@ -355,6 +356,7 @@ export class BoxInvites extends Component {
                                     this.fetchFor(i) && this.fetchFor(i).state !== 'done'
                                         ? this.fetchStatus(this.fetchFor(i)) : this.status(i)}</td></tr>`)}
                         </tbody></table></div>`}
+                <${StuckBoxes} app=${app} compact=${true} />
                 <div role="status" aria-live="polite" data-testid="invite-readiness">${this.renderReadiness(check)}</div>
                 ${this.renderFetchWait()}
                 <${DiscoverResult} app=${app} />

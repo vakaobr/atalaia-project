@@ -23,6 +23,7 @@ import { BoxLanguageSettings } from './components/box-language-settings.js';
 import { ClockBanner, ClockSettings } from './components/clock-settings.js';
 import { MapFetchingSettings } from './components/map-fetching-settings.js';
 import { FirmwarePanel } from './components/firmware-panel.js';
+import { StuckBoxes } from './components/stuck-boxes.js';
 import { PodConfigPanel } from './components/pod-config-panel.js';
 import { FetchedModes } from './components/fetched-modes.js';
 import { ModePackages } from './components/mode-packages.js';
@@ -348,7 +349,12 @@ class App extends Component {
             this.setState({ radio: msg.radio });
             break;
         case 'boxes':
-            this.setState((s) => ({ boxes: { ...(s.boxes || {}), boxes: msg.boxes }, boxesAt: Date.now() }));
+            // With the games a box is stuck in (stuck-boxes.js, STUCK-45), when the controller reports them.
+            this.setState((s) => {
+                const stuck = msg.stuck_watch === undefined ? {}
+                    : { stuck: msg.stuck, stuck_reports: msg.stuck_reports, stuck_watch: msg.stuck_watch };
+                return { boxes: { ...(s.boxes || {}), boxes: msg.boxes, ...stuck }, boxesAt: Date.now() };
+            });
             break;
         case 'invites':
             if (this.state.game && msg.game === this.state.game.id) this.setState({ invites: msg.invites });
@@ -594,7 +600,7 @@ class App extends Component {
         case 'field':
             return html`<${FieldView} app=${this} />`;
         case 'nodes':
-            return html`<${NodeList} app=${this} />${this.serves('firmware') && html`<${FirmwarePanel} app=${this} />`}${
+            return html`<${NodeList} app=${this} /><${StuckBoxes} app=${this} />${this.serves('firmware') && html`<${FirmwarePanel} app=${this} />`}${
                 this.serves('pod_config') && html`<${PodConfigPanel} app=${this} />`}${
                 this.serves('mode_packages') && html`<${FetchedModes} app=${this} />`}`;
         case 'join':
