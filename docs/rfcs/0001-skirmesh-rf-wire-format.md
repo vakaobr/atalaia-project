@@ -1032,9 +1032,9 @@ CMD opcode **9, `update`**: the controller offers a box a firmware release. Its 
 
 **Reason:** found on the bench on 2026-11-05: a box switched off when its game ended (a dead battery, in a real game) never hears the three GAME_OVERs, comes back still in the game and refuses every join; only erasing it over USB freed it. The modem dropped that game's packets before the controller could see them (another game, or no game configured), so the controller could not tell.
 
-## Amendment 28 (2026-11-05, proposed): RELEASE, a field frame that frees every box not in the live game
+## Amendment 28 (2026-11-05): RELEASE, a field frame that frees every box not in the live game
 
-**Status:** proposed and built with decisions STUCK-50 to STUCK-59 (the maintainer's brief of 2026-11-05, "part 2 after 1 and 3"); for review.
+**Status:** built with decisions STUCK-50 to STUCK-59 (the maintainer's brief of 2026-11-05, "part 2 after 1 and 3") and confirmed by the maintainer on 2026-11-05 ("go with your suggestions"), with STUCK-68 to STUCK-70: TIME's `wall_s` is the same corrected clock as RELEASE's `time`, the replay rule relies on the old controller's clock with `@leave` as the fallback, and the collateral on a second controller's game stays a confirmed GM action.
 
 **Supersedes:** nothing. It adds kind 6 to Amendment 7's field frames ([protocol/field-frames.md](../../protocol/field-frames.md)), which decoders refused until now.
 
@@ -1046,9 +1046,9 @@ CMD opcode **9, `update`**: the controller offers a box a firmware release. Its 
 
 **The replay rule, exactly:** a RELEASE is fresh for a box when its `time` is after that box's join of its current game, as measured by the first TIME of that game. A RELEASE recorded at T and played back later is therefore refused by every box that has joined a game since T, and can free only a box that was already in a game, other than the one it names, when it was sent: one the original was meant to free. It needs no counter on the box and nothing stored on the controller (which, by design, has lost its records). MOVE's rising revision does not fit: a lost database loses the revision too, and a box in a game ignores MOVE.
 
-**Compatibility:** framing and the field frame version stay 1. A box from before refuses kind 6 as unknown and stays in its game (its admin menu's *Leave the game* or `@leave` take it out, STUCK-20 to STUCK-33). The USB modem passes field frames as they are and needs no change. The Android field controller decodes kind 6 (the shared vectors) and sends it with the same rules as the Raspberry Pi (decision STUCK-61).
+**Compatibility:** framing and the field frame version stay 1. A box from before refuses kind 6 as unknown and stays in its game (its admin menu's *Leave the game* or `@leave` take it out, STUCK-20 to STUCK-33). The USB modem passes field frames as they are and needs no change. The Android field controller decodes kind 6 (the shared vectors) and sends it with the same rules as the Raspberry Pi (decision STUCK-61), with the Pi's clock guard (decision STUCK-62 as the maintainer changed it).
 
-**Security:** forging needs the join key, whose holder can already do worse. A replay is bounded by the rule above. The join time comes from the game controller's clock: one far behind (a Raspberry Pi at 1970) weakens the replay rule for its boxes, one far ahead makes them refuse until the releasing clock passes it. A RELEASE also frees the boxes of a game a second controller of the same field runs at the same time on the same channel: it is a confirmed GM action, never automatic. Air: three frames of about 87 ms.
+**Security:** forging needs the join key, whose holder can already do worse. A replay is bounded by the rule above. The join time comes from the game controller's clock: one far behind (a Raspberry Pi at 1970) weakens the replay rule for its boxes, one far ahead makes them refuse until the releasing clock passes it (the box's `@leave` remains). Both controllers stamp TIME's `wall_s` and RELEASE's `time` with the same clock, the wall clock with the GM's forward-only correction (CLK-4; on the phone since STUCK-62), and refuse to send RELEASE while it is implausible. A RELEASE also frees the boxes of a game a second controller of the same field runs at the same time on the same channel: it is a confirmed GM action, never automatic. Air: three frames of about 87 ms.
 
 **Reason:** GAME_OVER (Amendment 7's addendum) and its resend (Amendment 27) name a game by its key's tag, which the controller keeps. A controller reinstalled or with its database lost has neither the game nor its tag, and its stuck boxes could only be taken out one by one at the box.
 

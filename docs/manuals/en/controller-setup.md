@@ -121,6 +121,8 @@ What the controller does about it (the details are in the [controller README](..
 
 If the console refuses ("... is earlier than ..."), either the phone's time is wrong too, or the controller has already seen a later time because its clock was *ahead* for a while. The controller never goes back by itself: fix it as `root` with `sudo timedatectl set-time` and restart the service; the records made while it was ahead keep their dates.
 
+**A phone controller does the same.** A phone's clock is usually right, set by the mobile network, but one that was reset, set by hand, or has had no network for long can be wrong too. The phone controller checks it the same way (this release's date, the newest time it has seen, the newest data it holds), shows the same yellow banner, holds its deletions the same way, and takes the same **Set the controller's clock from this device**, forward only. The setting lasts until the controller is stopped. The controller also uses this corrected time when it tells the boxes the time and when it sends **Release every box not in this game**, so a box compares the two on one clock.
+
 ## Using a travel router
 
 A small **travel router** (a pocket router on a power bank) is the simplest field Wi-Fi: the Pi and the phones all join the router's Wi-Fi.

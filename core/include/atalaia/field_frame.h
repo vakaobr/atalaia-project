@@ -15,7 +15,7 @@
  *                                  there (RFC 0001 Amendment 19)
  *   RELEASE   controller -> boxes  "game L is live (or none), it is now T": every box in a game
  *                                  other than L that it joined before T leaves it (RFC 0001
- *                                  Amendment 28, proposed; for a controller that lost the game)
+ *                                  Amendment 28; for a controller that lost the game)
  *
  * On air:
  *

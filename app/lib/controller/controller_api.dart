@@ -47,6 +47,8 @@
 ///     POST /api/v1/join                      GM: a join payload (slice S4)
 ///     POST /api/v1/nodes/{id}/join           GM: a join payload for that node id
 ///     GET|PUT /api/v1/settings/box-language  the boxes' screen language
+///     GET|PUT /api/v1/clock                 the wall clock; the GM sets it
+///                                           forward (controller_clock.dart)
 ///     GET|PUT /api/v1/settings/map-fetching  may the console fetch maps (LEG-50)
 ///     WS   /api/v1/prop                      Android props on Wi-Fi
 ///                                            (controller_props.dart, slice S4)
@@ -119,6 +121,7 @@ import '../version.dart';
 import 'controller_branding.dart';
 import 'controller_channel.dart';
 import 'controller_checkin.dart';
+import 'controller_clock.dart';
 import 'controller_engine.dart';
 import 'controller_field.dart';
 import 'controller_images.dart';
@@ -379,6 +382,18 @@ class ControllerApi {
           (r) =>
               ApiResponse(200, engine.setBoxLanguage(r.body['box_language'])),
         ),
+      ),
+      // The controller's wall clock (controller_clock.dart, decisions CLK-*
+      // and STUCK-62): the GM sets it forward from the device it uses.
+      _route(
+        'GET',
+        r'/api/v1/clock',
+        _read((r, who) => ApiResponse(200, engine.clock.status())),
+      ),
+      _route(
+        'PUT',
+        r'/api/v1/clock',
+        _gm((r) => ApiResponse(200, engine.clock.set(r.body['epoch']))),
       ),
       // LEG-50: the field's choice to turn the console's map fetching off.
       _route(
@@ -704,6 +719,10 @@ class ControllerApi {
     ControllerError() => ApiResponse(e.status, {
       'detail': e.message,
       ...e.extra,
+    }),
+    ClockError() => ApiResponse(e.status, {
+      'detail': e.message,
+      'code': e.code,
     }),
     // Slice S7b: a mode package or a scenario refused (api.py's handlers).
     ModeException() => ApiResponse(400, {'detail': e.message}),

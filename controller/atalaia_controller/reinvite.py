@@ -296,12 +296,15 @@ class Reinvite:
     def stuck_view(self) -> dict[str, Any]:
         """``stuck``: per ended game a box was heard still in, {game, name, last_heard_s, nodes, rssi,
         game_over_resent}; ``stuck_reports``: the modem's reports of other games' packets;
-        ``stuck_watch``: whether the modem can report them (its IDENT says "games")."""
+        ``stuck_watch``: whether the modem can report them (its IDENT says "games"); ``radio_kind``: what the
+        radio is, so the console's hint fits it (STUCK-64 as changed by the maintainer): "modem" (a Pi's radio is
+        always a USB radio modem) or "none"; a phone controller also says "pod" (an I/O pod)."""
         stuck = self.ctl.stuck
         radio = self.ctl.modem
         return {"stuck": stuck.public() if stuck is not None else [],
                 "stuck_reports": stuck.reports if stuck is not None else 0,
-                "stuck_watch": radio is not None and getattr(radio, "has_other_games", False) is True}
+                "stuck_watch": radio is not None and getattr(radio, "has_other_games", False) is True,
+                "radio_kind": "modem" if radio is not None else "none"}
 
     def invites(self, game_id: int) -> list[dict[str, Any]]:
         return [self._view(i) for i in self.inviter.invites.values() if i.game_id == game_id]

@@ -9,15 +9,16 @@
 // answered by its GAME_OVER at most once a minute, the GM's Release and the
 // field-wide RELEASE with their rate limits and refusals, over the API too.
 
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:atalaia_app/controller/controller_api.dart';
 import 'package:atalaia_app/controller/controller_boxes.dart';
+import 'package:atalaia_app/controller/controller_clock.dart';
 import 'package:atalaia_app/controller/controller_engine.dart';
 import 'package:atalaia_app/controller/controller_radio.dart';
 import 'package:atalaia_app/controller/controller_stuck.dart';
 import 'package:atalaia_app/protocol/field_frame.dart';
+import 'package:atalaia_app/radio/rf_codec.dart';
 import 'package:atalaia_app/security/bytes.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -117,8 +118,14 @@ void main() {
     expect(boxes.boxes()['stuck_watch'], isTrue);
     expect(boxes.boxes()['stuck'], isEmpty);
     expect(boxes.boxes()['stuck_reports'], 0);
+    expect(boxes.boxes()['radio_kind'], 'modem');
     radio.games = false; // an older modem, or an I/O pod
     expect(boxes.boxes()['stuck_watch'], isFalse);
+    // The console's hint tells the two apart (STUCK-64 as changed by the
+    // maintainer): the stream's boxes message says what the radio is too.
+    radio.kind = 'pod';
+    expect(boxes.boxes()['radio_kind'], 'pod');
+    expect(boxes.stuckView()['radio_kind'], 'pod');
   });
 
   test('a box still in an ended game is told again and listed', () {
@@ -384,7 +391,7 @@ void main() {
     });
 
     test('needs a plausible clock', () {
-      wall = clockFloorS - 3600.0; // a phone whose clock is far behind
+      wall = clockReleaseDateS - 3600.0; // a phone whose clock is far behind
       expect(
         () => stuck.releaseField(),
         throwsA(
@@ -405,18 +412,25 @@ void main() {
     });
   });
 
-  test("the clock floor is the Pi's RELEASE_DATE", () {
-    final src = File('../controller/atalaia_controller/wallclock.py')
-        .readAsStringSync();
-    final m = RegExp(
-      r'RELEASE_DATE = calendar\.timegm\(\((\d+), (\d+), (\d+), 0, 0, 0\)\)',
-    ).firstMatch(src)!;
-    final date = DateTime.utc(
-      int.parse(m[1]!),
-      int.parse(m[2]!),
-      int.parse(m[3]!),
-    );
-    expect(clockFloorS, date.millisecondsSinceEpoch ~/ 1000);
+  test('TIME and RELEASE both carry the GM-corrected clock', () {
+    // A GM moved the clock an hour forward (controller_clock.dart): the join
+    // time a box takes from TIME and RELEASE's time must agree (Amendment
+    // 28's replay rule compares them).
+    engine.clock.set(wallStart + 3600);
+    final gid = game();
+    engine.startGame(gid, force: true);
+    run(3000);
+    final times = [
+      for (final (h, p) in radio.sent)
+        if (h.type == RfType.time) RfTime.decode(p).wallS,
+    ];
+    expect(times, isNotEmpty);
+    expect(times.first, closeTo(wallStart + 3600, 5));
+    engine.endGame(gid);
+    drain(15000);
+    final out = stuck.releaseField();
+    expect(out['time']! as int, closeTo(wallStart + 3600 + now / 1000, 2));
+    expect(out['time']! as int, greaterThan(times.last));
   });
 
   group('over the API', () {

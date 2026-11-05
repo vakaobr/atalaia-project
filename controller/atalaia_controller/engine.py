@@ -569,8 +569,10 @@ class Controller:
         self.transport = ModemTransport(self.modem, self.store, game["id"], node_id, max_hops,
                                         channel, key, wifi=self._to_wifi, resuming=resuming,
                                         pace_ms=self.cfg.controller_pace_ms)
+        # TIME's wall_s is the corrected clock (wallclock.py), as RELEASE's time: a box's join time comes
+        # from its first TIME, and Amendment 28's replay rule compares the two (decision STUCK-68).
         fc = FieldController(transport=self.transport, game_id=game["id"], teams=game["teams"],
-                             node_id=node_id, election=election, max_hops=max_hops)
+                             node_id=node_id, election=election, max_hops=max_hops, wall_clock=self._wall)
         fc.duration_ms = game["duration_ms"]
         # Node health events (decisions FU1-1 to FU1-4): node.online/node.offline and battery.low.
         fc.node_offline_ms = int(self.cfg.health_node_offline_s * 1000)

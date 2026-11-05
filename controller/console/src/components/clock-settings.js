@@ -5,7 +5,7 @@
 // has no real-time clock, so after a power cycle in a field with no internet its clock is wrong; the controller
 // says so (status.clock.ok false) and this banner offers, to the game master only, to set it from this device,
 // whose clock is right. The controller moves forward only, never below what it has seen and never absurdly
-// far, and says why when it refuses. Only the Pi controller has it (a phone's clock is the network's).
+// far, and says why when it refuses. Both controllers have it (the phone's controller_clock.dart since STUCK-62).
 
 import { html, Component, t } from '../ui.js';
 

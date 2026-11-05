@@ -70,6 +70,7 @@ import 'controller_adoption.dart';
 import 'controller_boxes.dart';
 import 'controller_branding.dart';
 import 'controller_channel.dart';
+import 'controller_clock.dart';
 import 'controller_failover.dart';
 import 'controller_checkin.dart';
 import 'controller_field.dart';
@@ -350,19 +351,30 @@ class ControllerEngine {
     int Function()? clockMs,
     double Function()? wallSeconds,
     Random? random,
-  }) : store = store ?? MemoryControllerStore(wallSeconds: wallSeconds),
-       _wall =
+  }) : store = store ?? MemoryControllerStore(),
+       _rawWall =
            wallSeconds ?? (() => DateTime.now().microsecondsSinceEpoch / 1e6),
        _random = random ?? Random.secure() {
+    final watch = Stopwatch()..start();
+    _clock = clockMs ?? () => watch.elapsedMilliseconds;
+    _t0 = _clock();
+    // The wall clock with the GM's correction (controller_clock.dart, the
+    // Pi's wallclock.py; decision STUCK-62): the store's timestamps too.
+    clock = ClockGuard(
+      raw: _rawWall,
+      mono: () => nowMs() / 1000,
+      newestRecord: _newestRecord,
+      getSetting: this.store.getSetting,
+      setSetting: this.store.setSetting,
+    );
+    final s = this.store;
+    if (s is MemoryControllerStore && !s.wallGiven) s.wallSeconds = _wall;
     this.modes = ControllerModes(
       this.store,
       core: core,
       catalog: modes,
       wallSeconds: _wall,
     );
-    final watch = Stopwatch()..start();
-    _clock = clockMs ?? () => watch.elapsedMilliseconds;
-    _t0 = _clock();
     final m = modem;
     if (m != null) {
       m
@@ -381,6 +393,7 @@ class ControllerEngine {
     }
     _restore();
     _tellModemLanguage();
+    clock.start();
   }
 
   final ControllerConfig config;
@@ -421,7 +434,36 @@ class ControllerEngine {
   /// [transport]): its queue, for the status and the tests.
   RadioTransport? get radioTransport => _radio;
   final _txStatus = <String, int>{};
-  final double Function() _wall;
+  final double Function() _rawWall;
+
+  /// The controller's wall clock and its guard (controller_clock.dart,
+  /// decisions CLK-* and STUCK-62): GET|PUT /api/v1/clock, `clock` in the
+  /// status, the retention purges wait while it is wrong.
+  late final ClockGuard clock;
+  double _wall() => clock.now();
+
+  /// The newest wall-clock timestamp the store holds (0 when empty), the
+  /// Pi's store.py `newest_wall_time`: the clock cannot honestly be earlier.
+  double _newestRecord() {
+    var best = 0.0;
+    void take(Object? v) {
+      if (v is num && v > best) best = v.toDouble();
+    }
+
+    for (final g in store.games()) {
+      for (final k in const ['created_at', 'started_at', 'ended_at']) {
+        take(g[k]);
+      }
+      final id = g['id'];
+      if (id is int) {
+        for (final ev in store.eventLog(id)) {
+          take(ev['received_at']);
+        }
+      }
+    }
+    return best;
+  }
+
   final Random _random;
   late final int Function() _clock;
   late final int _t0;
@@ -2332,6 +2374,9 @@ class ControllerEngine {
       'term': fc?.term,
       'live_game': _game?['id'],
       'key_lost': _keyLost,
+      // The wall clock and whether it is plausible (controller_clock.dart):
+      // the console's banner and the GM's setting.
+      'clock': clock.status(),
       'radio': radioState,
       'modem': {
         'ident': modem?.ident,
@@ -2613,6 +2658,7 @@ class ControllerEngine {
   /// Moves the controller on: the game clock, TIME beacons, node health,
   /// field.lua's timers, the game's time limit.
   void tick() {
+    clock.tick(); // a jump of the wall clock, its high-water mark
     checkin?.purge(); // retention (ADR-P3-13), at most every 10 minutes
     // Slice S7c: invites and their retries, GAME_OVERs, pairing runs, with
     // or without a game.

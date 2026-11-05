@@ -121,6 +121,8 @@ O que o controlador faz a este respeito (os pormenores estão no [README do cont
 
 Se a consola recusar («... is earlier than ...»), ou a hora do telemóvel também está errada, ou o controlador já viu uma hora posterior porque o seu relógio esteve *adiantado* durante algum tempo. O controlador nunca recua sozinho: corrija-se como `root` com `sudo timedatectl set-time` e reinicie-se o serviço; os registos feitos enquanto estava adiantado mantêm as suas datas.
 
+**Um telemóvel controlador faz o mesmo.** A hora de um telemóvel costuma estar certa, dada pela rede móvel, mas pode estar errada num telemóvel que foi reposto, acertado à mão ou que esteve muito tempo sem rede. O telemóvel controlador verifica-a da mesma maneira (a data desta versão, a hora mais recente que já viu, os dados mais recentes que guarda), mostra a mesma faixa amarela, adia as eliminações da mesma maneira e aceita o mesmo **Acertar o relógio do controlador por este dispositivo**, só para a frente. O acerto dura até o controlador parar. O controlador usa também esta hora acertada quando diz a hora às caixas e quando envia **Libertar todas as caixas que não estão neste jogo**, para que a caixa compare as duas no mesmo relógio.
+
 ## Usar um router de viagem
 
 Um **router de viagem** pequeno (um router de bolso ligado a uma bateria externa) é a forma mais simples de ter Wi-Fi no campo: o Pi e os telemóveis ligam-se todos ao Wi-Fi do router.

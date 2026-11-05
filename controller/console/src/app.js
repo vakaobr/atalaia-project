@@ -353,7 +353,8 @@ class App extends Component {
             // With the games a box is stuck in (stuck-boxes.js, STUCK-45), when the controller reports them.
             this.setState((s) => {
                 const stuck = msg.stuck_watch === undefined ? {}
-                    : { stuck: msg.stuck, stuck_reports: msg.stuck_reports, stuck_watch: msg.stuck_watch };
+                    : { stuck: msg.stuck, stuck_reports: msg.stuck_reports, stuck_watch: msg.stuck_watch,
+                        radio_kind: msg.radio_kind };
                 return { boxes: { ...(s.boxes || {}), boxes: msg.boxes, ...stuck }, boxesAt: Date.now() };
             });
             break;

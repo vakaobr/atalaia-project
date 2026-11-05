@@ -51,7 +51,7 @@ const _partGapMs = 150; // between an invite's parts (the box re-arms)
 const gameOverRepeats = 3;
 const gameOverGapMs = 4000;
 
-// RELEASE (RFC 0001 Amendment 28, proposed; lobby.py RELEASE_REPEATS): every
+// RELEASE (RFC 0001 Amendment 28; lobby.py RELEASE_REPEATS): every
 // box in a game other than the live one that it joined before the frame's
 // time leaves it. Said this many times, gameOverGapMs apart.
 const releaseRepeats = 3;
@@ -1056,11 +1056,14 @@ class ControllerBoxes {
   /// last_heard_s, nodes, rssi, game_over_resent}; `stuck_reports`: the
   /// radio's reports of other games' packets; `stuck_watch`: whether the
   /// radio can report them (a USB modem whose IDENT says "games"; never an
-  /// I/O pod), reinvite.py `stuck_view`.
+  /// I/O pod), reinvite.py `stuck_view`; `radio_kind`: "pod", "modem" or
+  /// "none", so the console's hint tells an I/O pod from an older USB radio
+  /// modem (decision STUCK-64 as changed by the maintainer).
   Map<String, Object?> stuckView() => {
     'stuck': stuck.public(),
     'stuck_reports': stuck.reports,
     'stuck_watch': engine.modem?.hasOtherGames ?? false,
+    'radio_kind': engine.radioKind,
   };
 
   /// The live game's invites as the console shows them: not *joined* while
