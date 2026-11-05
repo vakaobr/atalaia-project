@@ -965,13 +965,15 @@ static void update_preset_select(const char *data)
     long pages = 1;
     screen_json_int(data, "page", &page);
     screen_json_int(data, "pages", &pages);
+    /* "admin": the menu over a field game (decisions STUCK-20 to STUCK-33), not a list of games. */
+    box_text_id_t head = screen_json_true(data, "admin") ? TX_ADMIN_UP : TX_CHOOSE_GAME_UP;
     if (pages > 1) {
         char title[48];
-        snprintf(title, sizeof(title), "%s  %ld/%ld", box_text(TX_CHOOSE_GAME_UP), page, pages);
+        snprintf(title, sizeof(title), "%s  %ld/%ld", box_text(head), page, pages);
         lv_label_set_text(slot[3 * PRESET_ROWS + 1], title);
         lv_label_set_text(slot[3 * PRESET_ROWS + 2], box_text(TX_KEYS_CHOOSE_PAGES));
     } else {
-        lv_label_set_text(slot[3 * PRESET_ROWS + 1], box_text(TX_CHOOSE_GAME_UP));
+        lv_label_set_text(slot[3 * PRESET_ROWS + 1], box_text(head));
         lv_label_set_text(slot[3 * PRESET_ROWS + 2], box_text(TX_KEYS_CHOOSE));
     }
 
@@ -1080,6 +1082,16 @@ static void update_start_confirm(const char *data)
         lv_obj_set_width(slot[1], SCREEN_W - 20);
         lv_label_set_text(slot[1], box_text(TX_ADOPT_WARNING));
         lv_label_set_text(slot[3], box_text(TX_KEYS_ADOPT));
+        return;
+    }
+    /* "leave": the menu over a field game asks before the box ends its game (decisions STUCK-20
+     * to STUCK-33). */
+    if (screen_json_true(data, "leave")) {
+        lv_label_set_text(slot[2], box_text(TX_LEAVE_AGAIN_UP));
+        lv_label_set_text(slot[0], box_text(TX_LEAVE_ITEM));
+        lv_obj_set_width(slot[1], SCREEN_W - 20);
+        lv_label_set_text(slot[1], box_text(TX_LEAVE_WARNING));
+        lv_label_set_text(slot[3], box_text(TX_KEYS_LEAVE));
         return;
     }
     lv_obj_set_width(slot[1], LV_SIZE_CONTENT);

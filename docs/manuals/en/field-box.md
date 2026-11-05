@@ -120,6 +120,19 @@ In a stand-alone game the box has no game key. It **refuses player tags**. Modes
 
 ![A Field Box playing Bomb: the bomb is ready, red holds its button to arm it, the countdown runs, blue holds its button to defuse it](../../../site/img/modes/bomb-en.gif)
 
+### D. Take a box out of its game
+
+A box that was switched off when its game ended never hears the end. Switched on again, it is still in that game: it shows the game's screen and refuses every invite and join card. A box never leaves a game on its own when the controller goes silent. The controller frees it by itself when its USB radio modem runs the firmware of this release or later and the box is on the channel the modem listens on (the field's): it hears the box, says again that its game is over, and within about a minute the box shows the game's last screen, then **READY**. The organisers see such a box in the console's **Boxes** tab, under **Stuck in an ended game**, and **Release** tells it at once. A controller that was reinstalled, or lost its data, no longer knows the game: its **Release every box not in this game** (in **Settings**) frees the box too, if the box joined its game before. With an older modem, or if the box stays in the game, take it out at the box, with the admin PIN:
+
+1. Hold `*` for 3 seconds. The press itself still goes to the game, as one `*`.
+2. **Enter the admin PIN.** `#` confirms. `*` deletes; with nothing typed, `*` goes back to the game.
+3. **ADMIN** lists one entry, **Leave the game**. Press `#`.
+4. **LEAVE THE GAME?**: `#` leaves, `*` goes back.
+
+The box ends the game as if the organisers had ended it: the game's last screen, then **READY** after 30 seconds. It never joins that game again. It keeps its field, its join key, its Wi-Fi, its admin PIN and its games. It can be invited, or take a join card, at once.
+
+It works in a game that is still running too, so the organisers can pull a box out: their console then sees that box as ended, and the game goes on for the other boxes. The menu shows only while the box is in a game. It closes by itself after 30 seconds without a key, or when the game ends. Five wrong PINs make you wait, as everywhere else. A box with no keypad does the same over USB: `@leave` and the admin PIN ([firmware guide](firmware.md#5-first-boot-and-setup)). Not yet tried on hardware.
+
 ## 6. The box's screens and buttons
 
 You hold your team's button on the box. The box shows what is happening.
@@ -254,7 +267,7 @@ An Android phone can be a box too. In the app choose **Game prop**, then **Join 
 | --- | --- |
 | Nothing happens when I switch on | Check the main switch, the fuse and the battery. Charge it through USB-C with the switch **on**. If it smells or is hot, switch off and take the cells out. |
 | The box is not in the organisers' **Invite boxes** list | It must show **READY** and be adopted. Wait up to a minute, or ask the organisers to press **Look for boxes**. Check the region and move closer to the controller. |
-| The invite says **refused: in another game** | The box is still in an old game. Power-cycle it or end that game. |
+| The invite says **refused: in another game** | The box is still in an old game. Power-cycle it or end that game. If the game was already over (the box was off when it ended), take it out at the box: [Leave the game](#d-take-a-box-out-of-its-game). Do not erase it. |
 | The invite says **refused**, "another field's join key?" | The box belongs to another field. Adopt it again ([section 4](#4-adopt-the-box-into-the-field)). |
 | The console says **Box N has not been heard for more than 90 s** | Move the box closer, add a box in between as a relay, or check the antenna. The box may be fine: it keeps playing and catches up. |
 | The console says **Two boxes share node N** | One join was used on two boxes. Take one out of the game and join it again with a new join. |

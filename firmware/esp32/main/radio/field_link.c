@@ -485,6 +485,7 @@ static void on_time(field_link_t *l, const atalaia_header_t *h, uint16_t epoch, 
     }
     l->stats.times++;
     l->have_time = true;
+    if (l->first_wall_s == 0 && t.wall_s != 0) l->first_wall_s = t.wall_s;
     l->controller_time_ms = t.game_time_ms + FIELD_LINK_AIRTIME_MS;
     follow_state(l, t.game_state);
     if (t.game_state == FIELD_GAME_RUNNING && l->io.game_time != NULL) {

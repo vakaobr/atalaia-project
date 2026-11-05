@@ -2433,7 +2433,7 @@ def gen_module_core_vectors(ev: dict[str, Any]) -> str:
 
 FIELD_FRAME_VECTORS = REPO / "protocol" / "vectors" / "field_frame.json"
 FF_KINDS = {"announce": "ATALAIA_FF_ANNOUNCE", "discover": "ATALAIA_FF_DISCOVER", "invite": "ATALAIA_FF_INVITE",
-            "game_over": "ATALAIA_FF_GAME_OVER", "move": "ATALAIA_FF_MOVE"}
+            "game_over": "ATALAIA_FF_GAME_OVER", "move": "ATALAIA_FF_MOVE", "release": "ATALAIA_FF_RELEASE"}
 FF_RESULTS = ("accepted", "busy", "refused", "no_mode", "not_box", "storage", "radio", "ended")
 
 
@@ -2489,12 +2489,14 @@ def gen_field_frame_vectors(fv: dict[str, Any]) -> str:
         for key in ("name", "last_role"):
             if key in f:
                 init.append(f".{key} = {c_string(f[key])}")
-        for key in ("tier", "last_game", "answer", "invite_id", "part", "parts", "game_id"):
+        for key in ("tier", "last_game", "answer", "invite_id", "part", "parts", "game_id", "live_game"):
             if key in f:
                 init.append(f".{key} = {f[key]}")
         for key in ("channel_hz", "rev"):
             if key in f:
                 init.append(f".{key} = {f[key]}u")
+        if "time" in f:
+            init.append(f".time_s = {f['time']}u")
         if "result" in f:
             init.append(f".result = {FF_RESULTS.index(f['result'])}")
         if "chunk" in f:

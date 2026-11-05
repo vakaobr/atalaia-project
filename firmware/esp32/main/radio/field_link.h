@@ -155,6 +155,9 @@ typedef struct {
     uint8_t game_state; /* FIELD_GAME_*, from TIME and CMD */
     bool have_time;
     uint32_t controller_time_ms; /* game time of the last TIME, plus its airtime */
+    /* The wall clock (Unix seconds) of the first TIME taken in this join, 0 until one: a RELEASE
+     * older than it is refused (RFC 0001 Amendment 28, box_lobby.c). */
+    uint32_t first_wall_s;
     /* Freshness of what changes the game's state (RFC 0001 Amendment 23, SR-21): the nonce
      * counter of the last game-state CMD applied and of the last TIME applied, per source (a new
      * leader starts its own). One that is not above is refused: a recording of a CMD or TIME that

@@ -249,6 +249,8 @@ Depois, uma caixa sem campo mostra **Emparelhar caixa** e um código de 6 algari
 
 A caixa mantém a adoção e a chave do campo. Substitui o que a página pede. A compilação de bancada não tem página de configuração.
 
+**Tirar uma caixa do jogo.** Uma caixa que estava desligada quando o jogo terminou volta nesse jogo: o registo dela recusa todas as entradas (`join: a game is being played`) e a adoção por USB (`busy`). Não a apagues. Um controlador cujo modem de rádio USB tem o firmware de modem desta versão ou de uma posterior ouve-a e volta a enviar o GAME_OVER desse jogo, no máximo uma vez por minuto, e a caixa liberta-se sozinha (no registo: `game N is over (said by a field controller)`); grava primeiro o modem (`python tools/docker_fw.py modem`) para ter isto. Caso contrário: Na consola USB escreve `@leave` e o PIN de administração, e carrega em Enter. A caixa responde `leave: game N is over on this box; it is free for the next game`: termina o jogo como o fim dado pelo controlador o faria, nunca mais entra nesse jogo e mantém a adoção, a chave de entrada, o Wi-Fi, o PIN de administração e os modos. Um PIN errado conta para as esperas abaixo. Também funciona num jogo a decorrer. Uma caixa com teclado tem o mesmo no menu de administração: mantém `*` premido 3 segundos ([manual da Field Box](field-box.md#d-tirar-uma-caixa-do-jogo)). A compilação de bancada aceita `@leave` sozinho.
+
 **PIN esquecido.** Depois de cinco PIN errados, a caixa obriga-te a esperar 1, 2, 4... até 60 minutos. A espera sobrevive a um reinício. Se perdeste mesmo o PIN, apaga as definições ([secção 8](#8-uma-caixa-que-não-arranca)).
 
 Ainda não testado numa placa real: a página de configuração e os ecrãs acima. A página foi testada num computador e no emulador.

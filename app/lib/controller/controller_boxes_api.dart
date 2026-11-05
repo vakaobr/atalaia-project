@@ -9,6 +9,8 @@ part of 'controller_api.dart';
 //
 //     GET  /api/v1/boxes                     GM: the free boxes heard, the previous game
 //     POST /api/v1/boxes/discover            GM: "who is free?" (at most every 10 s)
+//     POST /api/v1/boxes/stuck/{game}/release GM: an ended game's GAME_OVER now, for a box still in it
+//     POST /api/v1/boxes/release             GM: RELEASE, every box not in the live game leaves its game
 //     GET|POST /api/v1/games/{id}/invites    GM: the live game's invites / invite boxes
 //     GET  /api/v1/adopt                     GM: the fingerprint, the field's name, the records
 //     POST /api/v1/adopt/card                GM: the NFC field card's bytes (never cached)
@@ -78,6 +80,37 @@ extension _BoxesRoutes on ControllerApi {
       'POST',
       r'/api/v1/boxes/discover',
       _gm((r) => ApiResponse(200, _needBoxes().discover())),
+    ),
+    // A box still in an ended game (controller_stuck.dart): that game's
+    // GAME_OVER now, and the field-wide RELEASE (RFC 0001 Amendment 28).
+    ControllerApi._route(
+      'POST',
+      r'/api/v1/boxes/release',
+      _gm((r) {
+        final stuck = engine.stuck;
+        if (stuck == null) {
+          return ApiResponse(200, {
+            'live_game': (engine.liveGame?['id'] as int?) ?? 0,
+            'release_frame': 'no_join_key',
+          });
+        }
+        return ApiResponse(200, stuck.releaseField());
+      }),
+    ),
+    ControllerApi._route(
+      'POST',
+      r'/api/v1/boxes/stuck/([^/]+)/release',
+      _gm((r) {
+        final id = r.pathInt(1);
+        final stuck = engine.stuck;
+        if (stuck == null) {
+          return ApiResponse(200, {
+            'game': id,
+            'game_over_frame': 'no_join_key',
+          });
+        }
+        return ApiResponse(200, stuck.release(id));
+      }),
     ),
     ControllerApi._route(
       'GET',

@@ -120,6 +120,19 @@ Num jogo autónomo a caixa não tem chave do jogo. **Recusa etiquetas de quem jo
 
 ![Uma Field Box a jogar a Bomba: a bomba pronta, a vermelha mantém premido o botão para a armar, a contagem corre, a azul mantém premido o botão para a desarmar](../../../site/img/modes/bomb-pt.gif)
 
+### D. Tirar uma caixa do jogo
+
+Uma caixa que estava desligada quando o jogo terminou nunca ouve o fim. Ao voltar a ser ligada, continua nesse jogo: mostra o ecrã do jogo e recusa todos os convites e cartões de entrada. Uma caixa nunca sai sozinha de um jogo quando o controlador se cala. O controlador liberta-a sozinho quando o modem de rádio USB tem o firmware desta versão ou de uma posterior e a caixa está no canal em que o modem escuta (o do campo): ouve a caixa, volta a dizer que o jogo dela terminou e, em cerca de um minuto, a caixa mostra o último ecrã do jogo e depois **PRONTA**. A organização vê essa caixa no separador **Caixas** da consola, em **Presas num jogo terminado**, e **Libertar** avisa-a logo. Um controlador que foi reinstalado, ou perdeu os dados, já não conhece o jogo: o seu **Libertar todas as caixas que não estão neste jogo** (em **Definições**) também liberta a caixa, se ela tiver entrado no seu jogo antes. Com um modem mais antigo, ou se a caixa continuar no jogo, tira-a na própria caixa, com o PIN de administração:
+
+1. Mantém `*` premido durante 3 segundos. O toque em si continua a ir para o jogo, como um `*`.
+2. **Marca o PIN de administração.** `#` confirma. `*` apaga; sem nada escrito, `*` volta ao jogo.
+3. **ADMINISTRAÇÃO** mostra uma entrada, **Sair do jogo**. Carrega em `#`.
+4. **SAIR DO JOGO?**: `#` sai, `*` volta.
+
+A caixa termina o jogo como se a organização o tivesse terminado: o último ecrã do jogo e, 30 segundos depois, **PRONTA**. Nunca mais entra nesse jogo. Mantém o campo, a chave de entrada, o Wi-Fi, o PIN de administração e os jogos. Pode ser convidada, ou receber um cartão de entrada, logo a seguir.
+
+Também funciona num jogo que ainda decorre, para a organização poder tirar uma caixa: a consola passa a ver essa caixa como terminada e o jogo continua para as outras caixas. O menu só aparece enquanto a caixa está num jogo. Fecha sozinho ao fim de 30 segundos sem tecla, ou quando o jogo termina. Cinco PIN errados obrigam a esperar, como em todo o lado. Uma caixa sem teclado faz o mesmo por USB: `@leave` e o PIN de administração ([guia do firmware](firmware.md#5-primeiro-arranque-e-configuração)). Ainda não experimentado em hardware.
+
 ## 6. Os ecrãs e os botões da caixa
 
 Manténs premido o botão da tua equipa na caixa. A caixa mostra o que se passa.
@@ -254,7 +267,7 @@ Um telemóvel Android também pode ser uma caixa. Na app escolhe **Dispositivo d
 | --- | --- |
 | Não acontece nada quando ligo | Verifica o interruptor principal, o fusível e a bateria. Carrega por USB-C com o interruptor **ligado**. Se cheirar mal ou estiver quente, desliga e tira as células. |
 | A caixa não está na lista de **Convidar caixas** da organização | Tem de mostrar **PRONTA** e estar adotada. Espera até um minuto, ou pede à organização que carregue em **Procurar caixas**. Confirma a região e aproxima-te do controlador. |
-| O convite diz **recusou: noutro jogo** | A caixa ainda está num jogo antigo. Desliga-a e volta a ligá-la, ou termina esse jogo. |
+| O convite diz **recusou: noutro jogo** | A caixa ainda está num jogo antigo. Desliga-a e volta a ligá-la, ou termina esse jogo. Se o jogo já tinha terminado (a caixa estava desligada quando acabou), tira-a na própria caixa: [Sair do jogo](#d-tirar-uma-caixa-do-jogo). Não a apagues. |
 | O convite diz **recusou**, «chave de entrada de outro campo?» | A caixa pertence a outro campo. Adota-a outra vez ([secção 4](#4-adota-a-caixa-no-campo)). |
 | A consola diz **A caixa N não dá notícias há mais de 90 s** | Aproxima a caixa, junta uma caixa no meio como repetidor, ou verifica a antena. A caixa pode estar bem: continua a jogar e põe-se em dia. |
 | A consola diz **Duas caixas partilham o n.º N** | A mesma entrada foi usada em duas caixas. Tira uma do jogo e junta-a de novo com outra entrada. |

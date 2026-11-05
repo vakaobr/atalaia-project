@@ -165,6 +165,19 @@ static uint8_t nfc_last_uid_len;
 static uint32_t nfc_last_poll_ms;
 /* The admin PIN (admin_pin.h): one check for the picker and adoption, its failure count in NVS. */
 static admin_pin_t admin_guard;
+/* The admin menu over a field game (decisions STUCK-20 to STUCK-33): '*' held down
+ * GAME_MENU_HOLD_MS while the box is in a game opens the admin PIN, then one entry, "Leave the
+ * game" (preset_ui_enable_leave). The game goes on underneath: its screens are kept, not drawn,
+ * and the last one comes back when the menu closes ('*' with no digit typed, the game over, or
+ * GAME_MENU_IDLE_MS without a key). */
+#define GAME_MENU_HOLD_MS 3000u
+#define GAME_MENU_IDLE_MS 30000u
+static preset_ui_t game_menu;
+static bool game_menu_active;
+static uint32_t game_menu_key_ms; /* the last key in the menu */
+static uint32_t star_held_ms;     /* '*' held down this long, in a game */
+static bool star_hold_used;       /* this hold opened the menu already */
+static screen_update_t game_menu_screen;
 
 /* The box's outputs (outputs.h): its simple outputs (simple_out_esp.c), CMD 12, the scripts'
  * cap(fn) calls, the admin's settings (outputs_admin.h). */
@@ -231,7 +244,7 @@ static void send_screen(const char *template_name, const char *data_json)
     snprintf(su.template_name, sizeof(su.template_name), "%s", template_name);
     snprintf(su.data_json, sizeof(su.data_json), "%s", data_json);
     status_hold_state(&status_hold, su.template_name, su.data_json);
-    xQueueSend(screen_queue, &su, 0);
+    if (!game_menu_active) xQueueSend(screen_queue, &su, 0); /* else kept for its close */
 }
 
 /* Show the picker's current step, if it changed. */
@@ -307,6 +320,41 @@ static void start_picker(void)
     show_picker();
 }
 
+/* The menu over a field game's current step, if it changed (not a state screen: the game's last
+ * one stays the state's, drawn again when the menu closes). */
+static void show_game_menu(void)
+{
+    screen_update_t su;
+    if (!preset_ui_screen(&game_menu, NULL, 0, &su)) return;
+    if (strcmp(su.template_name, game_menu_screen.template_name) == 0 &&
+        strcmp(su.data_json, game_menu_screen.data_json) == 0) {
+        return;
+    }
+    game_menu_screen = su;
+    xQueueSend(screen_queue, &su, 0);
+}
+
+static void open_game_menu(uint32_t now)
+{
+    preset_ui_init(&game_menu, NULL, 0);
+    preset_ui_set_guard(&game_menu, &admin_guard);
+    preset_ui_enable_leave(&game_menu, true);
+    game_menu.locked_min = admin_pin_wait_min(&admin_guard);
+    game_menu.no_pin = !admin_pin_is_set(&admin_guard);
+    memset(&game_menu_screen, 0, sizeof(game_menu_screen));
+    game_menu_active = true;
+    game_menu_key_ms = now;
+    ESP_LOGI(TAG, "admin menu over the game: the admin PIN, then \"Leave the game\"");
+    show_game_menu();
+}
+
+static void close_game_menu(void)
+{
+    game_menu_active = false;
+    memset(&game_menu, 0, sizeof(game_menu)); /* the typed digits go */
+    if (status_hold.have_state) xQueueSend(screen_queue, &status_hold.state, 0);
+}
+
 #if SERIAL_INPUT
 static void serial_input_init(void)
 {
@@ -342,7 +390,7 @@ static void serial_input_init(void)
 #if CONFIG_ATALAIA_SERIAL_JOIN
     ESP_LOGI(TAG, "serial join on: \"@join atalaia:join:...\", \"@joinkey <hex> <admin PIN>\", "
                   "\"@tag <uid> [<tag>]\", \"@wifi <ssid> <password>\", "
-                  "\"@setup <PIN>\", "
+                  "\"@setup <PIN>\", \"@leave <admin PIN>\", "
                   "\"@update <version> <release id> <admin PIN>\", \"@modes\", \"@forgetmodes\" "
                   "or \"@lobby\" on the console");
 #endif
@@ -390,6 +438,18 @@ static void serial_command(const char *cmd)
             } else {
                 ESP_LOGI(TAG, "%s", setup_reply);
             }
+            return;
+        }
+    }
+    if (SERIAL_ADOPT_ON || SERIAL_JOIN_ON) {
+        /* "@leave <admin PIN>" ("@leave" on a bench build): out of a game the box cannot leave
+         * otherwise, ended while it was off (decisions STUCK-20 to STUCK-33). Gated as
+         * "@joinkey" (SR-40): the PIN's count and waits apply. */
+        static char leave_reply[160];
+        if (box_game_leave_command(&box, &admin_guard, SERIAL_KEYS_ON, cmd, leave_reply,
+                                   sizeof(leave_reply))) {
+            ESP_LOGW(TAG, "%s", leave_reply);
+            if (game_menu_active) close_game_menu(); /* its game is over: nothing to leave */
             return;
         }
     }
@@ -582,7 +642,7 @@ static void serial_command(const char *cmd)
         ESP_LOGI(TAG,
                  "lobby: device %s, %s, channel %lu Hz, last game %u (%s), invites %lu "
                  "accepted, %lu refused, %lu frames ignored, field move revision %lu (%lu taken, "
-                 "%lu refused)",
+                 "%lu refused), releases %lu taken, %lu refused, joined at %lu",
                  hex[0] ? hex : "none (no join key)",
                  box_lobby_available(&box) ? "free for an invite" : "in a game",
                  (unsigned long)box.lobby.channel_hz, box.lobby.last_game,
@@ -590,7 +650,8 @@ static void serial_command(const char *cmd)
                  (unsigned long)box.lobby.invites_accepted,
                  (unsigned long)box.lobby.invites_refused, (unsigned long)box.lobby.frames_ignored,
                  (unsigned long)box.lobby.move_rev, (unsigned long)box.lobby.moves_taken,
-                 (unsigned long)box.lobby.moves_refused);
+                 (unsigned long)box.lobby.moves_refused, (unsigned long)box.lobby.releases_taken,
+                 (unsigned long)box.lobby.releases_refused, (unsigned long)box.join_wall_s);
         return;
     }
 #endif
@@ -1183,6 +1244,17 @@ static void task_game(void *arg)
 
         /* ---- Poll keypad: one press per key stroke ---- */
         char key = key_filter_update(&key_filter, hal.keypad->scan());
+        /* '*' held down in a game: the admin menu over it (its press went to the mode). */
+        if (key_filter.state == '*' && box_game_can_leave(&box) && !game_menu_active) {
+            star_held_ms += delta_ms;
+            if (star_held_ms >= GAME_MENU_HOLD_MS && !star_hold_used) {
+                star_hold_used = true;
+                open_game_menu(now);
+            }
+        } else if (key_filter.state != '*') {
+            star_held_ms = 0;
+            star_hold_used = false;
+        }
 #if SERIAL_INPUT
         char serial = serial_poll();
         if (key == HAL_KEY_NONE) key = serial;
@@ -1203,6 +1275,25 @@ static void task_game(void *arg)
         if (adoption_tick(&adopt, now) && picker_active) {
             memset(&picker_screen, 0, sizeof(picker_screen));
             show_picker(); /* adoption left the screen: the picker's step again */
+        }
+        if (key != HAL_KEY_NONE && game_menu_active) {
+            /* The menu over a field game: its keys never reach the mode. */
+            game_menu_key_ms = now;
+            preset_ui_handle_key(&game_menu, key);
+            preset_ui_state_t st = preset_ui_get_state(&game_menu);
+            if (st == PRESET_UI_STATE_LEAVE_REQUESTED) {
+                box_game_leave(&box, "admin menu");
+                close_game_menu();
+            } else if (st == PRESET_UI_STATE_CLOSED) {
+                close_game_menu();
+            } else {
+                show_game_menu();
+            }
+            key = HAL_KEY_NONE;
+        }
+        if (game_menu_active &&
+            (!box_game_can_leave(&box) || now - game_menu_key_ms >= GAME_MENU_IDLE_MS)) {
+            close_game_menu(); /* the game is over, or nobody is at the keypad */
         }
         if (key != HAL_KEY_NONE && picker_active && outputs_admin_active(&outs_admin)) {
             /* The outputs screen (the picker's "Outputs" entry): '#' or '*' back to the list. */
@@ -1267,7 +1358,8 @@ static void task_game(void *arg)
         {
             /* A refusal or failure screen has had its time: the state's screen again. */
             screen_update_t back;
-            if (status_hold_due(&status_hold, now, fw_update_esp_net_busy(), &back)) {
+            if (!game_menu_active &&
+                status_hold_due(&status_hold, now, fw_update_esp_net_busy(), &back)) {
                 xQueueSend(screen_queue, &back, 0);
             }
         }
@@ -1303,7 +1395,8 @@ static void task_game(void *arg)
             for (int i = 0; i < runner.queues.screen_count; i++) {
                 status_hold_state(&status_hold, runner.queues.screens[i].template_name,
                                   runner.queues.screens[i].data_json);
-                xQueueSend(screen_queue, &runner.queues.screens[i], 0);
+                /* Under the menu over the game: kept, drawn again when it closes. */
+                if (!game_menu_active) xQueueSend(screen_queue, &runner.queues.screens[i], 0);
             }
             runner.queues.screen_count = 0;
 

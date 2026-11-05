@@ -549,9 +549,10 @@ class FakeSerial:
     and records every frame the controller sends.
     """
 
-    def __init__(self, mute: bool = False, lang: bool = False) -> None:
+    def __init__(self, mute: bool = False, lang: bool = False, games: bool = False) -> None:
         self.mute = mute
         self.lang = lang  # the modem's IDENT says it takes SET_LANG
+        self.games = games  # ... and WATCH_GAMES (RFC 0001 Amendment 27)
         self.decoder = mf.FrameDecoder()
         self.received: list[tuple[int, bytes]] = []
         self._out = bytearray()
@@ -572,9 +573,12 @@ class FakeSerial:
                 self.push(mf.STATUS, f'{{"cmd":1,"configured":false,"ping":{token}}}'.encode())
             elif op == mf.CMD_IDENT:
                 lang = b',"lang":true' if self.lang else b""
-                self.push(mf.IDENT, b'{"fw":"atalaia-modem","fw_version":"fake"' + lang + b"}")
+                games = b',"games":true' if self.games else b""
+                self.push(mf.IDENT, b'{"fw":"atalaia-modem","fw_version":"fake"' + lang + games + b"}")
             elif op == mf.CMD_SET_LANG:
                 self.push(mf.STATUS, b'{"cmd":9,"configured":false}')
+            elif op == mf.CMD_WATCH_GAMES:
+                self.push(mf.STATUS, b'{"cmd":10,"configured":false}')
         return len(data)
 
     def push(self, frame_type: int, payload: bytes) -> None:
@@ -620,6 +624,9 @@ class FakeModem:
         self.peers: dict[int, int] = {}
         self.on_rx = self.on_tx_ack = self.on_state = self.on_error = None
         self.on_field_rx = self.on_field_ack = None
+        self.on_other_game = None                 # OTHER_GAME reports (RFC 0001 Amendment 27)
+        self.has_other_games = True
+        self.watching: list[bool] = []            # watch_games() calls
         self.fields: list[bytes] = []             # field frames sent (FIELD_TX)
         self.has_field_frames = True
         self.has_pair_frames = True             # pair frames too (protocol/adoption.md)
@@ -632,6 +639,13 @@ class FakeModem:
 
     def set_language(self, code) -> None:
         self.languages.append(code)
+
+    def watch_games(self, on: bool) -> None:
+        self.watching.append(on)
+
+    def other_game(self, game_id: int, source: int, rssi: int = -70, snr: int = 4) -> None:
+        """The modem heard a packet of another game (OTHER_GAME)."""
+        self.on_other_game(mf.OtherGame(game_id, source, rssi, snr))
 
     @property
     def is_up(self) -> bool:

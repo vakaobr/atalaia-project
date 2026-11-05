@@ -154,7 +154,8 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
         screen_json_int(data, "selected", &selected);
         screen_json_int(data, "page", &page);
         screen_json_int(data, "pages", &pages);
-        set_text(out->head, sizeof(out->head), TXO_GAMES);
+        set_text(out->head, sizeof(out->head),
+                 screen_json_true(data, "admin") ? TXO_ADMIN : TXO_GAMES); /* over a game */
         if (pages > 1) snprintf(out->head_right, sizeof(out->head_right), "%ld/%ld", page, pages);
         if (selected >= 1 && selected <= count) {
             snprintf(out->big, sizeof(out->big), "%d %s", (int)selected, names[selected - 1]);
@@ -195,6 +196,12 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
                              "adopt")) { /* the picker's "Adopt to another field" asks first */
             set_text(out->head, sizeof(out->head), TXO_CHANGE_FIELD);
             set_text(out->big, sizeof(out->big), TXO_CHANGE_FIELD_Q);
+            set_text(out->foot, sizeof(out->foot), TXO_KEYS_SETUP);
+            return true;
+        }
+        if (screen_json_true(data, "leave")) { /* the menu over a game asks first */
+            set_text(out->head, sizeof(out->head), TXO_LEAVE_GAME);
+            set_text(out->big, sizeof(out->big), TXO_LEAVE_Q);
             set_text(out->foot, sizeof(out->foot), TXO_KEYS_SETUP);
             return true;
         }

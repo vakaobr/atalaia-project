@@ -9,6 +9,7 @@
  *   radio --packet--> decrypt (epoch window), replay window --RX frame--> host
  *   host --FIELD_TX (a sealed field frame)--> radio, as it is, with or without a game
  *   radio --field frame (game 0, type 9)--> FIELD_RX --> host, as it is
+ *   radio --another game's packet--> OTHER_GAME (its game id, source, rssi) --> host, when asked
  *
  * The game key lives in RAM only: the controller sends it with CONFIGURE
  * after every connect. The controller owns its own epoch and sequence
@@ -73,10 +74,17 @@ typedef struct {
     uint32_t tx_fail;
     uint32_t cmds;
     uint32_t bad_frames;
-    uint32_t field_rx; /* field frames forwarded to the host */
-    uint32_t field_tx; /* field frames queued for the radio */
-    uint32_t rx_taken; /* packets the I/O pod took for itself (rx_filter), not sent on */
+    uint32_t field_rx;   /* field frames forwarded to the host */
+    uint32_t field_tx;   /* field frames queued for the radio */
+    uint32_t rx_taken;   /* packets the I/O pod took for itself (rx_filter), not sent on */
+    uint32_t other_game; /* OTHER_GAME reports sent (another game's packets, WATCH_GAMES on) */
 } modem_counters_t;
+
+/* A game id the modem reported in OTHER_GAME, and when (the rate limit). */
+typedef struct {
+    uint16_t game_id; /* 0: a free slot */
+    uint32_t at_ms;
+} modem_other_game_t;
 
 typedef struct {
     modem_io_t io;
@@ -106,6 +114,10 @@ typedef struct {
     char lang_default[MODEM_LANG_MAX + 1]; /* the build's language, for a modem told none */
     bool host_seen;                        /* a frame from the host has arrived since boot */
     uint32_t last_host_ms;                 /* when the last one did (the OLED's link state) */
+    /* WATCH_GAMES (RFC 0001 Amendment 27): report packets of other games, in RAM only (a reboot
+     * forgets it, as the key), and the game ids last reported. */
+    bool watch_games;
+    modem_other_game_t other[MODEM_OTHER_GAMES];
 } modem_t;
 
 /*

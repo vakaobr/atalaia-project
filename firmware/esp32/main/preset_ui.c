@@ -9,11 +9,12 @@
 
 #include "box_text.h"
 
-/* Entries of the list: the games, then "Wi-Fi setup", "Adopt to another field" and "Outputs"
- * when on. */
+/* Entries of the list: the games, then "Wi-Fi setup", "Adopt to another field", "Outputs" and
+ * "Leave the game" when on. */
 static int extra_count(const preset_ui_t *ui)
 {
-    return (ui->setup_entry ? 1 : 0) + (ui->adopt_entry ? 1 : 0) + (ui->outputs_entry ? 1 : 0);
+    return (ui->setup_entry ? 1 : 0) + (ui->adopt_entry ? 1 : 0) + (ui->outputs_entry ? 1 : 0) +
+           (ui->leave_entry ? 1 : 0);
 }
 
 static int entry_count(const preset_ui_t *ui)
@@ -37,7 +38,13 @@ static bool adopt_selected(const preset_ui_t *ui)
 /* Is the selected entry "Outputs"? */
 static bool outputs_selected(const preset_ui_t *ui)
 {
-    return ui->outputs_entry && ui->selected_preset == entry_count(ui);
+    return ui->outputs_entry && ui->selected_preset == entry_count(ui) - (ui->leave_entry ? 1 : 0);
+}
+
+/* Is the selected entry "Leave the game"? */
+static bool leave_selected(const preset_ui_t *ui)
+{
+    return ui->leave_entry && ui->selected_preset == entry_count(ui);
 }
 
 /* The label of extra entry k (0: the first after the games). */
@@ -45,7 +52,8 @@ static const char *extra_label(const preset_ui_t *ui, int k)
 {
     if (ui->setup_entry && k-- == 0) return box_text(TX_SETUP_ITEM);
     if (ui->adopt_entry && k-- == 0) return box_text(TX_ADOPT_ITEM);
-    if (ui->outputs_entry && k == 0) return box_text(TX_OUTPUTS_ITEM);
+    if (ui->outputs_entry && k-- == 0) return box_text(TX_OUTPUTS_ITEM);
+    if (ui->leave_entry && k == 0) return box_text(TX_LEAVE_ITEM);
     return "";
 }
 
@@ -70,6 +78,11 @@ void preset_ui_enable_adopt(preset_ui_t *ui, bool on)
 void preset_ui_enable_outputs(preset_ui_t *ui, bool on)
 {
     ui->outputs_entry = on;
+}
+
+void preset_ui_enable_leave(preset_ui_t *ui, bool on)
+{
+    ui->leave_entry = on;
 }
 
 void preset_ui_init(preset_ui_t *ui, const char *admin_pin, int preset_count)
@@ -130,8 +143,10 @@ bool preset_ui_handle_key(preset_ui_t *ui, char key)
             return true;
         }
         if (key == '*') {
-            /* Backspace. */
-            if (ui->pin_pos > 0) {
+            /* Backspace; with nothing typed, the menu over a game closes. */
+            if (ui->pin_pos == 0 && ui->leave_entry) {
+                ui->state = PRESET_UI_STATE_CLOSED;
+            } else if (ui->pin_pos > 0) {
                 ui->pin_pos--;
                 ui->pin_buffer[ui->pin_pos] = '\0';
             }
@@ -160,6 +175,7 @@ bool preset_ui_handle_key(preset_ui_t *ui, char key)
             ui->state = setup_selected(ui)     ? PRESET_UI_STATE_SETUP_CONFIRM
                         : adopt_selected(ui)   ? PRESET_UI_STATE_ADOPT_CONFIRM
                         : outputs_selected(ui) ? PRESET_UI_STATE_OUTPUTS_REQUESTED
+                        : leave_selected(ui)   ? PRESET_UI_STATE_LEAVE_CONFIRM
                                                : PRESET_UI_STATE_TIMER_ADJUST;
             return true;
         }
@@ -229,10 +245,23 @@ bool preset_ui_handle_key(preset_ui_t *ui, char key)
         }
         return false;
 
+    case PRESET_UI_STATE_LEAVE_CONFIRM:
+        if (key == '#') {
+            ui->state = PRESET_UI_STATE_LEAVE_REQUESTED;
+            return true;
+        }
+        if (key == '*') {
+            ui->state = PRESET_UI_STATE_PRESET_LIST;
+            return true;
+        }
+        return false;
+
     case PRESET_UI_STATE_GAME_STARTED:
     case PRESET_UI_STATE_SETUP_REQUESTED:
     case PRESET_UI_STATE_ADOPT_REQUESTED:
-    case PRESET_UI_STATE_OUTPUTS_REQUESTED: return false;
+    case PRESET_UI_STATE_OUTPUTS_REQUESTED:
+    case PRESET_UI_STATE_LEAVE_REQUESTED:
+    case PRESET_UI_STATE_CLOSED: return false;
     }
 
     return false;
@@ -312,11 +341,13 @@ bool preset_ui_screen(const preset_ui_t *ui, const char *const *labels, int labe
         }
         int pages = page_count(ui);
         int selected = ui->selected_preset - first;
+        /* The menu over a game is not a list of games: "admin" gives it its own header. */
+        const char *admin = ui->leave_entry ? ",\"admin\":true" : "";
         if (pages > 1) {
-            snprintf(data + pos, sz - pos, "],\"selected\":%d,\"page\":%d,\"pages\":%d}", selected,
-                     ui->page + 1, pages);
+            snprintf(data + pos, sz - pos, "],\"selected\":%d,\"page\":%d,\"pages\":%d%s}",
+                     selected, ui->page + 1, pages, admin);
         } else {
-            snprintf(data + pos, sz - pos, "],\"selected\":%d}", selected);
+            snprintf(data + pos, sz - pos, "],\"selected\":%d%s}", selected, admin);
         }
         break;
     }
@@ -347,10 +378,17 @@ bool preset_ui_screen(const preset_ui_t *ui, const char *const *labels, int labe
         snprintf(data, sz, "{\"adopt\":true}");
         break;
 
+    case PRESET_UI_STATE_LEAVE_CONFIRM:
+        tmpl = "start_confirm";
+        snprintf(data, sz, "{\"leave\":true}");
+        break;
+
     case PRESET_UI_STATE_GAME_STARTED:
     case PRESET_UI_STATE_SETUP_REQUESTED:
     case PRESET_UI_STATE_ADOPT_REQUESTED:
-    case PRESET_UI_STATE_OUTPUTS_REQUESTED: return false;
+    case PRESET_UI_STATE_OUTPUTS_REQUESTED:
+    case PRESET_UI_STATE_LEAVE_REQUESTED:
+    case PRESET_UI_STATE_CLOSED: return false;
     }
 
     snprintf(out->template_name, sizeof(out->template_name), "%s", tmpl);

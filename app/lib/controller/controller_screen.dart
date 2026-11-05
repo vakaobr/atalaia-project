@@ -630,6 +630,18 @@ class _ControllerScreenState extends State<ControllerScreen> {
           ),
           isThreeLine: true,
         ),
+        // A radio that cannot report boxes still in an ended game (decision
+        // STUCK-64): an older USB modem's firmware, or an I/O pod.
+        if (st.radio == 'up' && st.stuckWatch == false)
+          Notice(
+            s.t(
+              st.radioKind == 'pod'
+                  ? 'ctl.stuck_no_watch_pod'
+                  : 'ctl.stuck_no_watch_modem',
+            ),
+            kind: NoticeKind.warning,
+            key: const Key('ctl-stuck-no-watch'),
+          ),
       ];
     }
     final found = _found;

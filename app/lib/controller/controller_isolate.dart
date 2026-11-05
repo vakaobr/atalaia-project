@@ -47,6 +47,14 @@ final class ControllerStatus {
   String get readToken => (raw['read_token'] as String?) ?? '';
   String get radio => (raw['radio'] as String?) ?? 'none';
   bool get pod => raw['pod'] == true;
+
+  /// "pod" (an I/O pod) or "modem" (a USB radio modem); null without one.
+  String? get radioKind => raw['radio_kind'] as String?;
+
+  /// Whether the radio reports boxes still in an ended game (a USB modem
+  /// whose IDENT says `games`, controller_stuck.dart); null without the
+  /// field join key (no boxes over the radio).
+  bool? get stuckWatch => raw['stuck_watch'] as bool?;
   Map<String, Object?>? get game =>
       (raw['game'] as Map?)?.cast<String, Object?>();
   int get streamClients => (raw['stream_clients'] as int?) ?? 0;

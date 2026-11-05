@@ -271,6 +271,80 @@ class FieldTests(unittest.TestCase):
         self.assertTrue(wait_for(lambda: listed(), 8))
         self.assertEqual(listed()[0]["last_game"], gid)
 
+    def test_a_box_switched_off_when_its_game_ended_is_freed_when_it_comes_back(self):
+        """The bench finding of 2026-11-05 (decisions STUCK-1 to STUCK-19, RFC 0001 Amendment 27): a box
+        switched off when its game ends never hears the three GAME_OVERs; switched on, it rejoins the ended
+        game and refused every join. Now the C host modem reports that game's packets (OTHER_GAME), the
+        controller says its GAME_OVER again, and the box leaves the game and announces itself free."""
+        gid = self.game()
+        box = self.box("alpha", "--announce-ms", "400")
+        self.join(box)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
+        self.assertTrue(wait_for(lambda: self.modem.has_other_games, 5))
+        box.kill()  # the battery dies
+        r = self.client.post(f"/api/v1/games/{gid}/end", headers=GM, json={})
+        self.assertEqual((r.status_code, r.json()["game_over_frame"]), (200, "sent"))
+        self.assertTrue(wait_for(lambda: not self.ctrl.reinvite.inviter.games_over, 15))  # all three, unheard
+        since = len(box.lines)
+        box.start()  # a fresh battery: still in the ended game
+        self.assertTrue(box.wait_logged("rejoined the stored game", since))
+        self.assertTrue(box.wait_logged(f"game {gid} is over (said by a field controller)", since, 15), box.lines[-8:])
+        self.assertTrue(wait_for(lambda: box.status()["available"], 5))
+        device = box.status()["device_id"]
+
+        def boxes() -> dict:
+            return self.client.get("/api/v1/boxes", headers=GM).json()
+        self.assertTrue(wait_for(lambda: any(b["device_id"] == device for b in boxes()["boxes"]), 8))
+        [entry] = [b for b in boxes()["boxes"] if b["device_id"] == device]
+        self.assertEqual(entry["last_game"], gid)
+        listed = boxes()
+        self.assertTrue(listed["stuck_watch"])
+        self.assertEqual([(s["game"], s["game_over_resent"]) for s in listed["stuck"]], [(gid, 1)])
+
+    def test_a_controller_that_lost_its_database_releases_the_boxes_of_its_lost_game(self):
+        """RFC 0001 Amendment 28 (decisions STUCK-50 to STUCK-59): the controller is reinstalled with the
+        same field join key but a new database, so it has no record and no key tag of the game its box
+        is still in, and no GAME_OVER can name it. The box is switched off and on: back in that game.
+        A second box joins the new controller's live game. The GM's RELEASE (sealed with the field key,
+        naming the live game) frees the first box, as a GAME_OVER would; the second box plays on."""
+        gid = self.game()
+        stuck = self.box("alpha", "--announce-ms", "400")
+        self.join(stuck)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
+        self.assertTrue(wait_for(lambda: stuck.status()["phase"] == 2, 5))
+        time.sleep(1.2)  # a TIME was taken; the RELEASE's time (whole seconds) must be after it
+        # The controller is gone with its database; a new one with the same field join key.
+        self.client.close()
+        self.ctrl.stop()
+        self.store.close()
+        self.cfg.db_path = os.path.join(self.tmp.name, "new.db")
+        self.store = Store(self.cfg.db_path)
+        self.ctrl = Controller(self.cfg, self.store, modem=self.modem, core=CORE, join_key=JOIN_KEY)
+        self.client = TestClient(create_app(self.ctrl, Hub(), Auth(self.cfg.gm_token, self.cfg.read_token)))
+        self.ctrl.start()
+        self.assertIsNone(self.store.game(gid))
+        stuck.kill()
+        since = len(stuck.lines)
+        stuck.start()  # still in the lost game, from its stored join
+        self.assertTrue(stuck.wait_logged("rejoined the stored game", since))
+        self.assertFalse(stuck.status()["available"])
+        # The new controller's game, with a box of its own.
+        live = self.game()
+        player = self.box("bravo")
+        self.join(player)
+        self.assertEqual(self.client.post(f"/api/v1/games/{live}/start", headers=GM, json={"force": True}).status_code, 200)
+        self.assertTrue(wait_for(lambda: player.status()["phase"] == 2, 5))
+        r = self.client.post("/api/v1/boxes/release", headers=GM)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual((r.json()["live_game"], r.json()["release_frame"]), (live, "sent"))
+        self.assertTrue(stuck.wait_logged(f"game {gid} released by a field controller (live game {live})", since, 10),
+                        stuck.lines[-8:])
+        self.assertTrue(wait_for(lambda: stuck.status()["available"], 5))
+        self.assertEqual(player.status()["phase"], 2)  # the live game's box plays on
+        self.assertFalse(player.logged("released by a field controller"))
+        self.assertEqual(self.client.post("/api/v1/boxes/release", headers=GM).status_code, 429)  # once in 30 s
+
     def test_join_play_reboot_end(self):
         gid = self.game()
         box = self.box("alpha")

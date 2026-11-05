@@ -166,6 +166,9 @@
  *                               "outputs": each simple output's id, GPIO, enabled, on, pulsing
  *                               (a module's channel: "gpio": -1 and its "module"), and
  *                               "modules": the expansion port's modules
+ *   @leave <PIN>                the box leaves its game by hand, as a GAME_OVER for it would
+ *                               (main/box_game.c, decisions STUCK-20 to STUCK-33; the PIN is
+ *                               --admin-pin's, counted with its waits)
  *   @outputs                    one "LOG outputs: ..." line: the simple outputs' settings
  *   @output <n> enable|disable|test <PIN>, @output <n> function <name> <PIN>,
  *   @output <n> max <seconds> <PIN>
@@ -441,6 +444,30 @@ static int store_save_field_move(void *ctx, uint32_t channel_hz, uint32_t rev)
                     (uint8_t)(rev >> 24),        (uint8_t)(rev >> 16),
                     (uint8_t)(rev >> 8),         (uint8_t)rev};
     return write_file("field_move", b, sizeof(b));
+}
+
+/* When the box joined its game (RFC 0001 Amendment 28): the file "join_time", the game key's tag
+ * (8 bytes) and the wall clock of its first TIME (4, big-endian). */
+static int store_load_join_time(void *ctx, uint8_t tag[ATALAIA_FF_TAG_SIZE], uint32_t *wall_s)
+{
+    (void)ctx;
+    uint8_t b[ATALAIA_FF_TAG_SIZE + 4];
+    if (read_file("join_time", b, sizeof(b)) != (int)sizeof(b)) return -1;
+    memcpy(tag, b, ATALAIA_FF_TAG_SIZE);
+    *wall_s = (uint32_t)b[8] << 24 | (uint32_t)b[9] << 16 | (uint32_t)b[10] << 8 | b[11];
+    return 0;
+}
+
+static int store_save_join_time(void *ctx, const uint8_t tag[ATALAIA_FF_TAG_SIZE], uint32_t wall_s)
+{
+    (void)ctx;
+    uint8_t b[ATALAIA_FF_TAG_SIZE + 4];
+    memcpy(b, tag, ATALAIA_FF_TAG_SIZE);
+    b[8] = (uint8_t)(wall_s >> 24);
+    b[9] = (uint8_t)(wall_s >> 16);
+    b[10] = (uint8_t)(wall_s >> 8);
+    b[11] = (uint8_t)wall_s;
+    return write_file("join_time", b, sizeof(b));
 }
 
 /* The screens' language, the last game's (join key 15): the file "lang". */
@@ -1403,6 +1430,8 @@ int main(int argc, char **argv)
                              .save_field_move = store_save_field_move,
                              .load_lang = store_load_lang,
                              .save_lang = store_save_lang,
+                             .load_join_time = store_load_join_time,
+                             .save_join_time = store_save_join_time,
                              .ctx = NULL};
     box_shell_ops_t shell = {.screen = shell_screen,
                              .log = shell_log,
@@ -1513,6 +1542,7 @@ int main(int argc, char **argv)
                 char key;
                 const char *command = NULL;
                 serial_input_t in = serial_console_feed(&console, buf[i], &key, &command);
+                static char leave_reply[160];
                 if (in == SERIAL_COMMAND) {
                     if (strncmp(command, "join ", 5) == 0) {
                         box_join_result_t r = box_game_join_text(&game, command + 5);
@@ -1549,6 +1579,10 @@ int main(int argc, char **argv)
                                                   sizeof(reply_out));
                         }
                         out("LOG %s", reply_out);
+                    } else if (box_game_leave_command(&game, &guard, false, command, leave_reply,
+                                                      sizeof(leave_reply))) {
+                        /* "@leave <PIN>": out of the game by hand, as a release build. */
+                        out("LOG %s", leave_reply);
                     } else if (strncmp(command, "tag ", 4) == 0) {
                         out("LOG tag %s",
                             box_game_tag_text(&game, command + 4) ? "read" : "not read");

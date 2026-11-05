@@ -63,6 +63,10 @@ typedef struct {
     uint32_t move_channel, move_rev; /* the idle channel and the last MOVE's revision */
     bool have_move;
     int move_saves;
+    uint8_t join_tag[8]; /* when the box joined its game (RFC 0001 Amendment 28) */
+    uint32_t join_wall;
+    bool have_join_time;
+    int join_time_saves;
 } flash_t;
 
 static int st_load_join(void *ctx, uint8_t *buf, size_t cap)
@@ -127,6 +131,23 @@ static int st_save_field_move(void *ctx, uint32_t channel_hz, uint32_t rev)
     f->move_rev = rev;
     f->have_move = true;
     f->move_saves++;
+    return 0;
+}
+static int st_load_join_time(void *ctx, uint8_t tag[8], uint32_t *wall_s)
+{
+    flash_t *f = (flash_t *)ctx;
+    if (!f->have_join_time) return -1;
+    memcpy(tag, f->join_tag, 8);
+    *wall_s = f->join_wall;
+    return 0;
+}
+static int st_save_join_time(void *ctx, const uint8_t tag[8], uint32_t wall_s)
+{
+    flash_t *f = (flash_t *)ctx;
+    memcpy(f->join_tag, tag, 8);
+    f->join_wall = wall_s;
+    f->have_join_time = true;
+    f->join_time_saves++;
     return 0;
 }
 static int st_load_ff_boot(void *ctx, uint32_t *boot)
@@ -294,6 +315,8 @@ static void fixture(bool keep_flash)
                              .save_field_move = st_save_field_move,
                              .load_lang = st_load_lang,
                              .save_lang = st_save_lang,
+                             .load_join_time = st_load_join_time,
+                             .save_join_time = st_save_join_time,
                              .ctx = &flash};
     box_shell_ops_t sh = {.screen = sh_screen,
                           .log = NULL,
@@ -1840,6 +1863,146 @@ static void test_lobby_game_over(void)
     state_persist_clear();
 }
 
+/* The box's log lines (shell.log), the last few joined: "a\nb\n". */
+static char log_lines[1024];
+static void sh_log(void *user, const char *line)
+{
+    (void)user;
+    size_t used = strlen(log_lines);
+    if (used + strlen(line) + 2 >= sizeof(log_lines)) used = 0, log_lines[0] = '\0';
+    snprintf(log_lines + used, sizeof(log_lines) - used, "%s\n", line);
+}
+
+/* The admin PIN's clock, for its waits. */
+static uint32_t pin_clock;
+static uint32_t pin_now(void *ctx)
+{
+    (void)ctx;
+    return pin_clock;
+}
+
+/* A join text ("@join ...") for game gid, its key changed with gid. */
+static void join_text_for(uint16_t gid, char *text, size_t cap)
+{
+    atalaia_join_t j;
+    make_join(&j);
+    j.game_id = gid;
+    if (gid != GAME_ID) j.game_key[0] ^= (uint8_t)(gid ^ 0x5A);
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    CHECK(atalaia_join_to_text(buf, encode(&j, JOIN_KEY, buf), text, cap) > 0);
+}
+
+/* Found on the bench (2026-11-05): a box switched off when its game ended never hears the
+ * controller's GAME_OVER, comes back in that game and refuses every join; only erasing its
+ * flash got it out (and lost its adoption, Wi-Fi and PIN). Decisions STUCK-20 to STUCK-33: the
+ * admin menu's "Leave the game" and "@leave <admin PIN>" end the game exactly as its GAME_OVER
+ * would, behind the admin PIN (counted, with its waits); the game stays played to its end, the
+ * join key stays; a new @join is taken. With no game there is nothing to leave. */
+static void test_leave_by_hand(void)
+{
+    lobby_fixture();
+    admin_pin_ops_t pops = {.now_ms = pin_now};
+    admin_pin_t guard;
+    pin_clock = 0;
+    admin_pin_init(&guard, &pops, "5927");
+    char reply[160];
+    static char text[ATALAIA_JOIN_MAX * 2], text2[ATALAIA_JOIN_MAX * 2],
+        text3[ATALAIA_JOIN_MAX * 2];
+    join_text_for(GAME_ID, text, sizeof(text));
+    join_text_for(GAME_ID + 1, text2, sizeof(text2));
+    join_text_for(GAME_ID + 2, text3, sizeof(text3));
+
+    /* No game: refused, the PIN not even looked at; other commands are not this one. */
+    CHECK(!box_game_can_leave(&game));
+    CHECK(box_game_leave_command(&game, &guard, false, "leave 1111", reply, sizeof(reply)));
+    CHECK(strcmp(reply, "leave: refused (not in a game)") == 0 && guard.failures == 0);
+    CHECK(!box_game_leave(&game, "admin menu"));
+    CHECK(!box_game_leave_command(&game, &guard, false, "leaves 1111", reply, sizeof(reply)));
+    CHECK(!box_game_leave_command(&game, &guard, false, "lobby", reply, sizeof(reply)));
+
+    /* Joined over the console, played; switched off. */
+    CHECK(box_game_join_text(&game, text) == BOX_JOIN_OK);
+    uint32_t now = 10;
+    cmd(FIELD_CMD_START);
+    run_ms(&now, 2500);
+    CHECK(game.phase == BOX_PLAYING);
+    node_runner_stop(&runner);
+
+    /* Switched on after its controller ended the game: back in it, and the controller is gone. */
+    fixture(true);
+    game.shell.random = sh_random;
+    game.shell.log = sh_log;
+    log_lines[0] = '\0';
+    CHECK(box_game_load_join_key(&game) && game.lobby.ready);
+    CHECK(box_game_resume(&game, 5));
+    now = 5;
+    run_ms(&now, 5 * BOX_ANNOUNCE_MIN_MS);
+    CHECK(game.phase == BOX_PLAYING && box_game_can_leave(&game));
+    CHECK(box_game_join_text(&game, text2) == BOX_JOIN_BUSY); /* stuck */
+
+    /* Without the PIN, a wrong one, a word too many: refused; only the wrong PIN is counted. */
+    CHECK(box_game_leave_command(&game, &guard, false, "leave", reply, sizeof(reply)));
+    CHECK(strstr(reply, "leave: refused: the admin PIN goes last") == reply);
+    CHECK(box_game_leave_command(&game, &guard, false, "leave 1111", reply, sizeof(reply)));
+    CHECK(strcmp(reply, "leave: refused: admin PIN (wrong)") == 0 && guard.failures == 1);
+    CHECK(box_game_leave_command(&game, &guard, false, "leave 5927 now", reply, sizeof(reply)));
+    CHECK(strstr(reply, "wrong number of words") != NULL && guard.failures == 1);
+    CHECK(box_game_leave_command(&game, &guard, false,
+                                 "leave 5927                                         x", reply,
+                                 sizeof(reply)));
+    CHECK(strstr(reply, "leave: refused") == reply && guard.failures == 1);
+    CHECK(game.phase == BOX_PLAYING);
+    /* Five wrong in a row: then a wait, during which even the right PIN is not compared. */
+    for (int i = 0; i < 4; i++) {
+        CHECK(box_game_leave_command(&game, &guard, false, "leave 1111", reply, sizeof(reply)));
+    }
+    CHECK(guard.failures == ADMIN_PIN_FREE_TRIES);
+    CHECK(box_game_leave_command(&game, &guard, false, "leave 5927", reply, sizeof(reply)));
+    CHECK(strcmp(reply, "leave: refused: admin PIN locked, try again in 1 min") == 0);
+    CHECK(game.phase == BOX_PLAYING && guard.failures == ADMIN_PIN_FREE_TRIES);
+    pin_clock += 60000;
+
+    /* The right PIN: over as on its GAME_OVER (the mode's game over, the stored join erased). */
+    runner.queues.screen_count = 0;
+    CHECK(box_game_leave_command(&game, &guard, false, "leave 5927", reply, sizeof(reply)));
+    CHECK(strcmp(reply, "leave: game 3054 is over on this box; it is free for the next game") == 0);
+    CHECK(guard.failures == 0);
+    CHECK(game.phase == BOX_ENDED && flash.join_len == 0 && !box_game_can_leave(&game));
+    const char *t = last_screen(NULL);
+    CHECK(t != NULL && strcmp(t, "final_score") == 0);
+    CHECK(strstr(log_lines, "game 3054: left by hand at the box (console), as on a game over") !=
+          NULL);
+    CHECK(box_lobby_available(&game) && box_lobby_played_to_the_end(&game, GAME_ID));
+    CHECK(game.lobby.games_over_heard == 0); /* no frame was heard */
+    /* Nothing else forgotten: the join key, the device id. */
+    CHECK(game.have_join_key && flash.have_key && memcmp(flash.key, JOIN_KEY, 32) == 0);
+    CHECK(game.lobby.ready && flash.have_device_id);
+    /* Again: nothing to leave, and nothing counted. */
+    CHECK(box_game_leave_command(&game, &guard, false, "leave 1111", reply, sizeof(reply)));
+    CHECK(strcmp(reply, "leave: refused (not in a game)") == 0 && guard.failures == 0);
+    /* The old game never again (BN-19); a new game's @join is taken at once. */
+    CHECK(box_game_join_text(&game, text) == BOX_JOIN_ENDED);
+    CHECK(box_game_join_text(&game, text2) == BOX_JOIN_OK);
+    CHECK(game.phase == BOX_JOINED && game.join.game_id == GAME_ID + 1);
+
+    /* The admin menu's way, joined and not started: over too; it leaves after the linger, and a
+     * restart finds no game. */
+    CHECK(box_game_leave(&game, "admin menu"));
+    CHECK(game.phase == BOX_ENDED && box_lobby_played_to_the_end(&game, GAME_ID + 1));
+    CHECK(strstr(log_lines, "(admin menu)") != NULL);
+    run_ms(&now, BOX_END_LINGER_MS + 100);
+    CHECK(game.phase == BOX_IDLE);
+    node_runner_stop(&runner);
+    fixture(true);
+    CHECK(!box_game_resume(&game, 5) && game.phase == BOX_IDLE && game.have_join_key);
+
+    /* A bench build (open): "@leave" alone does it, an extra PIN word unchecked. */
+    CHECK(box_game_join_text(&game, text3) == BOX_JOIN_OK);
+    CHECK(box_game_leave_command(&game, &guard, true, "leave 0000", reply, sizeof(reply)));
+    CHECK(game.phase == BOX_ENDED && guard.failures == 0);
+    state_persist_clear();
+}
+
 /* A MOVE field frame: the field is on channel_hz now, revision rev (RFC 0001 Amendment 19). */
 static void move_frame(const uint8_t fkey[16], uint32_t channel_hz, uint32_t rev, uint8_t *keep,
                        size_t *keep_len)
@@ -2520,6 +2683,123 @@ static void test_outputs_disabled_in_a_field_game(void)
     CHECK(events_named("node.modules") == 0 && events_named("node.outputs_disabled") == 0);
 }
 
+/* A RELEASE field frame (RFC 0001 Amendment 28): game `live` is live (0: none), it is now `time_s`.
+ */
+static void release_frame(uint16_t live, uint32_t time_s, uint8_t *keep, size_t *keep_len)
+{
+    atalaia_ff_msg_t m;
+    memset(&m, 0, sizeof(m));
+    m.kind = ATALAIA_FF_RELEASE;
+    m.live_game = live;
+    m.time_s = time_s;
+    to_box(ff_key, &m, keep, keep_len);
+}
+
+/* A TIME of the box's current game ("running"), its controller's wall clock at wall_s. */
+static void time_wall(uint32_t wall_s)
+{
+    atalaia_time_msg_t t;
+    memset(&t, 0, sizeof(t));
+    t.game_time_ms = 1000;
+    t.game_state = FIELD_GAME_RUNNING;
+    t.wall_s = wall_s;
+    t.tx_time_us = 0xFFFF;
+    t.term = 1;
+    uint8_t pl[64];
+    size_t n = atalaia_time_encode(&t, pl, sizeof(pl));
+    atalaia_header_t h = {
+        ATALAIA_VF_MAKE(1, 2, 0, 1), game.join.game_id, 0, controller_seq++, 2, ATALAIA_MSG_TIME};
+    uint8_t out[PKT_CAP];
+    size_t len = atalaia_packet_encrypt(&h, 1, game.join.game_key, pl, n, out, sizeof(out),
+                                        &atalaia_crypto_test_stub);
+    CHECK(n > 0 && len > 0);
+    box_game_on_packet(&game, out, len, -55);
+}
+
+/* RFC 0001 Amendment 28 (decisions STUCK-50 to STUCK-59): a controller that lost its database has
+ * no key tag for the game a box is stuck in, so no GAME_OVER can name it. RELEASE frees every box
+ * in a game other than the live one, when the box joined that game before the RELEASE's time: the
+ * wall clock of the first TIME it took in the game, kept across a reboot with the game key's tag.
+ * Refused: before any TIME, one not newer than the join (a recording played back once the box is
+ * in a newer game); the live game's own boxes are left alone. */
+static void test_release(void)
+{
+    lobby_fixture();
+    game.shell.log = sh_log;
+    log_lines[0] = '\0';
+    static char text[ATALAIA_JOIN_MAX * 2], text2[ATALAIA_JOIN_MAX * 2];
+    join_text_for(GAME_ID, text, sizeof(text));
+    join_text_for(GAME_ID + 1, text2, sizeof(text2));
+    CHECK(box_game_join_text(&game, text) == BOX_JOIN_OK);
+    uint32_t now = 10;
+    /* No TIME heard yet: nothing to compare the release with. */
+    release_frame(0, 2000000000u, NULL, NULL);
+    CHECK(game.phase == BOX_JOINED && game.lobby.releases_refused == 1 && game.join_wall_s == 0);
+    cmd_now(FIELD_CMD_START);
+    time_wall(1793000100u);
+    run_ms(&now, 100);
+    CHECK(game.phase == BOX_PLAYING && game.join_wall_s == 1793000100u);
+    CHECK(flash.have_join_time && flash.join_wall == 1793000100u && flash.join_time_saves == 1);
+    time_wall(1793000200u); /* later TIMEs change nothing: the join's is the first */
+    run_ms(&now, 100);
+    CHECK(game.join_wall_s == 1793000100u && flash.join_time_saves == 1);
+    /* Not newer than the join (a recording from before): no. The live game's own: left alone. */
+    release_frame(0, 1793000050u, NULL, NULL);
+    release_frame(0x0D00, 1793000100u, NULL, NULL);
+    CHECK(game.phase == BOX_PLAYING && game.lobby.releases_refused == 3);
+    release_frame(GAME_ID, 1793009000u, NULL, NULL);
+    CHECK(game.phase == BOX_PLAYING && game.lobby.releases_refused == 3);
+    /* Another field's frame does not open. */
+    uint8_t saved_key[16];
+    static const uint8_t other_join[32] = {9, 9, 9};
+    memcpy(saved_key, ff_key, 16);
+    atalaia_ff_key(other_join, ff_key);
+    uint32_t ignored = game.lobby.frames_ignored;
+    release_frame(0, 1793009000u, NULL, NULL);
+    memcpy(ff_key, saved_key, 16);
+    CHECK(game.phase == BOX_PLAYING && game.lobby.frames_ignored == ignored + 1);
+
+    /* Switched off; its controller lost everything. Back on, still in the game, no TIME. */
+    node_runner_stop(&runner);
+    fixture(true);
+    game.shell.random = sh_random;
+    game.shell.log = sh_log;
+    log_lines[0] = '\0';
+    CHECK(box_game_load_join_key(&game) && game.lobby.ready);
+    CHECK(box_game_resume(&game, 5));
+    now = 5;
+    run_ms(&now, 5 * BOX_ANNOUNCE_MIN_MS);
+    CHECK(game.phase == BOX_PLAYING && game.join_wall_s == 1793000100u);
+    CHECK(box_game_join_text(&game, text2) == BOX_JOIN_BUSY); /* stuck */
+    /* The new controller's RELEASE (another game live): over as on GAME_OVER, free. */
+    static uint8_t rec[ATALAIA_FF_MAX];
+    size_t rec_len = 0;
+    runner.queues.screen_count = 0;
+    release_frame(0x0D00, 1793009000u, rec, &rec_len);
+    CHECK(game.phase == BOX_ENDED && game.lobby.releases_taken == 1);
+    CHECK(box_lobby_available(&game) && box_lobby_played_to_the_end(&game, GAME_ID));
+    CHECK(strstr(log_lines, "released by a field controller (live game 3328)") != NULL);
+    const char *t = last_screen(NULL);
+    CHECK(t != NULL && strcmp(t, "final_score") == 0);
+    CHECK(game.have_join_key && flash.have_device_id); /* nothing else is erased */
+    /* A newer game, joined at once; its first TIME is after the release. */
+    CHECK(box_game_join_text(&game, text2) == BOX_JOIN_OK && game.join.game_id == GAME_ID + 1);
+    CHECK(game.join_wall_s == 0);
+    cmd_now(FIELD_CMD_START);
+    time_wall(1793009500u);
+    run_ms(&now, 100);
+    CHECK(game.phase == BOX_PLAYING && game.join_wall_s == 1793009500u);
+    /* The recorded RELEASE played back now: older than this join, nothing changes. */
+    box_game_on_packet(&game, rec, rec_len, -60);
+    CHECK(game.phase == BOX_PLAYING && game.lobby.releases_refused == 1);
+    /* A newer one frees it too; one naming its game does not. */
+    release_frame(GAME_ID + 1, 1793010000u, NULL, NULL);
+    CHECK(game.phase == BOX_PLAYING);
+    release_frame(0, 1793010000u, NULL, NULL);
+    CHECK(game.phase == BOX_ENDED && game.lobby.releases_taken == 2);
+    state_persist_clear();
+}
+
 void run_box_game_tests(void)
 {
     test_outputs_in_a_field_game();
@@ -2532,6 +2812,8 @@ void run_box_game_tests(void)
     test_lobby_refusals();
     test_lobby_replay_refused();
     test_lobby_game_over();
+    test_leave_by_hand();
+    test_release();
     test_lobby_discover_and_ready_screen();
     test_lobby_move();
     test_lobby_device_id();

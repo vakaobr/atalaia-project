@@ -197,6 +197,32 @@ void main() {
     await h.services.controller.stop();
   }, variant: onAndroid);
 
+  testWidgets('a radio that cannot report boxes stuck in an ended game says '
+      'so (STUCK-64)', (tester) async {
+    await phone(tester);
+    final h = harness(language: AppLanguage.en);
+    await tester.pumpWidget(h.app(home: const ControllerScreen()));
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'ctl-start');
+    final s = Strings(AppLanguage.en);
+    final hint = find.byKey(const Key('ctl-stuck-no-watch'));
+    expect(hint, findsNothing); // no join key's boxes said: nothing
+    final run = h.controllerRuns.last;
+    run.emit({'radio': 'up', 'radio_kind': 'modem', 'stuck_watch': false});
+    await tester.pumpAndSettle();
+    await see(tester, find.text(s.t('ctl.stuck_no_watch_modem')));
+    run.emit({'radio_kind': 'pod'});
+    await tester.pumpAndSettle();
+    await see(tester, find.text(s.t('ctl.stuck_no_watch_pod')));
+    run.emit({'stuck_watch': true}); // a modem that reports them
+    await tester.pumpAndSettle();
+    expect(hint, findsNothing);
+    run.emit({'stuck_watch': false, 'radio': 'down'}); // said once it is up
+    await tester.pumpAndSettle();
+    expect(hint, findsNothing);
+    await h.services.controller.stop();
+  }, variant: onAndroid);
+
   testWidgets('a controller that fails or ends by itself says so', (
     tester,
   ) async {

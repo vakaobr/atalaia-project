@@ -318,7 +318,10 @@ decrypts with AES-CCM (mbedtls, hardware AES), drops flood copies and replays wi
 enforces the duty cycle of the channel's sub-band, measures the noise on
 a channel when asked (MEASURE, only while no game is configured), carries
 field frames as they are, with or without a game (FIELD_TX, FIELD_RX,
-FIELD_ACK: it never holds the field join key), and
+FIELD_ACK: it never holds the field join key), reports another game's
+packets when the controller asks (WATCH_GAMES, OTHER_GAME: the header's game id
+and source, once per game id in 10 s; RFC 0001 Amendment 27, so a box still in
+an ended game is told again), and
 keeps the game key in RAM only; it has no
 Lua, game screens or presets (~480 KB image, ~190 KB of it LVGL and the
 fonts for its own OLED). The log console stays on UART0
@@ -1396,7 +1399,16 @@ controller's game.
   channel and the MOVE's revision, which must rise, so a recorded MOVE played
   back later changes nothing) and announces itself 6-15 s later; a box in a
   game, a revision it has taken, or another region's channel changes nothing
-  (`moves_taken` and `moves_refused` in `@lobby`). The box's idle channel (its
+  (`moves_taken` and `moves_refused` in `@lobby`). A box in a game also takes
+  a **RELEASE** (kind 6, RFC 0001 Amendment 28, proposed), which a controller
+  that lost a game entirely (a new database) sends on the GM's word: it names
+  the live game and the controller's wall clock, and a box in another game
+  ends it as on GAME_OVER only if it joined that game before that time. The
+  join's time is the wall clock of the first TIME the box took in the game,
+  kept in NVS (`join_time`, with the game key's tag) so a reboot into the game
+  keeps it; a box that took no TIME, the live game's boxes and a RELEASE not
+  newer than the join (one played back) change nothing (`releases` and
+  `joined at` in `@lobby`; decisions STUCK-50 to STUCK-59). The box's idle channel (its
   last game's, or the field's) now also survives a reboot, where it used to
   fall back to the region's default. 30 s
   after a game ends the final screen gives way to "Ready / next game". `@lobby`

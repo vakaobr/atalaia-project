@@ -234,6 +234,61 @@ void box_game_end_by_field(box_game_t *g)
     if (g->phase == BOX_PLAYING || g->phase == BOX_JOINED) end_game(g);
 }
 
+bool box_game_can_leave(const box_game_t *g)
+{
+    return g->phase == BOX_JOINED || g->phase == BOX_PLAYING || g->phase == BOX_FETCHING;
+}
+
+bool box_game_leave(box_game_t *g, const char *how)
+{
+    if (!box_game_can_leave(g)) return false;
+    if (how == NULL || how[0] == '\0') how = "by hand";
+    if (g->phase == BOX_FETCHING) {
+        /* As a GAME_OVER for the game it fetches for: the fetch stops (cancelled, P5B-13). */
+        say(g, "game %u: left by hand at the box (%s): the mode fetch stops", g->join.game_id, how);
+        g->fetch_cancel = true;
+        return true;
+    }
+    say(g, "game %u: left by hand at the box (%s), as on a game over", g->join.game_id, how);
+    box_game_end_by_field(g);
+    return true;
+}
+
+bool box_game_leave_command(box_game_t *g, admin_pin_t *pin, bool open, const char *cmd,
+                            char *reply, size_t cap)
+{
+    static const char name[] = "leave";
+    size_t nl = sizeof(name) - 1;
+    if (strncmp(cmd, name, nl) != 0 || (cmd[nl] != ' ' && cmd[nl] != '\0')) return false;
+    if (!box_game_can_leave(g)) {
+        snprintf(reply, cap, "leave: refused (not in a game)");
+        return true;
+    }
+    char line[48], why[120];
+    bool ok = strlen(cmd) < sizeof(line);
+    if (ok) {
+        snprintf(line, sizeof(line), "%s", cmd);
+        ok = admin_pin_gate_serial(pin, open, line, 0, why, sizeof(why));
+    } else {
+        snprintf(why, sizeof(why), "refused: \"@leave <admin PIN>\"");
+    }
+    memset(line, 0, sizeof(line));
+    if (!ok) {
+        snprintf(reply, cap, "leave: %s", why);
+        return true;
+    }
+    uint16_t id = g->join.game_id;
+    bool fetching = g->phase == BOX_FETCHING;
+    box_game_leave(g, "console");
+    if (fetching) {
+        snprintf(reply, cap, "leave: game %u: the mode fetch stops", id);
+    } else {
+        snprintf(reply, cap, "leave: game %u is over on this box; it is free for the next game",
+                 id);
+    }
+    return true;
+}
+
 static void leave_game(box_game_t *g)
 {
     memset(g->link.proto.game_key, 0, sizeof(g->link.proto.game_key));
@@ -512,6 +567,7 @@ static void show_waiting(box_game_t *g)
 }
 
 static bool link_up(box_game_t *g, const atalaia_join_t *j, bool fresh);
+static void load_join_time(box_game_t *g, bool fresh);
 static bool wants_fetch(const box_game_t *g, const atalaia_join_t *j);
 static box_join_result_t start_fetch(box_game_t *g, const atalaia_join_t *j, const uint8_t *payload,
                                      size_t len);
@@ -550,6 +606,7 @@ static box_join_result_t apply(box_game_t *g, const atalaia_join_t *j, const uin
         mode_store_touch(j->mode_id); /* its fetched parts: the most recently used (P5B-15) */
     }
     if (!link_up(g, j, fresh)) return BOX_JOIN_RADIO;
+    load_join_time(g, fresh);
     g->preset_index = index;
     g->phase = BOX_JOINED;
     g->paused = false;
@@ -559,6 +616,41 @@ static box_join_result_t apply(box_game_t *g, const atalaia_join_t *j, const uin
         g->link.proto.epoch);
     show_waiting(g);
     return BOX_JOIN_OK;
+}
+
+/* When the box joined its game (RFC 0001 Amendment 28): unknown for a new join until its first
+ * TIME; after a reboot, what the store kept for this game (its key's tag), if anything. */
+static void load_join_time(box_game_t *g, bool fresh)
+{
+    if (fresh || g->store.load_join_time == NULL) return;
+    uint8_t tag[ATALAIA_FF_TAG_SIZE], kept[ATALAIA_FF_TAG_SIZE];
+    uint32_t wall = 0;
+    if (g->store.load_join_time(g->store.ctx, kept, &wall) != 0) return;
+    atalaia_radio_epoch_tag(g->join.game_key, tag);
+    if (memcmp(tag, kept, sizeof(tag)) == 0) g->join_wall_s = wall;
+    memset(tag, 0, sizeof(tag));
+}
+
+/* The first TIME of the game gives its join's wall clock, stored once (RFC 0001 Amendment 28). */
+static void keep_join_time(box_game_t *g)
+{
+    if (g->join_wall_s != 0 || g->link.first_wall_s == 0 ||
+        (g->phase != BOX_JOINED && g->phase != BOX_PLAYING)) {
+        return;
+    }
+    g->join_wall_s = g->link.first_wall_s;
+    if (g->store.save_join_time == NULL) return;
+    uint8_t tag[ATALAIA_FF_TAG_SIZE];
+    atalaia_radio_epoch_tag(g->join.game_key, tag);
+    if (g->store.save_join_time(g->store.ctx, tag, g->join_wall_s) != 0) {
+        say(g, "the game's join time could not be stored (a RELEASE is refused after a reboot)");
+    }
+    memset(tag, 0, sizeof(tag));
+}
+
+uint32_t box_game_join_time(const box_game_t *g)
+{
+    return g->join_wall_s;
 }
 
 /* HELLO's capability type ids: the shell's, `hit` while a module has a hit channel and `output`
@@ -587,6 +679,7 @@ static void fill_caps(box_game_t *g)
 static bool link_up(box_game_t *g, const atalaia_join_t *j, bool fresh)
 {
     if (j != &g->join) g->join = *j; /* after a fetch, the join is g->join itself */
+    g->join_wall_s = 0;              /* known at its first TIME (RFC 0001 Amendment 28) */
     take_language(g, j);
     for (uint8_t t = 0; t < j->team_count; t++) g->teams[t] = g->join.teams[t];
     if (g->shell.set_channel != NULL && !g->shell.set_channel(g->shell.user, j->channel_hz)) {
@@ -1017,6 +1110,7 @@ void box_game_tick(box_game_t *g, uint32_t raw_delta_ms, uint32_t now_ms)
         node_runner_tick(g->runner, field_link_adjust_delta(&g->link, raw_delta_ms));
     }
     field_link_tick(&g->link, now_ms);
+    keep_join_time(g);
     if (g->phase != BOX_ENDED) {
         if (!g->stats_on) {
             g->stats_on = true;

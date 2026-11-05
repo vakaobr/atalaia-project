@@ -1002,6 +1002,8 @@ const Map<String, String> enStrings = {
   'ctl.radio_up': 'Radio up',
   'ctl.radio_down': 'Radio down',
   'ctl.radio_connecting': 'Reaching the radio…',
+  'ctl.stuck_no_watch_modem': "This USB radio modem's firmware cannot report boxes still in an ended game: update it, so that the controller frees them by itself. Until then, take such a box out at the box: hold * for 3 s for the admin menu's “Leave the game”, or type @leave <admin PIN> on its USB console.",
+  'ctl.stuck_no_watch_pod': "An I/O pod cannot report boxes still in an ended game. For the controller to free them by itself, use a USB radio modem with up-to-date firmware. Until then, take such a box out at the box: hold * for 3 s for the admin menu's “Leave the game”, or type @leave <admin PIN> on its USB console.",
   'ctl.pod_forget': 'Unlink the pod',
   'ctl.codes': 'Access codes',
   'ctl.codes_hint':

@@ -18,6 +18,8 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 COPY core /src/core
 COPY firmware/esp32 /src/firmware/esp32
+# The host box builds the expansion modules' shared code too (box_host/CMakeLists.txt MODULE_CORE_DIR).
+COPY firmware/module-core /src/firmware/module-core
 RUN cmake -S /src/core -B /out/core -DCMAKE_BUILD_TYPE=Release -DATALAIA_SHARED=ON -DBUILD_TESTING=OFF > /dev/null \
  && cmake --build /out/core --parallel > /dev/null \
  && cmake -S /src/firmware/esp32/test/modem_host -B /out/modem_host -DCMAKE_BUILD_TYPE=Release > /dev/null \

@@ -243,6 +243,7 @@ static void test_ident_and_ping(void)
     CHECK(strstr(json, "\"epoch_window\":16") != NULL);
     CHECK(strstr(json, "\"region\":\"eu868\"") != NULL); /* the build's region (RF-AS923-2) */
     CHECK(strstr(json, "\"lang\":true") != NULL);        /* SET_LANG (decision MOD-2) */
+    CHECK(strstr(json, "\"games\":true") != NULL); /* WATCH_GAMES, OTHER_GAME (Amendment 27) */
 
     uint8_t ping[5] = {MODEM_CMD_PING};
     put32(ping + 1, 4242);
@@ -1062,6 +1063,96 @@ static void test_set_lang(void)
     CHECK(!modem_set_lang(&modem, "a_b") && strcmp(modem_lang(&modem), "de") == 0);
 }
 
+static void watch_games(uint8_t on)
+{
+    uint8_t cmd[2] = {MODEM_CMD_WATCH_GAMES, on};
+    host_send(MODEM_FRAME_CMD, cmd, sizeof(cmd));
+}
+
+static int other_games(void)
+{
+    int n = 0;
+    for (int i = 0; i < io_state.frames; i++) n += io_state.type[i] == MODEM_FRAME_OTHER_GAME;
+    return n;
+}
+
+/* RFC 0001 Amendment 27: another game's packets, reported (game id, source, rssi, snr) only after
+ * WATCH_GAMES on, between games and during another game, at most once per game id in 10 s. */
+static void test_other_games(void)
+{
+    setup(true, 16);
+    uint8_t pkt[RADIO_MAX_PKT_LEN];
+    size_t n = air_packet(240, 5, 1, 2, OTHER_KEY, "stuck box", pkt);
+    clear_out();
+    modem_on_air_rx(&modem, pkt, n, -70, 4); /* not asked: nothing, as before */
+    CHECK(io_state.frames == 0 && modem.count.rx_dropped == 1);
+
+    watch_games(1);
+    CHECK(status_has("\"cmd\":10"));
+    clear_out();
+    modem_on_air_rx(&modem, pkt, n, -70, 4); /* between games (no game configured) */
+    CHECK(io_state.frames == 1 && io_state.type[0] == MODEM_FRAME_OTHER_GAME);
+    CHECK(io_state.len[0] == MODEM_OTHER_GAME_LEN);
+    const uint8_t want[MODEM_OTHER_GAME_LEN] = {0, 240, 0, 5, (uint8_t)-70, 4};
+    CHECK(memcmp(io_state.payload[0], want, sizeof(want)) == 0);
+    CHECK(modem.count.rx_dropped == 2 && modem.count.other_game == 1);
+
+    /* Once per game id in 10 s; another game's id is its own. */
+    clear_out();
+    io_state.now += 9999;
+    modem_on_air_rx(&modem, pkt, n, -70, 4);
+    CHECK(other_games() == 0);
+    size_t n2 = air_packet(241, 6, 1, 1, OTHER_KEY, "another", pkt + 0);
+    modem_on_air_rx(&modem, pkt, n2, -71, 3);
+    CHECK(other_games() == 1 && io_state.payload[0][1] == 241);
+    io_state.now += 1;
+    n = air_packet(240, 5, 2, 2, OTHER_KEY, "stuck box", pkt);
+    clear_out();
+    modem_on_air_rx(&modem, pkt, n, -70, 4);
+    CHECK(other_games() == 1 && io_state.payload[0][1] == 240);
+
+    /* During a game: its own packets go on as RX, another game's are reported. */
+    configure(300, 0, 1, 2, 869525000, KEY);
+    clear_out();
+    io_state.now += MODEM_OTHER_GAME_MS;
+    modem_on_air_rx(&modem, pkt, n, -70, 4);
+    CHECK(other_games() == 1);
+    n2 = air_packet(300, 7, 1, 0, KEY, "ours", pkt);
+    clear_out();
+    modem_on_air_rx(&modem, pkt, n2, -60, 0);
+    CHECK(other_games() == 0 && last_of(MODEM_FRAME_RX) >= 0);
+
+    /* A flood of game ids: at most MODEM_OTHER_GAMES in 10 s. Game 0 or 0xFFFF and a packet
+     * in the clear are never reported. */
+    clear_out();
+    io_state.now += MODEM_OTHER_GAME_MS;
+    for (uint16_t g = 1; g <= 20; g++) {
+        n = air_packet(1000 + g, 1, 1, 0, OTHER_KEY, "flood", pkt);
+        modem_on_air_rx(&modem, pkt, n, -80, 0);
+    }
+    CHECK(other_games() == MODEM_OTHER_GAMES);
+    clear_out();
+    io_state.now += MODEM_OTHER_GAME_MS;
+    n = air_packet(0xFFFF, 1, 1, 0, OTHER_KEY, "bad id", pkt);
+    modem_on_air_rx(&modem, pkt, n, -80, 0);
+    n = air_packet(500, 1, 1, 0, OTHER_KEY, "clear", pkt);
+    pkt[0] &= (uint8_t)~ATALAIA_VF_MAKE(0, 0, 0, 1);
+    modem_on_air_rx(&modem, pkt, n, -80, 0);
+    CHECK(other_games() == 0);
+
+    /* Off again (and a bad value refused); a reboot forgets it (RAM only, as the key). */
+    watch_games(0);
+    n = air_packet(240, 5, 3, 2, OTHER_KEY, "stuck box", pkt);
+    clear_out();
+    modem_on_air_rx(&modem, pkt, n, -70, 4);
+    CHECK(other_games() == 0);
+    watch_games(2);
+    CHECK(last_error_code() == MODEM_ERR_BAD_PARAMS && !modem.watch_games);
+    watch_games(1);
+    setup(true, 16);
+    CHECK(!modem.watch_games);
+}
+
 /* IDENT must still be sent whole with the longest version a development build has. */
 static void test_ident_with_a_long_version(void)
 {
@@ -1071,6 +1162,12 @@ static void test_ident_with_a_long_version(void)
     modem_send_ident(&modem);
     CHECK(io_state.frames == 1 && io_state.type[0] == MODEM_FRAME_IDENT);
     CHECK(io_state.len[0] > 0 && io_state.payload[0][io_state.len[0] - 1] == '}');
+    /* Every capability is still there: the version is cut to what fits. */
+    char json[MODEM_FRAME_PAYLOAD_MAX + 1];
+    memcpy(json, io_state.payload[0], io_state.len[0]);
+    json[io_state.len[0]] = '\0';
+    CHECK(strstr(json, "\"games\":true}") != NULL);
+    CHECK(strstr(json, "\"fw_version\":\"0.4.0-dev.164+g8560d54.dirty") != NULL);
 }
 
 void run_modem_tests(void)
@@ -1091,5 +1188,6 @@ void run_modem_tests(void)
     test_field_frames();
     test_pair_frames();
     test_set_lang();
+    test_other_games();
     test_ident_with_a_long_version();
 }

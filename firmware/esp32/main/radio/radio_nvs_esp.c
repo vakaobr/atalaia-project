@@ -276,6 +276,31 @@ static int store_save_field_move(void *ctx, uint32_t channel_hz, uint32_t rev)
     return store_save_blob("field_move", b, sizeof(b));
 }
 
+/* When the box joined its game (RFC 0001 Amendment 28): the game key's tag (8) and the wall clock
+ * of its first TIME (4, big-endian), 12 bytes. */
+static int store_load_join_time(void *ctx, uint8_t tag[ATALAIA_FF_TAG_SIZE], uint32_t *wall_s)
+{
+    (void)ctx;
+    uint8_t b[ATALAIA_FF_TAG_SIZE + 4];
+    if (store_load_blob("join_time", b, sizeof(b)) != (int)sizeof(b)) return -1;
+    memcpy(tag, b, ATALAIA_FF_TAG_SIZE);
+    const uint8_t *w = b + ATALAIA_FF_TAG_SIZE;
+    *wall_s = (uint32_t)w[0] << 24 | (uint32_t)w[1] << 16 | (uint32_t)w[2] << 8 | w[3];
+    return 0;
+}
+
+static int store_save_join_time(void *ctx, const uint8_t tag[ATALAIA_FF_TAG_SIZE], uint32_t wall_s)
+{
+    (void)ctx;
+    uint8_t b[ATALAIA_FF_TAG_SIZE + 4];
+    memcpy(b, tag, ATALAIA_FF_TAG_SIZE);
+    b[8] = (uint8_t)(wall_s >> 24);
+    b[9] = (uint8_t)(wall_s >> 16);
+    b[10] = (uint8_t)(wall_s >> 8);
+    b[11] = (uint8_t)wall_s;
+    return store_save_blob("join_time", b, sizeof(b));
+}
+
 /* The screens' language, the last game's (join key 15; box_text.h): "" when it gave none. */
 static int store_load_lang(void *ctx, char *code, size_t cap)
 {
@@ -312,6 +337,8 @@ static const box_store_ops_t esp_box_store = {
     .save_field_move = store_save_field_move,
     .load_lang = store_load_lang,
     .save_lang = store_save_lang,
+    .load_join_time = store_load_join_time,
+    .save_join_time = store_save_join_time,
     .ctx = NULL,
 };
 

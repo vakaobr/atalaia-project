@@ -110,14 +110,32 @@ class Reinvite:
             log.info("box %s joined game %d as node %d (%s)", inv.device_id.hex(), inv.game_id, node_id, inv.role)
         self._flush()
 
-    def game_over(self, game_id: int, key_tag: bytes, channel_hz: Optional[int]) -> bool:
-        """Tells the game's boxes it is over (GAME_OVER, decision OT-13); False without a radio."""
+    def game_over(self, game_id: int, key_tag: bytes, channel_hz: Optional[int], why: Optional[str] = None) -> bool:
+        """Tells the game's boxes it is over (GAME_OVER, decision OT-13); False without a radio.
+        ``why``: said again for a box still in it (stuck_games.py, STUCK-1), logged once per burst."""
         modem = self.ctl.modem
         if modem is None or not modem.is_up or not getattr(modem, "has_field_frames", False):
             log.warning("game %d: no GAME_OVER sent (the radio modem is %s)", game_id, self.ctl.radio_state)
             return False
         self.inviter.game_over(game_id, key_tag, self.ctl.now_ms(), channel_hz=channel_hz)
-        log.info("game %d: GAME_OVER to its boxes (%d times, on %s Hz)", game_id, ff_repeats(), channel_hz)
+        if why is not None:
+            log.info("game %d: %s", game_id, why)
+        else:
+            log.info("game %d: GAME_OVER to its boxes (%d times, on %s Hz)", game_id, ff_repeats(), channel_hz)
+        self.inviter.tick(self.ctl.now_ms())  # the first one at once
+        return True
+
+    def release(self, live_game: int, time_s: int) -> bool:
+        """RELEASE (RFC 0001 Amendment 28): every box in a game other than ``live_game`` (0: none) that it
+        joined before ``time_s`` leaves it, three times on the channel the modem is on (the field's, or
+        the live game's). False without a modem that carries field frames."""
+        modem = self.ctl.modem
+        if modem is None or not modem.is_up or not getattr(modem, "has_field_frames", False):
+            log.warning("no RELEASE sent (the radio modem is %s)", self.ctl.radio_state)
+            return False
+        self.inviter.release(live_game, time_s, self.ctl.now_ms())
+        log.warning("RELEASE: every box in a game other than %s that it joined before %d leaves it "
+                    "(%d times)", live_game or "none", time_s, lobby.RELEASE_REPEATS)
         self.inviter.tick(self.ctl.now_ms())  # the first one at once
         return True
 
@@ -196,7 +214,8 @@ class Reinvite:
         """Tells the consoles what changed (outside the inviter's own calls)."""
         pending, self._pending_emit = self._pending_emit, set()
         if "boxes" in pending:
-            self.ctl._emit({"type": "boxes", "boxes": self.boxes()["boxes"]})
+            # With the games a box is stuck in, so the console's list follows them live (STUCK-45).
+            self.ctl._emit({"type": "boxes", "boxes": self.boxes()["boxes"], **self.stuck_view()})
         if "invites" in pending and self.ctl.game is not None:
             gid = self.ctl.game["id"]
             invites = self.invites(gid)
@@ -239,6 +258,11 @@ class Reinvite:
         mf = self.ctl.mode_fetch
         return mf.invite_view(inv.public()) if mf is not None else inv.public()
 
+    def refresh_boxes(self) -> None:
+        """What the box list shows changed (a game a box is stuck in): the consoles are told."""
+        self._changed("boxes")
+        self._flush()
+
     def refresh_invites(self) -> None:
         """A box's fetch changed whether its HELLO joined it (mode_fetch.py): the consoles are told."""
         self._changed("invites")
@@ -265,7 +289,19 @@ class Reinvite:
             return {"boxes": out, "previous_game": {k: v for k, v in prev.items() if k != "boxes"} if prev else None,
                     "radio": radio is not None and radio.is_up,
                     "field_frames": radio is not None and getattr(radio, "has_field_frames", False),
-                    "ignored": self.inviter.ignored, "stale": self.inviter.stale}
+                    "ignored": self.inviter.ignored, "stale": self.inviter.stale,
+                    # Boxes still in a game that is over (stuck_games.py, decisions STUCK-1 to STUCK-19).
+                    **self.stuck_view()}
+
+    def stuck_view(self) -> dict[str, Any]:
+        """``stuck``: per ended game a box was heard still in, {game, name, last_heard_s, nodes, rssi,
+        game_over_resent}; ``stuck_reports``: the modem's reports of other games' packets;
+        ``stuck_watch``: whether the modem can report them (its IDENT says "games")."""
+        stuck = self.ctl.stuck
+        radio = self.ctl.modem
+        return {"stuck": stuck.public() if stuck is not None else [],
+                "stuck_reports": stuck.reports if stuck is not None else 0,
+                "stuck_watch": radio is not None and getattr(radio, "has_other_games", False) is True}
 
     def invites(self, game_id: int) -> list[dict[str, Any]]:
         return [self._view(i) for i in self.inviter.invites.values() if i.game_id == game_id]

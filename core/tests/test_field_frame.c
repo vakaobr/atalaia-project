@@ -58,6 +58,8 @@ static bool same_msg(const atalaia_ff_msg_t *a, const atalaia_ff_msg_t *b)
         return a->game_id == b->game_id && memcmp(a->key_tag, b->key_tag, 8) == 0;
     }
     if (a->kind == ATALAIA_FF_MOVE) return a->channel_hz == b->channel_hz && a->rev == b->rev;
+    if (a->kind == ATALAIA_FF_RELEASE)
+        return a->live_game == b->live_game && a->time_s == b->time_s;
     if (memcmp(a->device_id, b->device_id, 8) != 0 || memcmp(a->token, b->token, 8) != 0) {
         return false;
     }
@@ -72,7 +74,7 @@ static bool same_msg(const atalaia_ff_msg_t *a, const atalaia_ff_msg_t *b)
 
 static void test_bodies(void)
 {
-    CHECK(FF_VALID_VECTOR_COUNT >= 11);
+    CHECK(FF_VALID_VECTOR_COUNT >= 13);
     for (size_t i = 0; i < FF_VALID_VECTOR_COUNT; i++) {
         const ff_valid_vector_t *v = &ff_valid_vectors[i];
         atalaia_ff_msg_t m;
@@ -128,6 +130,16 @@ static void test_bodies(void)
     bad = ff_valid_vectors[9].fields;
     bad.rev = 0;
     CHECK(atalaia_ff_body_encode(&bad, buf, sizeof(buf)) == 0);
+    /* RELEASE (RFC 0001 Amendment 28): a live game of 0-65534 and a time that is not 0. */
+    bad = ff_valid_vectors[11].fields;
+    CHECK(bad.kind == ATALAIA_FF_RELEASE && bad.live_game == 4242 && bad.time_s == 1793000000u);
+    bad.time_s = 0;
+    CHECK(atalaia_ff_body_encode(&bad, buf, sizeof(buf)) == 0);
+    bad = ff_valid_vectors[11].fields;
+    bad.live_game = 0xFFFF;
+    CHECK(atalaia_ff_body_encode(&bad, buf, sizeof(buf)) == 0);
+    bad.live_game = 0; /* no game live: still a RELEASE */
+    CHECK(atalaia_ff_body_encode(&bad, buf, sizeof(buf)) > 0);
 }
 
 static void test_frame_shape(void)
