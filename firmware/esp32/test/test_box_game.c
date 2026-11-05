@@ -1840,6 +1840,146 @@ static void test_lobby_game_over(void)
     state_persist_clear();
 }
 
+/* The box's log lines (shell.log), the last few joined: "a\nb\n". */
+static char log_lines[1024];
+static void sh_log(void *user, const char *line)
+{
+    (void)user;
+    size_t used = strlen(log_lines);
+    if (used + strlen(line) + 2 >= sizeof(log_lines)) used = 0, log_lines[0] = '\0';
+    snprintf(log_lines + used, sizeof(log_lines) - used, "%s\n", line);
+}
+
+/* The admin PIN's clock, for its waits. */
+static uint32_t pin_clock;
+static uint32_t pin_now(void *ctx)
+{
+    (void)ctx;
+    return pin_clock;
+}
+
+/* A join text ("@join ...") for game gid, its key changed with gid. */
+static void join_text_for(uint16_t gid, char *text, size_t cap)
+{
+    atalaia_join_t j;
+    make_join(&j);
+    j.game_id = gid;
+    if (gid != GAME_ID) j.game_key[0] ^= (uint8_t)(gid ^ 0x5A);
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    CHECK(atalaia_join_to_text(buf, encode(&j, JOIN_KEY, buf), text, cap) > 0);
+}
+
+/* Found on the bench (2026-11-05): a box switched off when its game ended never hears the
+ * controller's GAME_OVER, comes back in that game and refuses every join; only erasing its
+ * flash got it out (and lost its adoption, Wi-Fi and PIN). Decisions STUCK-20 to STUCK-33: the
+ * admin menu's "Leave the game" and "@leave <admin PIN>" end the game exactly as its GAME_OVER
+ * would, behind the admin PIN (counted, with its waits); the game stays played to its end, the
+ * join key stays; a new @join is taken. With no game there is nothing to leave. */
+static void test_leave_by_hand(void)
+{
+    lobby_fixture();
+    admin_pin_ops_t pops = {.now_ms = pin_now};
+    admin_pin_t guard;
+    pin_clock = 0;
+    admin_pin_init(&guard, &pops, "5927");
+    char reply[160];
+    static char text[ATALAIA_JOIN_MAX * 2], text2[ATALAIA_JOIN_MAX * 2],
+        text3[ATALAIA_JOIN_MAX * 2];
+    join_text_for(GAME_ID, text, sizeof(text));
+    join_text_for(GAME_ID + 1, text2, sizeof(text2));
+    join_text_for(GAME_ID + 2, text3, sizeof(text3));
+
+    /* No game: refused, the PIN not even looked at; other commands are not this one. */
+    CHECK(!box_game_can_leave(&game));
+    CHECK(box_game_leave_command(&game, &guard, false, "leave 1111", reply, sizeof(reply)));
+    CHECK(strcmp(reply, "leave: refused (not in a game)") == 0 && guard.failures == 0);
+    CHECK(!box_game_leave(&game, "admin menu"));
+    CHECK(!box_game_leave_command(&game, &guard, false, "leaves 1111", reply, sizeof(reply)));
+    CHECK(!box_game_leave_command(&game, &guard, false, "lobby", reply, sizeof(reply)));
+
+    /* Joined over the console, played; switched off. */
+    CHECK(box_game_join_text(&game, text) == BOX_JOIN_OK);
+    uint32_t now = 10;
+    cmd(FIELD_CMD_START);
+    run_ms(&now, 2500);
+    CHECK(game.phase == BOX_PLAYING);
+    node_runner_stop(&runner);
+
+    /* Switched on after its controller ended the game: back in it, and the controller is gone. */
+    fixture(true);
+    game.shell.random = sh_random;
+    game.shell.log = sh_log;
+    log_lines[0] = '\0';
+    CHECK(box_game_load_join_key(&game) && game.lobby.ready);
+    CHECK(box_game_resume(&game, 5));
+    now = 5;
+    run_ms(&now, 5 * BOX_ANNOUNCE_MIN_MS);
+    CHECK(game.phase == BOX_PLAYING && box_game_can_leave(&game));
+    CHECK(box_game_join_text(&game, text2) == BOX_JOIN_BUSY); /* stuck */
+
+    /* Without the PIN, a wrong one, a word too many: refused; only the wrong PIN is counted. */
+    CHECK(box_game_leave_command(&game, &guard, false, "leave", reply, sizeof(reply)));
+    CHECK(strstr(reply, "leave: refused: the admin PIN goes last") == reply);
+    CHECK(box_game_leave_command(&game, &guard, false, "leave 1111", reply, sizeof(reply)));
+    CHECK(strcmp(reply, "leave: refused: admin PIN (wrong)") == 0 && guard.failures == 1);
+    CHECK(box_game_leave_command(&game, &guard, false, "leave 5927 now", reply, sizeof(reply)));
+    CHECK(strstr(reply, "wrong number of words") != NULL && guard.failures == 1);
+    CHECK(box_game_leave_command(&game, &guard, false,
+                                 "leave 5927                                         x", reply,
+                                 sizeof(reply)));
+    CHECK(strstr(reply, "leave: refused") == reply && guard.failures == 1);
+    CHECK(game.phase == BOX_PLAYING);
+    /* Five wrong in a row: then a wait, during which even the right PIN is not compared. */
+    for (int i = 0; i < 4; i++) {
+        CHECK(box_game_leave_command(&game, &guard, false, "leave 1111", reply, sizeof(reply)));
+    }
+    CHECK(guard.failures == ADMIN_PIN_FREE_TRIES);
+    CHECK(box_game_leave_command(&game, &guard, false, "leave 5927", reply, sizeof(reply)));
+    CHECK(strcmp(reply, "leave: refused: admin PIN locked, try again in 1 min") == 0);
+    CHECK(game.phase == BOX_PLAYING && guard.failures == ADMIN_PIN_FREE_TRIES);
+    pin_clock += 60000;
+
+    /* The right PIN: over as on its GAME_OVER (the mode's game over, the stored join erased). */
+    runner.queues.screen_count = 0;
+    CHECK(box_game_leave_command(&game, &guard, false, "leave 5927", reply, sizeof(reply)));
+    CHECK(strcmp(reply, "leave: game 3054 is over on this box; it is free for the next game") == 0);
+    CHECK(guard.failures == 0);
+    CHECK(game.phase == BOX_ENDED && flash.join_len == 0 && !box_game_can_leave(&game));
+    const char *t = last_screen(NULL);
+    CHECK(t != NULL && strcmp(t, "final_score") == 0);
+    CHECK(strstr(log_lines, "game 3054: left by hand at the box (console), as on a game over") !=
+          NULL);
+    CHECK(box_lobby_available(&game) && box_lobby_played_to_the_end(&game, GAME_ID));
+    CHECK(game.lobby.games_over_heard == 0); /* no frame was heard */
+    /* Nothing else forgotten: the join key, the device id. */
+    CHECK(game.have_join_key && flash.have_key && memcmp(flash.key, JOIN_KEY, 32) == 0);
+    CHECK(game.lobby.ready && flash.have_device_id);
+    /* Again: nothing to leave, and nothing counted. */
+    CHECK(box_game_leave_command(&game, &guard, false, "leave 1111", reply, sizeof(reply)));
+    CHECK(strcmp(reply, "leave: refused (not in a game)") == 0 && guard.failures == 0);
+    /* The old game never again (BN-19); a new game's @join is taken at once. */
+    CHECK(box_game_join_text(&game, text) == BOX_JOIN_ENDED);
+    CHECK(box_game_join_text(&game, text2) == BOX_JOIN_OK);
+    CHECK(game.phase == BOX_JOINED && game.join.game_id == GAME_ID + 1);
+
+    /* The admin menu's way, joined and not started: over too; it leaves after the linger, and a
+     * restart finds no game. */
+    CHECK(box_game_leave(&game, "admin menu"));
+    CHECK(game.phase == BOX_ENDED && box_lobby_played_to_the_end(&game, GAME_ID + 1));
+    CHECK(strstr(log_lines, "(admin menu)") != NULL);
+    run_ms(&now, BOX_END_LINGER_MS + 100);
+    CHECK(game.phase == BOX_IDLE);
+    node_runner_stop(&runner);
+    fixture(true);
+    CHECK(!box_game_resume(&game, 5) && game.phase == BOX_IDLE && game.have_join_key);
+
+    /* A bench build (open): "@leave" alone does it, an extra PIN word unchecked. */
+    CHECK(box_game_join_text(&game, text3) == BOX_JOIN_OK);
+    CHECK(box_game_leave_command(&game, &guard, true, "leave 0000", reply, sizeof(reply)));
+    CHECK(game.phase == BOX_ENDED && guard.failures == 0);
+    state_persist_clear();
+}
+
 /* A MOVE field frame: the field is on channel_hz now, revision rev (RFC 0001 Amendment 19). */
 static void move_frame(const uint8_t fkey[16], uint32_t channel_hz, uint32_t rev, uint8_t *keep,
                        size_t *keep_len)
@@ -2532,6 +2672,7 @@ void run_box_game_tests(void)
     test_lobby_refusals();
     test_lobby_replay_refused();
     test_lobby_game_over();
+    test_leave_by_hand();
     test_lobby_discover_and_ready_screen();
     test_lobby_move();
     test_lobby_device_id();

@@ -234,6 +234,61 @@ void box_game_end_by_field(box_game_t *g)
     if (g->phase == BOX_PLAYING || g->phase == BOX_JOINED) end_game(g);
 }
 
+bool box_game_can_leave(const box_game_t *g)
+{
+    return g->phase == BOX_JOINED || g->phase == BOX_PLAYING || g->phase == BOX_FETCHING;
+}
+
+bool box_game_leave(box_game_t *g, const char *how)
+{
+    if (!box_game_can_leave(g)) return false;
+    if (how == NULL || how[0] == '\0') how = "by hand";
+    if (g->phase == BOX_FETCHING) {
+        /* As a GAME_OVER for the game it fetches for: the fetch stops (cancelled, P5B-13). */
+        say(g, "game %u: left by hand at the box (%s): the mode fetch stops", g->join.game_id, how);
+        g->fetch_cancel = true;
+        return true;
+    }
+    say(g, "game %u: left by hand at the box (%s), as on a game over", g->join.game_id, how);
+    box_game_end_by_field(g);
+    return true;
+}
+
+bool box_game_leave_command(box_game_t *g, admin_pin_t *pin, bool open, const char *cmd,
+                            char *reply, size_t cap)
+{
+    static const char name[] = "leave";
+    size_t nl = sizeof(name) - 1;
+    if (strncmp(cmd, name, nl) != 0 || (cmd[nl] != ' ' && cmd[nl] != '\0')) return false;
+    if (!box_game_can_leave(g)) {
+        snprintf(reply, cap, "leave: refused (not in a game)");
+        return true;
+    }
+    char line[48], why[120];
+    bool ok = strlen(cmd) < sizeof(line);
+    if (ok) {
+        snprintf(line, sizeof(line), "%s", cmd);
+        ok = admin_pin_gate_serial(pin, open, line, 0, why, sizeof(why));
+    } else {
+        snprintf(why, sizeof(why), "refused: \"@leave <admin PIN>\"");
+    }
+    memset(line, 0, sizeof(line));
+    if (!ok) {
+        snprintf(reply, cap, "leave: %s", why);
+        return true;
+    }
+    uint16_t id = g->join.game_id;
+    bool fetching = g->phase == BOX_FETCHING;
+    box_game_leave(g, "console");
+    if (fetching) {
+        snprintf(reply, cap, "leave: game %u: the mode fetch stops", id);
+    } else {
+        snprintf(reply, cap, "leave: game %u is over on this box; it is free for the next game",
+                 id);
+    }
+    return true;
+}
+
 static void leave_game(box_game_t *g)
 {
     memset(g->link.proto.game_key, 0, sizeof(g->link.proto.game_key));
