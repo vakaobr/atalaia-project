@@ -36,6 +36,7 @@
 #include "mem_monitor.h"
 #include "mbedtls/ssl.h"
 #include "sdkconfig.h"
+#include "wifi_args.h"
 
 static const char *TAG = "fw_update";
 
@@ -131,7 +132,8 @@ static bool net_up(void *ctx)
     (void)ctx;
     char ssid[33] = "", pass[65] = "";
     if (!config_store_get_str("wifi_ssid", ssid, sizeof(ssid)) || ssid[0] == '\0') {
-        ESP_LOGW(TAG, "no field Wi-Fi set (the setup portal, or \"@wifi <ssid> <password>\")");
+        ESP_LOGW(TAG, "no field Wi-Fi set (the setup portal, or \"@wifi <ssid> <password>\", "
+                      "quoted for spaces)");
         return false;
     }
     config_store_get_str("wifi_pass", pass, sizeof(pass));
@@ -500,8 +502,8 @@ void fw_update_esp_offer(const char *params_json)
 
 bool fw_update_esp_set_wifi(const char *ssid, const char *password)
 {
-    size_t ns = strlen(ssid), np = strlen(password);
-    if (ns < 1 || ns > 32 || np > 64 || (np > 0 && np < 8)) return false;
+    size_t ns = strlen(ssid);
+    if (ns < 1 || ns > WIFI_SSID_MAX || !wifi_pass_valid(password)) return false;
     config_store_set_str("wifi_ssid", ssid);
     config_store_set_str("wifi_pass", password);
     return true;

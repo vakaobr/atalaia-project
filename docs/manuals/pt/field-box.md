@@ -228,7 +228,7 @@ As *Ligaduras* e o *Hackeia o terminal* não seguem a língua da caixa. Cada um 
 
 A organização pode atualizar o firmware de uma caixa pelo Wi-Fi do campo, entre jogos. Nada corre enquanto há um jogo a decorrer.
 
-1. A caixa precisa do **Nome do Wi-Fi do campo** e da **Palavra-passe do Wi-Fi do campo** (definidos na página de configuração, [secção 3](#3-primeira-configuração-caixa-nova)) e de um jogo a que se tenha juntado.
+1. A caixa precisa do **Nome do Wi-Fi do campo** e da **Palavra-passe do Wi-Fi do campo** (definidos na página de configuração, [secção 3](#3-primeira-configuração-caixa-nova), ou com `@wifi` na consola USB, os nomes com espaços entre aspas: [guia do firmware](firmware.md)) e de um jogo a que se tenha juntado.
 2. A organização carrega uma versão assinada no separador **Caixas** da consola (**Atualizações de firmware**) e depois carrega em **Atualizar todas as caixas** ou em **Atualizar para** *versão* numa caixa. A caixa descarrega-a, volta a verificar a assinatura, instala-a e reinicia.
 3. Se a versão nova falhar o autoteste, a caixa volta sozinha à antiga.
 4. A consola mostra **enviada, à espera da caixa**, **instalada, a reiniciar**, **concluída**, **falhou**, **revertida** ou **sem notícias da caixa**.

@@ -228,7 +228,7 @@ A box built with an **expansion port** (an M12 socket, [port guide](../../../har
 
 The organisers can update a box's firmware over the field's Wi-Fi, between games. Nothing runs while a game is on.
 
-1. The box needs the **Field Wi-Fi name** and **password** (set in the setup page, [section 3](#3-first-time-setup-new-box)) and a joined game.
+1. The box needs the **Field Wi-Fi name** and **password** (set in the setup page, [section 3](#3-first-time-setup-new-box), or with `@wifi` on the USB console, names with spaces in double quotes: [firmware guide](firmware.md)) and a joined game.
 2. The organisers upload a signed release in the console's **Boxes** tab (**Firmware updates**), then press **Update every box** or **Update to** *version* for one box. The box downloads it, checks the signature again, installs it and restarts.
 3. If the new version fails its self-test, the box goes back to the old one by itself.
 4. The console shows **sent, waiting for the box**, **installed, restarting**, **done**, **failed**, **rolled back** or **no news from the box**.

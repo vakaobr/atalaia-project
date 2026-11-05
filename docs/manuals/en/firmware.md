@@ -267,7 +267,7 @@ A box of another field asks for its **admin PIN**. **Change field** moves a box 
 
 ## 7. Updates over the air, and what else uses the field Wi-Fi
 
-Two things use the field's Wi-Fi, and only between games: **firmware updates** and **game modes the box does not have** (fetched from the controller as signed packages). For both the box needs the **field Wi-Fi name and password** from the setup page. You can also set them on the USB console: `@wifi <name> <password>`. The controller must be running with HTTPS on.
+Two things use the field's Wi-Fi, and only between games: **firmware updates** and **game modes the box does not have** (fetched from the controller as signed packages). For both the box needs the **field Wi-Fi name and password** from the setup page. You can also set them on the USB console: `@wifi <name> <password>`. A name or password with spaces goes in double quotes: `@wifi "My Field" "pass word"` (inside the quotes, `\"` is a quote and `\\` a backslash). The name is up to 32 bytes; the password is 8 to 63 characters, 64 hex digits, or none for an open network. The box answers `field Wi-Fi: stored (network "My Field")`, or `refused:` and why (a quote left open, for example), and then stores nothing. The controller must be running with HTTPS on.
 
 **The rules for firmware updates.** The box installs an update only if all of these are true:
 

@@ -66,6 +66,7 @@
 #include "expansion_box.h"
 #include "expansion_esp.h"
 #include "sound_esp.h"
+#include "wifi_args.h"
 #include "wifi_setup.h"
 
 #ifdef ESP_PLATFORM
@@ -389,7 +390,7 @@ static void serial_input_init(void)
 #endif
 #if CONFIG_ATALAIA_SERIAL_JOIN
     ESP_LOGI(TAG, "serial join on: \"@join atalaia:join:...\", \"@joinkey <hex> <admin PIN>\", "
-                  "\"@tag <uid> [<tag>]\", \"@wifi <ssid> <password>\", "
+                  "\"@tag <uid> [<tag>]\", \"@wifi <ssid> <password>\" (quotes for spaces), "
                   "\"@setup <PIN>\", \"@leave <admin PIN>\", "
                   "\"@update <version> <release id> <admin PIN>\", \"@modes\", \"@forgetmodes\" "
                   "or \"@lobby\" on the console");
@@ -571,20 +572,19 @@ static void serial_command(const char *cmd)
         }
         return;
     }
-    if (strncmp(cmd, "wifi ", 5) == 0) {
-        /* "@wifi <ssid> <password>": the field Wi-Fi firmware updates use (no spaces in the
-         * SSID here; the setup portal takes any). An open network: "@wifi <ssid>". */
-        char ssid[33] = "", pass[65] = "";
-        const char *sp = strchr(cmd + 5, ' ');
-        size_t n = sp ? (size_t)(sp - (cmd + 5)) : strlen(cmd + 5);
-        if (n >= 1 && n < sizeof(ssid)) {
-            memcpy(ssid, cmd + 5, n);
-            snprintf(pass, sizeof(pass), "%s", sp ? sp + 1 : "");
+    if (strcmp(cmd, "wifi") == 0 || strncmp(cmd, "wifi ", 5) == 0) {
+        /* "@wifi <ssid> <password>": the field Wi-Fi firmware updates use. A name or password
+         * with spaces in double quotes, \" and \\ inside: @wifi "My Field" "pass word"
+         * (wifi_args.h, decisions WIFI-1 to WIFI-9). An open network: "@wifi <ssid>". */
+        char ssid[WIFI_SSID_MAX + 1], pass[WIFI_PASS_MAX + 1];
+        wifi_args_result_t r = wifi_args_parse(cmd[4] ? cmd + 5 : "", ssid, pass);
+        if (r == WIFI_ARGS_OK && fw_update_esp_set_wifi(ssid, pass)) {
+            ESP_LOGI(TAG, "field Wi-Fi: stored (network \"%s\")", ssid);
+        } else {
+            ESP_LOGW(TAG, "field Wi-Fi: %s",
+                     wifi_args_error(r == WIFI_ARGS_OK ? WIFI_ARGS_PASSWORD_LENGTH : r));
         }
-        ESP_LOGI(TAG, "field Wi-Fi: %s",
-                 fw_update_esp_set_wifi(ssid, pass)
-                     ? "stored"
-                     : "refused (SSID 1-32 bytes, password 8-64 or none)");
+        memset(pass, 0, sizeof(pass));
         return;
     }
     if (strncmp(cmd, "update ", 7) == 0) {
