@@ -125,6 +125,20 @@ class Reinvite:
         self.inviter.tick(self.ctl.now_ms())  # the first one at once
         return True
 
+    def release(self, live_game: int, time_s: int) -> bool:
+        """RELEASE (RFC 0001 Amendment 28): every box in a game other than ``live_game`` (0: none) that it
+        joined before ``time_s`` leaves it, three times on the channel the modem is on (the field's, or
+        the live game's). False without a modem that carries field frames."""
+        modem = self.ctl.modem
+        if modem is None or not modem.is_up or not getattr(modem, "has_field_frames", False):
+            log.warning("no RELEASE sent (the radio modem is %s)", self.ctl.radio_state)
+            return False
+        self.inviter.release(live_game, time_s, self.ctl.now_ms())
+        log.warning("RELEASE: every box in a game other than %s that it joined before %d leaves it "
+                    "(%d times)", live_game or "none", time_s, lobby.RELEASE_REPEATS)
+        self.inviter.tick(self.ctl.now_ms())  # the first one at once
+        return True
+
     def field_moved(self, old_hz: int, new_hz: int, rev: int) -> bool:
         """The field's channel changed: says so on the old one (MOVE, three times, RFC 0001 Amendment
         19) before the modem goes to the new one, then asks the boxes there. False when it cannot

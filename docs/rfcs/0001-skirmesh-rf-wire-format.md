@@ -1032,6 +1032,26 @@ CMD opcode **9, `update`**: the controller offers a box a firmware release. Its 
 
 **Reason:** found on the bench on 2026-11-05: a box switched off when its game ended (a dead battery, in a real game) never hears the three GAME_OVERs, comes back still in the game and refuses every join; only erasing it over USB freed it. The modem dropped that game's packets before the controller could see them (another game, or no game configured), so the controller could not tell.
 
+## Amendment 28 (2026-11-05, proposed): RELEASE, a field frame that frees every box not in the live game
+
+**Status:** proposed and built with decisions STUCK-50 to STUCK-59 (the maintainer's brief of 2026-11-05, "part 2 after 1 and 3"); for review.
+
+**Supersedes:** nothing. It adds kind 6 to Amendment 7's field frames ([protocol/field-frames.md](../../protocol/field-frames.md)), which decoders refused until now.
+
+**Change:**
+
+1. **RELEASE** (field frame kind 6, sealed with the field join key like every field frame, with the field frame nonce of RJ-15): key 4 `live_game` (0-65534, 0 when no game is live) and key 5 `time` (1-4294967295, the sender's wall clock in Unix seconds), both required.
+2. **The box** keeps, for the game it is in, the wall clock (`wall_s`) of the first TIME it took in that game (a TIME that passed the game key's MIC, the replay window and Amendment 23's ordering), in NVS beside the game key's tag, written once per game, so it survives a reboot into the game. It ends its game as on a matching GAME_OVER (the mode's game over, announcing itself, the game kept as played to its end, BN-10 to BN-13 and BN-19) when, and only when, it is in a game (joined or playing), `live_game` is 0 or another game id, it has that join time, and `time` is greater than it (unsigned 32-bit comparison). Anything else changes nothing and is logged.
+3. **The controller** sends it only on the GM's word, three times 4 s apart on the channel the modem is on, never from a standby, never while its wall clock is implausible (CLK-2), at most once in 30 s.
+
+**The replay rule, exactly:** a RELEASE is fresh for a box when its `time` is after that box's join of its current game, as measured by the first TIME of that game. A RELEASE recorded at T and played back later is therefore refused by every box that has joined a game since T, and can free only a box that was already in a game, other than the one it names, when it was sent: one the original was meant to free. It needs no counter on the box and nothing stored on the controller (which, by design, has lost its records). MOVE's rising revision does not fit: a lost database loses the revision too, and a box in a game ignores MOVE.
+
+**Compatibility:** framing and the field frame version stay 1. A box from before refuses kind 6 as unknown and stays in its game (its admin menu's *Leave the game* or `@leave` take it out, STUCK-20 to STUCK-33). The USB modem passes field frames as they are and needs no change. The Android field controller decodes kind 6 (the shared vectors) but does not send it yet.
+
+**Security:** forging needs the join key, whose holder can already do worse. A replay is bounded by the rule above. The join time comes from the game controller's clock: one far behind (a Raspberry Pi at 1970) weakens the replay rule for its boxes, one far ahead makes them refuse until the releasing clock passes it. A RELEASE also frees the boxes of a game a second controller of the same field runs at the same time on the same channel: it is a confirmed GM action, never automatic. Air: three frames of about 87 ms.
+
+**Reason:** GAME_OVER (Amendment 7's addendum) and its resend (Amendment 27) name a game by its key's tag, which the controller keeps. A controller reinstalled or with its database lost has neither the game nor its tag, and its stuck boxes could only be taken out one by one at the box.
+
 ## Open questions
 
 - Per-node session keys (HKDF-derived from the game key) would limit

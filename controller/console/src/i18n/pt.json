@@ -1493,25 +1493,42 @@
     "pending_note_one": "Há {n} réplica declarada por cronografar.",
     "back": "Voltar"
   },
-    "stuck": {
-      "title": "Presas num jogo terminado",
-      "intro": "Estas caixas foram ouvidas ainda num jogo que já terminou (estavam desligadas quando acabou). O controlador volta a enviar o GAME_OVER desse jogo no máximo uma vez por minuto; Libertar envia-o agora.",
-      "empty": "Nenhuma caixa ouvida ainda num jogo terminado.",
-      "no_watch": "O modem de rádio não consegue dizer que caixas ficaram num jogo terminado: atualiza o seu firmware. Até lá, tira a caixa do jogo na própria caixa: mantém * premido 3 s para o menu de administração, “Sair do jogo”, ou escreve @leave <PIN de administração> na sua consola USB.",
-      "game": "Jogo",
-      "nodes": "Nós ouvidos",
-      "signal": "Sinal",
-      "resent": "Reenvios",
-      "release": "Libertar",
-      "release_hint": "Enviar já o GAME_OVER deste jogo, para que as suas caixas saiam dele",
-      "released": "GAME_OVER de “{game}” enviado: as caixas saem do jogo e anunciam-se livres.",
-      "not_released": "GAME_OVER de “{game}” não enviado: {why}.",
-      "why": {
-        "no_radio": "o modem de rádio não está ligado ou não transporta tramas de campo",
-        "no_join_key": "este controlador não tem a chave de entrada do campo",
-        "no_tag": "o controlador não guardou a etiqueta da chave desse jogo"
-      }
-    },
+  "stuck": {
+    "title": "Presas num jogo terminado",
+    "intro": "Estas caixas foram ouvidas ainda num jogo que já terminou (estavam desligadas quando acabou). O controlador volta a enviar o GAME_OVER desse jogo no máximo uma vez por minuto; Libertar envia-o agora.",
+    "empty": "Nenhuma caixa ouvida ainda num jogo terminado.",
+    "no_watch": "O modem de rádio não consegue dizer que caixas ficaram num jogo terminado: atualiza o seu firmware. Até lá, tira a caixa do jogo na própria caixa: mantém * premido 3 s para o menu de administração, “Sair do jogo”, ou escreve @leave <PIN de administração> na sua consola USB.",
+    "game": "Jogo",
+    "nodes": "Nós ouvidos",
+    "signal": "Sinal",
+    "resent": "Reenvios",
+    "release": "Libertar",
+    "release_hint": "Enviar já o GAME_OVER deste jogo, para que as suas caixas saiam dele",
+    "released": "GAME_OVER de “{game}” enviado: as caixas saem do jogo e anunciam-se livres.",
+    "not_released": "GAME_OVER de “{game}” não enviado: {why}.",
+    "why": {
+      "no_radio": "o modem de rádio não está ligado ou não transporta tramas de campo",
+      "no_join_key": "este controlador não tem a chave de entrada do campo",
+      "no_tag": "o controlador não guardou a etiqueta da chave desse jogo"
+    }
+  },
+  "release_all": {
+    "title": "Caixas que ficaram num jogo perdido",
+    "intro": "Para um controlador que perdeu um jogo (reinstalado, ou com os dados perdidos): nenhum GAME_OVER consegue nomear esse jogo, e as caixas ficam nele. Libertar diz a todas as caixas deste campo, neste canal, que estejam num jogo que não seja “{game}” para saírem dele, como num fim de jogo. Uma caixa que tenha entrado no seu jogo depois de agora não é afetada.",
+    "intro_none": "Para um controlador que perdeu um jogo (reinstalado, ou com os dados perdidos): nenhum GAME_OVER consegue nomear esse jogo, e as caixas ficam nele. Sem nenhum jogo a decorrer, Libertar diz a todas as caixas deste campo, neste canal, que estejam num jogo para saírem dele, como num fim de jogo. Uma caixa que tenha entrado no seu jogo depois de agora não é afetada.",
+    "button": "Libertar todas as caixas que não estão neste jogo",
+    "button_none": "Libertar todas as caixas que estão num jogo",
+    "question": "Libertar todas as caixas deste campo que estão noutro jogo?",
+    "warning": "Os jogos delas terminam de vez. Um jogo feito ao mesmo tempo por outro controlador deste campo, neste canal, também perde as suas caixas.",
+    "yes": "Libertar",
+    "back": "Voltar",
+    "sent": "RELEASE enviado: as caixas noutro jogo saem dele e anunciam-se livres.",
+    "not_sent": "RELEASE não enviado: {why}.",
+    "why": {
+      "no_radio": "o modem de rádio não está ligado ou não transporta tramas de campo",
+      "no_join_key": "este controlador não tem a chave de entrada do campo"
+    }
+  },
   "clock": {
     "wrong": "O relógio do controlador está errado.",
     "reason_before_release": "Indica {now}, antes de esta versão do programa existir ({floor}). Um Raspberry Pi 4 não tem relógio próprio e, depois de um corte de energia, arranca com uma hora antiga.",

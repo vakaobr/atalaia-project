@@ -567,6 +567,7 @@ static void show_waiting(box_game_t *g)
 }
 
 static bool link_up(box_game_t *g, const atalaia_join_t *j, bool fresh);
+static void load_join_time(box_game_t *g, bool fresh);
 static bool wants_fetch(const box_game_t *g, const atalaia_join_t *j);
 static box_join_result_t start_fetch(box_game_t *g, const atalaia_join_t *j, const uint8_t *payload,
                                      size_t len);
@@ -605,6 +606,7 @@ static box_join_result_t apply(box_game_t *g, const atalaia_join_t *j, const uin
         mode_store_touch(j->mode_id); /* its fetched parts: the most recently used (P5B-15) */
     }
     if (!link_up(g, j, fresh)) return BOX_JOIN_RADIO;
+    load_join_time(g, fresh);
     g->preset_index = index;
     g->phase = BOX_JOINED;
     g->paused = false;
@@ -614,6 +616,41 @@ static box_join_result_t apply(box_game_t *g, const atalaia_join_t *j, const uin
         g->link.proto.epoch);
     show_waiting(g);
     return BOX_JOIN_OK;
+}
+
+/* When the box joined its game (RFC 0001 Amendment 28): unknown for a new join until its first
+ * TIME; after a reboot, what the store kept for this game (its key's tag), if anything. */
+static void load_join_time(box_game_t *g, bool fresh)
+{
+    if (fresh || g->store.load_join_time == NULL) return;
+    uint8_t tag[ATALAIA_FF_TAG_SIZE], kept[ATALAIA_FF_TAG_SIZE];
+    uint32_t wall = 0;
+    if (g->store.load_join_time(g->store.ctx, kept, &wall) != 0) return;
+    atalaia_radio_epoch_tag(g->join.game_key, tag);
+    if (memcmp(tag, kept, sizeof(tag)) == 0) g->join_wall_s = wall;
+    memset(tag, 0, sizeof(tag));
+}
+
+/* The first TIME of the game gives its join's wall clock, stored once (RFC 0001 Amendment 28). */
+static void keep_join_time(box_game_t *g)
+{
+    if (g->join_wall_s != 0 || g->link.first_wall_s == 0 ||
+        (g->phase != BOX_JOINED && g->phase != BOX_PLAYING)) {
+        return;
+    }
+    g->join_wall_s = g->link.first_wall_s;
+    if (g->store.save_join_time == NULL) return;
+    uint8_t tag[ATALAIA_FF_TAG_SIZE];
+    atalaia_radio_epoch_tag(g->join.game_key, tag);
+    if (g->store.save_join_time(g->store.ctx, tag, g->join_wall_s) != 0) {
+        say(g, "the game's join time could not be stored (a RELEASE is refused after a reboot)");
+    }
+    memset(tag, 0, sizeof(tag));
+}
+
+uint32_t box_game_join_time(const box_game_t *g)
+{
+    return g->join_wall_s;
 }
 
 /* HELLO's capability type ids: the shell's, `hit` while a module has a hit channel and `output`
@@ -642,6 +679,7 @@ static void fill_caps(box_game_t *g)
 static bool link_up(box_game_t *g, const atalaia_join_t *j, bool fresh)
 {
     if (j != &g->join) g->join = *j; /* after a fetch, the join is g->join itself */
+    g->join_wall_s = 0;              /* known at its first TIME (RFC 0001 Amendment 28) */
     take_language(g, j);
     for (uint8_t t = 0; t < j->team_count; t++) g->teams[t] = g->join.teams[t];
     if (g->shell.set_channel != NULL && !g->shell.set_channel(g->shell.user, j->channel_hz)) {
@@ -1072,6 +1110,7 @@ void box_game_tick(box_game_t *g, uint32_t raw_delta_ms, uint32_t now_ms)
         node_runner_tick(g->runner, field_link_adjust_delta(&g->link, raw_delta_ms));
     }
     field_link_tick(&g->link, now_ms);
+    keep_join_time(g);
     if (g->phase != BOX_ENDED) {
         if (!g->stats_on) {
             g->stats_on = true;

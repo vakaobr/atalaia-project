@@ -8,7 +8,9 @@ payload, protocol/join.md, in one to three parts, for the box's device id and
 the token of its last announcement), and says that a game is over (GAME_OVER:
 the game id and its key's tag, for a controller that lost the game's key;
 decision OT-13), and says that the field has moved to another channel (MOVE: the new channel
-and a revision that only rises, RFC 0001 Amendment 19). On air::
+and a revision that only rises, RFC 0001 Amendment 19), and frees every box in a game other than
+the live one (RELEASE: the live game id or 0, and the controller's wall clock, for a controller that
+lost the game entirely; RFC 0001 Amendment 28, proposed). On air::
 
     header (9: game_id 0, source 0, seq 0, hop_limit 0, type 9) | nonce (13) | body | MIC (8)
 
@@ -51,8 +53,9 @@ TAG_SIZE = 8  # a game key's tag: HMAC-SHA256(game key, "atalaia epoch tag")[:8]
 BOOT_MAX = 0xFFFFFF
 CTR_MAX = 0xFFFF
 
-ANNOUNCE, DISCOVER, INVITE, GAME_OVER, MOVE = 1, 2, 3, 4, 5
-KINDS = {"announce": ANNOUNCE, "discover": DISCOVER, "invite": INVITE, "game_over": GAME_OVER, "move": MOVE}
+ANNOUNCE, DISCOVER, INVITE, GAME_OVER, MOVE, RELEASE = 1, 2, 3, 4, 5, 6
+KINDS = {"announce": ANNOUNCE, "discover": DISCOVER, "invite": INVITE, "game_over": GAME_OVER, "move": MOVE,
+         "release": RELEASE}
 KIND_NAMES = {v: k for k, v in KINDS.items()}
 
 # What a box answers to an invite (ANNOUNCE key 10).
@@ -65,6 +68,7 @@ K_NAME, K_TIER, K_LAST_GAME, K_LAST_ROLE, K_BATTERY, K_ANSWER, K_RESULT = 4, 5, 
 K_INVITE, K_PART, K_PARTS, K_CHUNK = 4, 5, 6, 7
 K_GAME, K_KEY_TAG = 4, 5
 K_CHANNEL, K_REV = 4, 5  # MOVE: the field's new channel (Hz) and its revision
+K_LIVE_GAME, K_TIME = 4, 5  # RELEASE: the live game (0: none) and the sender's wall clock (Unix seconds)
 KNOWN_KEYS = set(range(1, 11))  # a key another kind uses is not an "unknown" one
 
 _HEADER = Header(vf_make(1, 1, False, True), 0, 0, 0, 0, FIELD_TYPE)
@@ -199,6 +203,11 @@ def validate(msg: dict[str, Any]) -> dict[str, Any]:
             raise FieldFrameError("game_id: 1-65534")
         if not _fixed(msg.get("key_tag"), TAG_SIZE):
             raise FieldFrameError("key_tag: 8 bytes")
+    elif kind == "release":
+        if not _uint(msg.get("live_game"), 0, 0xFFFE):
+            raise FieldFrameError("live_game: 0-65534")
+        if not _uint(msg.get("time"), 1, 0xFFFFFFFF):
+            raise FieldFrameError("time: 1-4294967295")
     elif kind == "move":
         if not _uint(msg.get("channel_hz"), 1, 0xFFFFFFFF):
             raise FieldFrameError("channel_hz: 1-4294967295")
@@ -241,6 +250,8 @@ def body_encode(msg: dict[str, Any]) -> bytes:
         out.update({K_GAME: msg["game_id"], K_KEY_TAG: bytes(msg["key_tag"])})
     elif kind == "move":
         out.update({K_CHANNEL: msg["channel_hz"], K_REV: msg["rev"]})
+    elif kind == "release":
+        out.update({K_LIVE_GAME: msg["live_game"], K_TIME: msg["time"]})
     body = cbor.encode(out)
     if len(body) > BODY_MAX:
         raise FieldFrameError(f"body of {len(body)} bytes; at most {BODY_MAX}")
@@ -252,6 +263,7 @@ _ANNOUNCE_KEYS = {K_KIND, K_DEVICE, K_TOKEN, K_NAME, K_TIER, K_LAST_GAME, K_LAST
 _INVITE_KEYS = {K_KIND, K_DEVICE, K_TOKEN, K_INVITE, K_PART, K_PARTS, K_CHUNK}
 _GAME_OVER_KEYS = {K_KIND, K_GAME, K_KEY_TAG}
 _MOVE_KEYS = {K_KIND, K_CHANNEL, K_REV}
+_RELEASE_KEYS = {K_KIND, K_LIVE_GAME, K_TIME}
 
 
 def body_decode(data: bytes) -> dict[str, Any]:
@@ -268,7 +280,7 @@ def body_decode(data: bytes) -> dict[str, Any]:
         raise FieldFrameError("the kind comes first")
     kind = KIND_NAMES.get(raw[K_KIND])
     allowed = {"announce": _ANNOUNCE_KEYS, "discover": {K_KIND}, "invite": _INVITE_KEYS,
-               "game_over": _GAME_OVER_KEYS, "move": _MOVE_KEYS}.get(kind or "")
+               "game_over": _GAME_OVER_KEYS, "move": _MOVE_KEYS, "release": _RELEASE_KEYS}.get(kind or "")
     if allowed is None:
         raise FieldFrameError(f"unknown kind {raw[K_KIND]}")
     for k in raw:
@@ -305,6 +317,11 @@ def body_decode(data: bytes) -> dict[str, Any]:
             msg[name] = raw[key]
     elif kind == "move":
         for key, name in ((K_CHANNEL, "channel_hz"), (K_REV, "rev")):
+            if key not in raw:
+                raise FieldFrameError(f"missing key {key}")
+            msg[name] = raw[key]
+    elif kind == "release":
+        for key, name in ((K_LIVE_GAME, "live_game"), (K_TIME, "time")):
             if key not in raw:
                 raise FieldFrameError(f"missing key {key}")
             msg[name] = raw[key]

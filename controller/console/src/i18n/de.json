@@ -1493,25 +1493,42 @@
     "pending_note_one": "{n} angemeldete Replik noch nicht gechront.",
     "back": "Zurück"
   },
-    "stuck": {
-      "title": "In einem beendeten Spiel hängengeblieben",
-      "intro": "Diese Boxen wurden noch in einem Spiel gehört, das vorbei ist (sie waren ausgeschaltet, als es endete). Der Controller sendet das GAME_OVER dieses Spiels höchstens einmal pro Minute erneut; Freigeben sendet es sofort.",
-      "empty": "Keine Box in einem beendeten Spiel gehört.",
-      "no_watch": "Das Funkmodem kann Boxen in einem beendeten Spiel nicht melden: Aktualisiere seine Firmware. Bis dahin nimm eine solche Box an der Box selbst aus dem Spiel: * 3 s lang halten für „Spiel verlassen“ im Admin-Menü, oder @leave <Admin-PIN> auf ihrer USB-Konsole eingeben.",
-      "game": "Spiel",
-      "nodes": "Gehörte Knoten",
-      "signal": "Signal",
-      "resent": "Erneut gesendet",
-      "release": "Freigeben",
-      "release_hint": "Das GAME_OVER dieses Spiels jetzt senden, damit seine Boxen es verlassen",
-      "released": "GAME_OVER von „{game}“ gesendet: Seine Boxen verlassen das Spiel und melden sich frei.",
-      "not_released": "GAME_OVER von „{game}“ nicht gesendet: {why}.",
-      "why": {
-        "no_radio": "das Funkmodem ist nicht verbunden oder überträgt keine Feld-Frames",
-        "no_join_key": "dieser Controller hat keinen Beitrittsschlüssel des Felds",
-        "no_tag": "der Controller hat für dieses Spiel kein Schlüssel-Tag behalten"
-      }
-    },
+  "stuck": {
+    "title": "In einem beendeten Spiel hängengeblieben",
+    "intro": "Diese Boxen wurden noch in einem Spiel gehört, das vorbei ist (sie waren ausgeschaltet, als es endete). Der Controller sendet das GAME_OVER dieses Spiels höchstens einmal pro Minute erneut; Freigeben sendet es sofort.",
+    "empty": "Keine Box in einem beendeten Spiel gehört.",
+    "no_watch": "Das Funkmodem kann Boxen in einem beendeten Spiel nicht melden: Aktualisiere seine Firmware. Bis dahin nimm eine solche Box an der Box selbst aus dem Spiel: * 3 s lang halten für „Spiel verlassen“ im Admin-Menü, oder @leave <Admin-PIN> auf ihrer USB-Konsole eingeben.",
+    "game": "Spiel",
+    "nodes": "Gehörte Knoten",
+    "signal": "Signal",
+    "resent": "Erneut gesendet",
+    "release": "Freigeben",
+    "release_hint": "Das GAME_OVER dieses Spiels jetzt senden, damit seine Boxen es verlassen",
+    "released": "GAME_OVER von „{game}“ gesendet: Seine Boxen verlassen das Spiel und melden sich frei.",
+    "not_released": "GAME_OVER von „{game}“ nicht gesendet: {why}.",
+    "why": {
+      "no_radio": "das Funkmodem ist nicht verbunden oder überträgt keine Feld-Frames",
+      "no_join_key": "dieser Controller hat keinen Beitrittsschlüssel des Felds",
+      "no_tag": "der Controller hat für dieses Spiel kein Schlüssel-Tag behalten"
+    }
+  },
+  "release_all": {
+    "title": "Boxen in einem verlorenen Spiel",
+    "intro": "Für einen Controller, der ein Spiel verloren hat (neu installiert oder seine Daten verloren): Kein GAME_OVER kann dieses Spiel benennen, also bleiben seine Boxen darin. Freigeben sagt jeder Box dieses Felds auf diesem Kanal, die in einem anderen Spiel als „{game}“ ist, dass sie es verlassen soll, wie bei einem Spielende. Eine Box, die ihr Spiel nach jetzt betreten hat, ist nicht betroffen.",
+    "intro_none": "Für einen Controller, der ein Spiel verloren hat (neu installiert oder seine Daten verloren): Kein GAME_OVER kann dieses Spiel benennen, also bleiben seine Boxen darin. Ohne laufendes Spiel sagt Freigeben jeder Box dieses Felds auf diesem Kanal, die in einem Spiel ist, dass sie es verlassen soll, wie bei einem Spielende. Eine Box, die ihr Spiel nach jetzt betreten hat, ist nicht betroffen.",
+    "button": "Alle Boxen freigeben, die nicht in diesem Spiel sind",
+    "button_none": "Alle Boxen in einem Spiel freigeben",
+    "question": "Alle Boxen dieses Felds freigeben, die in einem anderen Spiel sind?",
+    "warning": "Ihre Spiele enden für sie endgültig. Ein Spiel, das gleichzeitig ein anderer Controller dieses Felds auf diesem Kanal führt, verliert seine Boxen ebenfalls.",
+    "yes": "Freigeben",
+    "back": "Zurück",
+    "sent": "RELEASE gesendet: Boxen in einem anderen Spiel verlassen es und melden sich frei.",
+    "not_sent": "RELEASE nicht gesendet: {why}.",
+    "why": {
+      "no_radio": "das Funkmodem ist nicht verbunden oder überträgt keine Feld-Frames",
+      "no_join_key": "dieser Controller hat keinen Beitrittsschlüssel des Felds"
+    }
+  },
   "clock": {
     "wrong": "Die Uhr des Controllers geht falsch.",
     "reason_before_release": "Sie zeigt {now}, also vor der Veröffentlichung dieser Software ({floor}). Ein Raspberry Pi 4 hat keine eigene Uhr und startet nach einem Stromausfall mit einer alten Zeit.",

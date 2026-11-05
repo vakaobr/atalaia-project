@@ -24,6 +24,7 @@ import { ClockBanner, ClockSettings } from './components/clock-settings.js';
 import { MapFetchingSettings } from './components/map-fetching-settings.js';
 import { FirmwarePanel } from './components/firmware-panel.js';
 import { StuckBoxes } from './components/stuck-boxes.js';
+import { ReleaseBoxes } from './components/release-boxes.js';
 import { PodConfigPanel } from './components/pod-config-panel.js';
 import { FetchedModes } from './components/fetched-modes.js';
 import { ModePackages } from './components/mode-packages.js';
@@ -617,7 +618,7 @@ class App extends Component {
         case 'controller':
             return html`<${ControllerPanel} app=${this} />${this.state.role === 'gm' && html`<${RemoteGmLog} app=${this} />`}`;
         case 'settings':
-            return html`${this.serves('radio') && html`<${RadioSettings} app=${this} />`}<${ClockSettings} app=${this} /><${BoxLanguageSettings} app=${this} /><${MapFetchingSettings} app=${this} />${
+            return html`${this.serves('radio') && html`<${RadioSettings} app=${this} />`}<${ReleaseBoxes} app=${this} /><${ClockSettings} app=${this} /><${BoxLanguageSettings} app=${this} /><${MapFetchingSettings} app=${this} />${
                 this.state.role === 'gm' && this.serves('checkin') && html`<${PosterPromptSetting} />`}${
                 this.serves('branding') && html`<${BrandingSettings} app=${this} />`}${
                 this.serves('presets') && html`<${TeamPresets} app=${this} />`}<${AccessTokens} app=${this} />`;

@@ -476,6 +476,30 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("stuck-no-watch")).to_contain_text("update its firmware")
         expect(page.get_by_test_id("stuck-no-watch")).to_contain_text("@leave")
 
+    def test_release_every_box_not_in_this_game(self):
+        """RFC 0001 Amendment 28 (decisions STUCK-50 to STUCK-59): for a controller that lost a game, Settings
+        has "Release every box not in this game"; it asks first (Back changes nothing), then the controller
+        sends RELEASE through the C host modem, sealed with the field key, naming the live game."""
+        game = self.field.create_game("Domingo")
+        page = self.console()
+        page.get_by_test_id("lang").select_option("en")
+        page.get_by_test_id("tab-settings").click()
+        box = page.get_by_test_id("release-all")
+        expect(box).to_contain_text("other than “Domingo”")
+        page.get_by_test_id("release-all-open").click()
+        expect(page.get_by_test_id("release-all-confirm")).to_contain_text("Release every box of this field")
+        page.get_by_test_id("release-all-back").click()
+        expect(page.get_by_test_id("release-all-confirm")).to_have_count(0)
+        self.field.host.transmitted_all()
+        page.get_by_test_id("release-all-open").click()
+        page.get_by_test_id("release-all-yes").click()
+        expect(page.get_by_test_id("toast")).to_contain_text("RELEASE sent")
+        fkey = ff.field_key(JOIN_KEY)
+        sent = [ff.decode(fkey, f) for f in self.field.host.transmitted_all(0.5) if ff.is_frame(f)]
+        releases = [m for m in sent if m["kind"] == "release"]
+        self.assertTrue(releases)
+        self.assertEqual(releases[0]["live_game"], game["id"])
+
     def ready_game_with_the_dialog(self, lang: str = "en", **spec):
         """A Hold-All game (min_zones 2 by default) waiting for its zone box (node 7), and the
         console with the invite dialog open."""
@@ -4716,7 +4740,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v20').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v21').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js", "/console/labels.js", "/console/qr-svg.js"):

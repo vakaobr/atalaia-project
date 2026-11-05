@@ -180,6 +180,35 @@ class ReinviteSimTests(unittest.TestCase):
         self.run_for(21_000)
         self.assertEqual([(b.name, b.last_game) for b in self.inviter.available(self.now)], [("Zona Norte", 1)])
 
+    def test_release_frees_a_box_of_a_lost_game_and_a_replay_does_not(self):
+        """RFC 0001 Amendment 28: a controller that lost the game (a new database) names only the live game
+        and its clock; a box in another game it joined before then leaves it and announces itself. The
+        same RELEASE played back once the box is in a newer game is older than that join: nothing."""
+        self.assertEqual(self.box.join(join_payload(1, self.key1, 4)), "accepted")
+        self.box.start()
+        self.box.heard_time(1_793_000_000)
+        self.run_for(1_000)
+        self.inviter.release(1, 1_793_000_500, self.now)  # its own game is the live one: stays
+        self.run_for(13_000)
+        self.assertEqual(self.box.phase, "playing")
+        start = len(self.sent)
+        rel = self.inviter.release(9, 1_793_000_600, self.now)
+        self.run_for(500)
+        self.assertEqual(self.box.phase, "ended")
+        self.assertIn("game 1 released by a field controller (live game 9)", self.box.log)
+        recorded = self.sent[start]
+        self.run_for(12_000)
+        self.assertEqual((rel.sent, len(self.sent) - start, self.inviter.releases), (lobby.RELEASE_REPEATS, 3, []))
+        self.run_for(21_000)
+        self.assertEqual([(b.name, b.last_game) for b in self.inviter.available(self.now)], [("Zona Norte", 1)])
+        # A newer game; the recording played back changes nothing.
+        self.assertEqual(self.box.join(join_payload(2, self.key2, 4)), "accepted")
+        self.box.start()
+        self.box.heard_time(1_793_001_000)
+        self.box.on_frame(recorded, self.now)
+        self.assertEqual(self.box.phase, "playing")
+        self.assertIn("release refused", self.box.log[-1])
+
     def test_the_same_game_again_is_refused(self):
         """A box that played a game to its end does not join it again, even with a valid token."""
         self.play_first_game()

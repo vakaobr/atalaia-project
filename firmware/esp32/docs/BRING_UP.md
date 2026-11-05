@@ -508,6 +508,13 @@ and two boards at least 1 m apart, both antennas fitted.
    (`@lobby` shows the same device id). On a box with a keypad, the same from the admin
    menu: hold `*` 3 s during the game, the admin PIN and `#`, *Leave the game*, `#`, `#`.
    A release build counts a wrong PIN in `@leave <wrong>` (`refused: admin PIN (wrong)`).
+8. A box stuck in a lost game (RFC 0001 Amendment 28, decisions STUCK-50 to STUCK-59): join
+   the box, start the game and wait for a TIME (`@lobby` shows `joined at` with the Unix time),
+   switch the box off, stop the controller, move its database away and start it again (a new
+   database, the same field join key), switch the box on: back in the game. In the console's
+   *Settings*, *Release every box not in this game*, confirm: the box's log shows `game <id>
+   released by a field controller (live game 0)`, then the mode's game over and Ready, and the
+   console lists it as a free box. A second RELEASE within 30 s is refused (429).
 
 ## Step 10b2: Invited into the next game over the radio (two boards on the desk)
 

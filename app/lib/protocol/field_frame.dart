@@ -66,6 +66,7 @@ const _kinds = {
   'invite': 3,
   'game_over': 4,
   'move': 5,
+  'release': 6,
 };
 final _kindNames = {for (final e in _kinds.entries) e.value: e.key};
 
@@ -77,6 +78,9 @@ const _kInvite = 4, _kPart = 5, _kParts = 6, _kChunk = 7;
 const _kGame = 4, _kKeyTag = 5;
 // MOVE (RFC 0001 Amendment 19): the field's new channel (Hz) and a revision.
 const _kChannel = 4, _kRev = 5;
+// RELEASE (RFC 0001 Amendment 28, proposed): the live game (0: none) and the
+// sender's wall clock in Unix seconds.
+const _kLiveGame = 4, _kTime = 5;
 
 /// The header every field frame carries: version 1, normal priority, no
 /// ACK, encrypted (0x2A), game 0, source 0, seq 0, hop_limit 0, type 9.
@@ -254,6 +258,13 @@ Map<String, Object?> validateFieldMessage(Map<String, Object?> msg) {
       if (!_fixed(msg['key_tag'], ffTagSize)) {
         throw FieldFrameException('key_tag: 8 bytes');
       }
+    case 'release':
+      if (!_uint(msg['live_game'], 0, 0xfffe)) {
+        throw FieldFrameException('live_game: 0-65534');
+      }
+      if (!_uint(msg['time'], 1, 0xffffffff)) {
+        throw FieldFrameException('time: 1-4294967295');
+      }
     case 'move':
       if (!_uint(msg['channel_hz'], 1, 0xffffffff)) {
         throw FieldFrameException('channel_hz: 1-4294967295');
@@ -320,6 +331,9 @@ Uint8List encodeFieldBody(Map<String, Object?> msg) {
     case 'move':
       out[_kChannel] = msg['channel_hz'];
       out[_kRev] = msg['rev'];
+    case 'release':
+      out[_kLiveGame] = msg['live_game'];
+      out[_kTime] = msg['time'];
   }
   final body = cborEncode(out);
   if (body.length > ffBodyMax) {
@@ -353,6 +367,7 @@ const _inviteKeys = {
 };
 const _gameOverKeys = {_kKind, _kGame, _kKeyTag};
 const _moveKeys = {_kKind, _kChannel, _kRev};
+const _releaseKeys = {_kKind, _kLiveGame, _kTime};
 
 /// Reads a body as the C decoder does (refusing what it refuses).
 Map<String, Object?> decodeFieldBody(List<int> data) {
@@ -382,6 +397,7 @@ Map<String, Object?> decodeFieldBody(List<int> data) {
     'invite' => _inviteKeys,
     'game_over' => _gameOverKeys,
     'move' => _moveKeys,
+    'release' => _releaseKeys,
     _ => null,
   };
   if (allowed == null) throw FieldFrameException('unknown kind ${raw[_kKind]}');
@@ -434,6 +450,9 @@ Map<String, Object?> decodeFieldBody(List<int> data) {
     case 'move':
       need(_kChannel, 'channel_hz');
       need(_kRev, 'rev');
+    case 'release':
+      need(_kLiveGame, 'live_game');
+      need(_kTime, 'time');
   }
   return validateFieldMessage(msg);
 }
