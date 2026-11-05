@@ -76,6 +76,8 @@ Um telemóvel pode ser o controlador de um jogo pequeno, sem Raspberry Pi. Só A
 
 Se pararem e voltarem a arrancar o controlador, um jogo em curso continua.
 
+Um telemóvel controlador liberta uma caixa presa num jogo terminado tal como um Raspberry Pi (a lista **Presas num jogo terminado** do separador **Caixas** e os botões **Libertar**, mais abaixo), mas só com um modem de rádio USB com o firmware desta versão: um módulo de E/S não consegue dizer que caixas ficaram presas. Se não conseguir, o ecrã do telemóvel di-lo em **Rádio**; tira essa caixa do jogo na própria caixa. Ainda não experimentado em hardware.
+
 ### O Wi-Fi do campo
 
 Os telemóveis de quem joga, a consola e os dispositivos de jogo Android usam todos uma rede Wi-Fi do campo. Não precisa de internet. Usa um router, o hotspot de um telemóvel ou a rede que o telemóvel controlador cria. Põe o nome dela no cartaz (`wifi_ssid` num Pi, ou **Nome da rede Wi-Fi do campo** no formulário **Cartaz de check-in** do separador **Check-in**).

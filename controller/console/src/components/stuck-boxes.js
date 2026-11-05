@@ -10,8 +10,9 @@
 // GAME_OVER was sent again, with a Release button that sends it now
 // (POST /api/v1/boxes/stuck/{game}/release). A modem that cannot report them (`stuck_watch` false)
 // gets a hint: update its firmware, and take such a box out at the box (the admin menu's "Leave the
-// game", or @leave). A controller that does not report them at all (no `stuck_watch`: an older Pi,
-// a phone controller) shows nothing.
+// game", or @leave). A controller that does not report them at all (no `stuck_watch`: an older Pi or
+// phone controller) shows nothing; a phone controller reports them since STUCK-60 (with an I/O pod
+// as its radio, `stuck_watch` is false).
 
 import { html, Component, t } from '../ui.js';
 

@@ -76,6 +76,8 @@ A phone can be the controller of a small game, with no Raspberry Pi. Android onl
 
 If you stop and start the controller, a live game goes on.
 
+A phone controller frees a box stuck in an ended game as a Raspberry Pi does (the **Boxes** tab's **Stuck in an ended game** list and the **Release** buttons, below), but only with a USB radio modem on this release's firmware: an I/O pod cannot report such boxes. If it cannot, the phone's screen says so under **Radio**; take such a box out at the box. Not yet tried on hardware.
+
 ### The field's Wi-Fi
 
 Players' phones, the console and Android props all use one Wi-Fi network at the field. It does not need the internet. Use a router, a phone hotspot or the network the controller phone makes. Put its name on the poster (`wifi_ssid` on a Pi, or **The field's Wi-Fi network name** in the **Check-in poster** form of the **Check-in** tab).

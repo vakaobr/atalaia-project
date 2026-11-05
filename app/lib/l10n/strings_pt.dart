@@ -1015,6 +1015,8 @@ const Map<String, String> ptStrings = {
   'ctl.radio_up': 'Rádio ligado',
   'ctl.radio_down': 'Rádio em baixo',
   'ctl.radio_connecting': 'A ligar ao rádio…',
+  'ctl.stuck_no_watch_modem': 'O firmware deste modem de rádio USB não consegue dizer que caixas ficaram num jogo terminado: atualiza-o, para que o controlador as liberte sozinho. Até lá, tira a caixa do jogo na própria caixa: mantém * premido 3 s para o menu de administração, “Sair do jogo”, ou escreve @leave <PIN de administração> na sua consola USB.',
+  'ctl.stuck_no_watch_pod': 'Um módulo de E/S não consegue dizer que caixas ficaram num jogo terminado. Para que o controlador as liberte sozinho, usa um modem de rádio USB com o firmware atualizado. Até lá, tira a caixa do jogo na própria caixa: mantém * premido 3 s para o menu de administração, “Sair do jogo”, ou escreve @leave <PIN de administração> na sua consola USB.',
   'ctl.pod_forget': 'Desligar o módulo',
   'ctl.codes': 'Códigos de acesso',
   'ctl.codes_hint':
