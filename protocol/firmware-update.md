@@ -77,7 +77,7 @@ On CMD update (or `@update <version> <id>` on its serial console, which runs the
 
 Then, on its own task, while the radio and the joined game carry on:
 
-1. Joins the field Wi-Fi (`@wifi <ssid> <password>` or the setup portal): `no_wifi`.
+1. Joins the field Wi-Fi (`@wifi <ssid> <password>`, a name or password with spaces in double quotes, or the setup portal): `no_wifi`.
 2. `GET <url>/api/v1/firmware/<id>/release` from the join's addresses in turn, over HTTPS pinned to the field CA: `unreachable`.
 3. Checks the release text: exactly the manifest's five lines and `signature=<base64>`, nothing else (`bad_release`); the offered id and version (`bad_release`); the Ed25519 signature over the manifest with one of its own release keys (`bad_signature`); its platform (`wrong_platform`); a version above its own (`not_newer`); a size within the inactive OTA slot (`too_big`).
 4. `GET <url>/api/v1/firmware/<id>/image`: a `Content-Length` other than the signed size is refused (`download`). The first 324 bytes must declare the release's version and `atalaia_esp32` (`bad_image`), the box's own variant and board (`wrong_board`) and the partition table layout it needs (byte 5 of the Atalaia descriptor, 0 before layout 1; `layout` if it is newer than the box's own); only then is the inactive slot opened (`esp_ota_begin`, which erases it) and written as the bytes come, hashed with SHA-256 on the way. More bytes than signed, fewer, a broken connection (`download`), a game starting (`cancelled`), a flash error (`flash`) abort the write (`esp_ota_abort`).

@@ -163,6 +163,7 @@ else()
         "box_game.c"
         "box_lobby.c"
         "serial_console.c"
+        "wifi_args.c"
         "fw_update.c"
         "fw_layout.c"
         "fw_layout_esp.c"

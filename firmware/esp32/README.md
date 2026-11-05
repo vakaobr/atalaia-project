@@ -611,7 +611,7 @@ Radio-specific Kconfig options (under "Atalaia Field Box Configuration > Radio")
 Field game options (under "Field network games"):
 - `ATALAIA_STATE_INTERVAL_S` -- seconds between STATE packets in a joined game (default 15)
 - `ATALAIA_BATTERY_LOW_PCT` -- send `battery.low` below this battery level (default 20; 0 = never; only with a MAX17048 gauge)
-- `ATALAIA_SERIAL_JOIN` -- accept `@join`, `@joinkey`, `@tag`, `@wifi`, `@update`, `@modes`, `@forgetmodes` and `@lobby` lines on the serial console (default on). `@joinkey` and `@update` take the admin PIN as their last word unless `ATALAIA_SERIAL_KEYS` is on (the bench and Wokwi builds)
+- `ATALAIA_SERIAL_JOIN` -- accept `@join`, `@joinkey`, `@tag`, `@wifi`, `@update`, `@modes`, `@forgetmodes` and `@lobby` lines on the serial console (default on). `@joinkey` and `@update` take the admin PIN as their last word unless `ATALAIA_SERIAL_KEYS` is on (the bench and Wokwi builds). `@wifi <ssid> [<password>]` takes a name or password with spaces in double quotes, `\"` and `\\` inside (`@wifi "My Field" "pass word"`; decisions WIFI-1 to WIFI-9, `main/wifi_args.c`): the SSID 1-32 bytes, the password none, 8-63 characters or 64 hex digits
 - `ATALAIA_SERIAL_ADOPT` -- accept `@adopt-info` and `@adopt` on the serial console: USB adoption by the field controller (default on; protocol/adoption.md)
 - `ATALAIA_CONSOLE_USB_INPUT` -- read the console input from the USB-C port (USB-Serial-JTAG, the Heltec V4's only USB) as well as UART0 (default on; off in the Wokwi build)
 - `ATALAIA_LED_BRIGHTNESS_PCT` -- LED ring brightness at boot (default 40%; under "LEDs")
@@ -915,7 +915,7 @@ the console in about 22 s); not yet on a field.
   A development build can be signed with a bench key and installed like a release
   (BRING_UP.md step 10c); its release text and image say the version with its `+g...`.
 - **The ESP32 side** (`main/fw_update_esp.c`): the Wi-Fi station (`wifi_ssid`/`wifi_pass` in
-  NVS: the setup portal's "Field Wi-Fi" fields, or `@wifi <ssid> <password>`), `esp_http_client`
+  NVS: the setup portal's "Field Wi-Fi" fields, or `@wifi <ssid> <password>`, quoted for spaces), `esp_http_client`
   over HTTPS trusting only the field CA whose SHA-256 is key 13 of the box's join (the check is
   `main/field_ca_pin.c`, platform-free: the host box runs it too), `esp_ota_*`
   into the inactive slot, on its own task while the game task and the radio carry on.

@@ -842,7 +842,8 @@ menu "Atalaia Field Box Configuration"
                 sets the field join key while no game is joined, and
                 "@tag <uid hex> [<tag hex>]" reads a player tag (protocol/nfc-tag.md)
                 as if it had been tapped on the NFC reader. "@wifi <ssid> <password>"
-                stores the field Wi-Fi a firmware update uses, and
+                stores the field Wi-Fi a firmware update uses (a name or password
+                with spaces in double quotes: @wifi "My Field" "pass word"), and
                 "@update <version> <release id>" starts one as the controller's
                 CMD update does (protocol/firmware-update.md): the same checks. For bring-up and the
                 Wokwi emulator; a join still needs a payload signed with this
