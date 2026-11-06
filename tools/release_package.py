@@ -168,7 +168,7 @@ Use your board's port instead of COM5 (/dev/ttyACM0 on Linux). In this folder:
 USB FLASH REQUIRED ONCE when you come from v0.4.0 or earlier: this release has a new partition
 table (4 MB OTA slots, the first four partitions where they were), which an update over the air
 cannot change, so write the files above over USB with the command above (no erase_flash: the
-settings and the adoption stay; the field's logo and the fetched modes are fetched again). A box
+settings and the adoption stay; the fetched modes are fetched again). A box
 still on the old table refuses to run this firmware and says so on its screen.
 
 If the connection fails, hold PRG, press and release RST, release PRG (download
@@ -251,7 +251,7 @@ module an `atalaia-output-module-` `.uf2` file (its default channel list: four r
 take a build of their own): hold its BOOTSEL button, plug it into a computer and copy the file onto the drive that
 appears; a module is never updated over the air. Check what you downloaded against `SHA256SUMS`.
 
-**USB flash required once** when you come from v0.4.0 or earlier: the Field Box, modem and pod images of this release have a new partition table (4 MB OTA slots instead of 2 MB), and an update over the air cannot change the partition table. Flash the `-usb.zip` over USB once (write, no erase: the settings and the adoption stay; the cached game modes and the field's logo are fetched again). A box still on the old table refuses to run the new firmware and shows "Flash over USB" on its screen; one that gets it over the air from an older firmware goes back to the old one by itself. Later updates over the air work as before.
+**USB flash required once** when you come from v0.4.0 or earlier: the Field Box, modem and pod images of this release have a new partition table (4 MB OTA slots instead of 2 MB), and an update over the air cannot change the partition table. Flash the `-usb.zip` over USB once (write, no erase: the settings and the adoption stay; the cached game modes are fetched again). A box still on the old table refuses to run the new firmware and shows "Flash over USB" on its screen; one that gets it over the air from an older firmware goes back to the old one by itself. Later updates over the air work as before.
 
 **Signed with the CI release key.** The firmware trusts the project's release keys: root `424d053af5cdbc35`
 (held offline by the maintainer) and CI `a4f6002b0122b131` (`76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=`).
