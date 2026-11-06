@@ -106,8 +106,11 @@ The server's other settings (`ATALAIA_PURGE_HOUR`,
 `ATALAIA_PRIVACY_NOTICE_VERSION`, `ATALAIA_SHARING_TERMS_VERSION`, `ATALAIA_EXPORT_MIN_INTERVAL_S`, `ATALAIA_EXPORT_MAX_MB` and, for a hub,
 the per-field limits `ATALAIA_QUOTA_ACCOUNTS`, `_SCHEDULED_GAMES`, `_REGISTRATIONS`, `_GAMES`, `_ATAK_CERTS`,
 `_STREAMS`, `_STORED_MB` and `ATALAIA_HOSTED_WATCH_S`) can be added to `.env` too; the list, with the defaults, is in
-[server/README.md](../README.md). After a change: `docker compose up -d`
-(from `server/`). Not for a real deployment: `ATALAIA_TEST_ADAPTER`.
+[server/README.md](../README.md), and every setting there reaches the server's container (`docker-compose.yml` names
+each one; until 2026-11-06 some, such as `ATALAIA_APP_ANDROID_*` and `ATALAIA_PASSWORD_LOGIN`, were silently dropped,
+decision SRVENV-1). After a change: `docker compose up -d`
+(from `server/`). Not for a real deployment, and not passed by Compose: `ATALAIA_TEST_ADAPTER`,
+`ATALAIA_ALLOW_SIGNUP_WITHOUT_NOTICE` (SRVENV-2).
 Optional, for the ports: `ATALAIA_BIND` (`0.0.0.0`), `ATALAIA_HTTP_PORT`
 (80), `ATALAIA_HTTPS_PORT` (443).
 
@@ -466,7 +469,7 @@ the way the field normally talks to its players (the field's contact on its page
 **Sign-up needs a published privacy notice (LIVE-2):** a server with no notice file for `ATALAIA_PRIVACY_NOTICE_VERSION` in
 `ATALAIA_PRIVACY_NOTICE_DIR` refuses new accounts (`409 privacy_notice_unpublished`, password and social sign-up) and logs a
 warning at start; existing accounts log in as before. `ATALAIA_ALLOW_SIGNUP_WITHOUT_NOTICE=on` lifts it for a development
-server. A hosted hub whose notice version still starts with `template-` logs a warning at start.
+server run without Compose (the Compose files do not pass it, SRVENV-2). A hosted hub whose notice version still starts with `template-` logs a warning at start.
 
 **Test your restores.** `python3 tools/docker_server.py deploy` tests the
 scripts on any computer with Docker. A restore of your own backups is

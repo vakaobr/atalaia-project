@@ -63,6 +63,20 @@ services:
       ATALAIA_DATABASE_URL: "postgresql+asyncpg://atalaia:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD (server/setup.sh)}@postgres:5432/atalaia"
       ATALAIA_SECRET_KEY: "${ATALAIA_SECRET_KEY:?set ATALAIA_SECRET_KEY (server/setup.sh)}"
       ATALAIA_PUBLIC_URL: "${ATALAIA_PUBLIC_URL:-}"
+      # Every other setting of server/README.md's table that an operator may put in .env is passed below as
+      # "${NAME:-}": empty means the server's own default (atalaia_server/config.py), never a value of its own.
+      # The ones left out on purpose, and why, are in that table and in ComposeTests (tests/test_config.py).
+      ATALAIA_DB_POOL_SIZE: "${ATALAIA_DB_POOL_SIZE:-}"
+      ATALAIA_DB_MAX_OVERFLOW: "${ATALAIA_DB_MAX_OVERFLOW:-}"
+      ATALAIA_DB_TIMEOUT_S: "${ATALAIA_DB_TIMEOUT_S:-}"
+      # Login methods (LG-3) and the apps' App Links, passkeys and iOS associated domains (PKA-1).
+      ATALAIA_PASSWORD_LOGIN: "${ATALAIA_PASSWORD_LOGIN:-}"
+      ATALAIA_APP_ANDROID_PACKAGE: "${ATALAIA_APP_ANDROID_PACKAGE:-}"
+      ATALAIA_APP_ANDROID_SHA256: "${ATALAIA_APP_ANDROID_SHA256:-}"
+      ATALAIA_APP_IOS_APP_IDS: "${ATALAIA_APP_IOS_APP_IDS:-}"
+      # The pages' language (PV-9); the preview's file gives them its own defaults.
+      ATALAIA_LANG_FROM_BROWSER: "${ATALAIA_LANG_FROM_BROWSER:-}"
+      ATALAIA_DEFAULT_LANG: "${ATALAIA_DEFAULT_LANG:-}"
       # Social login (docs/DEPLOY.md, "Login methods"): a provider is on when all of its settings are given.
       ATALAIA_OIDC_GOOGLE_CLIENT_ID: "${ATALAIA_OIDC_GOOGLE_CLIENT_ID:-}"
       ATALAIA_OIDC_GOOGLE_CLIENT_SECRET: "${ATALAIA_OIDC_GOOGLE_CLIENT_SECRET:-}"
@@ -97,6 +111,9 @@ services:
       ATALAIA_ATAK_RELAY: "${ATALAIA_ATAK_RELAY:-off}"
       ATALAIA_ATAK_RELAY_HOST: "${ATALAIA_ATAK_RELAY_HOST:-}"
       ATALAIA_ATAK_RELAY_PUBLIC_PORT: "${ATALAIA_ATAK_PORT:-8089}"
+      ATALAIA_ATAK_CERT_DAYS: "${ATALAIA_ATAK_CERT_DAYS:-}"
+      # ATALAIA_ATAK_RELAY_PORT is not passed: the relay listens on 8089 in the container, which the port below
+      # publishes; ATALAIA_ATAK_PORT changes the published one.
       # Trust X-Forwarded-For/-Proto from any peer: only Caddy can reach this
       # port (the internal "app" network), and it replaces what clients send.
       FORWARDED_ALLOW_IPS: "*"
