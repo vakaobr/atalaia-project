@@ -55,7 +55,7 @@ For a referee or a visiting GM, make a short-lived day code in the console (**Se
 
 ## 4. The controller clock
 
-**From v0.9.0 (not released yet; build from `main` until then)** the phone controller has the Raspberry Pi's clock guard. A phone's clock is usually right, set by the mobile network, but one that was reset, set by hand, or has had no network for long can be wrong.
+**From v0.9.0** the phone controller has the Raspberry Pi's clock guard. A phone's clock is usually right, set by the mobile network, but one that was reset, set by hand, or has had no network for long can be wrong.
 
 1. The controller compares its clock with the day this software was released, with the newest time it has seen and with the newest data it holds.
 2. If the clock is earlier, the console shows the yellow banner **The controller's clock is wrong.** on every screen, and nothing is deleted until it is right.
@@ -90,7 +90,7 @@ Both carry the game's radio. They differ in what else they do:
 | Invites, game over, pairing by code | Yes | Only with pod firmware that relays these frames; with an older pod the console says the radio carries none |
 | Firmware updates for the boxes | Yes | Yes |
 | Channel scan | Yes | Yes |
-| Boxes still in an ended game reported and freed by themselves | Yes, with a modem image from v0.9.0 (not released yet) | **No**: an I/O pod cannot report them |
+| Boxes still in an ended game reported and freed by themselves | Yes, with a modem image from v0.9.0 | **No**: an I/O pod cannot report them |
 | Buttons, lights, siren for the phone | No | Yes |
 
 To use a USB radio modem, follow [Set up the radio modem, With a phone controller](modem.md#with-a-phone-controller). Linking an I/O pod (its passkey over Bluetooth, linking again) is in the [Phone prop guide](phone-prop.md).

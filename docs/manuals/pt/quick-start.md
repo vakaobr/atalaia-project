@@ -47,7 +47,7 @@ Firmware novo para as caixas: [Atualizar as caixas](field-box.md#update-the-boxe
 
 ## Se alguma coisa correr mal
 
-- **Uma caixa é recusada «noutro jogo», ou a consola mostra-a em Presas num jogo terminado:** toca em **Libertar**; ou tira-a do jogo na própria caixa ([tirar uma caixa do jogo](field-box.md#take-a-box-out-of-its-game), a partir da v0.9.0, ainda não publicada). Mais: [recuperar de problemas](game-master.md#recover-from-problems).
+- **Uma caixa é recusada «noutro jogo», ou a consola mostra-a em Presas num jogo terminado:** toca em **Libertar**; ou tira-a do jogo na própria caixa ([tirar uma caixa do jogo](field-box.md#take-a-box-out-of-its-game), a partir da v0.9.0). Mais: [recuperar de problemas](game-master.md#recover-from-problems).
 - **A consola diz Rádio em baixo:** verifica o cabo do modem USB e vê [recuperar de problemas](game-master.md#recover-from-problems) e [atualizar o modem](modem.md#update-the-modem).
 - **Uma faixa amarela diz O relógio do controlador está errado:** toca em **Acertar o relógio do controlador por este dispositivo** se a hora do teu telemóvel estiver certa ([o relógio do controlador](controller-setup.md#the-controller-clock)).
 - **Uma caixa aparece sem notícias:** aproxima-a, ou põe uma caixa no meio; depois de mudar de canal, usa **Procurar caixas** ([mudar de canal](game-master.md#change-the-channel)).

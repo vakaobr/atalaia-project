@@ -88,7 +88,7 @@ hero:
     Pré-alfa · software das fases 1 e 2 pronto; placas a sério já jogam jogos inteiros com o
     controlador de campo na bancada, com teclado; fase 3 pronta em software, a app iOS verificada
     num iPhone; o servidor do site da fase 4 a correr num servidor de testes; fase 5 feita em
-    software · versão mais recente v0.8.0 · ainda não pronta para o campo
+    software · versão mais recente v0.9.0 · ainda não pronta para o campo
   title: A plataforma aberta de <span class="nowrap">combate simulado</span>
   lead: >-
     A Atalaia é uma plataforma aberta para os dispositivos eletrónicos de jogo (os props) de
@@ -735,12 +735,16 @@ try:
   app:
     title: Num telemóvel Android
     text: >-
-      A partir da v0.9.0, cada <a href="https://github.com/vakaobr/atalaia-project/releases">versão no GitHub</a> traz o APK da app, assinado
-      com a chave do projeto, para cada versão se instalar por cima da anterior (uma app instalada de
-      uma compilação de testes antiga tem de ser desinstalada uma vez antes: os manuais dizem o que se
-      perde). Ou compila tu o APK de testes (debug) da app com o Docker e instala-o num telemóvel com Android 8.0
-      ou mais recente, ou no emulador Android, como explica o
-      <a href="https://github.com/vakaobr/atalaia-project/blob/main/app/README.md#install-it-on-an-android-phone-from-windows">guia
+      A <a href="https://github.com/vakaobr/atalaia-project/releases/tag/v0.9.0">v0.9.0</a> (6 de
+      novembro de 2026) é a primeira versão no GitHub que traz a app: o atalaia-app-0.9.0.apk,
+      assinado com a chave do projeto, para cada versão se instalar por cima da anterior. A
+      impressão digital SHA-256 do certificado é <code
+      class="fingerprint">9C:35:0D:17:37:D6:C5:35:CD:3E:D1:04:28:8E:65:AD:7D:B4:FA:CE:8E:4E:6F:27:75:3B:7B:7C:38:40:A1:99</code>;
+      o Android recusa uma atualização assinada com outra chave. Uma app instalada de uma compilação
+      de testes antiga tem de ser desinstalada uma vez antes (os manuais dizem o que se perde). Ou
+      compila tu o APK de testes (debug) da app com o Docker e instala-o num telemóvel com Android
+      8.0 ou mais recente, ou no emulador Android, como explica o <a
+      href="https://github.com/vakaobr/atalaia-project/blob/main/app/README.md#install-it-on-an-android-phone-from-windows">guia
       da app</a> (em inglês). Já correu em emuladores, mas ainda não num telemóvel a sério.
   manuals:
     title: Jogar e organizar
@@ -759,10 +763,9 @@ roadmap:
     do hardware: as fases 1 a 3 estão prontas em software (placas a sério já jogam jogos inteiros na
     bancada e a app para iOS já passou a sua lista de verificação num iPhone); as fases 4 e 5 estão
     feitas em software. As provas esperam por caixas montadas, testes no campo, um servidor a sério
-    e a chave do registo do projeto. A versão mais recente é a v0.8.0 (4 de novembro de 2026), a
-    primeira assinada com a nova chave de versões do projeto. A seguir vem a v0.9.0: libertar as
-    caixas que ficaram num jogo terminado e as regras do Wi-Fi da caixa estão feitas em software,
-    ainda não publicadas nem experimentadas em hardware.
+    e a chave do registo do projeto. A versão mais recente é a v0.9.0 (6 de novembro de 2026): o
+    controlador liberta as caixas que ficaram num jogo terminado (por agora, um teste na bancada),
+    as regras do Wi-Fi da caixa e a primeira app Android assinada com a chave do projeto.
   more: O roadmap completo, com o que cada fase inclui e a sua prova →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
   # hardware), in progress, designed (research, architecture and plan written; no code):
@@ -792,8 +795,8 @@ roadmap:
     short: >-
       Firmware da Field Box e manual de montagem; na bancada, uma placa a sério joga jogos inteiros,
       já com ecrã, teclado e botões montados com fios soltos (fotografia e vídeo na página de
-      montagem). Sair de um jogo terminado na própria caixa está feito em software para a v0.9.0.
-      Falta ainda uma caixa montada.
+      montagem). Sair de um jogo terminado na própria caixa chegou com a v0.9.0, ainda não
+      experimentado numa caixa a sério. Falta ainda uma caixa montada.
     done:
       - Firmware ESP32 da Field Box, com predefinições na própria caixa, a correr num emulador.
       - O pequeno ecrã da caixa mostra a barra de progresso, os pontos e o tempo de posse, em quatro línguas.
@@ -815,7 +818,7 @@ roadmap:
       - "Um barramento I2C instável deixa de reiniciar a caixa: o teclado, o ecrã pequeno, o leitor NFC e o medidor da bateria usam o driver mais recente do ESP-IDF, com limites de tempo, reposição do barramento e um recuo que põe de lado a peça que falha, pelo que um teclado avariado conta como sem tecla e o jogo continua. Um reinício passa a indicar o motivo real (alimentação, queda de tensão, software, falha, watchdog) em vez de sempre \"alimentação\", e a consola do GM diz \"Uma caixa falhou e reiniciou\". Encontrado na bancada: um teclado com soldaduras más reiniciou uma placa seis vezes em três minutos. Só testes no computador; falta o teste na bancada."
       - "Um texto de ecrã que não cabe é recusado quando se verifica o modo, e um texto que falha ao desenhar mostra \"?\" em vez de ficar em branco (um texto longo em quatro línguas ficava vazio, sem aviso, numa caixa). Testes no computador."
       - "Uma contagem de um usa o singular (\"1 ponto\", não \"1 pontos\") nos ecrãs da caixa, na app, na consola do GM e nas páginas da equipa. Testes em software."
-      - "Uma caixa que ficou num jogo terminado enquanto estava desligada sai dele na própria caixa: mantém * premido 3 segundos, escreve o PIN de administração e escolhe Sair do jogo (ou @leave na consola USB). Mantém o campo, o Wi-Fi e os modos. Em software, a partir da v0.9.0: ainda não publicada nem experimentada em hardware."
+      - "Uma caixa que ficou num jogo terminado enquanto estava desligada sai dele na própria caixa: mantém * premido 3 segundos, escreve o PIN de administração e escolhe Sair do jogo (ou @leave na consola USB). Mantém o campo, o Wi-Fi e os modos. Na v0.9.0 (6 de novembro de 2026); ainda não experimentado numa caixa a sério."
     next:
       - Uma caixa montada que aguente um jogo de clube de 2 horas sem reiniciar.
       - "Ver a barra do tempo num painel a sério."
@@ -824,7 +827,7 @@ roadmap:
       - "Gravar a nova tabela de partições numa placa a sério (uma gravação por USB, sem apagar, para uma caixa com a antiga)."
       - "Uma imagem de lançamento endurecida (cifra da memória flash, arranque seguro): está só escrita como plano, nada foi construído nem experimentado numa placa."
       - "Experimentar o tratamento de falhas do I2C numa placa com o teclado mal ligado, e o ecrã de arranque e os novos ecrãs em mais do que a primeira placa de bancada."
-      - "Publicar a v0.9.0 e experimentar o Sair do jogo numa caixa a sério."
+      - "Experimentar o Sair do jogo numa caixa a sério."
     gate: >-
       Prova: uma caixa aguenta um jogo de clube de 2 horas sem reiniciar. <strong>Em aberto</strong>
       até haver uma caixa montada que o consiga.
@@ -834,8 +837,8 @@ roadmap:
       Skirmesh-RF sobre LoRa, controlador de campo, API, consola da organização e um pacote de
       modos, testados em software; na bancada, placas a sério jogam jogos inteiros com o controlador
       pelo rádio, e o que a bancada achou está corrigido em software. Libertar as caixas que ficaram
-      num jogo terminado está feito em software para a v0.9.0. À espera de 5 caixas montadas num
-      campo.
+      num jogo terminado chegou com a v0.9.0 e passou o primeiro teste na bancada. À espera de 5
+      caixas montadas num campo.
     done:
       - O protocolo de rádio cifrado Skirmesh-RF e o modem de rádio USB.
       - O controlador de campo com a sua API.
@@ -880,8 +883,8 @@ roadmap:
       - "O controlador de campo aguenta um relógio errado (um Raspberry Pi 4 não tem relógio próprio e pode arrancar em 1970): os tempos de jogo e os prazos deixam de depender dele, a consola avisa o GM, que acerta a hora na consola (só para a frente), os certificados continuam válidos para telemóveis com a hora certa e a limpeza de dados espera. Testes no computador, ainda não num Pi real."
       - "Tokens de acesso de curta duração: o GM pode dar ao telemóvel de quem arbitra, a um teste automático ou a um ecrã para o público um token que só lê, só conduz o jogo ou só gere os marshals, para um jogo ou para todos, por 8 horas por omissão (no máximo 7 dias), e revogá-lo de imediato. Testes no computador."
       - "Atualizações pelo ar para as compilações da bancada: uma chave de versões da bancada, aceite na bancada ao lado das chaves do projeto, assina as compilações diárias; a 2 de novembro de 2026 uma caixa passou de uma compilação para a seguinte a partir da consola em cerca de 22 segundos, confirmada depois do autoteste."
-      - "O controlador liberta uma caixa que ficou num jogo terminado enquanto estava desligada: o modem USB avisa, o controlador volta a enviar o fim desse jogo, e a consola da organização mostra essas caixas em Presas num jogo terminado, com um botão Libertar. Um controlador que perdeu o jogo (reinstalado, ou com os dados perdidos) pode libertar todas as caixas que não estão no jogo em curso. Em software, a partir da v0.9.0: ainda não publicada nem experimentada em hardware. O modem precisa do firmware novo, gravado por USB."
-      - "A configuração do Wi-Fi da caixa: o @wifi aceita um nome e uma palavra-passe com espaços, entre aspas, e a página de configuração recusa o que a caixa não pode usar: um nome com mais de 32 bytes, ou uma palavra-passe que não seja vazia, de 8 a 63 caracteres ou de 64 algarismos hexadecimais. Em software, a partir da v0.9.0: ainda não publicada nem experimentada em hardware."
+      - "O controlador liberta uma caixa que ficou num jogo terminado enquanto estava desligada: o modem USB avisa, o controlador volta a enviar o fim desse jogo, e a consola da organização mostra essas caixas em Presas num jogo terminado, com um botão Libertar. Um controlador que perdeu o jogo (reinstalado, ou com os dados perdidos) pode libertar todas as caixas que não estão no jogo em curso. Na v0.9.0 (6 de novembro de 2026). Passou um teste na bancada a 6 de novembro de 2026: uma caixa Heltec V4.3 desligada a meio do jogo, o jogo terminou, voltou a ser ligada e o controlador libertou-a em segundos. O modem precisa do firmware da v0.9.0, gravado por USB."
+      - "A configuração do Wi-Fi da caixa: o @wifi aceita um nome e uma palavra-passe com espaços, entre aspas, e a página de configuração recusa o que a caixa não pode usar: um nome com mais de 32 bytes, ou uma palavra-passe que não seja vazia, de 8 a 63 caracteres ou de 64 algarismos hexadecimais. Na v0.9.0 (6 de novembro de 2026)."
     next:
       - As placas de rádio e 5 caixas montadas para o teste no campo.
       - Um teste no campo com 20 caixas, com e sem escuta antes de falar.
@@ -890,7 +893,7 @@ roadmap:
       - "Experimentar a janela de repetição e os controladores endurecidos em placas reais e num Pi real (um comando gravado e repetido na bancada)."
       - "Apagar o registo de épocas de uma caixa em duas placas de bancada para ver que volta a ser encontrada, duas vezes seguidas e com um antigo líder a voltar a entrar (o guia está escrito)."
       - "Acertar o relógio e usar tokens de acesso num Raspberry Pi real, num campo sem internet."
-      - "Publicar a v0.9.0 e experimentar a recuperação das caixas presas e as regras do Wi-Fi em placas e num modem a sério."
+      - "Experimentar a recuperação das caixas presas e as regras do Wi-Fi em mais placas (a recuperação passou um teste na bancada a 6 de novembro de 2026)."
     gate: >-
       Prova: 5 caixas num espaço de <a href="{{ page.to.glossary }}#glossario-cqb">CQB</a> e num campo
       exterior, sem uma única captura perdida. <strong>Em aberto.</strong>
@@ -1010,7 +1013,7 @@ roadmap:
         - "O próprio ecrã do controlador no telemóvel importa uma lista de inscrições (um ficheiro CSV ou JSON escolhido com o seletor de ficheiros do Android), sem precisar da consola de GM."
         - "Um controlador de reserva recebe do seu convite de adesão as escolhas das balizas das caixas (o interruptor do campo, as caixas desativadas, as salas) e os lugares das caixas, para que, depois de uma passagem de testemunho, os telemóveis recebam o mesmo registo de balizas; uma consola já aberta no controlador de reserva move os marcadores das caixas logo, sem recarregar. Em software, nos dois controladores; o movimento dos marcadores está testado num navegador sem ecrã."
         - "O controlador no telemóvel acompanha a revisão de segurança do controlador Pi: a revogação de modos assinados falha de forma segura (com um mínimo por modo e um limite de idade para um telemóvel sem rede, ambos no ecrã Pacotes de modos), e a emissão ATAK para o pessoal passa por TLS com uma autoridade de certificação fixada. Testado em software; não num telemóvel num campo."
-        - "O controlador Android liberta as caixas que ficaram num jogo terminado, como o Raspberry Pi, com um modem de rádio USB (um módulo de E/S não consegue avisar dessas caixas), e tem a mesma proteção do relógio que o Pi. Em software, a partir da v0.9.0: ainda não publicada nem experimentada num telemóvel a sério."
+        - "O controlador Android liberta as caixas que ficaram num jogo terminado, como o Raspberry Pi, com um modem de rádio USB (um módulo de E/S não consegue avisar dessas caixas), e tem a mesma proteção do relógio que o Pi. Na v0.9.0 (6 de novembro de 2026); ainda não experimentado num telemóvel a sério."
     g_ios:
       title: iOS
       items:
@@ -1253,8 +1256,8 @@ roadmap:
     short: >-
       Editor visual de modos, pacotes de modos assinados, o registo de modos como modelo, alemão e
       chinês tradicional, guias de montagem, os módulos de alvo e de saídas da porta de expansão.
-      Todos os passos de software estão feitos. A versão mais recente, a v0.8.0, vem assinada com a
-      nova chave de versões do projeto.
+      Todos os passos de software estão feitos. A versão mais recente, a v0.9.0, vem assinada com a
+      chave de versões do projeto e traz a app Android, assinada com a chave Android do projeto.
     done:
       - "<strong>O editor visual de modos</strong>: uma página do simulador onde se monta um modo
         com blocos (o que acontece quando uma equipa mantém o botão premido, temporizadores,
@@ -2318,9 +2321,9 @@ glossary:
     text: >-
       Uma caixa que estava desligada, ou fora de alcance, quando o jogo terminou, e por isso ainda
       julga estar nesse jogo: mostra o jogo antigo e recusa convites novos («noutro jogo»). A partir
-      da v0.9.0 (em software, ainda não publicada nem experimentada em hardware) o controlador volta
-      a enviar o fim desse jogo quando ouve uma caixa assim, a consola da organização mostra-a com
-      um botão Libertar, e o menu de administração da caixa tem Sair do jogo.
+      da v0.9.0 (publicada a 6 de novembro de 2026; por agora, um teste na bancada) o controlador
+      volta a enviar o fim desse jogo quando ouve uma caixa assim, a consola da organização mostra-a
+      com um botão Libertar, e o menu de administração da caixa tem Sair do jogo.
   microcontroller:
     id: glossario-microcontrolador
     term: Microcontrolador

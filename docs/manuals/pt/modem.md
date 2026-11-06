@@ -243,7 +243,7 @@ sudo journalctl -u atalaia-controller -n 50 | grep -i modem
 
 Deves ver `atalaia.modem INFO modem link up` e, mesmo antes, `atalaia.modem INFO modem: {...}`: a identidade do modem, com o `fw_version` e a `region`. Uma falha aparece como `cannot open the modem at /dev/ttyACM0: ...`, `modem missed ping 1 of 3` ou `modem link lost; reconnecting`.
 
-**Consegue avisar das caixas presas?** A partir da v0.9.0 (ainda não publicada; até lá, compila-a a partir do `main`, secção 3.2), a identidade do modem diz também `"games": true`. Um modem assim avisa o controlador quando ouve uma caixa que continua num jogo já terminado (uma caixa que estava desligada quando o jogo acabou), e o controlador liberta-a voltando a enviar o fim desse jogo. Funciona com um Raspberry Pi como controlador e com um telemóvel controlador (secção 11). Uma imagem do modem da v0.8.0 ou anterior não o faz: um controlador Raspberry Pi da v0.9.0 regista então uma vez `the radio modem's firmware cannot report boxes still in an ended game`, o separador **Caixas** da consola diz que o modem de rádio não consegue dizer que caixas ficaram num jogo terminado, e um telemóvel controlador di-lo no ecrã, em **Rádio**. Atualiza o modem para ter a recuperação automática (secção 10); até lá, tira essa caixa do jogo na própria caixa ([manual da Field Box](field-box.md#take-a-box-out-of-its-game)).
+**Consegue avisar das caixas presas?** A partir da v0.9.0, a identidade do modem diz também `"games": true`. Um modem assim avisa o controlador quando ouve uma caixa que continua num jogo já terminado (uma caixa que estava desligada quando o jogo acabou), e o controlador liberta-a voltando a enviar o fim desse jogo. Funciona com um Raspberry Pi como controlador e com um telemóvel controlador (secção 11). Uma imagem do modem da v0.8.0 ou anterior não o faz: um controlador Raspberry Pi da v0.9.0 regista então uma vez `the radio modem's firmware cannot report boxes still in an ended game`, o separador **Caixas** da consola diz que o modem de rádio não consegue dizer que caixas ficaram num jogo terminado, e um telemóvel controlador di-lo no ecrã, em **Rádio**. Atualiza o modem para ter a recuperação automática (secção 10); até lá, tira essa caixa do jogo na própria caixa ([manual da Field Box](field-box.md#take-a-box-out-of-its-game)).
 
 **Na consola da organização** (vê o [Manual da organização](game-master.md)): a etiqueta em cima à direita diz **Rádio: ligado**. `a ligar` e `em baixo` ainda não são bom sinal, e **sem modem** quer dizer que a definição está vazia. Se o modem cair, um alerta diz **Rádio em baixo: o modem USB não responde.**, e **Rádio de volta.** quando volta. O separador **Controlador** mostra **Rádio**, **Modem** (o firmware do modem e a versão) e **Religações do modem**: uma contagem que não pára de subir quer dizer cabo, porta ou energia com problemas.
 
@@ -273,7 +273,7 @@ O modem **não tem atualização pelo ar**: uma imagem nova escreve-se sempre po
 ### Quando o atualizar
 
 - As notas de uma versão nova dizem que o modem mudou. Vê a [página das versões](https://github.com/vakaobr/atalaia-project/releases) e o CHANGELOG.
-- O registo do controlador diz `the radio modem's firmware cannot report boxes still in an ended game`, ou o separador **Caixas** da consola, ou o ecrã de um telemóvel controlador em **Rádio**, diz que o modem de rádio não consegue dizer que caixas ficaram num jogo terminado. Isso precisa de uma imagem do modem da **v0.9.0** (ainda não publicada; até lá, compila-a a partir do `main`, secção 3.2).
+- O registo do controlador diz `the radio modem's firmware cannot report boxes still in an ended game`, ou o separador **Caixas** da consola, ou o ecrã de um telemóvel controlador em **Rádio**, diz que o modem de rádio não consegue dizer que caixas ficaram num jogo terminado. Isso precisa de uma imagem do modem da **v0.9.0**.
 - Foi gravado com a v0.4.0 ou anterior (a tabela de partições antiga, secção 4.3).
 
 Para ver que versão um modem tem: o separador **Controlador** da consola, **Modem**, ou o `fw_version` no registo do controlador (secção 8).
@@ -306,7 +306,7 @@ Um telemóvel controlador também pode usar um **módulo de E/S** como rádio. O
 | Ligação ao telemóvel | Só USB | USB ou Bluetooth |
 | Jogos, atualizações de firmware, procura de canal | Sim | Sim |
 | Convites, fim de jogo, emparelhamento por código | Sim | Só com um firmware do módulo que passe estas tramas |
-| Caixas presas num jogo terminado avisadas e libertadas sozinhas | Sim, a partir da v0.9.0 (ainda não publicada) | Não, nunca |
+| Caixas presas num jogo terminado avisadas e libertadas sozinhas | Sim, a partir da v0.9.0 | Não, nunca |
 
 ### Ligá-lo ao telemóvel
 
