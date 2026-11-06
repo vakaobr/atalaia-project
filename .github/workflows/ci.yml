@@ -230,6 +230,7 @@ jobs:
               - 'tools/firmware_release.py'
               - 'tools/gen_box_fonts.py'
               - 'tools/oled_logo.py'
+              - 'tools/secure_boot_sign.py'
             module_core:
               - *shared
               - 'firmware/module-core/**'
@@ -1043,6 +1044,55 @@ jobs:
           grep -q '^CONFIG_BT_NIMBLE_ENABLED=y' build-pod/sdkconfig
           if grep -E 'warning:' build-pod.log; then echo "::error::the pod build has warnings"; exit 1; fi
           grep '"project_version"' build-pod/project_description.json | grep -qF "\"$FW_VERSION\""
+
+  esp32-hardened-build:
+    # The hardened Field Box release (firmware/esp32/sdkconfig.release, RELEASE_HARDENING.md): it
+    # must keep building, its options must keep their names, its bootloader must fit below the
+    # partition table and its signed image in the slot. Signed with a throw-away key made in this
+    # job and gone with it; nothing is flashed, no eFuse is touched and no secret is used.
+    name: ESP32 hardened release cross-compilation (throw-away key)
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.esp32 == 'true'
+    runs-on: ubuntu-latest
+    container:
+      image: espressif/idf:v5.3.2@sha256:5b8f58d9d9caa45b689a31a0b6a0cc53b84594e0ba5fdd8d28eeef7d6123242a
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # the whole history and tags: the version counts commits since v<X.Y.Z> (FV-9)
+      - name: Firmware version (tools/docker_fw.py's, with the commit; FV-9)
+        run: |
+          # The checkout belongs to the runner's user, not the container's root.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          test "$(git rev-parse --is-shallow-repository)" = false
+          version="$(python3 tools/docker_fw.py version)"
+          # A pre-release (0.4.0-dev) without its commit means git gave nothing.
+          if [ "${version#*-}" != "$version" ] && [ "${version#*+}" = "$version" ]; then
+            echo "::error::the firmware version $version carries no commit"; exit 1
+          fi
+          echo "Firmware version: $version"
+          echo "FW_VERSION=$version" >> "$GITHUB_ENV"
+      - name: Build the hardened release (sdkconfig.release), with no warnings
+        working-directory: firmware/esp32
+        shell: bash # -eo pipefail: the build's own exit code counts through tee
+        run: |
+          . "$IDF_PATH/export.sh"
+          python3 ../../tools/secure_boot_sign.py --selftest
+          idf.py -B build-hardened -D SDKCONFIG=build-hardened/sdkconfig \
+            -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.release" -D "ATALAIA_FW_VERSION=$FW_VERSION" \
+            build 2>&1 | tee build-hardened.log
+          if grep -E 'warning:' build-hardened.log; then echo "::error::the hardened build has warnings"; exit 1; fi
+          grep '"project_version"' build-hardened/project_description.json | grep -qF "\"$FW_VERSION\""
+      - name: Check, sign with a throw-away key, check the sizes (as tools/docker_fw.py release-hardened)
+        working-directory: firmware/esp32
+        run: |
+          . "$IDF_PATH/export.sh"
+          python3 ../../tools/secure_boot_sign.py check-config build-hardened/sdkconfig
+          python3 ../../tools/check_fw_ram.py build-hardened/atalaia_esp32.map
+          python3 ../../tools/secure_boot_sign.py sign build-hardened/bootloader/bootloader.bin \
+            build-hardened/atalaia_esp32.bin --throwaway-test-key
+          python3 ../../tools/secure_boot_sign.py check-sizes build-hardened
 
   firmware-test:
     name: Firmware HAL stub tests

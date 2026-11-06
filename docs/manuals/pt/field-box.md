@@ -11,7 +11,7 @@ Para quem cuida das caixas num campo: ligá-las, pô-las num jogo e mantê-las v
 
 > **Ainda não está pronta para o campo.** A Atalaia está em pré-alfa. Placas Heltec V4.3 a sério já jogaram jogos inteiros numa bancada com o controlador de campo. Nenhuma caixa montada foi usada num campo. Cada passo abaixo corresponde ao que o firmware mostra hoje. Os passos que dependem de hardware dizem **Ainda não testado num campo**. As palavras em *itálico* estão no [glossário](https://atalaia-project.link/glossario/).
 
-> **Que firmware.** A versão publicada mais recente é a **v0.8.0** (2026-11-04). Algumas coisas abaixo chegam com a **v0.9.0**, que **ainda não foi publicada**: até lá, precisam de firmware compilado a partir do ramo `main` do projeto. Cada uma di-lo onde aparece: tirar uma caixa do jogo na própria caixa, o controlador libertar sozinho uma caixa nessa situação, nomes de Wi-Fi com espaços na consola USB e as regras de Wi-Fi da página de configuração.
+> **Que firmware.** A versão publicada mais recente é a **v0.9.0** (2026-11-06). Algumas coisas abaixo precisam da **v0.9.0** ou seguinte, e di-lo onde aparecem: tirar uma caixa do jogo na própria caixa, o controlador libertar sozinho uma caixa nessa situação, nomes de Wi-Fi com espaços na consola USB e as regras de Wi-Fi da página de configuração.
 
 ## Índice
 
@@ -89,7 +89,7 @@ Uma caixa nova mostra **PRIMEIRA CONFIGURAÇÃO** com o nome de uma rede Wi-Fi c
 
 A caixa reinicia. Uma caixa ainda sem campo mostra **Emparelhar caixa** e um código de 6 algarismos ([secção 5](#5-adota-a-caixa-no-campo)).
 
-**As regras do Wi-Fi do campo.** A partir da v0.9.0 (ainda não publicada), a página de configuração recusa o que a caixa não conseguiria usar, e diz porquê:
+**As regras do Wi-Fi do campo.** A partir da v0.9.0, a página de configuração recusa o que a caixa não conseguiria usar, e diz porquê:
 
 - o **nome** tem 1 a 32 bytes. Uma letra acentuada ocupa 2 bytes e um carácter chinês 3, por isso um nome com elas pode ser recusado com menos de 32 caracteres;
 - a **palavra-passe** fica vazia (uma rede aberta), tem 8 a 63 caracteres, ou exatamente 64 algarismos hexadecimais.
@@ -309,7 +309,7 @@ Quando o kit fica vazio, mostra **Sem ligaduras** e **A organização pode repor
 
 ## 10. Tirar uma caixa do jogo
 
-Uma caixa que estava desligada quando o jogo terminou nunca ouve o fim. Ao voltar a ser ligada, continua nesse jogo: mostra o ecrã do jogo e recusa todos os convites e cartões de entrada (a consola diz **recusou: noutro jogo**). Uma caixa nunca sai sozinha de um jogo quando o controlador se cala. **Não a apagues.** Há três maneiras de sair. As três precisam de firmware a partir da **v0.9.0 (ainda não publicada; até lá, compila a partir do `main`)**, na peça indicada.
+Uma caixa que estava desligada quando o jogo terminou nunca ouve o fim. Ao voltar a ser ligada, continua nesse jogo: mostra o ecrã do jogo e recusa todos os convites e cartões de entrada (a consola diz **recusou: noutro jogo**). Uma caixa nunca sai sozinha de um jogo quando o controlador se cala. **Não a apagues.** Há três maneiras de sair. As três precisam de firmware a partir da **v0.9.0**, na peça indicada.
 
 | Maneira | Quem faz | Precisa da v0.9.0 em |
 | --- | --- | --- |

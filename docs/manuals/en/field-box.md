@@ -11,7 +11,7 @@ For the person who looks after the boxes on a field: switching them on, getting 
 
 > **Not field-ready yet.** Atalaia is pre-alpha. Real Heltec V4.3 boards have played whole games on a bench with the field controller. No built box has been used on a field. Every step below matches what the firmware shows today. Steps that depend on hardware say **Not yet tested on a field**. Words in *italics* are in the [glossary](https://atalaia-project.link/en/glossary/).
 
-> **Which firmware.** The newest release is **v0.8.0** (2026-11-04). A few things below come with **v0.9.0**, which is **not released yet**: until it is, they need firmware built from the project's `main` branch. Each one says so where it appears: taking a box out of its game at the box, the controller freeing such a box by itself, Wi-Fi names with spaces on the USB console, and the setup page's Wi-Fi rules.
+> **Which firmware.** The newest release is **v0.9.0** (2026-11-06). A few things below need **v0.9.0** or later, and say so where they appear: taking a box out of its game at the box, the controller freeing such a box by itself, Wi-Fi names with spaces on the USB console, and the setup page's Wi-Fi rules.
 
 ## Contents
 
@@ -89,7 +89,7 @@ A new box shows **FIRST-TIME SETUP** with a Wi-Fi name like `atalaia-1A2B`.
 
 The box restarts. A box with no field yet shows **PAIR THIS BOX** and a 6-digit code ([section 5](#5-adopt-the-box-into-the-field)).
 
-**The field Wi-Fi rules.** From v0.9.0 (not released yet), the setup page refuses what the box could not use, and says why:
+**The field Wi-Fi rules.** From v0.9.0, the setup page refuses what the box could not use, and says why:
 
 - the **name** is 1 to 32 bytes. An accented letter takes 2 bytes and a Chinese character 3, so a name with them can be refused under 32 characters;
 - the **password** is empty (an open network), 8 to 63 characters, or exactly 64 hex digits.
@@ -309,7 +309,7 @@ When the kit is empty it shows **The kit is empty** and **The organisers can ref
 
 ## 10. Take a box out of its game
 
-A box that was switched off when its game ended never hears the end. Switched on again, it is still in that game: it shows the game's screen and refuses every invite and join card (the console says **refused: in another game**). A box never leaves a game on its own when the controller goes silent. **Do not erase it.** There are three ways out. All three need firmware from **v0.9.0 (not released yet; build from `main` until then)**, on the piece named.
+A box that was switched off when its game ended never hears the end. Switched on again, it is still in that game: it shows the game's screen and refuses every invite and join card (the console says **refused: in another game**). A box never leaves a game on its own when the controller goes silent. **Do not erase it.** There are three ways out. All three need firmware from **v0.9.0**, on the piece named.
 
 | Way | Who does it | Needs v0.9.0 on |
 | --- | --- | --- |

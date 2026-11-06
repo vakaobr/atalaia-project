@@ -9,7 +9,7 @@ Para quem dirige um campo: prepará-lo uma vez, dirigir um dia de jogo a partir 
 
 > **Ainda não está pronta para o campo.** A Atalaia está em pré-alfa. O controlador já jogou jogos inteiros com placas a sério numa bancada, mas nenhum controlador, caixa, telemóvel ou servidor foi usado num campo a sério. Cada passo abaixo corresponde ao que o software mostra hoje. Os passos que dependem de hardware dizem **Ainda não testado num campo**. As palavras em *itálico* estão no [glossário](https://atalaia-project.link/glossario/).
 
-> **Versões.** A versão mais recente é a **v0.8.0** (4 de novembro de 2026). Uma funcionalidade marcada **A partir da v0.9.0 (ainda não publicada)** só está no ramo `main` do projeto: chega com a próxima versão, ou compilando já a partir do `main`.
+> **Versões.** A versão mais recente é a **v0.9.0** (6 de novembro de 2026). Uma funcionalidade marcada **A partir da v0.9.0** precisa dessa versão ou de uma seguinte no controlador, no modem ou na caixa, como o texto indica.
 
 ## Índice
 
@@ -503,7 +503,7 @@ Tenta por esta ordem:
 3. **O controlador já não conhece o jogo** (foi reinstalado ou perdeu os dados): usa [Libertar todas as caixas que não estão neste jogo](#the-controller-was-reinstalled-or-lost-its-data).
 4. **Tira a caixa do jogo na própria caixa**: vê [Tirar uma caixa do jogo](#take-a-box-out-of-its-game).
 
-**Do que cada passo precisa.** Tudo isto é **A partir da v0.9.0 (ainda não publicada)**:
+**Do que cada passo precisa.** Tudo isto é **A partir da v0.9.0**:
 
 | Passo | Controlador | Modem de rádio USB | Caixa |
 | --- | --- | --- | --- |
@@ -516,7 +516,7 @@ Com um modem mais antigo a lista diz **O modem de rádio não consegue dizer que
 <a id="take-a-box-out-of-its-game"></a>
 ### Tirar uma caixa do jogo
 
-Na própria caixa, com o PIN de administração dela. Também serve para tirar uma caixa de um jogo ainda a decorrer: **põe primeiro o jogo em pausa**, porque o menu não abre com o jogo a decorrer e o controlador ao alcance (assim quem joga não o abre a meio do jogo). A consola passa a ver essa caixa como terminada, e o jogo continua para as outras. Uma caixa presa não ouve nada do controlador, por isso o menu dela abre 5 minutos depois de ser ligada. **A partir da v0.9.0 (ainda não publicada)** no firmware da caixa.
+Na própria caixa, com o PIN de administração dela. Também serve para tirar uma caixa de um jogo ainda a decorrer: **põe primeiro o jogo em pausa**, porque o menu não abre com o jogo a decorrer e o controlador ao alcance (assim quem joga não o abre a meio do jogo). A consola passa a ver essa caixa como terminada, e o jogo continua para as outras. Uma caixa presa não ouve nada do controlador, por isso o menu dela abre 5 minutos depois de ser ligada. **A partir da v0.9.0** no firmware da caixa; pôr primeiro em pausa é preciso a partir da v0.10.0.
 
 1. Mantém `*` premido 3 segundos.
 2. Escreve o PIN de administração e carrega em `#`.
@@ -544,7 +544,7 @@ Uma caixa com firmware mais antigo não tem este menu. Os passos 1 e 2 de [Uma c
 
 1. **Repõe uma cópia de segurança, se tiveres** ([guia de montagem do controlador](controller-setup.md)). Com a mesma chave de entrada as caixas continuam a funcionar.
 2. **Sem cópia de segurança**, dá ao controlador novo a mesma chave de entrada do campo, se ainda a tiveres. Caso contrário, adota de novo todas as caixas.
-3. **Caixas ainda no jogo antigo.** O controlador já não conhece esse jogo, por isso não o consegue terminar. Abre **Definições**, **Caixas que ficaram num jogo perdido**, toca em **Libertar todas as caixas que não estão neste jogo** (ou **Libertar todas as caixas que estão num jogo** quando não há jogo a decorrer) e confirma com **Libertar**. Todas as caixas deste campo, neste canal, que estejam noutro jogo saem dele e mostram **PRONTA**. **A partir da v0.9.0 (ainda não publicada)**, no controlador e nas caixas.
+3. **Caixas ainda no jogo antigo.** O controlador já não conhece esse jogo, por isso não o consegue terminar. Abre **Definições**, **Caixas que ficaram num jogo perdido**, toca em **Libertar todas as caixas que não estão neste jogo** (ou **Libertar todas as caixas que estão num jogo** quando não há jogo a decorrer) e confirma com **Libertar**. Todas as caixas deste campo, neste canal, que estejam noutro jogo saem dele e mostram **PRONTA**. **A partir da v0.9.0**, no controlador e nas caixas.
 
 Atenção: um jogo que outro controlador deste campo faça ao mesmo tempo, no mesmo canal, também perde as suas caixas. Uma caixa que entrou no seu jogo depois da libertação não é afetada. A libertação é recusada num controlador de reserva, com o relógio do controlador errado, e mais de uma vez em 30 segundos. Ainda não experimentado em hardware.
 
@@ -559,7 +559,7 @@ Quando o relógio está atrasado, todos os ecrãs mostram uma faixa amarela: **O
 2. Na faixa, ou em **Definições › Relógio do controlador**, toca em **Acertar o relógio do controlador por este dispositivo**. Só o código da organização o pode fazer.
 3. Diz **O relógio do controlador é agora …**.
 
-O relógio só avança: nunca para antes dos dados mais recentes que o controlador guarda, e nunca mais de 14 dias de cada vez quando já parece certo. O acerto dura até o controlador reiniciar, por isso um Pi 4 precisa dele depois de cada corte de energia. Quem fez o check-in com o relógio muito atrasado pode ter de o fazer outra vez (a app pede). **Libertar todas as caixas que não estão neste jogo** é recusado enquanto o relógio estiver errado. Para corrigir o relógio de vez, vê o [guia de montagem do controlador](controller-setup.md). Um telemóvel controlador tem a mesma faixa e o mesmo botão **a partir da v0.9.0 (ainda não publicada)**.
+O relógio só avança: nunca para antes dos dados mais recentes que o controlador guarda, e nunca mais de 14 dias de cada vez quando já parece certo. O acerto dura até o controlador reiniciar, por isso um Pi 4 precisa dele depois de cada corte de energia. Quem fez o check-in com o relógio muito atrasado pode ter de o fazer outra vez (a app pede). **Libertar todas as caixas que não estão neste jogo** é recusado enquanto o relógio estiver errado. Para corrigir o relógio de vez, vê o [guia de montagem do controlador](controller-setup.md). Um telemóvel controlador tem a mesma faixa e o mesmo botão **a partir da v0.9.0**.
 
 <a id="promote-the-standby"></a>
 ### Promover o de reserva
@@ -632,7 +632,7 @@ Cada caixa precisa do nome e da palavra-passe do Wi-Fi do campo na sua configura
 <a id="update-the-modem"></a>
 ### Atualizar o modem
 
-O modem de rádio USB **não se atualiza pelo ar**: grava-se de novo por USB. Fá-lo em cada versão que o mude, e quando a consola disser **O modem de rádio não consegue dizer que caixas ficaram num jogo terminado: atualiza o seu firmware**. Os avisos de caixas presas precisam de um modem a partir da v0.9.0 (ainda não publicada).
+O modem de rádio USB **não se atualiza pelo ar**: grava-se de novo por USB. Fá-lo em cada versão que o mude, e quando a consola disser **O modem de rádio não consegue dizer que caixas ficaram num jogo terminado: atualiza o seu firmware**. Os avisos de caixas presas precisam de um modem a partir da v0.9.0.
 
 1. Pára o controlador (num Pi: `sudo systemctl stop atalaia-controller`; num telemóvel: **Parar o controlador**).
 2. Grava a imagem do modem da mesma versão das caixas: [montar o modem de rádio](modem.md).
