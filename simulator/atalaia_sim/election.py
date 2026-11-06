@@ -30,10 +30,27 @@ Rules:
   three in a row about 10 s apart it assumes the slowest interval (30 s, so
   about 90 s of silence before a claim). TIMEs within 12.5 s of a change of
   game state are no evidence (the controller repeats the state as TIME
-  1.0, 2.5, 5.0 and 10.0 s after it, RFC 0001 Amendment 19), and a gap that
-  fits neither interval forgets what was measured. Nothing changes on the
-  wire; :attr:`leader_failover_mode` tells the engines when the leader's
-  mode differs from this node's, so they can warn.
+  1.0, 2.5, 5.0 and 10.0 s after it, RFC 0001 Amendment 19). Nothing
+  changes on the wire; :attr:`leader_failover_mode` tells the engines when
+  the leader's mode differs from this node's, so they can warn.
+- The leader's liveness and cadence come from the leader alone (decisions
+  FLC-1 to FLC-6). A follower recognises the node whose TIME (header
+  ``source``, authenticated by the MIC) it first takes at a term; a TIME at
+  that term from any other source neither refreshes the leader's liveness
+  nor touches its measured cadence, and is ignored, unless its source has a
+  lower node id and the recognised leader has missed a beacon (silence past
+  its interval plus 25 %): the survivor of a split election, where the
+  leader with the higher id yields (section "two controllers" below). Within one leader
+  and term the cadence is the shortest steady one heard: a gap shorter than
+  7.5 s (an extra TIME) is skipped without moving the measuring point, a
+  long silence starts the count again without forgetting the 10 s already
+  measured, and only two steady 30 s gaps in a row turn it back to 30 s. A
+  same-term CLAIM does not refresh the recognised leader's liveness either.
+  What this cannot stop: a node with the game key that forges the leader's
+  own ``source``, outbids it with a higher term, or beacons at the term
+  under a lower id once the real leader is gone (it is then the leader as
+  far as the radio can tell); the key is shared by every node of the game (RFC 0001
+  section 3).
 """
 
 from __future__ import annotations
@@ -126,6 +143,7 @@ class Election:
         self.role = FOLLOWER
         self.term = 0  # highest term seen (ours when leading)
         self.leader: Optional[int] = None
+        self._leader_term: Optional[int] = None  # the term the recognised leader was taken at
         self.last_heartbeat_ms: Optional[int] = None
         self.candidate_since_ms: Optional[int] = None
         self.history: list[tuple[int, str, int]] = []  # (t_ms, role, term)
@@ -145,7 +163,8 @@ class Election:
         self._slow_gaps = 0
 
     def _observe(self, source: int, term: int, now_ms: int, game_state: Optional[int]) -> None:
-        """One more TIME of the leader: measures the gap since its last one."""
+        """One more TIME of the recognised leader: measures the gap since its last regular one. The
+        cadence is kept per leader and term (decision FLC-1) and is the shortest steady one heard (FLC-2)."""
         if self._cadence_of != (source, term):
             self._reset_cadence()
             self._cadence_of = (source, term)
@@ -153,25 +172,25 @@ class Election:
             if self._last_state is None or game_state != self._last_state:
                 self._state_changed_ms = now_ms  # its repeats follow (or a leader heard first)
             self._last_state = game_state
-        prev, self._last_time_ms = self._last_time_ms, now_ms
-        if prev is None:
-            return
-        if self._state_changed_ms is not None and now_ms - self._state_changed_ms < STATE_REPEAT_WINDOW_MS:
-            return  # a state change's repeats: no evidence either way
+        prev = self._last_time_ms
+        if prev is None or (self._state_changed_ms is not None
+                            and now_ms - self._state_changed_ms < STATE_REPEAT_WINDOW_MS):
+            self._last_time_ms = now_ms
+            return  # the first TIME, or a state change's repeats: no evidence either way
         gap = now_ms - prev
+        if gap < BEACON_INTERVAL_FAILOVER_MS * (1 - CADENCE_TOLERANCE):
+            return  # an extra TIME: no evidence, and the next gap is measured from the last regular one
+        self._last_time_ms = now_ms
         if _fits(gap, BEACON_INTERVAL_FAILOVER_MS):
             self._fast_gaps += 1
             self._slow_gaps = 0
         elif _fits(gap, BEACON_INTERVAL_MS):
-            self._slow_gaps += 1
+            self._slow_gaps += 1  # one lost pair of 10 s beacons is not yet a leader on manual
             self._fast_gaps = 0
-            if self.leader_beacon_ms == BEACON_INTERVAL_FAILOVER_MS:
-                self.leader_beacon_ms = None  # two lost beacons, or a leader that is not on auto
         elif BEACON_INTERVAL_FAILOVER_MS < gap < BEACON_INTERVAL_MS:
             return  # a lost 10 s beacon, a late one: neither interval's evidence
         else:
-            self._fast_gaps = self._slow_gaps = 0
-            self.leader_beacon_ms = None
+            self._fast_gaps = self._slow_gaps = 0  # a long silence: count again, keep what was measured
             return
         if self._fast_gaps >= STEADY_FAST_GAPS:
             self.leader_beacon_ms = BEACON_INTERVAL_FAILOVER_MS
@@ -210,6 +229,7 @@ class Election:
         """Take the controller role with ``term`` (the first controller of a game)."""
         self.term = max(self.term, term)
         self.leader = self.node_id
+        self._leader_term = self.term
         self.candidate_since_ms = None
         self._reset_cadence()
         self._set_role(LEADER, now_ms)
@@ -229,6 +249,7 @@ class Election:
         self.term += 1
         self.candidate_since_ms = now_ms
         self.leader = None
+        self._leader_term = None
         self._reset_cadence()
         self._set_role(CANDIDATE, now_ms)
         return Claim(self.term, self.priority, self.node_id)
@@ -247,13 +268,29 @@ class Election:
             # the deterministic winner (lower node id) and let the other yield.
             if source > self.node_id:
                 return False
+        if self.role == FOLLOWER and self._from_another_than_the_leader(term, source, now_ms):
+            return False
         self.term = term
         self.leader = source
+        self._leader_term = term
         self.last_heartbeat_ms = now_ms
         self.candidate_since_ms = None
         self._set_role(FOLLOWER, now_ms)
         self._observe(source, term, now_ms, game_state)
         return True
+
+    def _from_another_than_the_leader(self, term: int, source: int, now_ms: int) -> bool:
+        """True for a TIME at the recognised leader's term from another source (decision FLC-3): it is
+        not the leader's liveness and is ignored. The one exception is the survivor of a split election:
+        two leaders at one term resolve to the lower node id (the other yields, :meth:`on_time`), so a
+        source with a lower id is taken once the recognised leader has missed a beacon (silence past its
+        interval plus the tolerance)."""
+        if self.leader is None or source == self.leader or self._leader_term != term:
+            return False
+        if source > self.leader or self.last_heartbeat_ms is None:
+            return source > self.leader
+        silence = now_ms - self.last_heartbeat_ms
+        return silence <= self.liveness_interval * (1 + CADENCE_TOLERANCE)
 
     def on_claim(self, term: int, priority: int, node_id: int, now_ms: int) -> None:
         """A CLAIM from another candidate."""
@@ -270,13 +307,17 @@ class Election:
             if term > self.term:
                 self._yield(term, now_ms)
             return
-        # Follower: an election is under way; wait for its winner's TIME.
+        # Follower: an election is under way; wait for its winner's TIME. A CLAIM at the term of the
+        # leader it follows is no election after that leader, and not its liveness (decision FLC-4).
+        if self.leader is not None and self._leader_term == term:
+            return
         self.term = max(self.term, term)
         self.last_heartbeat_ms = now_ms
 
     def _yield(self, term: int, now_ms: int) -> None:
         self.term = term
         self.leader = None
+        self._leader_term = None
         self.candidate_since_ms = None
         self.last_heartbeat_ms = now_ms  # give the winner a full timeout to beacon
         self._set_role(FOLLOWER, now_ms)

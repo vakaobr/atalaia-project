@@ -321,6 +321,10 @@ Findings from two real Heltec V4.3 boards and the Pi controller; the fixes are b
 - **The Field Box's lost epoch draw (EPW-2b to EPW-4b)** takes the lower half above a margin of 1024, as the controllers do; host tests and shared vectors.
 - **A bench update over the air with the bench release key (MAC-2).** Board 3, 0.6.0-dev.157 to 0.6.1-bench.1 from the console, about 22 s to confirmed after the self-test (BRING_UP step 10c).
 
+## 2026-11-06: the leader alone is its liveness (FLC-1 to FLC-6; software and host tests only)
+
+- **Failover hardened against same-term beacons from another source.** A follower measured the leader's cadence across every TIME at the term, so TIMEs from another keyed node reset it (liveness 10 s to 30 s, takeover 30 s to 90 s) and, after the leader stopped, kept a standby from taking over. The election (`election.py`, `controller_failover.dart`) now binds liveness and cadence to the recognised leader's authenticated `source`, keeps the shortest steady cadence per leader and term, and ignores same-term CLAIMs as liveness. Regression tests on both controllers. No wire change. Not tried on a field.
+
 ## 2026-11-06: a standby on automatic failover behind a main controller on manual (FAIL-1 to FAIL-6; software and host tests only)
 
 - **No false takeover from mixed failover modes.** A standby counted missed beacons at its own mode's interval, so one on `auto` behind a main controller on `manual` claimed after one late or lost 30 s beacon. The election (`election.py`, `controller_failover.dart`) now counts the interval it hears the leader beacon at: 10 s only after three steady gaps of about 10 s, else 30 s (about 90 s of silence); a state change's TIME repeats are no evidence. No wire change. Both controllers report the leader's cadence and the takeover silence, warn once per leader and term (log, stream, console), and the shared contract case changed with them. Not tried on a field.
