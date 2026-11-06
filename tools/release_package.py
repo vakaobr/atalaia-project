@@ -14,7 +14,8 @@
                                                   the field-box variant only: the modem and the pod
                                                   are not updated over the air (no Atalaia descriptor)
     python3 tools/release_package.py notes --version 0.4.0 --tag v0.4.0 --out notes.md
-        the GitHub release's text: a pre-alpha warning, the CHANGELOG's section and links
+        the GitHub release's text: a pre-alpha warning, which file is which (the phone app's
+        release-signed APK too), the CHANGELOG's section and links
 
 Standard library only. It never touches a key: signing is tools/firmware_release.py's job.
 """
@@ -33,6 +34,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 SLUG = "vakaobr/atalaia-project"
 NOTES_MAX = 120000  # GitHub's release body limit is 125000 characters
+# The certificate of the Android release key the release APK is signed with (release.yml's
+# ANDROID_CERT_SHA256, docs/community/keys.md; decisions APK-1 to APK-8).
+ANDROID_CERT_SHA256 = ("9C:35:0D:17:37:D6:C5:35:CD:3E:D1:04:28:8E:65:AD:7D:B4:FA:CE:8E:4E:6F:27:75:3B:7B:7C:38:40:A1:99")
 
 # What each image is for (the flashing README and the release notes).
 VARIANTS = {
@@ -250,6 +254,15 @@ the pod are not updated that way). The target module (an RP2040 board on a box's
 module an `atalaia-output-module-` `.uf2` file (its default channel list: four relays, 30 s at most each; other loads
 take a build of their own): hold its BOOTSEL button, plug it into a computer and copy the file onto the drive that
 appears; a module is never updated over the air. Check what you downloaded against `SHA256SUMS`.
+
+**The phone app.** `atalaia-app-{args.version}.apk` is the Android app (Android 8.0 or later), with its checksum in
+`atalaia-app-{args.version}.apk.sha256`. It is signed with the project's Android release key, certificate SHA-256
+`{ANDROID_CERT_SHA256}` ([the project's keys]({base}/blob/{args.tag}/docs/community/keys.md#the-android-app)), so
+from v0.9.0 each release installs over the one before and keeps the app's data. **Once only:** an app installed from
+an `atalaia-debug.apk` (every copy before v0.9.0) is signed with another key and must be uninstalled before the first
+release APK, which deletes its data; on a phone controller, back up first and do it between game days
+([Phone controller manual]({base}/blob/{args.tag}/docs/manuals/en/phone-controller.md#10-updates),
+[Player manual]({base}/blob/{args.tag}/docs/manuals/en/player.md#1-install-the-app)).
 
 **USB flash required once** when you come from v0.4.0 or earlier: the Field Box, modem and pod images of this release have a new partition table (4 MB OTA slots instead of 2 MB), and an update over the air cannot change the partition table. Flash the `-usb.zip` over USB once (write, no erase: the settings and the adoption stay; the cached game modes are fetched again). A box still on the old table refuses to run the new firmware and shows "Flash over USB" on its screen; one that gets it over the air from an older firmware goes back to the old one by itself. Later updates over the air work as before.
 

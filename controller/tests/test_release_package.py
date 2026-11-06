@@ -87,6 +87,19 @@ class ReleaseNotesGuides(unittest.TestCase):
         for guide in guides:
             self.assertTrue((REPO / guide).is_file(), guide)
 
+    def test_the_apk_fingerprint_is_the_workflows_and_the_keys_page(self) -> None:
+        # One certificate everywhere (decisions APK-1 to APK-8): the notes, release.yml's check
+        # and the page users verify against must not drift apart.
+        import re
+        source = (REPO / "tools" / "release_package.py").read_text(encoding="utf-8")
+        fp = re.search(r'ANDROID_CERT_SHA256 = \("([0-9A-F:]{95})"\)', source).group(1)
+        workflow = (REPO / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+        self.assertIn(f"ANDROID_CERT_SHA256: {fp}", workflow)
+        self.assertIn(fp, (REPO / "docs" / "community" / "keys.md").read_text(encoding="utf-8"))
+        self.assertIn("{ANDROID_CERT_SHA256}", source)
+        for guide in re.findall(r"\{args\.tag\}/(docs/[a-z/-]+\.md)", source):
+            self.assertTrue((REPO / guide).is_file(), guide)
+
 
 if __name__ == "__main__":
     unittest.main()

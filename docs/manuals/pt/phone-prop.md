@@ -37,11 +37,13 @@ Um **módulo de E/S** é uma placa pequena (uma Heltec V4, como a de uma caixa) 
 | Ligação ao controlador | O Wi-Fi do campo | Primeiro o Wi-Fi do campo, o rádio LoRa do módulo enquanto o Wi-Fi está em baixo |
 | Saídas, módulo de alvo, módulo de saídas | Nenhum | Se o módulo foi montado com eles ([secção 7](#7-saídas-e-módulos-no-módulo-de-es)) |
 
+<a id="2-set-up-the-phone"></a>
+
 ## 2. Preparar o telemóvel
 
 Faz isto uma vez, antes do dia de jogo.
 
-1. Instala a app Atalaia e abre-a. Em **O que vais fazer neste telemóvel?**, escolhe **Dispositivo de jogo**.
+1. Instala a app Atalaia ([Manual de quem joga, Instala a app](player.md#1-instala-a-app): a partir da v0.9.0, o APK que vem com a [versão no GitHub](https://github.com/vakaobr/atalaia-project/releases)) e abre-a. Em **O que vais fazer neste telemóvel?**, escolhe **Dispositivo de jogo**.
 2. Abre as **Definições** e define:
    - **Chave de entrada do campo**: os 64 algarismos hexadecimais que a organização te dá. Sem ela o telemóvel não entra nos jogos do campo.
    - **PIN da organização**: 4 a 8 algarismos. A app pede-o para começar, pôr em pausa, terminar e sair de um jogo, e para o menu **Organização**. Sem PIN, qualquer pessoa pode pôr em pausa ou terminar um jogo neste dispositivo.
@@ -49,6 +51,8 @@ Faz isto uma vez, antes do dia de jogo.
    - **Chaves dos modos obtidos**, só se a organização usar modos que a app não traz ([secção 8](#8-modos-que-a-app-não-traz)).
 3. Abre **Bateria e segundo plano** (nas **Definições**, ou a partir do aviso no ecrã do dispositivo) e tira a Atalaia da otimização da bateria. O ecrã dá os passos para Samsung, Xiaomi, Huawei, OnePlus e outras marcas. Sem isto, o Android pode parar a app durante um jogo.
 4. Carrega o telemóvel. Um jogo de algumas horas com o ecrã ligado gasta muita bateria: leva uma bateria externa.
+
+**Atualizações.** A partir da v0.9.0, instala o APK da versão nova por cima do antigo, entre jogos: todos os APK das versões são assinados com a única chave Android do projeto, por isso as definições acima ficam. **Só uma vez:** num dispositivo cuja app veio de um `atalaia-debug.apk` (antes da v0.9.0, ou compilado por alguém), desinstala a Atalaia antes do primeiro APK de uma versão, porque o Android recusa instalá-lo por cima de uma app assinada com outra chave. Desinstalar apaga as definições do dispositivo: a chave de entrada do campo, o PIN da organização, o modo quiosque, as chaves dos modos, o módulo de E/S ligado e a exceção da bateria. Faz isto entre dias de jogo, com a chave de entrada à mão (a organização tem-na), depois prepara o telemóvel outra vez a partir do passo 1 e liga o módulo de novo ([secção 3](#3-ligar-um-módulo-de-es)).
 
 ## 3. Ligar um módulo de E/S
 

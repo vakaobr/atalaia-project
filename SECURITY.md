@@ -72,7 +72,7 @@ Limits: the window lives in RAM, so a box that has just rebooted accepts the fir
 
 - A pinned **field CA is exactly one certificate**: a bundle is refused, and the app keeps only the certificate it hashed (APP-1).
 - **No app-wide cleartext HTTP on Android.** The network security config allows plain HTTP only to the loopback, the emulator's host, `192.168.4.1` and `atalaia.local` (the web-view console); a build with `-Patalaia.cleartextLan=true` restores the old policy for fields whose console has another address (APP-3). The app's own clients still pin the field CA.
-- **The release APK is never signed with the debug key by accident**: it reads a keystore from `ATALAIA_RELEASE_*` variables or Gradle properties and stops without one. The maintainer has not yet made the release keystore (APP-2).
+- **The release APK is never signed with the debug key by accident**: it reads a keystore from `ATALAIA_RELEASE_*` variables or Gradle properties and stops without one. Since v0.9.0 the release APK attached to each GitHub release is signed with the project's Android key, kept in the `release` environment, and the release fails unless `apksigner` reports its certificate (APK-1 to APK-8; fingerprint in docs/community/keys.md).
 - **The social-login ticket is bound to the app instance**, so a ticket taken from the return link is useless (APP-4).
 
 ## Personal data at a field and on the server

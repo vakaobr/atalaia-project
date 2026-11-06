@@ -17,6 +17,10 @@
 #                                     and that it carries no Google Play services;
 #                                     then a release build with no keystore, which must
 #                                     stop and say so (APP-2)
+#   sh app/tool/check.sh apk-release  the release APK, signed with the release key
+#                                     (ATALAIA_RELEASE_*), the same checks, and apksigner's
+#                                     certificate SHA-256 must be ATALAIA_APK_CERT_SHA256
+#                                     (release.yml; decisions APK-1 to APK-8)
 #   sh app/tool/check.sh format       format lib/, test/, integration_test/ and tool/ in place
 #   sh app/tool/check.sh lock         resolve pubspec.yaml again and write pubspec.lock
 #   sh app/tool/check.sh gen          write lib/modes/builtin_modes.g.dart from modes/
@@ -149,6 +153,44 @@ check_android_lib() {
     echo "ok   $abi  $(wc -c < "$lib") bytes, needs: $needed"
 }
 
+check_apk() {
+    apk="$1"
+    rm -rf /tmp/apk-lib /tmp/apk-dex
+    listing=$(unzip -l "$apk")
+    for abi in $ABIS; do
+        echo "$listing" | grep -q "lib/$abi/libatalaia_core.so" \
+            || { echo "check.sh: $apk has no lib/$abi/libatalaia_core.so" >&2; exit 1; }
+        mkdir -p "/tmp/apk-lib/$abi"
+        unzip -o -q "$apk" "lib/$abi/libatalaia_core.so" -d "/tmp/apk-lib/$abi"
+        check_android_lib "/tmp/apk-lib/$abi/lib/$abi/libatalaia_core.so" "$abi"
+    done
+    # The GM console the phone controller serves: every file of controller/console/src
+    # (and the check-in notices) in the APK's assets (decision PE24-61).
+    n=0
+    for f in $(cd assets && find console notices -type f); do
+        echo "$listing" | grep -q " assets/flutter_assets/assets/$f\$" \
+            || { echo "check.sh: $apk has no assets/$f" >&2; exit 1; }
+        n=$((n + 1))
+    done
+    echo "ok   the GM console and the check-in notices in the APK ($n files)"
+    # No proprietary SDKs (decision PD5): no Google Play services or ML Kit classes.
+    mkdir -p /tmp/apk-dex
+    unzip -o -q "$apk" 'classes*.dex' -d /tmp/apk-dex
+    # (A known class must be found: proof that the search reads the classes. ZXing's in a debug
+    # APK; in a release APK R8 renames the libraries' classes, so the QR scanner activity, which
+    # the manifest names and R8 keeps. The Google Play services search proper is the debug APK's:
+    # both builds have the same dependencies.)
+    marker="${2:-Lcom/google/zxing/qrcode/QRCodeReader;}"
+    cat /tmp/apk-dex/classes*.dex | grep -a -q -F "$marker" \
+        || { echo "check.sh: cannot read the classes of $apk (no $marker)" >&2; exit 1; }
+    if cat /tmp/apk-dex/classes*.dex | grep -a -q -E 'Lcom/google/android/gms/|Lcom/google/mlkit/'; then
+        echo "check.sh: $apk contains Google Play services or ML Kit classes" >&2
+        exit 1
+    fi
+    echo "ok   no Google Play services or ML Kit classes in the APK"
+    echo "ok   $apk ($(wc -c < "$apk") bytes)"
+}
+
 flutter --version
 case "$MODE" in
     check)
@@ -186,34 +228,7 @@ case "$MODE" in
         flutter pub get --enforce-lockfile
         flutter build apk --debug
         apk=build/app/outputs/flutter-apk/app-debug.apk
-        listing=$(unzip -l "$apk")
-        for abi in $ABIS; do
-            echo "$listing" | grep -q "lib/$abi/libatalaia_core.so" \
-                || { echo "check.sh: $apk has no lib/$abi/libatalaia_core.so" >&2; exit 1; }
-            mkdir -p "/tmp/apk-lib/$abi"
-            unzip -o -q "$apk" "lib/$abi/libatalaia_core.so" -d "/tmp/apk-lib/$abi"
-            check_android_lib "/tmp/apk-lib/$abi/lib/$abi/libatalaia_core.so" "$abi"
-        done
-        # The GM console the phone controller serves: every file of controller/console/src
-        # (and the check-in notices) in the APK's assets (decision PE24-61).
-        n=0
-        for f in $(cd assets && find console notices -type f); do
-            echo "$listing" | grep -q " assets/flutter_assets/assets/$f\$" \
-                || { echo "check.sh: $apk has no assets/$f" >&2; exit 1; }
-            n=$((n + 1))
-        done
-        echo "ok   the GM console and the check-in notices in the APK ($n files)"
-        # No proprietary SDKs (decision PD5): no Google Play services or ML Kit classes.
-        mkdir -p /tmp/apk-dex
-        unzip -o -q "$apk" 'classes*.dex' -d /tmp/apk-dex
-        # (ZXing's classes must be found: proof that the search reads the classes.)
-        cat /tmp/apk-dex/classes*.dex | grep -a -q 'Lcom/google/zxing/qrcode/QRCodeReader;'             || { echo "check.sh: cannot read the classes of $apk" >&2; exit 1; }
-        if cat /tmp/apk-dex/classes*.dex | grep -a -q -E 'Lcom/google/android/gms/|Lcom/google/mlkit/'; then
-            echo "check.sh: $apk contains Google Play services or ML Kit classes" >&2
-            exit 1
-        fi
-        echo "ok   no Google Play services or ML Kit classes in the APK"
-        echo "ok   $apk ($(wc -c < "$apk") bytes)"
+        check_apk "$apk"
         # A release build must not fall back to the debug key (security review APP-2): with no
         # release keystore and no explicit opt-in it has to stop and say what to set.
         if ATALAIA_RELEASE_STORE_FILE= ATALAIA_RELEASE_STORE_PASSWORD= ATALAIA_RELEASE_KEY_ALIAS= \
@@ -229,6 +244,51 @@ case "$MODE" in
             cp "$apk" "$ATALAIA_APK_OUT/atalaia-debug.apk"
             echo "ok   copied to app/build/atalaia-debug.apk"
         fi
+        ;;
+    apk-release)
+        # The release APK the release workflow attaches (decisions APK-1 to APK-8): signed with the
+        # release key named by ATALAIA_RELEASE_STORE_FILE, _STORE_PASSWORD, _KEY_ALIAS and
+        # _KEY_PASSWORD (build.gradle.kts), the same checks as the debug APK, then apksigner must
+        # say it verifies and that its one signer's certificate has the SHA-256 in
+        # ATALAIA_APK_CERT_SHA256 (64 hex digits, colons and case ignored). ATALAIA_APK_VERSION is
+        # the release's version (X.Y.Z or X.Y.Z-pre): the versionName, and X*1000000+Y*1000+Z the
+        # versionCode, so every release installs over the one before. The APK is copied to
+        # $ATALAIA_APK_OUT/atalaia-app-<version>.apk.
+        version="${ATALAIA_APK_VERSION:?ATALAIA_APK_VERSION is not set}"
+        want=$(printf '%s' "${ATALAIA_APK_CERT_SHA256:?ATALAIA_APK_CERT_SHA256 is not set}" | tr -d ':' | tr 'A-F' 'a-f')
+        out="${ATALAIA_APK_OUT:?ATALAIA_APK_OUT is not set}"
+        printf '%s' "$want" | grep -Eqx '[0-9a-f]{64}' \
+            || { echo "check.sh: ATALAIA_APK_CERT_SHA256 is not a SHA-256 fingerprint" >&2; exit 1; }
+        core=${version%%-*}
+        printf '%s' "$core" | grep -Eqx '[0-9]+\.[0-9]+\.[0-9]+' \
+            || { echo "check.sh: ATALAIA_APK_VERSION $version is not X.Y.Z[-pre]" >&2; exit 1; }
+        IFS=. read -r major minor patch <<EOV
+$core
+EOV
+        [ "$minor" -lt 1000 ] && [ "$patch" -lt 1000 ] && [ "$major" -lt 2100 ] \
+            || { echo "check.sh: $version does not fit the versionCode scheme" >&2; exit 1; }
+        code=$((major * 1000000 + minor * 1000 + patch))
+        android_tools
+        flutter pub get --enforce-lockfile
+        flutter build apk --release --build-name "$version" --build-number "$code"
+        apk=build/app/outputs/flutter-apk/app-release.apk
+        check_apk "$apk" "Lorg/atalaia/app/QrScanActivity;"
+        # The newest build-tools' apksigner (the image's SDK has them).
+        apksigner=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -n 1)
+        [ -x "$apksigner" ] || { echo "check.sh: no apksigner in $ANDROID_HOME/build-tools" >&2; exit 1; }
+        "$apksigner" verify --verbose --print-certs "$apk" > /tmp/apksigner.txt 2>&1 \
+            || { cat /tmp/apksigner.txt; echo "check.sh: apksigner does not verify $apk" >&2; exit 1; }
+        grep -E '^Verified using|^Number of signers|certificate (DN|SHA-256)' /tmp/apksigner.txt
+        grep -qx 'Number of signers: 1' /tmp/apksigner.txt \
+            || { echo "check.sh: $apk must have exactly one signer" >&2; exit 1; }
+        got=$(sed -n 's/^Signer #1 certificate SHA-256 digest: *//p' /tmp/apksigner.txt | tr 'A-F' 'a-f')
+        if [ "$got" != "$want" ]; then
+            echo "check.sh: $apk is signed by certificate $got, not the release key $want" >&2
+            exit 1
+        fi
+        echo "ok   $apk is signed by the certificate $got"
+        cp "$apk" "$out/atalaia-app-$version.apk"
+        echo "ok   copied to atalaia-app-$version.apk (versionName $version, versionCode $code)"
         ;;
     format)
         flutter pub get --enforce-lockfile

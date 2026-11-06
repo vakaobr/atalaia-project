@@ -20,15 +20,19 @@ For people who play on an Atalaia field. You install the app, check in at the fi
 
 ## 1. Install the app
 
-The app is **not in Google Play or the App Store yet**. Ask the organisers: they may give you the installation file (`atalaia-debug.apk`), or you can build it yourself with the [app guide](../../../app/README.md#install-it-on-an-android-phone-from-windows).
+The app is **not in Google Play or the App Store yet**. From v0.9.0 on, every [GitHub release](https://github.com/vakaobr/atalaia-project/releases) has the Android app attached: `atalaia-app-<version>.apk`, with `atalaia-app-<version>.apk.sha256` (its SHA-256 checksum) next to it. The organisers may also give you the file, or you can build it yourself with the [app guide](../../../app/README.md#install-it-on-an-android-phone-from-windows) (a build of your own is debug-signed: see the warning below).
 
 ### Android
 
-1. Get the `atalaia-debug.apk` file onto your phone (USB cable, memory card or a shared folder). It is about 150 MB.
+1. Download `atalaia-app-<version>.apk` from the release page, on the phone or on a computer, and get it onto the phone (USB cable, memory card or a shared folder). It is about 80 MB.
 2. Open it in the phone's file manager.
 3. If Android asks, allow **Install unknown apps** for that file manager.
 4. Tap **Install**, then open **Atalaia**.
 5. Allow the permissions the app asks for when you use them: camera, location and notifications.
+
+**Updates.** From v0.9.0 on, the release APKs are all signed with the project's one Android key: download the new release's APK and install it over the old one. Android keeps your settings, your tickets and the fields you trust. The certificate's SHA-256 fingerprint is in [the project's keys](../../community/keys.md#the-android-app); Android refuses an APK that claims to be Atalaia but is signed with another key.
+
+**Once only: an app from an older file.** Before v0.9.0 the app was given out as `atalaia-debug.apk`, signed with the key of whichever computer built it. Android will not install the release APK over it (*App not installed*, or *conflicts with an existing package*). Uninstall Atalaia once, then install the release APK; after that, updates install in place. Uninstalling deletes what the app keeps: your language and settings, your check-in ticket and the fields you trusted. After installing again, choose your language, scan the field's poster, trust the field and check in again (or ask the marshal for a new ticket). **If this phone is a field's phone controller or a game prop, read the warning in the [Phone controller manual](phone-controller.md#10-updates) or the [Phone prop guide](phone-prop.md#2-set-up-the-phone) first**: those lose more.
 
 ### iPhone
 
