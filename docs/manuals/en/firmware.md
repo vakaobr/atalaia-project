@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Firmware guide for builders
 
-For the person who builds a box or a prop and has to put the software on it. You do not need to write code. You need a computer, a USB-C data cable and the board. The steps are the same for every kind of board in the project: the Field Box, the Satellite, the I/O pod and the controller's modem board.
+For the person who builds a box or a prop and has to put the software on it. You do not need to write code. You need a computer, a USB-C data cable and the board. The steps are the same for the project's ESP32 boards: the Field Box, the Satellite, the I/O pod and the controller's modem board. The two small RP2040 boards on the expansion port (the target and the output module) are flashed another, simpler way: [section 11](#11-the-expansion-modules-target-and-output-module).
 
 > **Not field-ready yet.** The firmware releases on GitHub are marked pre-release for that reason. Atalaia is pre-alpha. Real Heltec V4.3 boards have been flashed and used on a bench with the field controller: boot, radio, buttons, the board's own OLED, adoption by USB cable and by code, and an update over the air. Nothing else in this guide has run on a real board. Steps that depend on hardware that was not tried say **Not yet tested on a real board**.
 
-The hardware is in the build manuals: [Field Box](../../../hardware/field-box/BUILD.md), [Satellite](../../../hardware/satellite/BUILD.md), [I/O pod](../../../hardware/io-pod/BUILD.md). The controller is in the [controller setup guide](controller-setup.md), and its radio modem board in [Set up the radio modem](modem.md).
+The hardware is in the build manuals: [Field Box](../../../hardware/field-box/BUILD.md), [Satellite](../../../hardware/satellite/BUILD.md), [I/O pod](../../../hardware/io-pod/BUILD.md), [expansion port](../../../hardware/expansion-port/BUILD.md), [target](../../../hardware/target-addon/BUILD.md), [output module](../../../hardware/output-module/BUILD.md). Using the boxes on a field (setup, outputs, taking a box out of its game, updates) is in the [Field Box operator manual](field-box.md). The controller is in the [controller setup guide](controller-setup.md), and its radio modem board in [Set up the radio modem](modem.md).
 
 ## Contents
 
@@ -23,10 +23,11 @@ The hardware is in the build manuals: [Field Box](../../../hardware/field-box/BU
 8. [A box that does not boot](#8-a-box-that-does-not-boot)
 9. [The modem board](#9-the-modem-board)
 10. [The I/O pod variants](#10-the-io-pod-variants)
+11. [The expansion modules: target and output module](#11-the-expansion-modules-target-and-output-module)
 
 ## 1. What you flash
 
-There is one firmware project and four images you can build from it.
+There is one ESP32 firmware project and four images you can build from it, plus the firmware of the two expansion modules.
 
 | Image | Build command | Output folder | For | Use in a game |
 | --- | --- | --- | --- | --- |
@@ -34,8 +35,9 @@ There is one firmware project and four images you can build from it.
 | USB radio modem | `python tools/docker_fw.py modem` | `firmware/esp32/build-modem/` | The second board, plugged into the controller | Yes |
 | I/O pod | `python tools/docker_fw.py pod` | `firmware/esp32/build-pod/` | A board that lends its buttons and radio to an Android phone | Yes |
 | Bench | `python tools/docker_fw.py bench` | `firmware/esp32/build-bench/` | A bare board on your desk: keys typed on the USB console, no setup page, admin PIN 1234 | **Never** |
+| Target and output module (RP2040, UF2 files) | `python tools/docker_module.py build` | `firmware/target-module/build/`, `firmware/output-module/build/` | The boards on a box's or a pod's expansion port | Yes ([section 11](#11-the-expansion-modules-target-and-output-module)) |
 
-All of them are made for the **Heltec WiFi LoRa 32 V4** (revision V4.3 by default, V4.2 with one change, see [section 4](#4-the-options-a-builder-sets)). Do not flash a build for one kind of board onto another. A box will refuse an update made for another variant or board anyway.
+The four ESP32 images are made for the **Heltec WiFi LoRa 32 V4** (revision V4.3 by default, V4.2 with one change, see [section 4](#4-the-options-a-builder-sets)). Do not flash a build for one kind of board onto another. A box will refuse an update made for another variant or board anyway.
 
 ## 2. Get the firmware: download a release, or build it
 
@@ -43,7 +45,9 @@ Two ways. Download a release if you only want to put the project's firmware on a
 
 ### 2.1 Download a release (the easy way)
 
-The project publishes firmware on GitHub: [the Releases page](https://github.com/vakaobr/atalaia-project/releases). Take the newest one (v0.6.1 on 2026-11-02; the first was v0.4.0; v0.6.0 has no files, its build failed). Each is marked **pre-release**: pre-alpha and **not field-tested**. Read its notes first.
+The project publishes firmware on GitHub: [the Releases page](https://github.com/vakaobr/atalaia-project/releases). Take the newest one: **v0.8.0**, 2026-11-04 (before it v0.7.0, 2026-11-03, and v0.6.1, 2026-11-02; the first was v0.4.0; v0.6.0 has no files, its build failed). Each is marked **pre-release**: pre-alpha and **not field-tested**. Read its notes first.
+
+**v0.8.0 changed the release keys.** It is signed with the project's new CI key, which boxes on v0.6.1 or older do not trust. Flash such a box over USB, or take it through v0.7.0 first: [section 7.1](#71-with-the-projects-releases). A few things in this guide come with v0.9.0, which is not released yet; they say so, and need a build from `main` until then.
 
 Pick the files for your board:
 
@@ -52,9 +56,11 @@ Pick the files for your board:
 | A Field Box, or a Satellite (same image) | `atalaia-field-box-<version>-usb.zip` (esptool over USB) or `atalaia-field-box-<version>-merged.bin` (browser flasher) | The plain `atalaia-field-box-<version>.bin` and its `.bin.release.json` are for updates over the air ([section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)); you do not need them to flash |
 | The controller's USB radio modem | `atalaia-modem-<version>-usb.zip` or `-merged.bin` | The second board, plugged into the controller |
 | An I/O pod | `atalaia-io-pod-<version>-usb.zip` or `-merged.bin` | |
+| A target (from v0.8.0) | `atalaia-target-module-<version>.uf2` (one plate) or `atalaia-target-module-2-<version>.uf2` (two plates) | [Section 11](#11-the-expansion-modules-target-and-output-module) |
+| An output module (from v0.8.0) | `atalaia-output-module-<version>.uf2` | Four relays, 30 s at most each; other loads need a build of your own ([section 11](#11-the-expansion-modules-target-and-output-module)) |
 | Never for a game | (the bench image is not released) | Build it yourself if you need it |
 
-All of them are for the Heltec WiFi LoRa 32 V4.3, European radio region (EU868), listen before talk on, with the project's keys built in. For V4.2, for Taiwan (AS923) or for your own keys, build it yourself ([2.2](#22-build-it-yourself)).
+The ESP32 files are for the Heltec WiFi LoRa 32 V4.3, European radio region (EU868), listen before talk on, with the project's keys built in. For V4.2, for Taiwan (AS923) or for your own keys, build it yourself ([2.2](#22-build-it-yourself)).
 
 **Check what you downloaded.** Download `SHA256SUMS` too, and compare. On Linux and macOS, in the folder of the files (`shasum -a 256 -c SHA256SUMS` on macOS; files you did not download are reported missing, ignore them):
 
@@ -62,13 +68,13 @@ All of them are for the Heltec WiFi LoRa 32 V4.3, European radio region (EU868),
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 
-On Windows `cmd`: `certutil -hashfile atalaia-field-box-0.6.1-usb.zip SHA256` and compare the line with the one in `SHA256SUMS`. The sums prove the file is the one the release page lists. The signature proves who made a Field Box image: the `.release.json` is signed with one of the project's CI release keys, which every box trusts by default (`firmware/esp32/docs/RELEASE_SIGNING.md`). A box and a controller check it for you before they install an update.
+On Windows `cmd`: `certutil -hashfile atalaia-field-box-0.8.0-usb.zip SHA256` and compare the line with the one in `SHA256SUMS`. The sums prove the file is the one the release page lists. The signature proves who made a Field Box image: the `.release.json` is signed with one of the project's CI release keys, which every box trusts by default (`firmware/esp32/docs/RELEASE_SIGNING.md`). A box and a controller check it for you before they install an update.
 
 **Flash the zip.** Unzip it. In that folder follow [section 3](#3-flash-it) from 3.1 on: the commands are the same, and the `README.txt` inside the zip repeats them. The folder has the `flash_args` file the command uses, so skip the build and the `cd firmware/esp32/build` step.
 
 **Flash the merged file from a browser** (Chrome or Edge, no Python): open Espressif's web flasher, [https://espressif.github.io/esptool-js/](https://espressif.github.io/esptool-js/), connect the board (download mode if it does not appear, [3.2](#32-find-the-boards-port)), set the flash address to `0x0`, choose the `-merged.bin` file and program. Not tried by the project with a real board yet; the file is the same one the esptool command produces from the zip.
 
-The version on the release is the version the box shows at boot (`0.6.1`).
+The version on the release is the version the box shows at boot (`0.8.0`).
 
 ### 2.2 Build it yourself
 
@@ -87,7 +93,7 @@ python tools/docker_fw.py build
 
 On macOS and Linux, use `python3` if `python` is not found. The first build downloads the build tools and takes several minutes (about ten the first time). It ends with a line that names the file `firmware/esp32/build/atalaia_esp32.bin`. The other files you need are in the same folder. You do not need to read them.
 
-A build from a checkout prints a version such as `0.6.1+12.g1a2b3c4` (or `0.7.0-dev.12+g1a2b3c4` between releases): the release's number, the number of changes since, and the code's identifier. It is also on the board's small screen at boot. Keep a note of it with the box. To get exactly a release's firmware, check out its tag (`git checkout v0.6.1`) and build there: a clean checkout of a tag says plain `0.6.1`.
+A build from a checkout prints a version such as `0.8.0+12.g1a2b3c4` (or `0.9.0-dev.12+g1a2b3c4` between releases): the release's number, the number of changes since, and the code's identifier. It is also on the board's small screen at boot. Keep a note of it with the box. To get exactly a release's firmware, check out its tag (`git checkout v0.8.0`) and build there: a clean checkout of a tag says plain `0.8.0`.
 
 **Keys.** A build you make trusts the project's two release keys and two mode keys by default, the same as the released files, so a controller you run accepts the project's signed releases. Your own builds are not signed by the project: sign them with your own key and give the boxes its public half (`--release-keys=`, [section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)).
 
@@ -152,7 +158,7 @@ Keep the quotes: PowerShell reads a bare `@` differently. `flash_args` is a file
 
 For the modem and the pod, go to `build-modem` or `build-pod` instead. The modem has its own page, with these commands for each system: [Set up the radio modem](modem.md).
 
-**USB flash required once, from v0.5.** A box flashed with v0.4.0 or earlier has the old partition table (2 MB program slots). From v0.5 the program slots are 4 MB, and an update over the air cannot change the partition table, so flash such a box over USB once, with the command above and **without** `erase_flash`: the settings, the keys and the adoption stay where they are (the table's first four partitions did not move). What is lost is the storage partition, which moved: the box formats it on the first start and fetches the game modes and the field's logo again at the next join. A box still on the old table refuses to run the new firmware: its screen says *Flash over USB* and the log says `WRONG PARTITION TABLE`. A box that was offered the new image over the air by an older firmware goes back to its old one by itself. After the one USB flash, updates over the air work as before. The USB radio modem and the I/O pod share the table: one already flashed with v0.4.0 or earlier only logs `WRONG PARTITION TABLE` and keeps working, but flash it over USB once as well (without `erase_flash`) so it has the new layout.
+**USB flash required once, from v0.5.** A box flashed with v0.4.0 or earlier has the old partition table (2 MB program slots). From v0.5 the program slots are 4 MB, and an update over the air cannot change the partition table, so flash such a box over USB once, with the command above and **without** `erase_flash`: the settings, the keys and the adoption stay where they are (the table's first four partitions did not move). What is lost is the storage partition, which moved: the box formats it on the first start and fetches the game modes it lacks again at the next join. A box still on the old table refuses to run the new firmware: its screen says *Flash over USB* and the log says `WRONG PARTITION TABLE`. A box that was offered the new image over the air by an older firmware goes back to its old one by itself. After the one USB flash, updates over the air work as before. The USB radio modem and the I/O pod share the table: one already flashed with v0.4.0 or earlier only logs `WRONG PARTITION TABLE` and keeps working, but flash it over USB once as well (without `erase_flash`) so it has the new layout.
 
 ### 3.4 Restart and watch
 
@@ -188,7 +194,7 @@ Most options are build options. Give them to `docker_fw.py`:
 | Listen before talk | `--lbt=on` or `--lbt=off` | on |
 | Antenna gain | `--antenna-dbi=10` (the fitted antenna's rated gain, 0 to 20 dBi): the firmware lowers the transmit power by it, so a higher-gain antenna stays within the legal radiated power | 2 dBi |
 | Mode keys | `--mode-keys=<key>[,<key>...]` (up to 4, hex or base64) | The project's two keys |
-| Release keys | `--release-keys=<key>[,<key>...]` (up to 4) | None: every update is refused |
+| Release keys | `--release-keys=<key>[,<key>...]` (up to 4, hex or base64) | The project's two release keys: root `424d053af5cdbc35` and CI `a4f6002b0122b131` ([section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)) |
 | Version | `--fw-version=0.4.1` | From the code |
 | Piezo buzzer (on GPIO 45) | `--buzzer=on` | off |
 | Simple output: an RC relay switch for a siren, strobe or smoke remote (GPIO 46 on a V4.3, 5 on a V4.2; not yet tried on hardware) | `--simple-out=on`; `--simple-out=on2` adds a second one on GPIO 45 (not with the buzzer); a number picks another free GPIO (a bench board) | off |
@@ -237,7 +243,7 @@ A new Field Box or Satellite does this on its first start. The 2.4 GHz antenna m
    - **Admin PIN**: 4 to 8 digits. Write it down. 1234, 0000, a sequence such as 9876 and a repeated pair such as 1212 are refused.
    - **Display Brightness** and **Audio Volume**.
    - **Field join key** (optional): the 64 digits from the organisers. You can add it later by adoption.
-   - **Field Wi-Fi name** and **password** (optional, but needed for updates and fetched game modes: [section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)). The field Wi-Fi must be 2.4 GHz. The password is 8 to 63 characters, 64 hex digits, or none for an open network, as on the USB console; the page refuses any other. The name is at most 32 bytes, also as on the USB console: an accented letter takes 2 and a Chinese character 3, so a name with them can be refused under 32 characters.
+   - **Field Wi-Fi name** and **password** (optional, but needed for updates and fetched game modes: [section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)). The field Wi-Fi must be 2.4 GHz. The name is 1 to 32 bytes: an accented letter takes 2 and a Chinese character 3, so a name with them can be refused under 32 characters. The password is none (an open network), 8 to 63 characters, or exactly 64 hex digits. From v0.9.0 (not released yet) the page refuses anything else and says why, as the USB console does; v0.8.0 and older cut a longer name or password without saying so.
 5. Tap **Save & Reboot**. The box restarts.
 
 Then a box with no field shows **PAIR THIS BOX** and a 6-digit code ([section 6](#6-adoption)). A box that is already adopted shows **READY**.
@@ -249,7 +255,7 @@ Then a box with no field shows **PAIR THIS BOX** and a 6-digit code ([section 6]
 
 The box keeps its adoption and its field key. It replaces what the page asks for. The bench build has no setup page.
 
-**Take a box out of its game.** A box that was switched off when its game ended comes back in that game: its log refuses every join (`join: a game is being played`) and USB adoption (`busy`). Do not erase it. A controller whose USB radio modem runs this release's modem firmware or later hears it and sends that game's GAME_OVER again, at most once a minute, and the box frees itself (its log: `game N is over (said by a field controller)`); flash the modem first (`python tools/docker_fw.py modem`) to get this. Otherwise: On the USB console type `@leave` and the admin PIN, then Enter. The box answers `leave: game N is over on this box; it is free for the next game`: it ends the game as the controller's end would, never joins that game again, and keeps its adoption, its join key, its Wi-Fi, its admin PIN and its modes. A wrong PIN counts toward the waits below. It works in a running game too. A box with a keypad has the same in its admin menu: hold `*` 3 seconds ([Field Box manual](field-box.md#d-take-a-box-out-of-its-game)). The bench build takes `@leave` alone.
+**Take a box out of its game.** A box that was switched off when its game ended comes back in that game: its log refuses every join (`join: a game is being played`) and USB adoption (`busy`). Do not erase it. From v0.9.0 (not released yet; build from `main` until then), type `@leave` and the admin PIN on the USB console, then Enter. The box answers `leave: game N is over on this box; it is free for the next game`, and keeps its adoption, its join key, its Wi-Fi, its admin PIN and its modes. A wrong PIN counts toward the waits below. The bench build takes `@leave` alone. The other ways out (the box's admin menu, and the controller freeing it by itself with a v0.9.0 modem) are in the [Field Box manual](field-box.md#take-a-box-out-of-its-game).
 
 **Forgotten PIN.** After five wrong PINs the box makes you wait 1, 2, 4... up to 60 minutes. The wait survives a restart. If you really lost the PIN, erase the settings ([section 8](#8-a-box-that-does-not-boot)).
 
@@ -267,27 +273,47 @@ A box of another field asks for its **admin PIN**. **Change field** moves a box 
 
 ## 7. Updates over the air, and what else uses the field Wi-Fi
 
-Two things use the field's Wi-Fi, and only between games: **firmware updates** and **game modes the box does not have** (fetched from the controller as signed packages). For both the box needs the **field Wi-Fi name and password** from the setup page. You can also set them on the USB console: `@wifi <name> <password>`. A name or password with spaces goes in double quotes: `@wifi "My Field" "pass word"` (inside the quotes, `\"` is a quote and `\\` a backslash). The name is up to 32 bytes; the password is 8 to 63 characters, 64 hex digits, or none for an open network. The box answers `field Wi-Fi: stored (network "My Field")`, or `refused:` and why (a quote left open, for example), and then stores nothing. The controller must be running with HTTPS on.
+Two things use the field's Wi-Fi, and only between games: **firmware updates** and **game modes the box does not have** (fetched from the controller as signed packages). For both the box needs the **field Wi-Fi name and password** from the setup page, and the controller must be running with HTTPS on.
+
+You can also set the Wi-Fi on the USB console: `@wifi <name> <password>`, or `@wifi <name>` for an open network. From v0.9.0 (not released yet), a name or password with spaces goes in double quotes: `@wifi "My Field" "pass word"` (inside the quotes, `\"` is a quote and `\\` a backslash). The rules are the setup page's ([section 5](#5-first-boot-and-setup)). The box answers `field Wi-Fi: stored (network "My Field")`, or `field Wi-Fi: refused:` and why (a quote left open, for example), and then stores nothing. On v0.8.0, `@wifi` takes no spaces in the name.
 
 **The rules for firmware updates.** The box installs an update only if all of these are true:
 
 - No game is being played.
-- The update is signed by a **release key built into the box's own firmware** (`--release-keys`). By default that is the project's two release keys (root and CI), so the Field Box files from a GitHub release can be installed as updates; a box built with `--release-keys=` your own key trusts only that. The project's keys and what happens if one leaks are in [RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md).
+- The update is signed by a **release key built into the box's own firmware** (`--release-keys`, [section 4](#4-the-options-a-builder-sets)). By default that is the project's two release keys, so the Field Box files from a GitHub release can be installed as updates; a box built with `--release-keys=` your own key trusts only that.
 - The version is higher than the one it runs.
 - It is the same variant and board (a V4.2 image never goes on a V4.3).
 - The battery is at 30 % or more, if the box has a gauge.
 
-**The short path.**
+The controller checks the signature too, when the release is uploaded, against its own `[firmware] release_keys`: a release signed by a key it does not list is refused. How the organisers run an update from the console: [Field Box manual, Update the boxes](field-box.md#update-the-boxes).
 
-**With the project's releases:** flash a box once over USB with a release, then upload a later release's `atalaia-field-box-<version>.bin` and its `.bin.release.json` in the console's **Boxes** tab. The controller's `[firmware] release_keys` already holds the project's keys by default (a Pi without the setting takes the new default when it starts). If your `controller.toml` lists them by hand (the example file did), make the list the root key `5tzPkN0AJSn+g34CP59linCRf/fcaWFc7GAAg7qzYNc=` and the CI key `76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=`, and drop the old CI key `rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw=` (key id `32b3c815ac30ad43`): the project's releases are signed with the CI key `a4f6002b0122b131` since the release after v0.7.0, and the old key is retired. Nothing removes it from your list for you. A site server's `ATALAIA_FIRMWARE_KEYS`, if you set it, drops it too. A box still on v0.6.1 or older trusts only the root and the old CI key: install v0.7.0 on it first (over the air or by USB), then the later releases ([RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md#rotating-the-ci-key-2026-11)). Press **Update to** (step 5). **With your own key:**
+### 7.1 With the project's releases
+
+The project has two release keys, listed in [docs/community/keys.md](../../community/keys.md) and [RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md):
+
+| Key | Key id | Public key (base64, for `controller.toml`) |
+| --- | --- | --- |
+| Root | `424d053af5cdbc35` | `5tzPkN0AJSn+g34CP59linCRf/fcaWFc7GAAg7qzYNc=` |
+| CI (signs the releases from v0.8.0) | `a4f6002b0122b131` | `76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=` |
+| Old CI, **retired** (signed the releases up to v0.7.0) | `32b3c815ac30ad43` | `rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw=` |
+
+Firmware up to v0.6.1 trusts root and the old CI key; v0.7.0 trusts all three; v0.8.0 and later trust root and the new CI key only. To bring a field onto v0.8.0 or later:
+
+1. **Flash each box once over USB** with a release, if it has never been ([section 3](#3-flash-it)).
+2. **Set the controller's keys.** A Raspberry Pi whose `controller.toml` has no `release_keys` takes the project's current two keys when it starts. If `controller.toml` lists them by hand (the example file did), make the list exactly the root key and the new CI key from the table, and drop the old one. Nothing removes it for you. Restart the controller. A phone controller that kept the app's default takes the new list by itself; an edited list is kept as it is. A site server's `ATALAIA_FIRMWARE_KEYS`, if you set it, drops the old key too.
+3. **Boxes on v0.7.0 or later:** upload the newest release's `atalaia-field-box-<version>.bin` and its `.bin.release.json` in the console's **Boxes** tab, and press **Update to**.
+4. **Boxes on v0.6.1 or older** refuse v0.8.0 and later. Either flash the newest release over USB, without `erase_flash` (the settings, the keys and the adoption stay), or update them to **v0.7.0** first over the air and then to the newest. v0.7.0 is signed with the old key, so the controller accepts its upload only while its `release_keys` also lists the old key: add it for that step and drop it again afterwards.
+5. **Check** that every box reports the new version, and delete any release the console marks **key no longer trusted**.
+
+### 7.2 With your own key
 
 1. Make a key with `tools/firmware_release.py keygen`. Keep the private file safe and out of the repository.
-2. Build the boxes with `--release-keys=<the public key>`. Flash them over USB, once. Updates cannot install a new bootloader.
+2. Build the boxes with `--release-keys=<the public key>` (add the project's keys again if you still want its releases). Flash them over USB, once. Updates cannot install a new bootloader.
 3. Put the key's public half in the controller's `[firmware] release_keys` setting.
-4. For an update, build a higher version (`--fw-version=0.4.1`), sign it with `tools/firmware_release.py sign`, and upload the image and its `.release.json` in the console's **Boxes** tab. Press **Update to**.
+4. For an update, build a higher version (`--fw-version=0.8.1`), sign it with `tools/firmware_release.py sign`, and upload the image and its `.release.json` in the console's **Boxes** tab. Press **Update to**.
 5. The box downloads it, checks it again, installs it and restarts. If the new image fails its self-test, the box goes back to the old one by itself.
 
-Done once on a real board on a bench, with a throw-away key, sent by the controller over the radio, on a home Wi-Fi network (about 11 seconds). Not yet tested on a field. A box flashed with firmware from before updates over the air existed needs one USB flash first, and so does a box on the old partition table (v0.4.0 or earlier) before it takes v0.5 ([section 3.3](#33-write-the-image)).
+Done once on a real board on a bench, with a throw-away key, sent by the controller over the radio, on a home Wi-Fi network (about 11 seconds). Not yet tested on a field. A box flashed with firmware from before updates over the air existed needs one USB flash first, and so does a box on the old partition table (v0.4.0 or earlier) before it takes v0.5 or later ([section 3.3](#33-write-the-image)).
 
 ## 8. A box that does not boot
 
@@ -335,6 +361,37 @@ An I/O pod lends its buttons, keypad, ring, sound, NFC reader and radio to an An
 - **Expansion port** (optional): every pod build looks for modules on its expansion port (the M12 socket on the board's I2C bus, GPIO 17 and 18): a target module's hits reach the phone's game. `--module-outputs=on` also lends an output module's relays to the phone (`CONFIG_ATALAIA_POD_MODULE_OUTPUTS`; their longest on `CONFIG_ATALAIA_POD_MODULE_MAX_ON_S`, 30 s by default, never more than the module's own); the pod turns them off when the phone goes. `# CONFIG_ATALAIA_POD_PORT is not set` leaves the port out. Wiring: [I/O pod build guide, section 8.2](../../../hardware/io-pod/BUILD.md#82-expansion-port-optional).
 - The board's small screen stays dark, except while a phone pairs: the code, then **PAIRED**, **FAILED**, **TOO SLOW** or **PAIR AGAIN** (in English: the pod has no language). Pairing with the code is not yet tried on a real board.
 
-Not yet tested on a real board: all of it. The pod firmware has run on a computer, against the app and the controller. The Satellite is not a variant: it is the Field Box image with fewer parts fitted ([Satellite build guide](../../../hardware/satellite/BUILD.md)). The target addon cannot be built yet ([its page](../../../hardware/target-addon/BUILD.md)).
+Not yet tested on a real board: all of it. The pod firmware has run on a computer, against the app and the controller. The Satellite is not a variant: it is the Field Box image with fewer parts fitted ([Satellite build guide](../../../hardware/satellite/BUILD.md)). The modules a pod or a box takes on its expansion port are in [section 11](#11-the-expansion-modules-target-and-output-module).
+
+## 11. The expansion modules: target and output module
+
+A Field Box or an I/O pod with an **expansion port** (an M12 socket on the board's I2C bus) takes small modules, each with an RP2040 board and firmware of its own. Every Field Box image and every pod image looks for them; there is nothing to set on the box. What they do on a field is in the [Field Box manual, section 8](field-box.md#8-outputs-and-modules).
+
+| Module | What it is | Address | Build guide |
+| --- | --- | --- | --- |
+| **Target** | A plate players shoot at, with a piezo sensor; one plate, or two with the second firmware file | 0x58, up to 0x5B with the address jumpers | [hardware/target-addon/BUILD.md](../../../hardware/target-addon/BUILD.md) |
+| **Output module** | Up to 4 relays or MOSFETs on a supply of its own, behind an I2C isolator; SELV loads only, at most 24 V DC and 2 A per channel | 0x5C, up to 0x5F with the address jumpers | [hardware/output-module/BUILD.md](../../../hardware/output-module/BUILD.md) |
+
+Both firmwares are written and tested on a computer; **neither has run on a board yet**, and no module has been built from its guide.
+
+**Get the UF2 file.** Download it from a release (v0.8.0 or later; [section 2.1](#21-download-a-release-the-easy-way)), checked against `SHA256SUMS`, or build both with Docker:
+
+```
+python tools/docker_module.py build
+```
+
+The files land in `firmware/target-module/build/` (`atalaia_target_module.uf2`, and `atalaia_target_module_2.uf2` for two plates) and `firmware/output-module/build/` (`atalaia_output_module.uf2`). The UF2 files are not signed: a module is flashed by hand and never updated over the air.
+
+**The output module's channels.** The released file has four relays, 30 seconds at most each. For other loads, set each channel's type, use, longest time on and rest time at build time (`OUTPUT_CHANNELS`, for example `relay:siren:60:0,relay:strobe:120:0,relay:smoke:30:30:sense`) as in [firmware/output-module/README.md](../../../firmware/output-module/README.md). These are the module's own limits: the box's admin can only lower them.
+
+**Flash a module:**
+
+1. **Unplug the module from the box's port.** Never connect its USB cable and the port cable at the same time. For the output module, switch its own supply off too: its RP2040 board joins USB 5 V to its 5 V pin.
+2. Hold the board's **BOOT** (BOOTSEL) button and plug its USB cable into a computer. Release the button.
+3. A drive called `RPI-RP2` appears. Copy the UF2 file onto it.
+4. The board restarts into the firmware by itself.
+5. Unplug the USB cable, plug the module into the box's port, and check: the box's USB log says `expansion: 0x58 added: ...` (the module's address), and `@modules` on its USB console lists it (a target as `58:target/1.0.0:hit`).
+
+More, with the pins and the host tests: [firmware/target-module/README.md](../../../firmware/target-module/README.md), [firmware/output-module/README.md](../../../firmware/output-module/README.md).
 
 Found a step that does not match what you see? Open an issue or tell us in [Discussions](https://github.com/vakaobr/atalaia-project/discussions).
