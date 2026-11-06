@@ -7,7 +7,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 The **radio modem** is the controller's radio: a Heltec WiFi LoRa 32 V4 board, flashed with the modem image, plugged into the controller's USB port. The controller (a Raspberry Pi) has no radio of its own. Without the modem it runs and the console opens, but nothing reaches the boxes and nothing is heard from them.
 
-This page is the whole path, from a bare board to a box joining a game through the modem. The other guides link here: the [firmware guide](firmware.md#9-the-modem-board), the [controller setup guide](controller-setup.md#3-prepare-the-modem-board) and the [Game master manual](game-master.md#on-a-raspberry-pi-or-another-linux-computer).
+This page is the whole path, from a bare board to a box joining a game through the modem. The other guides link here: the [firmware guide](firmware.md), the [controller setup guide](controller-setup.md#3-prepare-the-modem-board), the [Phone controller guide](phone-controller.md) and the [Game master manual](game-master.md). To update a modem you already have, go to [section 10](#update-the-modem); to use it with an Android phone as the controller, [section 11](#with-a-phone-controller).
 
 > **What was tested, and what was not.** A modem flashed like this ran with the controller and real boxes on a bench (2026-10-21): the controller in Docker on Windows (WSL2), the modem on a Windows COM port, which the container reached through a small COM-to-TCP bridge (see the advanced note in section 7). **Not yet run on a Raspberry Pi**: the Linux port names, the `dialout` group and the `systemd` steps below follow the project's files and the controller guide, and no Pi has run them. On macOS (2026-11-02, a Mac mini with Apple silicon, macOS 27) the modem image and box images were flashed as in section 4, and the controller in Docker reached the modem through a bridge on the Mac (section 7) and logged `modem link up`; a controller run natively on macOS is not tried. The browser flasher is not tried with a real board. Not tested on a field.
 
@@ -22,7 +22,9 @@ This page is the whole path, from a bare board to a box joining a game through t
 7. Check that the controller and the modem talk (section 8).
 8. Join a box to a game through it (section 9).
 
-If something fails, go to the table in [section 10](#10-troubleshooting).
+Later: update the modem when a new release needs it (section 10). With a phone as the controller, sections 6 and 7 are replaced by section 11.
+
+If something fails, go to the table in [section 12](#troubleshooting).
 
 ## 2. Before you start
 
@@ -36,22 +38,22 @@ If something fails, go to the table in [section 10](#10-troubleshooting).
 
 ## 3. Get the modem image
 
-Two ways, as for the boxes ([firmware guide, section 2](firmware.md#2-get-the-firmware-download-a-release-or-build-it)).
+Two ways, as for the boxes (the [firmware guide](firmware.md), "Get the firmware").
 
 ### 3.1 Download a release (the easy way)
 
 1. Open [the Releases page](https://github.com/vakaobr/atalaia-project/releases) and take the newest release. Each one is marked **pre-release**: pre-alpha, not field-tested.
-2. Download two files: **`atalaia-modem-<version>-usb.zip`** and **`SHA256SUMS`**. (`atalaia-modem-<version>-merged.bin` is the same image as one file, for a browser flasher: [firmware guide](firmware.md#21-download-a-release-the-easy-way).) The modem has no over-the-air update: it is always flashed over USB.
+2. Download two files: **`atalaia-modem-<version>-usb.zip`** and **`SHA256SUMS`**. (`atalaia-modem-<version>-merged.bin` is the same image as one file, for a browser flasher: [firmware guide](firmware.md).) The modem has no over-the-air update: it is always flashed over USB.
 3. Check the download. On Linux, in the folder of the files (files you did not download are reported missing: ignore them):
 
    ```
    sha256sum -c --ignore-missing SHA256SUMS
    ```
 
-   On macOS: `shasum -a 256 -c SHA256SUMS`. On Windows `cmd`: `certutil -hashfile atalaia-modem-0.6.1-usb.zip SHA256`, then compare the line with the one in `SHA256SUMS`.
+   On macOS: `shasum -a 256 -c SHA256SUMS`. On Windows `cmd`: `certutil -hashfile atalaia-modem-0.8.0-usb.zip SHA256`, then compare the line with the one in `SHA256SUMS`.
 4. Unzip it into a folder of its own. It holds the bootloader, the partition table, the program, a `flash_args` file and a `README.txt` that repeats the commands below.
 
-   Windows `cmd`: `mkdir atalaia-modem` then `tar -xf atalaia-modem-0.6.1-usb.zip -C atalaia-modem` (or right-click, *Extract All*). Linux and macOS: `unzip atalaia-modem-0.6.1-usb.zip -d atalaia-modem`.
+   Windows `cmd`: `mkdir atalaia-modem` then `tar -xf atalaia-modem-0.8.0-usb.zip -C atalaia-modem` (or right-click, *Extract All*). Linux and macOS: `unzip atalaia-modem-0.8.0-usb.zip -d atalaia-modem`.
 
 **What the released modem is:** the Heltec **V4.3**, the **EU868** region (868 MHz), listen before talk on, an antenna of 2 dBi assumed, the project's keys built in, the screen in English until the controller tells it the boxes' language. **For a V4.2, for Taiwan (AS923), for an antenna of more than 2 dBi or for a screen that starts in another language, build it yourself.**
 
@@ -67,7 +69,7 @@ python tools/docker_fw.py modem
 
 On macOS and Linux use `python3` if `python` is not found. The first build takes several minutes. It ends with `Modem firmware: firmware/esp32/build-modem/atalaia_esp32.bin`. The folder to flash from is **`firmware/esp32/build-modem`**: it holds `flash_args` and the files it names.
 
-Options, all for the modem's build folder only (the full list is in [firmware guide, section 4](firmware.md#4-the-options-a-builder-sets)):
+Options, all for the modem's build folder only (the full list is in the [firmware guide](firmware.md), "The options a builder sets"):
 
 | What | How |
 | --- | --- |
@@ -174,9 +176,9 @@ DUTY  ...    left      the airtime left
 
 With no controller yet, **`LINK waiting`** is right. That is a flashed, healthy modem. Anything else:
 
-- **RADIO FAULT** in place of the last lines: the radio chip did not start. Section 10.
+- **RADIO FAULT** in place of the last lines: the radio chip did not start. Section 12.
 - The tower and the words of a Field Box (a setup or a READY screen): you flashed the box image. Flash again from the `modem` files.
-- Nothing, at all: section 10.
+- Nothing, at all: section 12.
 
 Now unplug the board and carry it to the controller, or leave it plugged in if you flashed on the Pi.
 
@@ -239,28 +241,84 @@ sudo journalctl -u atalaia-controller -n 50 | grep -i modem
 
 You should see `atalaia.modem INFO modem link up` and, just before it, `atalaia.modem INFO modem: {...}`: the modem's identity, with its `fw_version` and its `region`. A failure shows as `cannot open the modem at /dev/ttyACM0: ...`, `modem missed ping 1 of 3` or `modem link lost; reconnecting`.
 
-The identity of a modem built from this release on also says `"games": true`: the modem then tells the controller when it hears a box still in a game that is over (one that was switched off when its game ended), and the controller frees it by telling it again that the game is over. This works with a Raspberry Pi controller and with a phone controller (the modem plugged into the phone over USB). With an older modem the Raspberry Pi logs `the radio modem's firmware cannot report boxes still in an ended game` once, and a phone says it on its screen under **Radio**; flash this image to get the automatic recovery, or take such a box out at the box (its admin menu's **Leave the game**, or `@leave` over USB: [Field Box manual](field-box.md#d-take-a-box-out-of-its-game)).
+**Can it report stuck boxes?** From v0.9.0 (not released yet; build it from `main` until then, section 3.2), the modem's identity also says `"games": true`. Such a modem tells the controller when it hears a box still in a game that is over (a box that was switched off when its game ended), and the controller frees it by sending that game's end again. This works with a Raspberry Pi controller and with a phone controller (section 11). A modem image of v0.8.0 or older cannot do it: a Raspberry Pi controller from v0.9.0 then logs `the radio modem's firmware cannot report boxes still in an ended game` once, the console's **Boxes** tab says the radio modem cannot report them, and a phone controller says it on its screen under **Radio**. Update the modem to get the automatic recovery (section 10); until then, take such a box out at the box ([Field Box manual](field-box.md#take-a-box-out-of-its-game)).
 
-**In the GM console** ([Game master manual, section 3](game-master.md#3-open-the-gm-console)): the pill at the top right says **Radio: up**. `connecting` and `down` are not yet working, and **no modem** means the setting is empty. If the modem drops, an alert says **Radio down: the USB modem does not answer.**, and **Radio back.** when it returns. The **Controller** tab lists **Radio**, **Modem** (the modem's firmware and version) and **Modem reconnects**: a count that keeps rising means a bad cable, port or power.
+**In the GM console** (see the [Game master manual](game-master.md)): the pill at the top right says **Radio: up**. `connecting` and `down` are not yet working, and **no modem** means the setting is empty. If the modem drops, an alert says **Radio down: the USB modem does not answer.**, and **Radio back.** when it returns. The **Controller** tab lists **Radio**, **Modem** (the modem's firmware and version) and **Modem reconnects**: a count that keeps rising means a bad cable, port or power.
 
 **Two more checks, in the console's Settings:**
 
-- **Region.** Under **Radio region**, no red message about the modem. If it says *The USB modem is built for …, but the field is in …*, the modem and the field disagree on the region and no game can start (section 10).
-- **Scan.** Under **Field radio channel**, tap **Scan**. The modem listens to each channel for about a minute and lists them quietest first. It transmits nothing, and it only works with a radio that started: the console says *The USB modem has no radio chip* if it did not.
+- **Region.** Under **Radio region**, no red message about the modem. If it says *The USB modem is built for …, but the field is in …*, the modem and the field disagree on the region and no game can start (section 12).
+- **Scan.** Under **Field radio channel**, tap **Scan**. The modem listens to the candidate channels, about 60 seconds in all, split between them, and lists them quietest first. Nothing changes until you accept a channel. It transmits nothing, and it only works with a radio that started: the console says *The USB modem has no radio chip* if it did not.
 
 ## 9. A box joins a game through the modem
 
 This is the real test: a box and the modem hear each other. You need an adopted box (it shows **READY** after you switch it on) in the same region, with its antenna fitted, within a few metres of the modem.
 
-1. If the box is new, adopt it: **Adopt** tab, by USB cable, a card, or **Pair by code (radio)** ([Game master manual, Adopt the boxes](game-master.md#adopt-the-boxes)). Pairing by code uses the modem's radio.
+1. If the box is new, adopt it: **Adopt** tab, by USB cable, a card, or **Pair by code (radio)** (see the [Game master manual](game-master.md)). Pairing by code uses the modem's radio.
 2. Make a game (**Game** tab, **Create game**). The **Boxes for this game** dialog opens.
-3. Switch the box on. Within about 20 seconds it appears in the list. Tap **Look for boxes** to ask now. A box that does not appear does not hear or is not heard: section 10.
+3. Switch the box on. Within about 20 seconds it appears in the list. Tap **Look for boxes** to ask now. A box that does not appear does not hear or is not heard: section 12.
 4. Tick the box, pick its **Role**, tap **Invite**. **Progress** goes **sending**, **invited**, **accepted, joining**, **joined**.
 5. On the modem's screen, **GAME** now shows the game's number and **TX** and **RX** count up. On the box's screen it says it is in the game.
 
-If **joined** appears, the radio path works in both directions. End the game from the **Game** tab when you are done (nothing starts until you start it). The rest is the [Game master manual](game-master.md#6-assign-boxes).
+If **joined** appears, the radio path works in both directions. End the game from the **Game** tab when you are done (nothing starts until you start it). The rest is the [Game master manual](game-master.md).
 
-## 10. Troubleshooting
+<a id="update-the-modem"></a>
+
+## 10. Update the modem
+
+The modem has **no over-the-air update**: a new image is always written over USB, as in section 4.
+
+### When to update it
+
+- A new release's notes say the modem changed. Look at the [Releases page](https://github.com/vakaobr/atalaia-project/releases) and the CHANGELOG.
+- The controller's log says `the radio modem's firmware cannot report boxes still in an ended game`, or the console's **Boxes** tab, or a phone controller's screen under **Radio**, says the radio modem cannot report them. That needs a modem image from **v0.9.0** (not released yet; build it from `main` until then, section 3.2).
+- It was flashed with v0.4.0 or earlier (the old partition table, section 4.3).
+
+To see which version a modem runs: the console's **Controller** tab, **Modem**, or the `fw_version` in the controller's log (section 8).
+
+A modem and a controller of different versions still talk: a newer controller simply does not use what an older modem cannot do. You do not have to update both on the same day, but a new feature that needs the modem only works once both are new.
+
+### How to update it
+
+1. Do it between games: while the modem is unplugged, no box hears the controller.
+2. Get the new image: download it and check it (section 3.1), or build it with the same options as before (section 3.2).
+3. Stop the controller, so that the port is free: `sudo systemctl stop atalaia-controller` on a Raspberry Pi. On a phone controller, tap **Stop the controller** and unplug the modem from the phone.
+4. Plug the modem into the computer you flash with (on a Pi, it can stay where it is).
+5. Write the image as in section 4.3. You do not need `erase_flash`: the modem keeps no settings or keys of its own.
+6. Check its screen: the splash shows the new version (section 5).
+7. Plug it back into the controller and start the controller: `sudo systemctl start atalaia-controller` on a Pi, or plug it into the phone and tap **Start the controller**.
+8. Check as in section 8: **LINK OK**, the new `fw_version` in the log and in the **Controller** tab. From v0.9.0, the identity in the log also says `"games": true`.
+
+<a id="with-a-phone-controller"></a>
+
+## 11. With a phone controller
+
+An Android phone can be the controller, with this modem as its radio ([Phone controller guide](phone-controller.md)). The modem is the same board and the same image as for a Raspberry Pi: sections 2 to 5 do not change. Not yet tried with a real phone.
+
+### USB radio modem or I/O pod
+
+A phone controller can also use an **I/O pod** as its radio. The modem is the better radio for the boxes; the pod adds buttons, lights and a siren for the phone.
+
+| | USB radio modem | I/O pod |
+| --- | --- | --- |
+| Link to the phone | USB only | USB or Bluetooth |
+| Games, firmware updates, channel scan | Yes | Yes |
+| Invites, game over, pairing by code | Yes | Only with pod firmware that relays these frames |
+| Boxes still in an ended game reported and freed by themselves | Yes, from v0.9.0 (not released yet) | No, never |
+
+### Plug it into the phone
+
+1. Fit the antenna before the board has power.
+2. Plug the modem into the phone with a short USB-C data cable (a USB-C to USB-C cable, or an OTG adapter if the phone needs one). The phone powers the board.
+3. In the app, **Field controller**, under **Radio**, tap **Find pods**. The modem shows in the list, like a pod over USB. Tap it. If Android asks whether the app may use the USB device, allow it. The controller tells a modem from a pod by its answer.
+4. Tap **Start the controller**. The screen says **Radio up**, and the modem's screen says **LINK OK**.
+
+The radio is chosen before the start: to change it, tap **Stop the controller** first (**To change the radio, stop the controller.**). With a modem older than v0.9.0, the screen says under **Radio** that its firmware cannot report boxes still in an ended game: update it (section 10).
+
+<a id="10-troubleshooting"></a>
+<a id="troubleshooting"></a>
+
+## 12. Troubleshooting
 
 | What you see | Likely cause and what to do |
 | --- | --- |
@@ -280,9 +338,11 @@ If **joined** appears, the radio path works in both directions. End the game fro
 | Log: `WRONG PARTITION TABLE` | The modem has the old table (v0.4.0 or earlier). It works, and says so only on UART0, so you may not see it. Flash it once over USB without `erase_flash` (section 4.3). The `README.txt` in the zip says the same |
 | Console, Settings: **The USB modem is built for …, but the field is in …** | The modem's region and the field's region differ. No game can start. Build the modem for the field's region (`--region=`) and flash again, or put the field back in the modem's region |
 | The console header says **Radio: no modem** | `[modem] port` is empty, or the section is missing: section 7 |
-| The modem is **OK** but no box appears under **Look for boxes** | The box and the modem are not on the same region or channel; the box is not adopted; the box is in another game (**refused: in another game**: power-cycle it); an antenna is missing or the box is too far. [Game master manual, Troubleshooting](game-master.md#troubleshooting) |
+| The modem is **OK** but no box appears under **Look for boxes** | The box and the modem are not on the same region or channel; the box is not adopted; the box is still in another game (**refused: in another game**: free it as in the [Game master manual](game-master.md#recover-from-problems), or at the box: [Field Box manual](field-box.md#take-a-box-out-of-its-game)); an antenna is missing or the box is too far. [Game master manual, Recover from problems](game-master.md#recover-from-problems) |
 | `Radio: up` but **fail** (the TX line) keeps rising | Transmissions fail. Look at the **DUTY** line: at `0.0s` the airtime budget is spent, so wait. If not, check the antenna and the radio fault state |
 | **RX auth** keeps rising | Packets of the game that do not decrypt: a box with an old key, or another game on the same id nearby |
+| Log: `the radio modem's firmware cannot report boxes still in an ended game` | The modem image is older than v0.9.0. Update it (section 10). Until then, take such a box out at the box ([Field Box manual](field-box.md#take-a-box-out-of-its-game)) |
+| Phone controller: the modem is not in the list under **Find pods** | A data cable, an OTG adapter if the phone needs one, the antenna on. Stop the controller first: the radio is chosen before the start (section 11) |
 | It worked, then after a reboot of the Pi it does not | The port name changed. Use the `by-id` name (section 6). Make sure the service is enabled: `sudo systemctl enable atalaia-controller` |
 
 Not in the table? Ask in [Discussions](https://github.com/vakaobr/atalaia-project/discussions) or open an issue, with the controller's log lines about the modem, what the screen says and your system. The details of the modem's firmware and its screen are in the [firmware README](../../../firmware/esp32/README.md#usb-radio-modem-variant); the frames on the cable are in [protocol/usb-modem.md](../../../protocol/usb-modem.md).
