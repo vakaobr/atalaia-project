@@ -101,7 +101,7 @@ Boxes get the key when they are adopted ([protocol/adoption.md](protocol/adoptio
 
 ### What a lost or stolen Field Box exposes today
 
-The firmware images the project builds and releases **do not use NVS encryption, flash encryption or secure boot**: `firmware/esp32/sdkconfig.defaults` sets none of them, and the eFuses of a box flashed from a release are all unburnt. (Earlier versions of this page and of the protocol documents spoke of "encrypted NVS"; that is the design for a production box, not what the images do yet. [protocol/adoption.md](protocol/adoption.md) section 2 lists what a production box needs, and [firmware/esp32/docs/RELEASE_HARDENING.md](firmware/esp32/docs/RELEASE_HARDENING.md) is the plan to get there.) The box logs `NVS encryption is off` at every boot to say so.
+The firmware images the project builds and releases **do not use NVS encryption, flash encryption or secure boot**: `firmware/esp32/sdkconfig.defaults` sets none of them, and the eFuses of a box flashed from a release are all unburnt. (Earlier versions of this page and of the protocol documents spoke of "encrypted NVS"; that is the design for a production box, not what the images do yet. [protocol/adoption.md](protocol/adoption.md) section 2 lists what a production box needs, and [firmware/esp32/docs/RELEASE_HARDENING.md](firmware/esp32/docs/RELEASE_HARDENING.md) is the plan to get there. Its hardened image can be built (`tools/docker_fw.py release-hardened`, CI's `esp32-hardened-build` job), but it is not released and no box runs it.) The box logs `NVS encryption is off` at every boot to say so.
 
 So anyone who holds a box and a USB cable can read its whole flash with `esptool read_flash` and take from it, without the admin PIN:
 

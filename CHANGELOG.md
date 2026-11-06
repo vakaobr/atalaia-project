@@ -14,6 +14,10 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Details
+
+- **The hardened Field Box image builds (plan step 2; nothing burned).** `firmware/esp32/sdkconfig.release` turns on secure boot v2 (RSA-3072), flash encryption in release mode, NVS encryption by the flash-encryption scheme and anti-rollback at security version 1, as the maintainer chose (firmware/esp32/docs/RELEASE_HARDENING.md, section 5). `python3 tools/docker_fw.py release-hardened [--secure-boot-key PATH]` builds it into `build-hardened/`, checks that every option made it into the build, the internal RAM and the sizes, and signs the bootloader and the app with `espsecure.py sign_data --version 2` (`tools/secure_boot_sign.py`; a throw-away test key when no key is given). The bootloader fits below the partition table only with its log off: 28,672 of 32,768 bytes signed, so the partition table does not change. The signed app is 53.22 % of its slot. CI's new `esp32-hardened-build` job builds it with a throw-away key. Released images do not change: the release workflow is untouched, the signing step is written down in RELEASE_SIGNING.md, and no box has been flashed with the hardened image.
+
 ## [0.9.0](https://github.com/vakaobr/atalaia-project/compare/v0.8.0...v0.9.0) (2026-11-06)
 
 ### Features
