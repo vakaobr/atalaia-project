@@ -8,7 +8,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 Atalaia is written in English first and ships in European Portuguese, with German (plan
 phase 10 of phase 5, decisions P5H-1 to P5H-11; the built-in modes and the site server's pages,
 P5H-12 to P5H-16) and Traditional Chinese as written in Taiwan (`zh-tw`, plan phase 11, decisions
-P5K-1 to P5K-12; the same parts, P5K-13 to P5K-15) being reviewed; both are in
+P5K-1 to P5K-12; the same parts, P5K-13 to P5K-15) being reviewed, and Polish on the project page
+only (`pl`, decisions SITE-PL-1 to SITE-PL-9), an AI draft awaiting a native speaker's review; all are in
 [`docs/review/decisions-to-review.md`](../review/decisions-to-review.md). Translations are
 welcome for any language people play in; you do not need to write code.
 

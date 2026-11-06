@@ -19,6 +19,7 @@ templates site/src/diagrams/<name>.svg, the script writes, each marked
     site/de/<folder>/index.html   each page in German (decision P5H-3)
     site/zh-tw/<folder>/index.html  each page in Traditional Chinese (Taiwan), with
                                   English slugs (decision P5K)
+    site/pl/<folder>/index.html   each page in Polish (decision SITE-PL-1)
     site/img/diagrams/<name>-<layout>-<code>.svg   each diagram, per layout and language
     site/img/wiring/<name>.svg    the Field Box's WireViz wiring drawings, copied from
                                   hardware/field-box/wiring/ (one source of truth; see WIRING)
@@ -143,6 +144,10 @@ class Language:
     # The language of the app screenshots the main page shows (img/screens/app-*-<code>.png,
     # copied from the app's golden images): its own, or English's until its own are copied.
     screenshots: str = ""
+    # The language of the mode animations (img/modes/<mode>-<code>.gif, drawn from the Field Box's
+    # own screens by tools/gen_mode_gifs.py): its own, or English's while the box has no screens in
+    # it (Polish, SITE-PL-3).
+    mode_gifs: str = ""
 
     @property
     def og_code(self) -> str:
@@ -151,6 +156,10 @@ class Language:
     @property
     def screenshots_code(self) -> str:
         return self.screenshots or self.code
+
+    @property
+    def mode_gifs_code(self) -> str:
+        return self.mode_gifs or self.code
 
     @property
     def key(self) -> str:
@@ -164,6 +173,7 @@ LANGUAGES = (
     Language("en", "en", "en_GB", "en/"),
     Language("de", "de", "de_DE", "de/", og_image="en"),
     Language("zh-tw", "zh-Hant-TW", "zh_TW", "zh-tw/", og_image="en"),
+    Language("pl", "pl", "pl_PL", "pl/", og_image="en", screenshots="en", mode_gifs="en"),
 )
 
 
@@ -178,13 +188,16 @@ class Page:
 # letters in an address are percent-encoded when shared). Keep the slugs stable: other sites
 # link to them.
 PAGES = (
-    Page("index", {"pt": "", "en": "", "de": "", "zh-tw": ""}),
-    Page("modes", {"pt": "modos/", "en": "modes/", "de": "modi/", "zh-tw": "modes/"}),
-    Page("radio", {"pt": "radio/", "en": "radio/", "de": "funk/", "zh-tw": "radio/"}),
-    Page("roadmap", {"pt": "roadmap/", "en": "roadmap/", "de": "roadmap/", "zh-tw": "roadmap/"}),
-    Page("build", {"pt": "montagem/", "en": "build-guides/", "de": "bauen/", "zh-tw": "build-guides/"}),
-    Page("architecture", {"pt": "como-se-liga/", "en": "how-it-fits/", "de": "zusammenspiel/", "zh-tw": "how-it-fits/"}),
-    Page("glossary", {"pt": "glossario/", "en": "glossary/", "de": "glossar/", "zh-tw": "glossary/"}),
+    Page("index", {"pt": "", "en": "", "de": "", "zh-tw": "", "pl": ""}),
+    Page("modes", {"pt": "modos/", "en": "modes/", "de": "modi/", "zh-tw": "modes/", "pl": "tryby/"}),
+    Page("radio", {"pt": "radio/", "en": "radio/", "de": "funk/", "zh-tw": "radio/", "pl": "radio/"}),
+    Page("roadmap", {"pt": "roadmap/", "en": "roadmap/", "de": "roadmap/", "zh-tw": "roadmap/", "pl": "roadmap/"}),
+    Page("build", {"pt": "montagem/", "en": "build-guides/", "de": "bauen/", "zh-tw": "build-guides/",
+                   "pl": "budowa/"}),
+    Page("architecture", {"pt": "como-se-liga/", "en": "how-it-fits/", "de": "zusammenspiel/", "zh-tw": "how-it-fits/",
+                          "pl": "jak-to-dziala/"}),
+    Page("glossary", {"pt": "glossario/", "en": "glossary/", "de": "glossar/", "zh-tw": "glossary/",
+                      "pl": "slownik/"}),
 )
 
 # page.* values that come from the page's meta.<page>.* texts: value -> (key, fallback key).
@@ -410,6 +423,7 @@ def language_values(lang: Language) -> dict[str, str]:
         "page.lang": lang.html_lang,
         "page.code": lang.code,  # the language's short code, as in file names (lora-wide-en.svg)
         "page.screenshots": lang.screenshots_code,  # the app screenshots' language (app-roles-en.png)
+        "page.mode_gifs": lang.mode_gifs_code,  # the mode animations' language (bomb-en.gif)
         "page.og_locale": lang.og_locale,
         "page.og_locale_alternate": ",".join(o.og_locale for o in LANGUAGES if o != lang),
     }

@@ -12,8 +12,17 @@
 @font-face { font-family: "Barlow"; font-style: normal; font-weight: 600; font-display: swap; src: url("fonts/barlow-latin-600-normal.woff2") format("woff2"); }
 @font-face { font-family: "Barlow Condensed"; font-style: normal; font-weight: 600; font-display: swap; src: url("fonts/barlow-condensed-latin-600-normal.woff2") format("woff2"); }
 @font-face { font-family: "Barlow Condensed"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/barlow-condensed-latin-700-normal.woff2") format("woff2"); }
+/* Latin Extended (Polish ą ć ę ł ń ś ź ż and other letters the latin files above lack): Fontsource's
+   latin-ext subsets, declared after the latin faces so that they win for these letters only; a browser
+   downloads them only for a page that holds one of them (their unicode-range), so the other
+   languages' pages load nothing more (SITE-PL-2). */
+@font-face { font-family: "Barlow"; font-style: normal; font-weight: 400; font-display: swap; unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; src: url("fonts/barlow-latin-ext-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-style: italic; font-weight: 400; font-display: swap; unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; src: url("fonts/barlow-latin-ext-400-italic.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-style: normal; font-weight: 600; font-display: swap; unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; src: url("fonts/barlow-latin-ext-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-style: normal; font-weight: 600; font-display: swap; unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; src: url("fonts/barlow-condensed-latin-ext-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-style: normal; font-weight: 700; font-display: swap; unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; src: url("fonts/barlow-condensed-latin-ext-700-normal.woff2") format("woff2"); }
 
-/* The language flags: Chrome and Edge on Windows draw a flag emoji as two letters, so these four are
+/* The language flags: Chrome and Edge on Windows draw a flag emoji as two letters, so these five are
    drawn by a small colour font. Its unicode-range holds only the regional-indicator letters (a flag is
    two of them), so no other text uses it. */
 @font-face { font-family: "Twemoji Country Flags"; font-style: normal; font-weight: 400; font-display: swap; unicode-range: U+1F1E6-1F1FF; src: url("fonts/twemoji-country-flags-subset.woff2") format("woff2"); }

@@ -136,7 +136,7 @@ The diagrams are built in English and Portuguese, for wide and narrow screens, f
 | [`examples/scoreboard/`](examples/scoreboard/) | MQTT subscriber scoreboard example | GPL-3.0-or-later |
 | [`hardware/`](hardware/) | Reference builds: wiring, bills of materials, enclosures; the Field Box build manual ([hardware/field-box/BUILD.md](hardware/field-box/BUILD.md)) and the build guides of the Satellite, the I/O pod, the expansion port ([hardware/expansion-port/BUILD.md](hardware/expansion-port/BUILD.md)), the target addon ([hardware/target-addon/BUILD.md](hardware/target-addon/BUILD.md)) and the I2C output module ([hardware/output-module/BUILD.md](hardware/output-module/BUILD.md)) | CERN-OHL-S-2.0 |
 | [`docs/`](docs/) | Design spec, RFCs, phase folders, guides, [user manuals](docs/manuals/README.md) | CC-BY-SA-4.0 |
-| [`site/`](site/) | The project page in Portuguese, English, German and Traditional Chinese, published to [GitHub Pages](https://atalaia-project.link/) | CC-BY-SA-4.0 |
+| [`site/`](site/) | The project page in Portuguese, English, German, Traditional Chinese and Polish, published to [GitHub Pages](https://atalaia-project.link/) | CC-BY-SA-4.0 |
 | [`tools/`](tools/) | Developer scripts: `check.sh`, `docker_fw.py`, `docker_console.py`, `docker_editor.py`, `docker_server.py`, `docker_sim.py`, `build_site.py`, `docker_hw.py`, `docker_module.py` | GPL-3.0-or-later |
 
 See [LICENSING.md](LICENSING.md) for the details.

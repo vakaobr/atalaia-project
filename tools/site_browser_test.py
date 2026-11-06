@@ -11,11 +11,12 @@ FAILS when Playwright is missing; it never passes by skipping. Set ATALAIA_SKIP_
 it on purpose (a machine with no browser), and the run says so.
 
 It serves site/ and opens every generated page, at a phone width and a desktop width, in the light
-and the dark colour scheme, and checks that: the four flags are links to the same page in each
+and the dark colour scheme, and checks that: the five flags are links to the same page in each
 language (hreflang, lang, aria-label, title, aria-current on the current language only); they sit at
 the top right; the page has no horizontal scroll; the flag font is loaded and is used for the flags
 only (its unicode-range); a flag shows a visible outline when a keyboard focuses it; and the footer's
-text is as wide as its container (not cut at 80ch).
+text is as wide as its container (not cut at 80ch). On the Polish pages, the Latin Extended font files
+are loaded, so ą ć ę ł ń ś ź ż are drawn in Barlow, not in a fallback font (SITE-PL-2).
 """
 
 from __future__ import annotations
@@ -33,8 +34,8 @@ except ImportError:  # pragma: no cover
     sync_playwright = None
 
 SITE = Path(__file__).resolve().parents[1] / "site"
-LANGS = [("pt-PT", "Português"), ("en", "English"), ("de", "Deutsch"), ("zh-Hant-TW", "繁體中文（台灣）")]
-FLAGS = ["\U0001F1F5\U0001F1F9", "\U0001F1EC\U0001F1E7", "\U0001F1E9\U0001F1EA", "\U0001F1F9\U0001F1FC"]
+LANGS = [("pt-PT", "Português"), ("en", "English"), ("de", "Deutsch"), ("zh-Hant-TW", "繁體中文（台灣）"), ("pl", "Polski")]
+FLAGS = ["\U0001F1F5\U0001F1F9", "\U0001F1EC\U0001F1E7", "\U0001F1E9\U0001F1EA", "\U0001F1F9\U0001F1FC", "\U0001F1F5\U0001F1F1"]
 PAGES = sorted(p.relative_to(SITE).as_posix() for p in SITE.rglob("index.html")
                if not {"src", "i18n", "img", "fonts"} & set(p.relative_to(SITE).parts))
 # How long to wait for something the page does after an action (a picture that has to load). Generous:
@@ -70,7 +71,7 @@ class SiteFlags(unittest.TestCase):
         cls.httpd.shutdown()
 
     def test_pages_found(self):
-        self.assertEqual(len(PAGES), 7 * 4)
+        self.assertEqual(len(PAGES), 7 * len(LANGS))
 
     def test_flags_and_footer_everywhere(self):
         for scheme in ("light", "dark"):
@@ -87,7 +88,8 @@ class SiteFlags(unittest.TestCase):
 
     def test_mode_animations_and_box_screens(self):
         """The main page shows three mode GIFs with working play/pause buttons; the modes page holds the box's stills."""
-        for lang_dir, modes_dir in (("", "modos/"), ("en/", "en/modes/"), ("de/", "de/modi/"), ("zh-tw/", "zh-tw/modes/")):
+        for lang_dir, modes_dir in (("", "modos/"), ("en/", "en/modes/"), ("de/", "de/modi/"), ("zh-tw/", "zh-tw/modes/"),
+                                   ("pl/", "pl/tryby/")):
             for width in (375, 768, 1280):
                 for reduced in ("no-preference", "reduce"):
                     ctx = self.browser.new_context(viewport={"width": width, "height": 800}, reduced_motion=reduced)
@@ -140,7 +142,7 @@ class SiteFlags(unittest.TestCase):
         page.evaluate("document.fonts.ready")
         html_lang = page.get_attribute("html", "lang")
         links = page.query_selector_all("nav.lang a")
-        self.assertEqual(len(links), 4)
+        self.assertEqual(len(links), len(LANGS))
         current = []
         for link, (lang, name), flag in zip(links, LANGS, FLAGS):
             self.assertEqual(link.get_attribute("hreflang"), lang)
@@ -166,6 +168,12 @@ class SiteFlags(unittest.TestCase):
                          "U+1F1E6-1F1FF")
         loaded = page.evaluate("[...document.fonts].filter(f => f.family.includes('Twemoji') && f.status === 'loaded').length")
         self.assertEqual(loaded, 1)
+        if html_lang == "pl":
+            # Polish letters come from the latin-ext files (their unicode-range), loaded for these pages.
+            fonts = page.evaluate("performance.getEntriesByType('resource').map(r => r.name)"
+                                  ".filter(n => n.includes('-latin-ext-'))")
+            self.assertTrue(fonts, "a Polish page loads no Latin Extended font file")
+            self.assertTrue(page.evaluate("document.fonts.check('16px Barlow', 'ąćęłńśźż')"))
         # Keyboard focus shows an outline.
         links[1].focus()
         page.keyboard.press("Shift+Tab")

@@ -15,20 +15,21 @@ that changes it, leaving out `src/`, `i18n/` and this README.
 
 A short main page, and a page of its own for each long section. Portuguese (pt-PT) is the default
 language, at the site root; English is under `/en/`, German under `/de/` (decision P5H-3) and
-Traditional Chinese as written in Taiwan under `/zh-tw/` (plan phase 11); both drafted by an AI model
-and waiting for a native speaker's review ([docs/translations/](../docs/translations/README.md)).
+Traditional Chinese as written in Taiwan under `/zh-tw/` (plan phase 11) and Polish under `/pl/`
+(decision SITE-PL-1, the project page only); all three drafted by an AI model and waiting for a native
+speaker's review ([docs/translations/](../docs/translations/README.md)).
 Every page exists in every language, and its folder is named in its language, except in Chinese,
 which keeps English's ASCII folders (Han letters in an address are percent-encoded when shared):
 
-| Page | Portuguese | English | German | Chinese | Template | What it holds |
+| Page | Portuguese | English | German | Chinese | Polish | Template | What it holds |
 | --- | --- | --- | --- | --- | --- | --- |
-| Main page | `/` | `/en/` | `/de/` | `/zh-tw/` | `src/index.html` | The hero, how a game works, why Atalaia, how it fits together, a short radio section, three game modes, "What it looks like" (three mode animations, the real box's clip, then the app's screenshots), try it, the roadmap in one line per phase, the community hub, getting involved, the name and field safety |
-| Game modes | `/modos/` | `/en/modes/` | `/de/modi/` | `/zh-tw/modes/` | `src/modes.html` | Every mode (each with its animation), the Codes modifier, the Medic Kit, "your mode" and the box's step-by-step screenshots |
-| Radio | `/radio/` | `/en/radio/` | `/de/funk/` | `/zh-tw/radio/` | `src/radio.html` | How the radio works: both diagrams with their lead-ins, and the channel |
-| Roadmap | `/roadmap/` | `/en/roadmap/` | `/de/roadmap/` | `/zh-tw/roadmap/` | `src/roadmap.html` | The six phases, each as a one-line summary, bullets of what is done (the long lists fold into a `<details>`), bullets of what is next or waiting, and its gate, with a link to the phase's `STATUS.md`. "Roadmap" stays in English in Portuguese too |
-| Build guides | `/montagem/` | `/en/build-guides/` | `/de/bauen/` | `/zh-tw/build-guides/` | `src/build.html` | Safety rules for every build; the Satellite, the I/O pod, the expansion port and the target addon shortened from `hardware/<node>/BUILD.md` (the full guides, in English and Portuguese), with their pin tables and photo placeholders; the Field Box's first bench build, with its photo and clip, and its simple output (an RC relay switch for a siren, strobe or smoke remote), which the Satellite and the pod refer to; a pointer to the Field Box's build manual (phase 5 plan phase 12, decisions P5J-1 to P5J-13, SITEB-1 to SITEB-9) |
-| How it fits together | `/como-se-liga/` | `/en/how-it-fits/` | `/de/zusammenspiel/` | `/zh-tw/how-it-fits/` | `src/architecture.html` | The seven architecture diagrams of `docs/architecture.md` as SVG, each with a short "what flows / what does not" text and a link to the doc (decision SITEARCH-1). Linked from the navigation, the roadmap and the build guides |
-| Glossary | `/glossario/` | `/en/glossary/` | `/de/glossar/` | `/zh-tw/glossary/` | `src/glossary.html` | Every glossary entry; the glossary links of every page lead here |
+| Main page | `/` | `/en/` | `/de/` | `/zh-tw/` | `/pl/` | `src/index.html` | The hero, how a game works, why Atalaia, how it fits together, a short radio section, three game modes, "What it looks like" (three mode animations, the real box's clip, then the app's screenshots), try it, the roadmap in one line per phase, the community hub, getting involved, the name and field safety |
+| Game modes | `/modos/` | `/en/modes/` | `/de/modi/` | `/zh-tw/modes/` | `/pl/tryby/` | `src/modes.html` | Every mode (each with its animation), the Codes modifier, the Medic Kit, "your mode" and the box's step-by-step screenshots |
+| Radio | `/radio/` | `/en/radio/` | `/de/funk/` | `/zh-tw/radio/` | `/pl/radio/` | `src/radio.html` | How the radio works: both diagrams with their lead-ins, and the channel |
+| Roadmap | `/roadmap/` | `/en/roadmap/` | `/de/roadmap/` | `/zh-tw/roadmap/` | `/pl/roadmap/` | `src/roadmap.html` | The six phases, each as a one-line summary, bullets of what is done (the long lists fold into a `<details>`), bullets of what is next or waiting, and its gate, with a link to the phase's `STATUS.md`. "Roadmap" stays in English in Portuguese too |
+| Build guides | `/montagem/` | `/en/build-guides/` | `/de/bauen/` | `/zh-tw/build-guides/` | `/pl/budowa/` | `src/build.html` | Safety rules for every build; the Satellite, the I/O pod, the expansion port and the target addon shortened from `hardware/<node>/BUILD.md` (the full guides, in English and Portuguese), with their pin tables and photo placeholders; the Field Box's first bench build, with its photo and clip, and its simple output (an RC relay switch for a siren, strobe or smoke remote), which the Satellite and the pod refer to; a pointer to the Field Box's build manual (phase 5 plan phase 12, decisions P5J-1 to P5J-13, SITEB-1 to SITEB-9) |
+| How it fits together | `/como-se-liga/` | `/en/how-it-fits/` | `/de/zusammenspiel/` | `/zh-tw/how-it-fits/` | `/pl/jak-to-dziala/` | `src/architecture.html` | The seven architecture diagrams of `docs/architecture.md` as SVG, each with a short "what flows / what does not" text and a link to the doc (decision SITEARCH-1). Linked from the navigation, the roadmap and the build guides |
+| Glossary | `/glossario/` | `/en/glossary/` | `/de/glossar/` | `/zh-tw/glossary/` | `/pl/slownik/` | `src/glossary.html` | Every glossary entry; the glossary links of every page lead here |
 
 | Path | What it is |
 | --- | --- |
@@ -36,17 +37,18 @@ which keeps English's ASCII folders (Han letters in an address are percent-encod
 | `en/index.html`, `en/<folder>/index.html` | The English pages. Generated |
 | `de/index.html`, `de/<folder>/index.html` | The German pages. Generated |
 | `zh-tw/index.html`, `zh-tw/<folder>/index.html` | The Traditional Chinese (Taiwan) pages. Generated |
+| `pl/index.html`, `pl/<folder>/index.html` | The Polish pages. Generated |
 | `sitemap.xml` | Every page in every language, each with its translations (`hreflang`). Generated |
 | `style.css`, `favicon.svg` | Shared by every page |
 | `img/` | The badge and illustrations (see [Images](#images)) |
 | `img/wiring/` | The Field Box's two wiring drawings, copied from `hardware/field-box/wiring/` by `tools/build_site.py` (see [The build guides page](#the-build-guides-page)). Generated |
 | `img/diagrams/` | The two radio diagrams in each language and layout. Generated (see [Diagrams](#diagrams)) |
-| `fonts/` | Barlow and Barlow Condensed (latin subset, WOFF2; SIL OFL 1.1, see [LICENSES/OFL-1.1.txt](../LICENSES/OFL-1.1.txt)) and a four-flag subset of Twemoji Country Flags for the language switcher (CC BY 4.0, credited in the footer), all self-hosted so the page loads nothing from other sites; see [fonts/README.md](fonts/README.md) |
+| `fonts/` | Barlow and Barlow Condensed (latin and, for Polish, latin-ext subsets, WOFF2; SIL OFL 1.1, see [LICENSES/OFL-1.1.txt](../LICENSES/OFL-1.1.txt)) and a five-flag subset of Twemoji Country Flags for the language switcher (CC BY 4.0, credited in the footer), all self-hosted so the page loads nothing from other sites; see [fonts/README.md](fonts/README.md) |
 | `style.css` | The look: slate, sand and signal orange taken from the badge, with the hero's hills and tower drawn in inline SVG (the subpages' heads reuse the hills) |
 | `src/<page>.html` | The template of each page, built in every language |
 | `src/partials/` | The parts every page shares: `head.html` (title, description, canonical and `hreflang` addresses, social preview tags), `header.html` (navigation and language switcher) and `footer.html` |
 | `src/diagrams/` | The templates of the radio diagrams |
-| `i18n/pt.yaml`, `i18n/en.yaml`, `i18n/de.yaml`, `i18n/zh-tw.yaml` | The text of every page, one file per language |
+| `i18n/pt.yaml`, `i18n/en.yaml`, `i18n/de.yaml`, `i18n/zh-tw.yaml`, `i18n/pl.yaml` | The text of every page, one file per language |
 
 ### Old links and anchors
 
@@ -86,10 +88,10 @@ the rest of this folder (see [REUSE.toml](../REUSE.toml)); the top-level README 
 | Files | What they are | Where they appear |
 | --- | --- | --- |
 | `logo-1024.png`, `logo-512.png`, `logo-192.png` | The round badge: watchtowers with signal fires on dunes | The Name section of both main pages, the apple-touch-icon (192), the top of the README. The header keeps the small SVG mark and `favicon.svg`, as the badge is too detailed at that size |
-| `watchtower-night-960/1600` (`.jpg`, `.webp`) | Night scene: a hilltop watchtower linked to GAME PROP boxes across a valley, with the English text "Open-source project ATALAIA" painted in | Hero of the English, German and Chinese main pages; the README banner |
+| `watchtower-night-960/1600` (`.jpg`, `.webp`) | Night scene: a hilltop watchtower linked to GAME PROP boxes across a valley, with the English text "Open-source project ATALAIA" painted in | Hero of the English, German, Chinese and Polish main pages; the README banner |
 | `watchtower-night-pt-960/1600` (`.jpg`, `.webp`) | The same night scene with its text in Portuguese, "Projeto de código aberto ATALAIA" | Hero of the Portuguese main page |
-| `field-isometric-960/1600` (`.jpg`, `.webp`) | Isometric stone tower ringed by GAME PROP cases | "How it fits together" on the English, German and Chinese main pages |
-| `og-pt.jpg`, `og-en.jpg` | 1200 × 630 social previews (`og:image`) | Link previews of every page in that language; the German and Chinese pages use `og-en.jpg` (`og_image` in `LANGUAGES`) until one is drawn with their text |
+| `field-isometric-960/1600` (`.jpg`, `.webp`) | Isometric stone tower ringed by GAME PROP cases | "How it fits together" on the English, German, Chinese and Polish main pages |
+| `og-pt.jpg`, `og-en.jpg` | 1200 × 630 social previews (`og:image`) | Link previews of every page in that language; the German, Chinese and Polish pages use `og-en.jpg` (`og_image` in `LANGUAGES`) until one is drawn with their text |
 | `screens/` | Screenshots (see [Screenshots](#screenshots)) | "What it looks like" on the main page; some in the top-level README |
 | `modes/` | The modes page's animated pictures, 56 GIFs and 56 stills (see [Game-mode animations](#game-mode-animations)) | The cards of the modes page; one in the top-level README |
 
@@ -126,7 +128,7 @@ every frame for faces or private information first.
 | Files | What they are |
 | --- | --- |
 | `bomb-*.png`, `join-joined.png`, `codes-entry.png` | The Field Box firmware (320 × 240) in the Wokwi emulator |
-| `app-<screen>-pt.png`, `-en.png`, `-de.png`, `-zh-tw.png` | The app's golden test images (360 × 780), copied from `app/test/goldens/images/screens/` (`home` as `app-roles`, `prop_game` as `app-prop-game`, `player`, `chrono`) and `branding/` (`player` as `app-player-branded`); each language's page shows its own (`app-<screen>-zh-tw.png` from the `_zh-tw` goldens; `screenshots` in `LANGUAGES` can point a new language at English's until its goldens exist) |
+| `app-<screen>-pt.png`, `-en.png`, `-de.png`, `-zh-tw.png` | The app's golden test images (360 × 780), copied from `app/test/goldens/images/screens/` (`home` as `app-roles`, `prop_game` as `app-prop-game`, `player`, `chrono`) and `branding/` (`player` as `app-player-branded`); each language's page shows its own (`app-<screen>-zh-tw.png` from the `_zh-tw` goldens; `screenshots` in `LANGUAGES` can point a new language at English's until its goldens exist: Polish shows English's, as the app has no Polish) |
 | `app-medic-*.png` | The Medic Kit's screens (320 × 240) as the app draws them, from `app/test/goldens/images/templates/medic_*.png`; the kit's screens are Portuguese by default, so every language shows the same copies |
 
 When the app's golden images change (`python tools/docker_app.py goldens`), copy them again.
@@ -156,7 +158,8 @@ A card's picture is a `<picture>` whose `<source>` for `prefers-reduced-motion: 
 frame, with `loading="lazy"` and the alt text and caption of `gifs.<id>`; a small inline script
 (`src/partials/modegif.html`, included by the main and modes pages) adds a pause button under each (play, for someone who asked for less
 motion; clicking it swaps the image for the animated GIF). Every mode has a picture in each of the
-four languages (the box's templates are in all four; the messages a mode's script writes, such as
+four languages (the box's templates are in all four; the Polish pages show the English GIFs, `mode_gifs`
+in `LANGUAGES`, as the box has no Polish, decision SITE-PL-3; the messages a mode's script writes, such as
 "Kill confirmed: b1", stay English); a `languages: [en]` entry in the script would make one `-en`
 picture that the four pages share. Decisions GIF-1 to GIF-12 in `docs/review/decisions-to-review.md`.
 

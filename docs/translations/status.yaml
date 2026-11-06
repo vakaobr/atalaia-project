@@ -55,3 +55,15 @@ languages:
     reviewed_by: null
     # Where Traditional Chinese exists (modes and server as German's).
     domains: [site, console, editor, app, box, modes, server]
+  pl:
+    name: Polski
+    status: draft
+    drafted: 2026-11-06
+    review: >-
+      the project page only, for Polish airsoft (ASG) players, drafted by an AI model (Claude) on
+      2026-11-06, not yet reviewed by a native-speaking player (SITE-PL-1). Review it with the
+      Polish section of docs/translations/glossary.md on the pages under /pl/, then set status to
+      complete and name the reviewer here.
+    reviewed_by: null
+    # Only the project page so far: the console, editor, app, box, modes and server show English.
+    domains: [site]
