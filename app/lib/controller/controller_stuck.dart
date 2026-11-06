@@ -27,9 +27,9 @@
 /// kept for the console (`stuck` in GET /api/v1/boxes, and the stream's
 /// `boxes` message): per game, when a box in it was last heard, from which
 /// node ids, and how many times its GAME_OVER went again. The GM's console
-/// lists them and can say a game's GAME_OVER at once ([release], the Release
-/// button, POST /api/v1/boxes/stuck/{game}/release) within a short rate
-/// limit, and can tell every box of the field on this channel that is in a
+/// lists the games heard within [stuckShownMs] (STUCK-71) and can say a
+/// game's GAME_OVER at once ([release], the Release button, POST
+/// /api/v1/boxes/stuck/{game}/release) within a short rate limit, and can tell every box of the field on this channel that is in a
 /// game other than the live one to leave it ([releaseField], RELEASE, POST
 /// /api/v1/boxes/release), for a game this controller lost entirely.
 ///
@@ -54,7 +54,14 @@ const stuckReleaseMs = 10000;
 /// The field-wide RELEASE (Amendment 28): one burst in this time at most.
 const stuckReleaseFieldMs = 30000;
 
-/// A game not heard of for this long leaves the list (as a free box).
+/// The console lists a game heard within this time (STUCK-71): a box in a
+/// game sends STATE every 15 s and the modem reports a game at most every
+/// 10 s, so a box still in it is heard well within two minutes; a freed box,
+/// or one switched off, is silent and leaves the list.
+const stuckShownMs = 120000;
+
+/// A game not heard of for this long is forgotten: until then a box heard
+/// again keeps its game's resend count and once-a-minute limit.
 const stuckForgetMs = 2 * 3600000;
 
 /// The ended games whose key tag the controller keeps.
@@ -276,14 +283,16 @@ class ControllerStuck {
     return {'live_game': liveId, 'time': timeS, 'release_frame': 'sent'};
   }
 
-  /// The games a box was heard still in, the most recent first, with their
-  /// names.
+  /// The games a box was heard still in within [stuckShownMs], the most
+  /// recent first, with their names (STUCK-71: a game whose boxes went
+  /// silent, freed or switched off, is not shown).
   List<Map<String, Object?>> public() {
     final now = engine.nowMs();
     games.removeWhere((_, s) => now - s.heardMs > stuckForgetMs);
     _released.removeWhere((_, t) => now - t > releaseMs);
-    final list = games.values.toList()
-      ..sort((a, b) => b.heardMs.compareTo(a.heardMs));
+    final list =
+        games.values.where((s) => now - s.heardMs <= stuckShownMs).toList()
+          ..sort((a, b) => b.heardMs.compareTo(a.heardMs));
     return [
       for (final s in list)
         s.public(now, _store.game(s.gameId)?['name'] as String?),
