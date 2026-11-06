@@ -50,9 +50,13 @@ class PriorityTests(unittest.TestCase):
 
 class AutoElectionTests(unittest.TestCase):
     def setUp(self):
+        # A leader on auto, heard beaconing every 10 s (the first TIME's gap is no evidence, then three
+        # steady gaps: decisions FAIL-1 to FAIL-3), the last one at 0.
         self.e = Election(5, priority=1000, mode="auto")
-        self.e.follow(0)
-        self.e.on_time(1, source=0, now_ms=0)
+        self.e.follow(-40_000)
+        for t in range(-40_000, 1, 10_000):
+            self.e.on_time(1, source=0, now_ms=t, game_state=1)
+        self.assertEqual(self.e.leader_beacon_ms, 10_000)
 
     def test_heartbeats_keep_a_follower_quiet(self):
         for t in range(10_000, 200_000, 10_000):
@@ -122,6 +126,121 @@ class AutoElectionTests(unittest.TestCase):
         self.e.tick(35_000)
         roles = [role for _, role, _ in self.e.history]
         self.assertEqual(roles[-2:], [CANDIDATE, LEADER])
+
+
+RUNNING, PAUSED = 1, 2
+REPEATS_MS = (1_000, 2_500, 5_000, 10_000)  # Amendment 19: the TIMEs after a state change
+
+
+class MixedModeTests(unittest.TestCase):
+    """A standby on auto behind a leader on manual (decisions FAIL-1 to FAIL-6): it counted its own 10 s
+    beacons and took a working controller over after one of the leader's 30 s gaps."""
+
+    def run_beacons(self, e, times, states=None, until=None):
+        """Feeds the leader's TIMEs at ``times`` and ticks every 100 ms; returns the first CLAIM's time."""
+        beacons = dict(zip(times, states or [RUNNING] * len(times)))
+        end = until if until is not None else max(times)
+        for t in range(0, end + 1, 100):
+            if t in beacons:
+                e.on_time(1, source=0, now_ms=t, game_state=beacons[t])
+            if e.tick(t) is not None:
+                return t
+        return None
+
+    def test_an_auto_standby_never_takes_over_a_working_manual_leader(self):
+        e = Election(5, priority=1000, mode="auto")
+        e.follow(0)
+        claimed = self.run_beacons(e, list(range(0, 600_001, 30_000)))
+        self.assertIsNone(claimed)  # before the fix: a claim 30 s after the first beacon
+        self.assertEqual(e.role, FOLLOWER)
+        self.assertEqual(e.leader_beacon_ms, 30_000)
+        self.assertEqual(e.leader_failover_mode, "manual")
+        self.assertEqual(e.takeover_after_ms, 90_000)
+
+    def test_a_late_manual_beacon_is_not_three_missed_ones(self):
+        # The leader's tick or the channel delays a beacon by 200 ms: before the fix the standby had
+        # counted three 10 s beacons by then and claimed (no game state given here, as an older caller).
+        e = Election(5, priority=1000, mode="auto")
+        e.follow(0)
+        for i in range(20):
+            e.on_time(1, source=0, now_ms=i * 30_200)
+            for t in range(i * 30_200, (i + 1) * 30_200, 100):
+                self.assertIsNone(e.tick(t), f"a claim at {t} ms")
+        self.assertEqual(e.leader_failover_mode, "manual")
+
+    def test_it_takes_over_when_the_manual_leader_falls_silent(self):
+        e = Election(5, priority=1000, mode="auto")
+        e.follow(0)
+        claimed = self.run_beacons(e, list(range(0, 120_001, 30_000)), until=400_000)
+        self.assertEqual(claimed, 120_000 + 90_000)  # three missed 30 s beacons
+
+    def test_a_state_change_repeated_as_time_is_not_taken_for_auto(self):
+        # A manual leader that pauses and resumes: each change is a TIME and four repeats in 10 s, and
+        # the 30 s beacon goes on from the last repeat. The short gaps are no evidence of 10 s beacons.
+        e = Election(5, priority=1000, mode="auto")
+        e.follow(0)
+        times, states = [0, 30_000], [RUNNING, RUNNING]
+        state, t = RUNNING, 30_000
+        for change_after in (10_000, 10_000, 12_000, 9_000, 10_000):
+            t += change_after
+            state = PAUSED if state == RUNNING else RUNNING
+            burst = [t] + [t + r for r in REPEATS_MS]
+            times += burst
+            states += [state] * len(burst)
+            t = burst[-1]
+        for _ in range(4):
+            t += 30_000
+            times.append(t)
+            states.append(state)
+        claimed = self.run_beacons(e, times, states)
+        self.assertIsNone(claimed)
+        self.assertNotEqual(e.leader_beacon_ms, 10_000)
+
+    def test_a_manual_standby_sees_an_auto_leader_and_still_waits_for_the_gm(self):
+        e = Election(5, priority=1000, mode="manual")
+        e.follow(0)
+        self.assertIsNone(self.run_beacons(e, list(range(0, 100_001, 10_000)), until=600_000))
+        self.assertEqual(e.leader_failover_mode, "auto")
+        self.assertIsNone(e.takeover_after_ms)
+
+    def test_until_the_leader_is_heard_the_slowest_interval_counts(self):
+        e = Election(5, priority=1000, mode="auto")
+        e.follow(0)
+        self.assertIsNone(e.leader_beacon_ms)
+        self.assertEqual(e.takeover_after_ms, 90_000)
+        self.assertIsNone(e.tick(89_999))
+        self.assertIsNotNone(e.tick(90_000))
+
+    def test_an_auto_leader_is_learned_and_a_lost_beacon_keeps_it(self):
+        e = Election(5, priority=1000, mode="auto")
+        e.follow(0)
+        # 0 opens the first window (no evidence), 10 s is inside it, then 20, 30, 40: three steady gaps.
+        self.assertIsNone(self.run_beacons(e, [0, 10_000, 20_000, 30_000]))
+        self.assertIsNone(e.leader_beacon_ms)
+        self.assertIsNone(self.run_beacons(e, [40_000]))
+        self.assertEqual(e.leader_beacon_ms, 10_000)
+        e.on_time(1, source=0, now_ms=60_000, game_state=RUNNING)  # 50 s was lost
+        self.assertEqual(e.leader_beacon_ms, 10_000)
+        self.assertIsNone(e.tick(89_999))
+        self.assertIsNotNone(e.tick(90_000))  # three missed 10 s beacons
+
+    def test_two_lost_beacons_forget_the_auto_cadence(self):
+        e = Election(5, priority=1000, mode="auto")
+        e.follow(0)
+        self.run_beacons(e, [0, 10_000, 20_000, 30_000, 40_000])
+        self.assertEqual(e.leader_beacon_ms, 10_000)
+        e.on_time(1, source=0, now_ms=70_000, game_state=RUNNING)
+        self.assertIsNone(e.leader_beacon_ms)
+        self.assertEqual(e.takeover_after_ms, 90_000)
+
+    def test_a_new_leader_or_term_is_measured_afresh(self):
+        e = Election(5, priority=1000, mode="auto")
+        e.follow(0)
+        self.run_beacons(e, [0, 10_000, 20_000, 30_000, 40_000])
+        self.assertEqual(e.leader_beacon_ms, 10_000)
+        e.on_time(2, source=7, now_ms=45_000, game_state=RUNNING)
+        self.assertIsNone(e.leader_beacon_ms)
+        self.assertEqual(e.takeover_after_ms, 90_000)
 
 
 class ManualElectionTests(unittest.TestCase):

@@ -53,6 +53,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -540,6 +541,10 @@ class ControllerEngine {
   /// The live game came back after a restart without its key: it can only
   /// be ended (ADR-P2-4).
   bool _keyLost = false;
+
+  /// The failover-mode mismatch last warned of (leader, term, its mode;
+  /// decision FAIL-4).
+  (int?, int, String)? _failoverWarned;
   int _lastTimeSave = 0;
 
   int nowMs() => _clock() - _t0;
@@ -2372,6 +2377,16 @@ class ControllerEngine {
       'priority': config.priority,
       'role': fc?.election.role,
       'term': fc?.term,
+      // The leader's beacon interval as heard, its failover mode as that
+      // shows, and the silence after which this standby stands on its own
+      // (decisions FAIL-1 to FAIL-4).
+      'leader_beacon_s': fc?.election.leaderBeaconMs == null
+          ? null
+          : fc!.election.leaderBeaconMs! ~/ 1000,
+      'leader_failover_mode': fc?.election.leaderFailoverMode,
+      'takeover_after_s': fc?.election.takeoverAfterMs == null
+          ? null
+          : fc!.election.takeoverAfterMs! ~/ 1000,
       'live_game': _game?['id'],
       'key_lost': _keyLost,
       // The wall clock and whether it is plausible (controller_clock.dart):
@@ -2619,6 +2634,42 @@ class ControllerEngine {
     _setState(id, state, times);
   }
 
+  /// A standby whose failover mode differs from the leader's, as the
+  /// leader's beacons show it, is logged and told to the consoles once per
+  /// leader and term (engine.py `_check_failover_modes`, decision FAIL-4).
+  /// The election already counts the leader's interval, so this is a
+  /// warning, not a refusal.
+  void _checkFailoverModes(FieldController fc) {
+    final e = fc.election;
+    final leaderMode = e.role == electionFollower ? e.leaderFailoverMode : null;
+    if (leaderMode == null || leaderMode == config.failoverMode) return;
+    final key = (e.leader, e.term, leaderMode);
+    if (key == _failoverWarned) return;
+    _failoverWarned = key;
+    final after = e.takeoverAfterMs;
+    developer.log(
+      leaderMode == 'manual'
+          ? 'the controller in charge (node ${e.leader}) beacons every 30 s '
+                '(failover_mode manual) and this standby is on auto: it takes '
+                'over only after ${(after ?? 0) ~/ 1000} s of silence; give '
+                'every controller of the game the same failover_mode'
+          : 'the controller in charge (node ${e.leader}) is on automatic '
+                'failover and this standby on manual: it never takes over by '
+                'itself (promote it); give every controller of the game the '
+                'same failover_mode',
+      name: 'atalaia.controller',
+      level: 900,
+    );
+    _emit({
+      'type': 'system',
+      'kind': 'failover.mismatch',
+      'failover_mode': config.failoverMode,
+      'leader': e.leader,
+      'leader_failover_mode': leaderMode,
+      'takeover_after_s': after == null ? null : after ~/ 1000,
+    });
+  }
+
   /// The election's role changed (engine.py `_on_role`): the term is kept
   /// with the game, the consoles are told, and a takeover runs the game's
   /// field.lua here from now on (a new run; the old controller's runs'
@@ -2671,6 +2722,7 @@ class ControllerEngine {
     if (fc == null) return;
     _radio?.pump(nowMs()); // the next paced frame, if its gap has passed
     fc.tick(nowMs());
+    _checkFailoverModes(fc);
     positions?.tick();
     final field = _field;
     if (field != null && fc.gameState == gameRunning) {

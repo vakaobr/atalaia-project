@@ -106,7 +106,7 @@ The phone cannot adopt boxes over a USB cable. Adopt them with the **field card*
 A phone can stand by for a Pi, and a Pi for a phone. How a standby joins a game, what it refuses and how it takes over is in the [Controller setup guide, A standby controller](controller-setup.md#standby-controller). On the phone:
 
 1. Give it the **same field join key** as the main controller ([section 3](#3-codes-and-the-join-key)).
-2. In **Settings**, open **Site server, failover and ATAK (field controller)**. Under **Failover**, choose **Manual** or **Automatic**. *Manual: the GM promotes a standby controller. Automatic: a standby takes over after three missed beacons (30 s).* Give every controller of a game the same choice.
+2. In **Settings**, open **Site server, failover and ATAK (field controller)**. Under **Failover**, choose **Manual** or **Automatic**. *Manual: the GM promotes a standby controller. Automatic: a standby takes over after three missed beacons (30 s).* A standby counts the beacons it hears from the main controller, so behind a main controller on manual it waits about 90 s and does not take over a controller that still works ([Controller setup guide](controller-setup.md#failover-mode)). Give every controller of a game the same choice anyway: the console's **Controller** tab warns when they differ.
 3. The setting applies when the controller next starts: stop it and start it again.
 4. Join each game as a standby from the console's **Join** tab, **Join as a standby controller**, with the text the main controller made.
 5. To take over by hand, tap **Promote to controller** in the console's **Controller** tab.

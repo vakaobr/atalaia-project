@@ -453,8 +453,7 @@ díodo virada para BAT+, a risca do condensador do anel virada para o GND; o
    secção 5, descreve-as). Usa o cabo USB e a consola, e `@setup <PIN>` na
    consola USB para abrir de novo a página de configuração.
 5. **Mais sobre a página de configuração, a adoção e as atualizações:** o
-   [guia de firmware](../../docs/manuals/pt/firmware.md). O logótipo do campo
-   precisa de um ecrã grande, por isso um Satélite nunca o mostra.
+   [guia de firmware](../../docs/manuals/pt/firmware.md).
 
 ## 12. Resolução de problemas
 

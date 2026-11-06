@@ -307,6 +307,8 @@ last ACK'd seq. Scores merge by maximum per counter (conflict-free).
 Default: manual failover. Automatic CLAIM is tested and enabled per
 field profile after field validation.
 
+*Note (2026-11-06, decisions FAIL-1 to FAIL-6; no wire change): a follower counts the missed beacons at the interval it hears the leader beacon at, not the one its own failover mode gives. A standby on automatic failover behind a leader on manual (a beacon every 30 s) counted 10 s beacons and claimed while the leader still worked. It now measures the gaps between the leader's TIMEs: 10 s only after three gaps in a row of about 10 s, else 30 s (about 90 s of silence before a CLAIM); the TIMEs within 12.5 s of a change of game state (Amendment 19's repeats) are no evidence. `simulator/atalaia_sim/election.py` and `app/lib/controller/controller_failover.dart`.*
+
 ### 8. Duty-cycle and power (EU868)
 
 | Sub-band | Frequency | Duty cycle | Airtime/hour |

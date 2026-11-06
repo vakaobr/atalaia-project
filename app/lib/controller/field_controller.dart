@@ -641,7 +641,14 @@ class FieldController {
     } on Object {
       return;
     }
-    if (!election.onTime(beacon.term, source, _now)) return;
+    if (!election.onTime(
+      beacon.term,
+      source,
+      _now,
+      gameState: beacon.gameState,
+    )) {
+      return;
+    }
     gameState = beacon.gameState;
     gameTimeMs = beacon.gameTimeMs;
     _lastTick = _now;

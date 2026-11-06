@@ -1248,6 +1248,10 @@ nodes join, so the first Pi to join becomes the primary controller.
 1. **Detection**: nodes count consecutive missed TIME beacons. After 3
    missed beacons (30 seconds at normal rate, 30 seconds at failover
    rate), the controller is considered down.
+   *Note (2026-11-06, decisions FAIL-1 to FAIL-6):* the beacons are
+   counted at the interval the node hears the controller beacon at, not
+   the one its own failover mode gives: 30 s (90 seconds of silence)
+   until it has heard three beacons in a row 10 s apart.
 
 2. **Candidacy**: each controller-capable node calculates its priority
    and sends a CLAIM message with a new term number = `last_seen_term +

@@ -1996,6 +1996,33 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertIsNone(bad.evaluate("localStorage.getItem('atalaia.token')"))
         self.forget_refusal("/api/v1/whoami")
 
+    def test_a_standby_on_another_failover_mode_than_the_leader_is_told(self):
+        # Decision FAIL-4: the status (the API's and the stream's hello) says the leader's mode as its
+        # beacons show it. A standby's status, as the engine gives it, stands in for one here.
+        ctrl = self.field.bundle.controller
+        real = ctrl.status
+
+        def standby_status():
+            return {**real(), "role": "follower", "leader": 1, "term": 1, "failover_mode": "auto",
+                    "leader_beacon_s": 30, "leader_failover_mode": "manual", "takeover_after_s": 90}
+        ctrl.status = standby_status
+        self.addCleanup(lambda: setattr(ctrl, "status", real))
+        page = self.page(f"/console/#token={GM}&lang=en", width=390, height=844)
+        page.get_by_test_id("tab-controller").click()
+        expect(page.get_by_test_id("failover-mismatch")).to_contain_text("only after 90 s of silence")
+        expect(page.get_by_test_id("takeover-after")).to_have_text("90 s of silence")
+        self.no_horizontal_scroll(page)
+        pt = self.page(f"/console/#token={GM}&lang=pt")
+        pt.get_by_test_id("tab-controller").click()
+        expect(pt.get_by_test_id("failover-mismatch")).to_contain_text("só assume depois de 90 s de silêncio")
+        # The Pi's own status (a controller in charge): no notice, no takeover line.
+        ctrl.status = real
+        own = self.page(f"/console/#token={GM}&lang=en")
+        own.get_by_test_id("tab-controller").click()
+        expect(own.get_by_test_id("controller-status")).to_be_visible()
+        expect(own.get_by_test_id("failover-mismatch")).to_have_count(0)
+        expect(own.get_by_test_id("takeover-after")).to_have_count(0)
+
     # app/lib/controller/controller_api.dart (slice S7a added the radio and the field plan)
     PHONE_FEATURES = ["checkin", "join", "box_language", "positions", "radio", "field"]
     # The console's calls in the areas a phone controller does not serve yet.
@@ -4750,7 +4777,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v22').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v23').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js", "/console/labels.js", "/console/qr-svg.js"):
