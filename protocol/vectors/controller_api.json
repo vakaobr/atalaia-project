@@ -1326,7 +1326,7 @@
       ]
     },
     {
-      "name": "check-in: a marshal's own token takes a printed ticket; a player's token and the read token cannot (TKT-1; without a roster every ticket is 404)",
+      "name": "check-in: a marshal's own token takes a printed ticket; a player's token and the read token cannot (TKT-1; without a roster every ticket is 404, so the answer's `already` and `confirmed` (TKT-5, TKT-7) are pinned by each controller's own tests)",
       "steps": [
         {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Tickets", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"], "assignments": {"4": "zone"}}}, "status": 201, "save": {"gid": "id"}},
         {"request": {"method": "POST", "path": "/api/v1/checkin", "token": "none", "body": {"game_id": "${gid}", "player_id": "p-mmmmmmmmmmmm", "player_secret": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc", "display_name": "Marta", "notice_version": 2}}, "status": 201, "save": {"m0": "token"}},

@@ -1464,8 +1464,11 @@ class Checkin:
         token for this game, TKT-1) scan a registered player's printed ``atalaia:ticket:`` code. The registration
         must be in this game's roster and the ticket its own (403 ``ticket_not_newest`` otherwise); an expected
         player arrives at once, or waits for "card seen, matches" under the APD rule (the ticket is not the
-        card). The answer is the row with ``already``: true when the scan changed nothing (the player had
-        arrived). Who scanned and when are kept with the arrival and logged (TKT-3); at most ``ticket_rate``
+        card). A player who checked in with the app and waits as ``pending`` is confirmed by the scan, which is
+        the staff confirmation (TKT-7), unless the APD rule's card check is still to do: then they stay pending
+        for it. The answer is the row with ``already``: true when the scan changed nothing (the player had
+        arrived and was confirmed, or a second scan), and ``confirmed``: true when it confirmed a pending
+        check-in. Who scanned and when are kept with the arrival and logged (TKT-3); at most ``ticket_rate``
         scans a minute per staff id (TKT-2)."""
         game = self._staff(viewer, game_id)
         staff = self._staff_id(viewer)
@@ -1491,26 +1494,45 @@ class Checkin:
             if row["status"] == "removed":
                 raise Forbidden("staff removed this check-in")
             arriving = row["status"] == "expected"
-            emit = False
+            emit = changed = confirmed = False
+            st = self.settings()
+            card_rule = bool(st["apd"]["checkin"])
+            scan = {"ticket_scanned_by": staff, "ticket_scanned_at": now, "updated_at": now}
             if arriving:
-                st = self.settings()
                 if self.store.count_checkins(game_id) >= st["max_players"]:
                     raise Forbidden(f"game {game_id} is full ({st['max_players']} players)")
-                scan = {"ticket_scanned_by": staff, "ticket_scanned_at": now, "updated_at": now}
-                if st["apd"]["checkin"]:  # the ticket is not the card: pending until "card seen, matches"
+                changed = True
+                if card_rule:  # the ticket is not the card: pending until "card seen, matches"
                     self.store.update_checkin(game_id, row["player_id"], status="pending", **scan)
                 else:
                     emit = True
                     self.store.update_checkin(game_id, row["player_id"], status="checked_in", checked_in_at=now,
                                               **scan)
+            elif row["status"] == "pending":
+                # A pending self check-in: the scan is the staff confirmation (TKT-7). The card check, when the
+                # rule asks for it and nobody ticked it yet, still waits; the scan is recorded once.
+                fields = {} if row.get("ticket_scanned_at") is not None else dict(scan)
+                card_done = row.get("card_checked_at") is not None
+                if not card_rule or card_done:
+                    fields.update(status="checked_in", checked_in_at=now, updated_at=now)
+                    verdict = row.get("apd_verdict") if card_rule else None  # as a PATCH confirmation judges it
+                    if verdict not in (None, "valid"):  # a confirmation over a failing verdict is staff's call
+                        fields["apd_override"] = True
+                        log.info("apd override: game %d, %s confirmed by staff, reason %s, verdict %s", game_id,
+                                 row["player_id"], verdict, verdict)
+                    emit = confirmed = True
+                if fields:
+                    changed = True
+                    self.store.update_checkin(game_id, row["player_id"], **fields)
             row = self.store.checkin(game_id, row["player_id"])
             assert row is not None
-        if arriving:
-            log.info("ticket check-in: game %d, %s by %s, %s", game_id, row["player_id"], staff, row["status"])
+        if changed:
+            log.info("ticket check-in: game %d, %s by %s, %s%s", game_id, row["player_id"], staff, row["status"],
+                     " (confirmed)" if confirmed else "")
         if emit:
             self._emit_checkin_event(game, row)
         self._notify(game_id, row["player_id"])
-        return {**self.row_view(game, row), "already": not arriving}
+        return {**self.row_view(game, row), "already": not changed, "confirmed": confirmed}
 
     def apply_shared_chrono(self, game_id: int, roster_players: list[str], answer: dict[str, Any]) -> dict[str, Any]:
         """Other fields' records of the game's roster players, from ``GET /api/v1/sync/chrono`` (S14-5,

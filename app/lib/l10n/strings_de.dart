@@ -556,10 +556,13 @@ const Map<String, String> deStrings = {
       '{name} steht auf der Liste und wartet auf die Ausweisprüfung: Sieh dir '
       'den Verbandsausweis an und tippe "Ausweis gesehen, stimmt" in Repliken '
       'zum Chronen.',
+  'ticket.confirmed':
+      '{name} hat auf eine Bestätigung der Orga gewartet: Jetzt bestätigt '
+      'und eingecheckt.',
   'ticket.already': '{name} war schon eingecheckt: Nichts geändert.',
   'ticket.already_pending':
-      '{name} ist schon da und wartet auf die Ausweisprüfung oder eine '
-      'Bestätigung: Siehe Repliken zum Chronen.',
+      '{name} ist schon da und wartet auf die Ausweisprüfung: Siehe Repliken '
+      'zum Chronen.',
   'ticket.not_newest':
       'Das ist nicht das neueste Ticket dieser Anmeldung: Es wurde ein neues '
       'gemacht, und dieses gilt nicht mehr. Frag nach dem neuen Ticket oder '

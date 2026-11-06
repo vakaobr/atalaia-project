@@ -2836,9 +2836,13 @@ class ControllerCheckin {
   /// printed ticket. The registration must be in this
   /// game's roster and the ticket its own (403 `ticket_not_newest`); an
   /// expected player arrives at once, or waits for "card seen, matches"
-  /// under the APD rule. The answer is the row with `already`: true when the
-  /// scan changed nothing. Who scanned and when are kept with the arrival
-  /// and logged (TKT-3); at most [ticketRate] scans a minute per staff id
+  /// under the APD rule. A player who checked in with the app and waits as
+  /// `pending` is confirmed by the scan, the staff confirmation (TKT-7),
+  /// unless the APD rule's card check is still to do: then they stay pending
+  /// for it. The answer is the row with `already`: true when the scan
+  /// changed nothing, and `confirmed`: true when it confirmed a pending
+  /// check-in. Who scanned and when are kept with the arrival and logged
+  /// (TKT-3); at most [ticketRate] scans a minute per staff id
   /// (TKT-2). Without a roster no registration is on the list: 404, as on a
   /// Pi without one.
   Map<String, Object?> ticketCheckin(
@@ -2890,16 +2894,19 @@ class ControllerCheckin {
     final pid = row['player_id']! as String;
     final arriving = row['status'] == 'expected';
     var emit = false;
+    var changed = false;
+    var confirmed = false;
+    final scan = {
+      'ticket_scanned_by': staff,
+      'ticket_scanned_at': now,
+      'updated_at': now,
+    };
     if (arriving) {
       final st = settings();
       if (_count(gameId) >= (st['max_players']! as int)) {
         throw _forbidden('game $gameId is full (${st['max_players']} players)');
       }
-      final scan = {
-        'ticket_scanned_by': staff,
-        'ticket_scanned_at': now,
-        'updated_at': now,
-      };
+      changed = true;
       if (apdRule().checkin) {
         // The ticket is not the card: pending until "card seen, matches".
         _update(gameId, pid, {'status': 'pending', ...scan});
@@ -2912,14 +2919,40 @@ class ControllerCheckin {
         });
       }
       _save();
+    } else if (row['status'] == 'pending') {
+      // A pending self check-in: the scan is the staff confirmation (TKT-7).
+      // The card check, when the rule asks for it and nobody ticked it yet,
+      // still waits; the scan is recorded once.
+      final fields = <String, Object?>{
+        if (row['ticket_scanned_at'] == null) ...scan,
+      };
+      if (!apdRule().checkin || row['card_checked_at'] != null) {
+        fields.addAll({
+          'status': 'checked_in',
+          'checked_in_at': now,
+          'updated_at': now,
+        });
+        emit = confirmed = true;
+      }
+      if (fields.isNotEmpty) {
+        changed = true;
+        _update(gameId, pid, fields);
+        if (confirmed && _apdOverride(_row(gameId, pid)!)) {
+          _update(gameId, pid, {'apd_override': true});
+        }
+        _save();
+      }
     }
     row = _row(gameId, pid)!;
-    if (arriving) {
-      audit('ticket check-in: game $gameId, $pid by $staff, ${row['status']}');
+    if (changed) {
+      audit(
+        'ticket check-in: game $gameId, $pid by $staff, ${row['status']}'
+        '${confirmed ? ' (confirmed)' : ''}',
+      );
     }
     if (emit) _emitCheckinEvent(game, row);
     _notify(gameId, pid);
-    return {...rowView(game, row), 'already': !arriving};
+    return {...rowView(game, row), 'already': !changed, 'confirmed': confirmed};
   }
 
   /// GET /api/v1/games/{id}/checkins.csv (the GM token): one line per

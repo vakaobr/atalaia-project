@@ -67,8 +67,9 @@ Players who registered on the field's site come with a **check-in ticket**: a QR
 - **Take the ticket with your phone.** On the **Marshal** screen, open **Check in a ticket** and tap **Scan the ticket**, then point the camera at the QR code (on paper or on the player's screen). No camera, or a smudged code: type the text printed under the QR code (`atalaia:ticket:…`) in **The ticket's text** and tap **Check in**. Be on the field's Wi-Fi: the field controller decides, with your own marshal check-in, so you need no GM code. The GM console's **Check-in › Printed ticket** does the same at the desk.
 - **What the answer says:**
   - **… is checked in.** Done.
-  - **… is on the list and waits for the card check**: the field checks membership cards, and the ticket is not the card. Look at the card and tap **Card seen, matches** in **Replicas to chrono** ([Check the membership card](#check-the-membership-card)).
-  - **… was already checked in** (or **has already arrived**): the ticket was taken before, or the player checked in with the app. Nothing changed.
+  - **… was waiting for a staff confirmation: confirmed now, checked in.** The player had checked in with the app and the field has staff confirm check-ins; your scan is that confirmation. Done.
+  - **… is on the list and waits for the card check**: the field checks membership cards, and the ticket is not the card (this holds for a player who checked in with the app and waits for staff too: the scan does not replace the card check). Look at the card and tap **Card seen, matches** in **Replicas to chrono** ([Check the membership card](#check-the-membership-card)).
+  - **… was already checked in** (or **has already arrived**): the ticket was taken before, or the player checked in with the app and was already confirmed. Nothing changed.
   - **This is not the newest ticket for this registration**: a newer ticket was made and this one no longer works. Ask the player for the new one.
   - **… is not on this game's list**: the registration is for another game, or the field's list from the site has not arrived yet. Ask the GM.
   - **The field controller refused the ticket: …**: the reason follows (for example, staff removed this check-in, or the game is full).
