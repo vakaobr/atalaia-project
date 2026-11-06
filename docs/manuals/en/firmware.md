@@ -237,7 +237,7 @@ A new Field Box or Satellite does this on its first start. The 2.4 GHz antenna m
    - **Admin PIN**: 4 to 8 digits. Write it down. 1234, 0000, a sequence such as 9876 and a repeated pair such as 1212 are refused.
    - **Display Brightness** and **Audio Volume**.
    - **Field join key** (optional): the 64 digits from the organisers. You can add it later by adoption.
-   - **Field Wi-Fi name** and **password** (optional, but needed for updates and fetched game modes: [section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)). The field Wi-Fi must be 2.4 GHz. The password is 8 to 63 characters, 64 hex digits, or none for an open network, as on the USB console; the page refuses any other.
+   - **Field Wi-Fi name** and **password** (optional, but needed for updates and fetched game modes: [section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)). The field Wi-Fi must be 2.4 GHz. The password is 8 to 63 characters, 64 hex digits, or none for an open network, as on the USB console; the page refuses any other. The name is at most 32 bytes, also as on the USB console: an accented letter takes 2 and a Chinese character 3, so a name with them can be refused under 32 characters.
 5. Tap **Save & Reboot**. The box restarts.
 
 Then a box with no field shows **PAIR THIS BOX** and a 6-digit code ([section 6](#6-adoption)). A box that is already adopted shows **READY**.

@@ -66,6 +66,7 @@ typedef enum {
     WS_MSG_PIN_WEAK,
     WS_MSG_JOIN_KEY,
     WS_MSG_WIFI_PASS,
+    WS_MSG_WIFI_SSID,
     WS_MSG_SAVED,
     WS_MSG_COUNT,
 } wifi_setup_msg_t;
@@ -80,6 +81,14 @@ const char *wifi_setup_pin_problem_in(box_lang_t lang, const char *pin);
  * or 64 hex digits (decision WIFI-7, changed by the maintainer on 2026-11-05).
  */
 const char *wifi_setup_wifi_pass_problem_in(box_lang_t lang, const char *pass);
+
+/*
+ * Why the form's field Wi-Fi name (SSID) is refused, in a language, or NULL: the console's
+ * "@wifi" rule (wifi_ssid_valid, wifi_args.h): 1-32 bytes, counted in UTF-8 bytes after the
+ * form's URL decoding (decision WIFI-10). "" and NULL are refused here; the form handler asks
+ * only about a name that was typed, since the field Wi-Fi is optional.
+ */
+const char *wifi_setup_wifi_ssid_problem_in(box_lang_t lang, const char *ssid);
 
 /*
  * The captive portal's DNS answer to one query packet: every A (and ANY) question for any name

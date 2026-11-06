@@ -13,6 +13,12 @@ static bool is_hex(char c)
     return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
 
+bool wifi_ssid_valid(const char *ssid)
+{
+    size_t n = strlen(ssid);
+    return n >= 1 && n <= WIFI_SSID_MAX;
+}
+
 bool wifi_pass_valid(const char *pass)
 {
     size_t n = strlen(pass);
