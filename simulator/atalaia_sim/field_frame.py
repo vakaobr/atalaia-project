@@ -9,8 +9,9 @@ the token of its last announcement), and says that a game is over (GAME_OVER:
 the game id and its key's tag, for a controller that lost the game's key;
 decision OT-13), and says that the field has moved to another channel (MOVE: the new channel
 and a revision that only rises, RFC 0001 Amendment 19), and frees every box in a game other than
-the live one (RELEASE: the live game id or 0, and the controller's wall clock, for a controller that
-lost the game entirely; RFC 0001 Amendment 28). On air::
+the live one (RELEASE: the live game id or 0, the controller's wall clock and the channel it is sent
+on, for a controller that lost the game entirely; RFC 0001 Amendment 28 and its addendum of
+2026-11-06, ``release_verdict``). On air::
 
     header (9: game_id 0, source 0, seq 0, hop_limit 0, type 9) | nonce (13) | body | MIC (8)
 
@@ -69,6 +70,7 @@ K_INVITE, K_PART, K_PARTS, K_CHUNK = 4, 5, 6, 7
 K_GAME, K_KEY_TAG = 4, 5
 K_CHANNEL, K_REV = 4, 5  # MOVE: the field's new channel (Hz) and its revision
 K_LIVE_GAME, K_TIME = 4, 5  # RELEASE: the live game (0: none) and the sender's wall clock (Unix seconds)
+K_RELEASE_CHANNEL = 6       # RELEASE: the channel it is sent on (Hz), required since 2026-11-06
 KNOWN_KEYS = set(range(1, 11))  # a key another kind uses is not an "unknown" one
 
 _HEADER = Header(vf_make(1, 1, False, True), 0, 0, 0, 0, FIELD_TYPE)
@@ -208,6 +210,8 @@ def validate(msg: dict[str, Any]) -> dict[str, Any]:
             raise FieldFrameError("live_game: 0-65534")
         if not _uint(msg.get("time"), 1, 0xFFFFFFFF):
             raise FieldFrameError("time: 1-4294967295")
+        if not _uint(msg.get("channel_hz"), 1, 0xFFFFFFFF):
+            raise FieldFrameError("channel_hz: 1-4294967295")
     elif kind == "move":
         if not _uint(msg.get("channel_hz"), 1, 0xFFFFFFFF):
             raise FieldFrameError("channel_hz: 1-4294967295")
@@ -251,7 +255,7 @@ def body_encode(msg: dict[str, Any]) -> bytes:
     elif kind == "move":
         out.update({K_CHANNEL: msg["channel_hz"], K_REV: msg["rev"]})
     elif kind == "release":
-        out.update({K_LIVE_GAME: msg["live_game"], K_TIME: msg["time"]})
+        out.update({K_LIVE_GAME: msg["live_game"], K_TIME: msg["time"], K_RELEASE_CHANNEL: msg["channel_hz"]})
     body = cbor.encode(out)
     if len(body) > BODY_MAX:
         raise FieldFrameError(f"body of {len(body)} bytes; at most {BODY_MAX}")
@@ -263,7 +267,7 @@ _ANNOUNCE_KEYS = {K_KIND, K_DEVICE, K_TOKEN, K_NAME, K_TIER, K_LAST_GAME, K_LAST
 _INVITE_KEYS = {K_KIND, K_DEVICE, K_TOKEN, K_INVITE, K_PART, K_PARTS, K_CHUNK}
 _GAME_OVER_KEYS = {K_KIND, K_GAME, K_KEY_TAG}
 _MOVE_KEYS = {K_KIND, K_CHANNEL, K_REV}
-_RELEASE_KEYS = {K_KIND, K_LIVE_GAME, K_TIME}
+_RELEASE_KEYS = {K_KIND, K_LIVE_GAME, K_TIME, K_RELEASE_CHANNEL}
 
 
 def body_decode(data: bytes) -> dict[str, Any]:
@@ -321,7 +325,7 @@ def body_decode(data: bytes) -> dict[str, Any]:
                 raise FieldFrameError(f"missing key {key}")
             msg[name] = raw[key]
     elif kind == "release":
-        for key, name in ((K_LIVE_GAME, "live_game"), (K_TIME, "time")):
+        for key, name in ((K_LIVE_GAME, "live_game"), (K_TIME, "time"), (K_RELEASE_CHANNEL, "channel_hz")):
             if key not in raw:
                 raise FieldFrameError(f"missing key {key}")
             msg[name] = raw[key]
@@ -417,3 +421,31 @@ class Reassembly:
         if len(payload) > JOIN_MAX:
             raise FieldFrameError("the parts make more than a join payload")
         return payload
+
+
+# --- RELEASE on a box (RFC 0001 Amendment 28, addendum of 2026-11-06) -----------------------------
+
+RELEASE_AHEAD_S = 300   # a RELEASE's time at most this far past the box's estimate of its game's clock
+RELEASE_HEARD_S = 90    # a box that heard a TIME of its game more recently than this ignores a RELEASE
+RELEASE_VERDICTS = ("taken", "live", "other_channel", "hearing", "no_join_time", "old", "ahead")
+
+
+def release_verdict(box: dict[str, Any], msg: dict[str, Any]) -> str:
+    """Whether a box in a game (joined or playing: the caller checks) takes a RELEASE, as
+    atalaia_ff_release_verdict in core/src/field_frame.c: ``box`` has game_id, channel_hz, join_wall_s
+    (0: unknown), heard_time (a TIME of its game heard since it started) with since_heard_s, and
+    time_wall_s (the newest TIME's non-zero wall_s since it started, 0: none) with since_time_s.
+    Returns one of RELEASE_VERDICTS."""
+    if msg["live_game"] and msg["live_game"] == box["game_id"]:
+        return "live"
+    if msg["channel_hz"] != box["channel_hz"]:
+        return "other_channel"
+    if box["heard_time"] and box["since_heard_s"] < RELEASE_HEARD_S:
+        return "hearing"
+    if not box["join_wall_s"]:
+        return "no_join_time"
+    if msg["time"] <= box["join_wall_s"]:
+        return "old"
+    if box["time_wall_s"] and msg["time"] > box["time_wall_s"] + box["since_time_s"] + RELEASE_AHEAD_S:
+        return "ahead"
+    return "taken"

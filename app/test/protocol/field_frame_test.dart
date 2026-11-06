@@ -103,8 +103,14 @@ void main() {
       );
     });
 
-    test('RELEASE (RFC 0001 Amendment 28): the live game and a time', () {
-      final msg = {'kind': 'release', 'live_game': 0, 'time': 1793000000};
+    test('RELEASE (RFC 0001 Amendment 28): the live game, a time and the '
+        'channel (its addendum of 2026-11-06)', () {
+      final msg = {
+        'kind': 'release',
+        'live_game': 0,
+        'time': 1793000000,
+        'channel_hz': 869525000,
+      };
       expect(plain(decodeFieldBody(encodeFieldBody(msg))), msg);
       for (final bad in [
         {'live_game': 65535},
@@ -112,6 +118,9 @@ void main() {
         {'time': 0},
         {'time': 4294967296},
         {'time': '1793000000'},
+        {'channel_hz': 0},
+        {'channel_hz': 4294967296},
+        {'channel_hz': null},
       ]) {
         expect(
           () => encodeFieldBody({...msg, ...bad}),
@@ -137,7 +146,7 @@ void main() {
         );
       }
       final bodies = cases(v, 'invalid_bodies');
-      expect(bodies, hasLength(58));
+      expect(bodies, hasLength(63));
       for (final c in bodies) {
         expect(
           () => decodeFieldBody(h(c['body'])),

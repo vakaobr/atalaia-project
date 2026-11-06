@@ -62,6 +62,12 @@ const clockSetMaxAheadFloorS = 5 * 365 * 86400;
 /// ... and from a plausible clock, at most this far above it.
 const clockSetMaxAheadNowS = 14 * 86400;
 
+/// A field-wide RELEASE (RFC 0001 Amendment 28, its addendum of
+/// 2026-11-06) is stamped with [ClockGuard.now]: never more than this past a
+/// clock the controller can vouch for (wallclock.py `RELEASE_SLACK_S`). The
+/// boxes refuse one more than the same 300 s past their game's clock.
+const clockReleaseSlackS = 300;
+
 /// A clock setting that is refused; [code] is stable for the console
 /// (wallclock.py `ClockError`).
 class ClockError implements Exception {
@@ -220,6 +226,51 @@ class ClockGuard {
   /// Moves the controller's wall clock forward to [epoch] (a GM's device
   /// clock). Refused: not a number, below the floor, not forward, or
   /// absurdly far ahead.
+  /// Throws [ClockError] unless [now] may stamp a field-wide RELEASE
+  /// (wallclock.py `release_check`, decision RLB-4). Its bound is a clock
+  /// the controller can vouch for, plus [clockReleaseSlackS]: the GM's
+  /// device clock when the request carries it ([deviceTime], the console
+  /// sends it), else the system clock without the GM's correction. A phone
+  /// whose own clock was set ahead by hand is caught only by a console on
+  /// another device.
+  void releaseCheck([Object? deviceTime]) {
+    if (!plausible()) {
+      throw ClockError(
+        'not_set',
+        "the controller's clock is not set: set it first, so that the boxes "
+            'can tell this RELEASE from an older one',
+      );
+    }
+    final nowS = now();
+    if (deviceTime != null) {
+      if (deviceTime is! num || deviceTime.isNaN || deviceTime.isInfinite) {
+        throw ClockError(
+          'invalid',
+          'device_time: seconds since 1970 as a number',
+          status: 400,
+        );
+      }
+      if (nowS > deviceTime + clockReleaseSlackS) {
+        throw ClockError(
+          'ahead_of_device',
+          "the controller's clock (${_iso(nowS)}) is ahead of this device's "
+              '(${_iso(deviceTime.toDouble())}): a RELEASE stamped with it '
+              'would stay valid too long. Restart the controller to drop the '
+              "correction, or set this device's clock",
+        );
+      }
+      return;
+    }
+    if (_offset > clockReleaseSlackS) {
+      throw ClockError(
+        'unconfirmed',
+        "the controller's clock was moved ${_offset.toStringAsFixed(0)} s "
+            'forward and no device confirmed it: send the RELEASE from the '
+            "console (it sends its device's clock)",
+      );
+    }
+  }
+
   Map<String, Object?> set(Object? epoch) {
     if (epoch is! num || epoch.isNaN || epoch.isInfinite) {
       throw ClockError(

@@ -399,8 +399,8 @@ static const uint8_t ff_valid_10_frame[] = {
 };
 #define ff_valid_10_frame_len sizeof(ff_valid_10_frame)
 static const uint8_t ff_valid_11_body[] = {
-    0xa3, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
-    0x40,
+    0xa4, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
+    0x40, 0x06, 0x1a, 0x33, 0xd3, 0xe6, 0x08,
 };
 #define ff_valid_11_body_len sizeof(ff_valid_11_body)
 static const uint8_t ff_valid_11_nonce[] = {
@@ -410,13 +410,15 @@ static const uint8_t ff_valid_11_nonce[] = {
 #define ff_valid_11_nonce_len sizeof(ff_valid_11_nonce)
 static const uint8_t ff_valid_11_frame[] = {
     0x2a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x31, 0x04, 0x53,
-    0xd4, 0x49, 0xa7, 0xf0, 0xb0, 0x00, 0x00, 0x01, 0x00, 0x0b, 0x23, 0xde,
-    0x98, 0x32, 0x17, 0x55, 0x37, 0x09, 0xce, 0x3c, 0x70, 0xe4, 0x01, 0x2f,
-    0x83, 0xe9, 0x92, 0x2c, 0xfb, 0x63, 0xee,
+    0xd4, 0x49, 0xa7, 0xf0, 0xb0, 0x00, 0x00, 0x01, 0x00, 0x0b, 0x24, 0xde,
+    0x98, 0x32, 0x17, 0x55, 0x37, 0x09, 0xce, 0x3c, 0x70, 0xe4, 0x01, 0x8d,
+    0x0b, 0x23, 0x8c, 0x5e, 0x4c, 0xcc, 0xd8, 0xe1, 0xde, 0x0b, 0xd2, 0x7b,
+    0xf5,
 };
 #define ff_valid_11_frame_len sizeof(ff_valid_11_frame)
 static const uint8_t ff_valid_12_body[] = {
-    0xa3, 0x01, 0x06, 0x04, 0x00, 0x05, 0x1a, 0xff, 0xff, 0xff, 0xff,
+    0xa4, 0x01, 0x06, 0x04, 0x00, 0x05, 0x1a, 0xff, 0xff, 0xff, 0xff, 0x06,
+    0x1a, 0xff, 0xff, 0xff, 0xff,
 };
 #define ff_valid_12_body_len sizeof(ff_valid_12_body)
 static const uint8_t ff_valid_12_nonce[] = {
@@ -426,9 +428,9 @@ static const uint8_t ff_valid_12_nonce[] = {
 #define ff_valid_12_nonce_len sizeof(ff_valid_12_nonce)
 static const uint8_t ff_valid_12_frame[] = {
     0x2a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x31, 0x04, 0x53,
-    0xd4, 0x49, 0xa7, 0xf0, 0xb0, 0x00, 0x00, 0x01, 0x00, 0x0c, 0x94, 0xaa,
-    0x84, 0xbb, 0xde, 0x96, 0xf2, 0xd3, 0xd4, 0xce, 0xa4, 0x49, 0x59, 0x0f,
-    0x6c, 0x0d, 0x09, 0xb8, 0xca,
+    0xd4, 0x49, 0xa7, 0xf0, 0xb0, 0x00, 0x00, 0x01, 0x00, 0x0c, 0x93, 0xaa,
+    0x84, 0xbb, 0xde, 0x96, 0xf2, 0xd3, 0xd4, 0xce, 0xa4, 0x60, 0x0a, 0xc6,
+    0xbe, 0xe3, 0x4c, 0x06, 0x2a, 0x72, 0x87, 0xfa, 0x96, 0x5a, 0x6d,
 };
 #define ff_valid_12_frame_len sizeof(ff_valid_12_frame)
 
@@ -454,8 +456,8 @@ static const ff_valid_vector_t ff_valid_vectors[] = {
     {"game_over_last_game_id", {.kind = ATALAIA_FF_GAME_OVER, .key_tag = {0x56, 0xc4, 0xe1, 0xd0, 0x29, 0x97, 0x26, 0xc2}, .game_id = 65534}, ff_valid_8_body, ff_valid_8_body_len, ff_valid_8_nonce, ff_valid_8_frame, ff_valid_8_frame_len},
     {"move", {.kind = ATALAIA_FF_MOVE, .channel_hz = 869925000u, .rev = 3u}, ff_valid_9_body, ff_valid_9_body_len, ff_valid_9_nonce, ff_valid_9_frame, ff_valid_9_frame_len},
     {"move_largest", {.kind = ATALAIA_FF_MOVE, .channel_hz = 4294967295u, .rev = 4294967295u}, ff_valid_10_body, ff_valid_10_body_len, ff_valid_10_nonce, ff_valid_10_frame, ff_valid_10_frame_len},
-    {"release", {.kind = ATALAIA_FF_RELEASE, .live_game = 4242, .time_s = 1793000000u}, ff_valid_11_body, ff_valid_11_body_len, ff_valid_11_nonce, ff_valid_11_frame, ff_valid_11_frame_len},
-    {"release_no_live_game", {.kind = ATALAIA_FF_RELEASE, .live_game = 0, .time_s = 4294967295u}, ff_valid_12_body, ff_valid_12_body_len, ff_valid_12_nonce, ff_valid_12_frame, ff_valid_12_frame_len},
+    {"release", {.kind = ATALAIA_FF_RELEASE, .live_game = 4242, .channel_hz = 869525000u, .time_s = 1793000000u}, ff_valid_11_body, ff_valid_11_body_len, ff_valid_11_nonce, ff_valid_11_frame, ff_valid_11_frame_len},
+    {"release_no_live_game", {.kind = ATALAIA_FF_RELEASE, .live_game = 0, .channel_hz = 4294967295u, .time_s = 4294967295u}, ff_valid_12_body, ff_valid_12_body_len, ff_valid_12_nonce, ff_valid_12_frame, ff_valid_12_frame_len},
 };
 #define FF_VALID_VECTOR_COUNT (sizeof(ff_valid_vectors) / sizeof(ff_valid_vectors[0]))
 
@@ -605,8 +607,8 @@ static const uint8_t ff_bad_body_0[] = {
 };
 #define ff_bad_body_0_len sizeof(ff_bad_body_0)
 static const uint8_t ff_bad_body_1[] = {
-    0xa3, 0x01, 0x07, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
-    0x40,
+    0xa4, 0x01, 0x07, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
+    0x40, 0x06, 0x1a, 0x33, 0xd3, 0xe6, 0x08,
 };
 #define ff_bad_body_1_len sizeof(ff_bad_body_1)
 static const uint8_t ff_bad_body_2[] = {
@@ -867,65 +869,95 @@ static const uint8_t ff_bad_body_45[] = {
 };
 #define ff_bad_body_45_len sizeof(ff_bad_body_45)
 static const uint8_t ff_bad_body_46[] = {
-    0xa2, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92,
+    0xa3, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x06, 0x1a, 0x33, 0xd3, 0xe6,
+    0x08,
 };
 #define ff_bad_body_46_len sizeof(ff_bad_body_46)
 static const uint8_t ff_bad_body_47[] = {
-    0xa2, 0x01, 0x06, 0x05, 0x1a, 0x6a, 0xdf, 0x02, 0x40,
+    0xa3, 0x01, 0x06, 0x05, 0x1a, 0x6a, 0xdf, 0x02, 0x40, 0x06, 0x1a, 0x33,
+    0xd3, 0xe6, 0x08,
 };
 #define ff_bad_body_47_len sizeof(ff_bad_body_47)
 static const uint8_t ff_bad_body_48[] = {
-    0xa3, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x00,
+    0xa3, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
+    0x40,
 };
 #define ff_bad_body_48_len sizeof(ff_bad_body_48)
 static const uint8_t ff_bad_body_49[] = {
-    0xa3, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1b, 0x00, 0x00, 0x00,
-    0x01, 0x00, 0x00, 0x00, 0x00,
+    0xa4, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
+    0x40, 0x06, 0x00,
 };
 #define ff_bad_body_49_len sizeof(ff_bad_body_49)
 static const uint8_t ff_bad_body_50[] = {
-    0xa3, 0x01, 0x06, 0x04, 0x19, 0xff, 0xff, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
-    0x40,
+    0xa4, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
+    0x40, 0x06, 0x1b, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
 };
 #define ff_bad_body_50_len sizeof(ff_bad_body_50)
 static const uint8_t ff_bad_body_51[] = {
-    0xa3, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x48, 0x45, 0xaa, 0xb1,
-    0xd2, 0x5d, 0x35, 0x15, 0xd2,
+    0xa4, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
+    0x40, 0x06, 0x69, 0x38, 0x36, 0x39, 0x35, 0x32, 0x35, 0x30, 0x30, 0x30,
 };
 #define ff_bad_body_51_len sizeof(ff_bad_body_51)
 static const uint8_t ff_bad_body_52[] = {
-    0xa4, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
-    0x40, 0x02, 0x48, 0x5a, 0x17, 0xc0, 0xde, 0x0b, 0x0e, 0x12, 0x34,
+    0xa4, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x00, 0x06, 0x1a, 0x33,
+    0xd3, 0xe6, 0x08,
 };
 #define ff_bad_body_52_len sizeof(ff_bad_body_52)
 static const uint8_t ff_bad_body_53[] = {
-    0xa4, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
-    0x40, 0x03, 0x48, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+    0xa4, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1b, 0x00, 0x00, 0x00,
+    0x01, 0x00, 0x00, 0x00, 0x00, 0x06, 0x1a, 0x33, 0xd3, 0xe6, 0x08,
 };
 #define ff_bad_body_53_len sizeof(ff_bad_body_53)
 static const uint8_t ff_bad_body_54[] = {
-    0xa4, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
-    0x40, 0x07, 0x41, 0x01,
+    0xa4, 0x01, 0x06, 0x04, 0x19, 0xff, 0xff, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
+    0x40, 0x06, 0x1a, 0x33, 0xd3, 0xe6, 0x08,
 };
 #define ff_bad_body_54_len sizeof(ff_bad_body_54)
 static const uint8_t ff_bad_body_55[] = {
+    0xa4, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x48, 0x45, 0xaa, 0xb1,
+    0xd2, 0x5d, 0x35, 0x15, 0xd2, 0x06, 0x1a, 0x33, 0xd3, 0xe6, 0x08,
+};
+#define ff_bad_body_55_len sizeof(ff_bad_body_55)
+static const uint8_t ff_bad_body_56[] = {
+    0xa5, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
+    0x40, 0x06, 0x1a, 0x33, 0xd3, 0xe6, 0x08, 0x02, 0x48, 0x5a, 0x17, 0xc0,
+    0xde, 0x0b, 0x0e, 0x12, 0x34,
+};
+#define ff_bad_body_56_len sizeof(ff_bad_body_56)
+static const uint8_t ff_bad_body_57[] = {
+    0xa5, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
+    0x40, 0x06, 0x1a, 0x33, 0xd3, 0xe6, 0x08, 0x03, 0x48, 0x01, 0x23, 0x45,
+    0x67, 0x89, 0xab, 0xcd, 0xef,
+};
+#define ff_bad_body_57_len sizeof(ff_bad_body_57)
+static const uint8_t ff_bad_body_58[] = {
+    0xa5, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
+    0x40, 0x06, 0x1a, 0x33, 0xd3, 0xe6, 0x08, 0x07, 0x41, 0x01,
+};
+#define ff_bad_body_58_len sizeof(ff_bad_body_58)
+static const uint8_t ff_bad_body_59[] = {
+    0xa5, 0x01, 0x06, 0x04, 0x19, 0x10, 0x92, 0x05, 0x1a, 0x6a, 0xdf, 0x02,
+    0x40, 0x06, 0x1a, 0x33, 0xd3, 0xe6, 0x08, 0x08, 0x18, 0x32,
+};
+#define ff_bad_body_59_len sizeof(ff_bad_body_59)
+static const uint8_t ff_bad_body_60[] = {
     0xa6, 0x01, 0x01, 0x02, 0x48, 0x5a, 0x17, 0xc0, 0xde, 0x0b, 0x0e, 0x12,
     0x34, 0x03, 0x48, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x04,
     0x63, 0x62, 0x6f, 0x78, 0x05, 0x00, 0x18, 0x20, 0x01,
 };
-#define ff_bad_body_55_len sizeof(ff_bad_body_55)
-static const uint8_t ff_bad_body_56[] = {
+#define ff_bad_body_60_len sizeof(ff_bad_body_60)
+static const uint8_t ff_bad_body_61[] = {
     0xa5, 0x01, 0x01, 0x02, 0x48, 0x5a, 0x17, 0xc0, 0xde, 0x0b, 0x0e, 0x12,
     0x34, 0x03, 0x48, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x04,
     0x63, 0x62, 0x6f, 0x78, 0x05, 0x00, 0x00,
 };
-#define ff_bad_body_56_len sizeof(ff_bad_body_56)
-static const uint8_t ff_bad_body_57[] = {
+#define ff_bad_body_61_len sizeof(ff_bad_body_61)
+static const uint8_t ff_bad_body_62[] = {
     0xa6, 0x01, 0x01, 0x02, 0x48, 0x5a, 0x17, 0xc0, 0xde, 0x0b, 0x0e, 0x12,
     0x34, 0x03, 0x48, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x04,
     0x63, 0x62, 0x6f, 0x78, 0x05, 0x00, 0x05, 0x00,
 };
-#define ff_bad_body_57_len sizeof(ff_bad_body_57)
+#define ff_bad_body_62_len sizeof(ff_bad_body_62)
 
 static const ff_bad_vector_t ff_bad_bodies[] = {
     {"unknown_kind", ff_bad_body_0, ff_bad_body_0_len, "body"},
@@ -976,16 +1008,21 @@ static const ff_bad_vector_t ff_bad_bodies[] = {
     {"move_with_an_invite_key", ff_bad_body_45, ff_bad_body_45_len, "body"},
     {"release_without_time", ff_bad_body_46, ff_bad_body_46_len, "body"},
     {"release_without_live_game", ff_bad_body_47, ff_bad_body_47_len, "body"},
-    {"release_time_0", ff_bad_body_48, ff_bad_body_48_len, "body"},
-    {"release_time_too_big", ff_bad_body_49, ff_bad_body_49_len, "body"},
-    {"release_live_game_65535", ff_bad_body_50, ff_bad_body_50_len, "body"},
-    {"release_time_as_bytes", ff_bad_body_51, ff_bad_body_51_len, "body"},
-    {"release_with_a_device", ff_bad_body_52, ff_bad_body_52_len, "body"},
-    {"release_with_a_token", ff_bad_body_53, ff_bad_body_53_len, "body"},
-    {"release_with_an_invite_key", ff_bad_body_54, ff_bad_body_54_len, "body"},
-    {"key_32", ff_bad_body_55, ff_bad_body_55_len, "body"},
-    {"trailing_byte", ff_bad_body_56, ff_bad_body_56_len, "body"},
-    {"duplicate_key", ff_bad_body_57, ff_bad_body_57_len, "body"},
+    {"release_without_channel", ff_bad_body_48, ff_bad_body_48_len, "body"},
+    {"release_channel_0", ff_bad_body_49, ff_bad_body_49_len, "body"},
+    {"release_channel_too_big", ff_bad_body_50, ff_bad_body_50_len, "body"},
+    {"release_channel_as_text", ff_bad_body_51, ff_bad_body_51_len, "body"},
+    {"release_time_0", ff_bad_body_52, ff_bad_body_52_len, "body"},
+    {"release_time_too_big", ff_bad_body_53, ff_bad_body_53_len, "body"},
+    {"release_live_game_65535", ff_bad_body_54, ff_bad_body_54_len, "body"},
+    {"release_time_as_bytes", ff_bad_body_55, ff_bad_body_55_len, "body"},
+    {"release_with_a_device", ff_bad_body_56, ff_bad_body_56_len, "body"},
+    {"release_with_a_token", ff_bad_body_57, ff_bad_body_57_len, "body"},
+    {"release_with_an_invite_key", ff_bad_body_58, ff_bad_body_58_len, "body"},
+    {"release_with_an_announce_key", ff_bad_body_59, ff_bad_body_59_len, "body"},
+    {"key_32", ff_bad_body_60, ff_bad_body_60_len, "body"},
+    {"trailing_byte", ff_bad_body_61, ff_bad_body_61_len, "body"},
+    {"duplicate_key", ff_bad_body_62, ff_bad_body_62_len, "body"},
 };
 #define FF_BAD_BODY_COUNT (sizeof(ff_bad_bodies) / sizeof(ff_bad_bodies[0]))
 
@@ -1165,5 +1202,43 @@ static const uint8_t ff_nonce_source[4][13] = {
     {0x31, 0x04, 0x53, 0xd4, 0x49, 0xa7, 0xf0, 0xb0, 0x00, 0x00, 0x2a, 0xff, 0xff},
     {0x31, 0x04, 0x53, 0xd4, 0x49, 0xa7, 0xf0, 0xb0, 0x00, 0x00, 0x2b, 0x00, 0x00},
 };
+
+#define FF_RELEASE_AHEAD_S 300u
+#define FF_RELEASE_HEARD_S 90u
+
+typedef struct {
+    const char *name;
+    atalaia_ff_release_box_t box;
+    atalaia_ff_msg_t release;
+    atalaia_ff_release_verdict_t verdict;
+} ff_release_rule_t;
+
+static const ff_release_rule_t ff_release_rules[] = {
+    {"taken", {513, 869525000u, 1793000100u, true, 600u, 1793003600u, 600u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 1793004200u, .channel_hz = 869525000u}, 0},
+    {"taken_no_live_game", {513, 869525000u, 1793000100u, true, 600u, 1793003600u, 600u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 0, .time_s = 1793004200u, .channel_hz = 869525000u}, 0},
+    {"live_game_is_the_box_s", {513, 869525000u, 1793000100u, true, 600u, 1793003600u, 600u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 513, .time_s = 1793004200u, .channel_hz = 869525000u}, 1},
+    {"another_channel", {513, 869525000u, 1793000100u, true, 600u, 1793003600u, 600u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 1793004200u, .channel_hz = 868100000u}, 2},
+    {"another_channel_live_game_0", {513, 869525000u, 1793000100u, true, 600u, 1793003600u, 600u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 0, .time_s = 1793004200u, .channel_hz = 869525001u}, 2},
+    {"playing_a_game_it_hears", {513, 869525000u, 1793000100u, true, 10u, 1793000100u, 10u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 1793000200u, .channel_hz = 869525000u}, 3},
+    {"playing_a_game_it_hears_14_days_ahead", {513, 869525000u, 1793000100u, true, 10u, 1793000100u, 10u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 1794209700u, .channel_hz = 869525000u}, 3},
+    {"playing_a_game_it_hears_time_max", {513, 869525000u, 1793000100u, true, 10u, 1793000100u, 10u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 4294967295u, .channel_hz = 869525000u}, 3},
+    {"heard_just_under_the_limit", {513, 869525000u, 1793000100u, true, 89u, 1793003600u, 600u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 1793004200u, .channel_hz = 869525000u}, 3},
+    {"heard_at_the_limit", {513, 869525000u, 1793000100u, true, 90u, 1793003600u, 600u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 1793004200u, .channel_hz = 869525000u}, 0},
+    {"time_without_a_wall_clock_heard", {513, 869525000u, 1793000100u, true, 5u, 0u, 600u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 1793004200u, .channel_hz = 869525000u}, 3},
+    {"no_time_ever_heard", {513, 869525000u, 0u, false, 0u, 0u, 0u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 1793004200u, .channel_hz = 869525000u}, 4},
+    {"at_the_join", {513, 869525000u, 1793000100u, true, 600u, 1793003600u, 600u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 1793000100u, .channel_hz = 869525000u}, 5},
+    {"before_the_join", {513, 869525000u, 1793000100u, true, 600u, 1793003600u, 600u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 1792996500u, .channel_hz = 869525000u}, 5},
+    {"ahead_by_the_margin", {513, 869525000u, 1793000100u, true, 600u, 1793003600u, 600u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 1793004500u, .channel_hz = 869525000u}, 0},
+    {"ahead_past_the_margin", {513, 869525000u, 1793000100u, true, 600u, 1793003600u, 600u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 1793004501u, .channel_hz = 869525000u}, 6},
+    {"ahead_14_days", {513, 869525000u, 1793000100u, true, 600u, 1793003600u, 600u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 1794213800u, .channel_hz = 869525000u}, 6},
+    {"ahead_time_max", {513, 869525000u, 1793000100u, true, 600u, 1793003600u, 600u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 4294967295u, .channel_hz = 869525000u}, 6},
+    {"quiet_for_hours", {513, 869525000u, 1793000100u, true, 21600u, 1793003600u, 21600u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 1793025140u, .channel_hz = 869525000u}, 0},
+    {"time_near_the_end_of_the_clock", {513, 869525000u, 1793000100u, true, 600u, 4294967040u, 65535u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 4294967295u, .channel_hz = 869525000u}, 0},
+    {"rebooted_into_a_lost_game", {513, 869525000u, 1793000100u, false, 0u, 0u, 0u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 1795596200u, .channel_hz = 869525000u}, 0},
+    {"rebooted_another_channel", {513, 869525000u, 1793000100u, false, 0u, 0u, 0u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 1793004200u, .channel_hz = 868100000u}, 2},
+    {"rebooted_before_the_join", {513, 869525000u, 1793000100u, false, 0u, 0u, 0u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 1793000099u, .channel_hz = 869525000u}, 5},
+    {"rebooted_then_heard_its_game", {513, 869525000u, 1793000100u, true, 3u, 0u, 0u}, {.kind = ATALAIA_FF_RELEASE, .live_game = 3328, .time_s = 1793004200u, .channel_hz = 869525000u}, 3},
+};
+#define FF_RELEASE_RULE_COUNT (sizeof(ff_release_rules) / sizeof(ff_release_rules[0]))
 
 #endif /* ATALAIA_FIELD_FRAME_VECTORS_H */

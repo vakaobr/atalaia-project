@@ -5,7 +5,8 @@
 // controller that lost a game entirely (reinstalled, its database lost), no GAME_OVER can name the
 // game a box is still in. "Release every box not in this game" asks first, then
 // POST /api/v1/boxes/release: every box of the field on this channel that is in a game other than
-// the live one (any game, with none live), joined before now, ends it as on a game over. Shown to
+// the live one (any game, with none live), joined before now, ends it as on a game over (unless its
+// game's controller still talks to it; RFC 0001 Amendment 28's addendum of 2026-11-06). Shown to
 // the GM in Settings, on a controller that reports stuck boxes (`stuck_watch` in GET /api/v1/boxes:
 // a Pi, or a phone controller since STUCK-60).
 
@@ -33,7 +34,8 @@ export class ReleaseBoxes extends Component {
     async release() {
         const { app } = this.props;
         this.setState({ busy: true });
-        const out = await app.call('POST', '/boxes/release');
+        // This device's clock: the controller refuses to stamp a RELEASE beyond it (decision RLB-4).
+        const out = await app.call('POST', '/boxes/release', { device_time: Date.now() / 1000 });
         this.setState({ busy: false, asking: false });
         if (!out) return; // refused (too soon, a clock not set, a standby): the toast says why
         app.showToast(out.release_frame === 'sent' ? t('release_all.sent')

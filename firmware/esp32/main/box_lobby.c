@@ -22,11 +22,13 @@
  * the game as on CMD end. A GAME_OVER for another game, or for its game id under
  * another key (an old game's, played back), changes nothing.
  *
- * And RELEASE (RFC 0001 Amendment 28, proposed), from a controller that lost the game entirely (a
- * new database): "game L is live (0: none), it is now T". A box in a game other than L that it
- * joined before T (the wall clock of the first TIME it took in its game, kept across a reboot)
- * ends it as on GAME_OVER. One recorded and played back after the box joined a newer game is older
- * than that join, so it changes nothing; a box that never heard a TIME of its game refuses it.
+ * And RELEASE (RFC 0001 Amendment 28 and its addendum of 2026-11-06), from a controller that lost
+ * the game entirely (a new database): "game L is live (0: none), it is now T, on channel C". A box
+ * on C in a game other than L that it joined before T (the wall clock of the first TIME it took in
+ * its game, kept across a reboot) ends it as on GAME_OVER, unless T is too far past its game's
+ * clock. One recorded and played back after the box joined a newer game is older than that join,
+ * one played back on another channel names the wrong one, so neither changes anything; a box that
+ * never heard a TIME of its game refuses it (on_release).
  */
 #include <stdarg.h>
 #include <stdio.h>
@@ -357,22 +359,40 @@ static void on_game_over(box_game_t *g, const atalaia_ff_msg_t *m)
     box_game_end_by_field(g);
 }
 
-/* "Game L is live (0: none), it is now T" (RFC 0001 Amendment 28): a box in another game leaves
- * it, as on GAME_OVER, when it joined that game before T. The join's time is the wall clock of
- * the first TIME the box took in it (box_game_join_time, kept across a reboot): a RELEASE that is
- * not newer is refused, so one recorded and played back once the box is in a newer game changes
- * nothing; with no TIME heard there is nothing to compare, and it is refused too. A box fetching
- * its modes is not on its game's link yet (and keeps nothing over a reboot): left alone. */
+/* "Game L is live (0: none), it is now T, on channel C" (RFC 0001 Amendment 28 and its addendum of
+ * 2026-11-06): a box in another game leaves it, as on GAME_OVER, when atalaia_ff_release_verdict
+ * takes it: C is the channel of the box's game (a recording played back on another channel changes
+ * nothing there); the box has heard no TIME of its game for ATALAIA_FF_RELEASE_HEARD_S (a game
+ * whose controller still talks is not one RELEASE is for); it joined its game before T, by the wall
+ * clock of the first TIME it took in it (box_game_join_time, kept across a reboot), so a recording
+ * played back once the box is in a newer game changes nothing; and T is at most
+ * ATALAIA_FF_RELEASE_AHEAD_S past the box's estimate of its game's clock (the newest TIME's wall_s
+ * plus the time since), so a RELEASE stamped by a clock that runs ahead does not stay valid. A box
+ * restarted into a game nobody runs any more hears no TIME and is freed at once. A box fetching its
+ * modes is not on its game's link yet (and keeps nothing over a reboot): left alone. */
 static void on_release(box_game_t *g, const atalaia_ff_msg_t *m)
 {
     box_lobby_t *l = &g->lobby;
-    if (g->phase != BOX_JOINED && g->phase != BOX_PLAYING) return;    /* free, over, or fetching */
-    if (m->live_game != 0 && m->live_game == g->join.game_id) return; /* the live game's box */
-    uint32_t joined = box_game_join_time(g);
-    if (joined == 0 || m->time_s <= joined) {
+    if (g->phase != BOX_JOINED && g->phase != BOX_PLAYING) return; /* free, over, or fetching */
+    const field_link_t *link = &g->link;
+    atalaia_ff_release_box_t box = {
+        .game_id = g->join.game_id,
+        .channel_hz = g->join.channel_hz,
+        .join_wall_s = box_game_join_time(g),
+        .heard_time = link->have_time, /* since the link's start: a reboot clears it */
+        .since_heard_s = link->have_time ? (g->now_ms - link->last_time_ms) / 1000u : 0,
+        .time_wall_s = link->last_wall_s,
+        .since_time_s = link->last_wall_s != 0 ? (g->now_ms - link->last_wall_ms) / 1000u : 0,
+    };
+    atalaia_ff_release_verdict_t v = atalaia_ff_release_verdict(&box, m);
+    if (v == ATALAIA_FF_RELEASE_LIVE) return; /* the live game's box */
+    if (v != ATALAIA_FF_RELEASE_TAKEN) {
         l->releases_refused++;
-        say(g, "release refused: game %u was joined at %lu, the release is of %lu", g->join.game_id,
-            (unsigned long)joined, (unsigned long)m->time_s);
+        say(g,
+            "release refused (%s): game %u on %lu Hz was joined at %lu, the release is of %lu on "
+            "%lu Hz",
+            atalaia_ff_release_verdict_name(v), g->join.game_id, (unsigned long)box.channel_hz,
+            (unsigned long)box.join_wall_s, (unsigned long)m->time_s, (unsigned long)m->channel_hz);
         return;
     }
     l->releases_taken++;

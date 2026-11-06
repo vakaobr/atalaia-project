@@ -520,6 +520,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         releases = [m for m in sent if m["kind"] == "release"]
         self.assertTrue(releases)
         self.assertEqual(releases[0]["live_game"], game["id"])
+        self.assertGreater(releases[0]["channel_hz"], 0)  # the channel it is sent on (RLB-1)
 
     def ready_game_with_the_dialog(self, lang: str = "en", **spec):
         """A Hold-All game (min_zones 2 by default) waiting for its zone box (node 7), and the
@@ -4788,7 +4789,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v25').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v26').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js", "/console/labels.js", "/console/qr-svg.js"):

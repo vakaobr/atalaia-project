@@ -78,9 +78,10 @@ const _kInvite = 4, _kPart = 5, _kParts = 6, _kChunk = 7;
 const _kGame = 4, _kKeyTag = 5;
 // MOVE (RFC 0001 Amendment 19): the field's new channel (Hz) and a revision.
 const _kChannel = 4, _kRev = 5;
-// RELEASE (RFC 0001 Amendment 28): the live game (0: none) and the
-// sender's wall clock in Unix seconds.
-const _kLiveGame = 4, _kTime = 5;
+// RELEASE (RFC 0001 Amendment 28): the live game (0: none), the
+// sender's wall clock in Unix seconds and (its addendum of 2026-11-06,
+// required) the channel it is sent on, Hz.
+const _kLiveGame = 4, _kTime = 5, _kReleaseChannel = 6;
 
 /// The header every field frame carries: version 1, normal priority, no
 /// ACK, encrypted (0x2A), game 0, source 0, seq 0, hop_limit 0, type 9.
@@ -265,6 +266,9 @@ Map<String, Object?> validateFieldMessage(Map<String, Object?> msg) {
       if (!_uint(msg['time'], 1, 0xffffffff)) {
         throw FieldFrameException('time: 1-4294967295');
       }
+      if (!_uint(msg['channel_hz'], 1, 0xffffffff)) {
+        throw FieldFrameException('channel_hz: 1-4294967295');
+      }
     case 'move':
       if (!_uint(msg['channel_hz'], 1, 0xffffffff)) {
         throw FieldFrameException('channel_hz: 1-4294967295');
@@ -334,6 +338,7 @@ Uint8List encodeFieldBody(Map<String, Object?> msg) {
     case 'release':
       out[_kLiveGame] = msg['live_game'];
       out[_kTime] = msg['time'];
+      out[_kReleaseChannel] = msg['channel_hz'];
   }
   final body = cborEncode(out);
   if (body.length > ffBodyMax) {
@@ -367,7 +372,7 @@ const _inviteKeys = {
 };
 const _gameOverKeys = {_kKind, _kGame, _kKeyTag};
 const _moveKeys = {_kKind, _kChannel, _kRev};
-const _releaseKeys = {_kKind, _kLiveGame, _kTime};
+const _releaseKeys = {_kKind, _kLiveGame, _kTime, _kReleaseChannel};
 
 /// Reads a body as the C decoder does (refusing what it refuses).
 Map<String, Object?> decodeFieldBody(List<int> data) {
@@ -453,6 +458,7 @@ Map<String, Object?> decodeFieldBody(List<int> data) {
     case 'release':
       need(_kLiveGame, 'live_game');
       need(_kTime, 'time');
+      need(_kReleaseChannel, 'channel_hz');
   }
   return validateFieldMessage(msg);
 }
