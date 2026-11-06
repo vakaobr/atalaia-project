@@ -154,14 +154,19 @@ class SoftAuthenticator:
     def _client_data(kind: str, challenge: str, origin: str) -> bytes:
         return json.dumps({"type": kind, "challenge": challenge, "origin": origin, "crossOrigin": False}).encode()
 
-    def create(self, options: dict[str, Any], origin: str, rp_id: Optional[str] = None) -> dict[str, Any]:
-        """The answer of ``navigator.credentials.create`` to these options."""
+    def create(self, options: dict[str, Any], origin: str, rp_id: Optional[str] = None, fmt: str = "none",
+               att_stmt: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+        """The answer of ``navigator.credentials.create`` to these options: attestation ``none``, ``packed``
+        self-attestation (signed with the credential's own key), or any other ``fmt`` with the given statement."""
         rp = rp_id or options["rp"]["id"]
         self.user_handle = unb64u(options["user"]["id"])
         auth_data = (hashlib.sha256(rp.encode()).digest() + bytes([self._flags(True)]) + self.counter.to_bytes(4, "big")
                      + bytes(16) + len(self.credential_id).to_bytes(2, "big") + self.credential_id + self._cose_key())
-        attestation = cbor2.dumps({"fmt": "none", "attStmt": {}, "authData": auth_data})
         client_data = self._client_data("webauthn.create", options["challenge"], origin)
+        if att_stmt is None and fmt == "packed":
+            att_stmt = {"alg": -7, "sig": self.key.sign(auth_data + hashlib.sha256(client_data).digest(),
+                                                        ec.ECDSA(hashes.SHA256()))}
+        attestation = cbor2.dumps({"fmt": fmt, "attStmt": att_stmt or {}, "authData": auth_data})
         return {"id": b64u(self.credential_id), "rawId": b64u(self.credential_id), "type": "public-key",
                 "authenticatorAttachment": "platform", "clientExtensionResults": {},
                 "response": {"clientDataJSON": b64u(client_data), "attestationObject": b64u(attestation),
