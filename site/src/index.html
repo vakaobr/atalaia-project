@@ -4,7 +4,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 Template of the main page. tools/build_site.py renders it once per language,
 with the text from site/i18n/<language>.yaml, into site/index.html (Portuguese)
-and site/en/index.html (English), site/de/index.html (German), site/zh-tw/index.html (Traditional Chinese). The other pages (modes, radio, roadmap,
+and site/en/index.html (English), site/de/index.html (German), site/zh-tw/index.html (Traditional Chinese), site/pl/index.html (Polish). The other pages (modes, radio, roadmap,
 glossary) have templates of their own beside this one; see site/README.md.
 
   {{ key }}            the text of key, inserted as HTML
@@ -45,13 +45,13 @@ the pages. Code blocks and anything else that is the same in every language stay
           <a class="button" href="https://github.com/vakaobr/atalaia-project">{{ hero.source }}</a>
         </div>
         <p class="name">{{ hero.name }} <a href="#name">{{ hero.why_name }}</a></p>
-        {# The night scene has its title painted in: Portuguese and English have their own copies; German and Traditional Chinese show the English one. #}
+        {# The night scene has its title painted in: Portuguese and English have their own copies; German, Traditional Chinese and Polish show the English one. #}
         <picture class="hero-art">
 {% if lang pt %}
           <source type="image/webp" srcset="{{ page.root }}img/watchtower-night-pt-960.webp 960w, {{ page.root }}img/watchtower-night-pt-1600.webp 1600w" sizes="(min-width: 1080px) 1048px, calc(100vw - 32px)">
           <img src="{{ page.root }}img/watchtower-night-pt-960.jpg" srcset="{{ page.root }}img/watchtower-night-pt-960.jpg 960w, {{ page.root }}img/watchtower-night-pt-1600.jpg 1600w" sizes="(min-width: 1080px) 1048px, calc(100vw - 32px)" width="1600" height="893" decoding="async" fetchpriority="high" alt="{{ hero.image_alt|text }}">
 {% endif %}
-{% if lang en de zh-tw %}
+{% if lang en de zh-tw pl %}
           <source type="image/webp" srcset="{{ page.root }}img/watchtower-night-960.webp 960w, {{ page.root }}img/watchtower-night-1600.webp 1600w" sizes="(min-width: 1080px) 1048px, calc(100vw - 32px)">
           <img src="{{ page.root }}img/watchtower-night-960.jpg" srcset="{{ page.root }}img/watchtower-night-960.jpg 960w, {{ page.root }}img/watchtower-night-1600.jpg 1600w" sizes="(min-width: 1080px) 1048px, calc(100vw - 32px)" width="1600" height="893" decoding="async" fetchpriority="high" alt="{{ hero.image_alt|text }}">
 {% endif %}
@@ -125,8 +125,8 @@ the pages. Code blocks and anything else that is the same in every language stay
           </ol>
         </figure>
         <p class="note">{{ how.core }}</p>
-{% if lang en de zh-tw %}
-        {# English, German and Traditional Chinese pages (the picture's labels are English): its keys, how.image_*, are not in pt.yaml. #}
+{% if lang en de zh-tw pl %}
+        {# English, German, Traditional Chinese and Polish pages (the picture's labels are English): its keys, how.image_*, are not in pt.yaml. #}
         <figure class="art">
           <picture>
             <source type="image/webp" srcset="{{ page.root }}img/field-isometric-960.webp 960w, {{ page.root }}img/field-isometric-1600.webp 1600w" sizes="(min-width: 800px) 760px, calc(100vw - 32px)">
@@ -184,24 +184,24 @@ the pages. Code blocks and anything else that is the same in every language stay
         <h2 id="screens">{{ screens.title }}</h2>
         <p class="intro">{{ screens.intro }}</p>
         <div class="gif-row" data-play="{{ gifs.play|text }}" data-pause="{{ gifs.pause|text }}">
-          <figure class="modegif" data-still="{{ page.root }}img/modes/domination-{{ page.code }}-still.gif" data-anim="{{ page.root }}img/modes/domination-{{ page.code }}.gif">
+          <figure class="modegif" data-still="{{ page.root }}img/modes/domination-{{ page.mode_gifs }}-still.gif" data-anim="{{ page.root }}img/modes/domination-{{ page.mode_gifs }}.gif">
             <picture>
-              <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/domination-{{ page.code }}-still.gif">
-              <img src="{{ page.root }}img/modes/domination-{{ page.code }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.domination.alt|text }}">
+              <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/domination-{{ page.mode_gifs }}-still.gif">
+              <img src="{{ page.root }}img/modes/domination-{{ page.mode_gifs }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.domination.alt|text }}">
             </picture>
             <figcaption>{{ gifs.domination.caption }}</figcaption>
           </figure>
-          <figure class="modegif" data-still="{{ page.root }}img/modes/bomb-{{ page.code }}-still.gif" data-anim="{{ page.root }}img/modes/bomb-{{ page.code }}.gif">
+          <figure class="modegif" data-still="{{ page.root }}img/modes/bomb-{{ page.mode_gifs }}-still.gif" data-anim="{{ page.root }}img/modes/bomb-{{ page.mode_gifs }}.gif">
             <picture>
-              <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/bomb-{{ page.code }}-still.gif">
-              <img src="{{ page.root }}img/modes/bomb-{{ page.code }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.bomb.alt|text }}">
+              <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/bomb-{{ page.mode_gifs }}-still.gif">
+              <img src="{{ page.root }}img/modes/bomb-{{ page.mode_gifs }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.bomb.alt|text }}">
             </picture>
             <figcaption>{{ gifs.bomb.caption }}</figcaption>
           </figure>
-          <figure class="modegif" data-still="{{ page.root }}img/modes/sabotage-{{ page.code }}-still.gif" data-anim="{{ page.root }}img/modes/sabotage-{{ page.code }}.gif">
+          <figure class="modegif" data-still="{{ page.root }}img/modes/sabotage-{{ page.mode_gifs }}-still.gif" data-anim="{{ page.root }}img/modes/sabotage-{{ page.mode_gifs }}.gif">
             <picture>
-              <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/sabotage-{{ page.code }}-still.gif">
-              <img src="{{ page.root }}img/modes/sabotage-{{ page.code }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.sabotage.alt|text }}">
+              <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/sabotage-{{ page.mode_gifs }}-still.gif">
+              <img src="{{ page.root }}img/modes/sabotage-{{ page.mode_gifs }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.sabotage.alt|text }}">
             </picture>
             <figcaption>{{ gifs.sabotage.caption }}</figcaption>
           </figure>

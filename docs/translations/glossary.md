@@ -171,3 +171,44 @@ not yet reviewed.
 | Sabotage | Sabotagem | Sabotage | 破壞 |
 | Money Factory | Fábrica de Dinheiro | Money Factory | 印鈔廠 *(check)* |
 | Progressive Domination | Domínio Progressivo | Progressive Domination | 漸進佔點 *(check)* |
+
+## Polish (pl): the project page
+
+Polish covers only the project page so far (`site/i18n/pl.yaml`, decision SITE-PL-1), drafted by an
+AI model on 2026-11-06 and **not yet reviewed by a native-speaking player**; so it has its own list
+here rather than a column in the tables above. A reviewer who changes a word changes it here and in
+`site/i18n/pl.yaml`; when Polish reaches other parts, it becomes a column.
+
+| | Polish (pl) |
+|---|---|
+| Who is addressed | "ty" (Wybierz, Przytrzymaj, Zobacz), as Polish ASG forums write |
+| People | plural and neutral forms where natural: "gracze", "osoby grające", "uczestnicy", "organizatorzy"; no gendered past tense addressed to the reader, no "gracz/ka" (SITE-PL-6) |
+| Numbers, quotes, dates | decimal comma (1,3 J); „ ”; 8 listopada 2026 |
+
+| English | Polish (pl) |
+|---|---|
+| airsoft | airsoft, ASG |
+| game master, GM / organisers | organizator, GM / organizatorzy |
+| marshal | sędzia |
+| player / participant / spectator | gracz, osoba grająca / uczestnik / widz |
+| team / squad / squad leader | drużyna / squad / dowódca squadu |
+| field / field owners | teren gry, pole / właściciele terenów |
+| game / game mode / scenario / objective | gra, rozgrywka / tryb gry / scenariusz / cel |
+| target (to shoot) | tarcza |
+| zone / capture / neutral / held | strefa / przejąć / neutralna / zajęta |
+| bomb / arm / defuse / explode | bomba / uzbroić / rozbroić / wybuchnąć |
+| respawn / lives / medic / bandage / hit | respawn / życia / medyk / bandaż / trafienie |
+| chrono / replica / joule limit | chrono, pomiar chrono / replika / limit dżuli |
+| game prop / box | urządzenie do gry (prop) / skrzynka |
+| Field Box, Satellite | Field Box, Satellite (names kept) |
+| I/O pod / target addon / expansion port / simple output | moduł I/O / moduł tarczy / port rozszerzeń / proste wyjście |
+| field controller / GM console / site server | kontroler terenu / konsola GM / serwer strony |
+| player app / mode editor / registry | aplikacja (dla graczy) / edytor trybów / rejestr trybów |
+| join / adopt / pair | dołączyć / przypisać (do terenu) / sparować |
+| firmware update / signed package / licence | aktualizacja firmware'u / podpisany pakiet / licencja |
+| build guide / bench | instrukcja budowy / stół warsztatowy |
+| scoreboard / score | tablica wyników / wynik, punkty |
+
+Mode names follow German's column: Domination, Hold-All Domination, Bomba / Rush, Last Stand,
+Kill Confirmed, Respawn i życia, Check-in, Kody, Medic Kit, Master i Satelity, Okna tarcz,
+VIP / Payload, Hacking Terminal, Cele, Sabotaż, Money Factory, Progressive Domination.

@@ -61,6 +61,7 @@ page.nav.<page> marks the link of the page being read. The language switcher
         <a href="{{ page.href.en }}" hreflang="en" lang="en" aria-label="English" title="English"{{ page.current.en }}><span class="flag" aria-hidden="true">&#x1F1EC;&#x1F1E7;</span></a>
         <a href="{{ page.href.de }}" hreflang="de" lang="de" aria-label="Deutsch" title="Deutsch"{{ page.current.de }}><span class="flag" aria-hidden="true">&#x1F1E9;&#x1F1EA;</span></a>
         <a href="{{ page.href.zh_tw }}" hreflang="zh-Hant-TW" lang="zh-Hant-TW" aria-label="繁體中文（台灣）" title="繁體中文（台灣）"{{ page.current.zh_tw }}><span class="flag" aria-hidden="true">&#x1F1F9;&#x1F1FC;</span></a>
+        <a href="{{ page.href.pl }}" hreflang="pl" lang="pl" aria-label="Polski" title="Polski"{{ page.current.pl }}><span class="flag" aria-hidden="true">&#x1F1F5;&#x1F1F1;</span></a>
       </nav>
     </div>
     {# Optional: Escape closes the open menu (focus goes back to its summary) and a click outside closes it. #}
@@ -76,6 +77,6 @@ page.nav.<page> marks the link of the page being read. The language switcher
         });
       })();
     </script>
-    {# Only an AI-drafted language fills it in (P5H-11, P5K-12); empty, it is hidden. #}
+    {# Only an AI-drafted language fills it in (P5H-11, P5K-12, SITE-PL-1); empty, it is hidden. #}
     <p class="translation-notice" role="note">{{ header.translation_notice }}</p>
   </header>
