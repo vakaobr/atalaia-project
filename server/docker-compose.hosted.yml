@@ -54,6 +54,7 @@ services:
       ATALAIA_QUOTA_GAMES: "${ATALAIA_QUOTA_GAMES:-}"
       ATALAIA_QUOTA_ATAK_CERTS: "${ATALAIA_QUOTA_ATAK_CERTS:-}"
       ATALAIA_QUOTA_STREAMS: "${ATALAIA_QUOTA_STREAMS:-}"
+      ATALAIA_QUOTA_STORED_MB: "${ATALAIA_QUOTA_STORED_MB:-}"
       ATALAIA_HOSTED_WATCH_S: "${ATALAIA_HOSTED_WATCH_S:-}"
       # One social login callback on the hub's own name for every field (decision LG-14; DEPLOY.md, "Social login"):
       # "on" or "off" (default); the same setting picks Caddy's relay-on.caddy / relay-off.caddy above.

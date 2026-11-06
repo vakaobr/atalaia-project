@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -273,6 +274,129 @@ class ComposeTests(unittest.TestCase):
             for name in names:
                 var = f"ATALAIA_OIDC_{provider}_{name}"
                 self.assertIn(f'{var}: "${{{var}:-}}"', text, var)
+
+    def test_every_setting_reaches_the_container_or_is_left_out_on_purpose(self) -> None:
+        """Each setting the server reads (recorded from Settings.from_env, plus the env reads elsewhere in the
+        package) and each one in README.md's settings table is passed to a container by one of the Compose files,
+        or is in LEFT_OUT with its reason (SRVENV-1: ATALAIA_APP_ANDROID_* were in .env and never arrived)."""
+        files, readme = _compose_files(self)
+        server_env = {k for name, doc in files.items() for k in _service_env(doc, "server")}
+        any_env = {k for doc in files.values() for svc in (doc.get("services") or {}) for k in _service_env(doc, svc)}
+        recorder = _Recorder(BASE)
+        Settings.from_env(recorder)
+        read_by_settings = {k for k in recorder.seen if k.startswith("ATALAIA_")}
+        self.assertGreater(len(read_by_settings), 40)
+        source = "\n".join(p.read_text(encoding="utf-8")
+                           for p in (Path(__file__).resolve().parents[1] / "atalaia_server").rglob("*.py"))
+        read_elsewhere = set(re.findall(r"""(?:environ|env)(?:\.get\(|\[)\s*["'](ATALAIA_[A-Z0-9_]*[A-Z0-9])["']""",
+                                        source))
+        documented = _readme_settings(readme)
+        read_by_scripts = set(re.findall(r"ATALAIA_[A-Z0-9_]*[A-Z0-9]", "\n".join(
+            p.read_text(encoding="utf-8") for p in Path(__file__).resolve().parents[1].glob("*.sh"))))
+        self.assertIn("ATALAIA_APP_ANDROID_SHA256", documented)
+        for var in sorted(read_by_settings - LEFT_OUT.keys()):
+            with self.subTest(var=var):
+                self.assertIn(var, server_env, f"{var} is read by the server's settings but no Compose file passes "
+                                               "it to the server: add it, or to LEFT_OUT with the reason")
+        for var in sorted((read_elsewhere | documented) - LEFT_OUT.keys()):
+            with self.subTest(var=var):
+                self.assertIn(var, any_env, f"{var} reaches no container: add it to a Compose file, or to "
+                                            "LEFT_OUT with the reason")
+        for var, why in LEFT_OUT.items():
+            with self.subTest(var=var):
+                self.assertNotIn(var, server_env if var in read_by_settings else any_env,
+                                 f"{var} is passed after all: take it out of LEFT_OUT")
+                self.assertIn(var, read_by_settings | read_elsewhere | documented | read_by_scripts,
+                              f"{var}: nothing reads it")
+                self.assertTrue(why)
+
+    def test_an_empty_setting_is_the_servers_own_default(self) -> None:
+        """"${NAME:-}" sends an empty value when .env has none: the server must read it as unset. And the base
+        file's other fallbacks ("${NAME:-info}") must be the server's own defaults."""
+        files, _ = _compose_files(self)
+        default = Settings.from_env(BASE)
+        for name, doc in files.items():
+            for var, value in _service_env(doc, "server").items():
+                m = re.fullmatch(r"\$\{(ATALAIA_[A-Z0-9_]+):-([^}]*)\}", str(value))
+                if not m or m.group(1) != var or (m.group(2) and name != "docker-compose.yml"):
+                    continue
+                with self.subTest(file=name, var=var):
+                    self.assertEqual(Settings.from_env({**BASE, var: m.group(2)}), default, f"{name}: {var}")
+
+
+# Settings no Compose file passes on purpose; the README's table says so in each row (SRVENV-*).
+LEFT_OUT = {
+    "ATALAIA_TEST_ADAPTER": "trials and tests only: a deployment never offers the in-memory platform",
+    "ATALAIA_ALLOW_SIGNUP_WITHOUT_NOTICE": "development and tests only: a deployment publishes its notice (LIVE-2)",
+    "ATALAIA_ATAK_RELAY_PORT": "the relay listens on 8089 in the container, the port Compose publishes; "
+                               "ATALAIA_ATAK_PORT changes the published one",
+    "ATALAIA_BACKUP_DAYS": "read by backup.sh from the env file, not by a container",
+}
+
+
+class _Recorder(dict):
+    """A mapping that remembers each key asked for (present or not)."""
+
+    def __init__(self, base: dict) -> None:
+        super().__init__(base)
+        self.seen: set[str] = set()
+
+    def get(self, key, default=None):  # type: ignore[override]
+        self.seen.add(key)
+        return super().get(key, default)
+
+    def __getitem__(self, key):
+        self.seen.add(key)
+        return super().__getitem__(key)
+
+    def __contains__(self, key) -> bool:
+        self.seen.add(key)
+        return super().__contains__(key)
+
+
+def _compose_files(case: unittest.TestCase) -> tuple[dict, str]:
+    here = Path(__file__).resolve().parents[1]
+    if not (here / "docker-compose.yml").exists():
+        case.skipTest("docker-compose.yml is not next to the tests here")
+    try:
+        import yaml
+    except ImportError:
+        case.skipTest("PyYAML is not installed")
+
+    class Loader(yaml.SafeLoader):
+        """Compose's merge tags (!override, !reset) read as the plain value under them."""
+
+    def plain(loader: yaml.SafeLoader, suffix: str, node: yaml.Node) -> object:
+        if isinstance(node, yaml.MappingNode):
+            return loader.construct_mapping(node)
+        if isinstance(node, yaml.SequenceNode):
+            return loader.construct_sequence(node)
+        return loader.construct_scalar(node)
+
+    Loader.add_multi_constructor("!", plain)
+    files = {name: yaml.load((here / name).read_text(encoding="utf-8"), Loader=Loader)  # noqa: S506 (SafeLoader)
+             for name in ("docker-compose.yml", "docker-compose.hosted.yml", "docker-compose.preview.yml")}
+    return files, (here / "README.md").read_text(encoding="utf-8")
+
+
+def _service_env(doc: dict, service: str) -> dict:
+    env = ((doc.get("services") or {}).get(service) or {}).get("environment") or {}
+    if isinstance(env, list):
+        env = dict(item.split("=", 1) if "=" in item else (item, "") for item in env)
+    return env
+
+
+def _readme_settings(readme: str) -> set[str]:
+    """The variables in the first column of README.md's "## Settings" table; ATALAIA_QUOTA_<NAME> is each quota."""
+    section = readme.split("\n## Settings\n", 1)[1].split("\n## ", 1)[0]
+    names: set[str] = set()
+    for line in section.splitlines():
+        if line.startswith("| `ATALAIA_"):
+            names.update(re.findall(r"`(ATALAIA_[A-Z0-9_<>]+)`", line.split(" | ", 1)[0]))
+    if "ATALAIA_QUOTA_<NAME>" in names:
+        names.discard("ATALAIA_QUOTA_<NAME>")
+        names.update(f"ATALAIA_QUOTA_{q.upper()}" for q in QUOTA_DEFAULTS)
+    return names
 
 
 if __name__ == "__main__":
