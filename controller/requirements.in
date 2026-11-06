@@ -26,4 +26,4 @@ cryptography>=44.0.1
 # Tests only: the HTTP client of FastAPI's TestClient. Starlette 1.x wants httpx2
 # (Pydantic's fork of httpx 0.28) and warns on httpx; Ubuntu's older Starlette
 # takes python3-httpx, and the tests use whichever is installed (PLK-3).
-httpx2>=2.0
+httpx2>=2.16.0
