@@ -13,6 +13,9 @@
     python tools/docker_app.py apk                flutter build apk --debug, with the core built by
                                                   Gradle and the NDK (CI: flutter-build-android);
                                                   the APK lands in app/build/atalaia-debug.apk
+    python tools/docker_app.py gradle-verification  write app/android/gradle/verification-metadata.xml
+                                                  again (Gradle's dependency checksums), then build
+                                                  the debug and the unsigned release APK with it
     python tools/docker_app.py format             format app/lib, test, integration_test and tool in place
     python tools/docker_app.py lock               resolve app/pubspec.yaml again, write pubspec.lock
     python tools/docker_app.py gen                write app/lib/modes/builtin_modes.g.dart from modes/
@@ -36,7 +39,7 @@ running. Two images are used:
   1 GB) and Gradle 9.1.0 with its dependencies on the first `apk`.
 
 The checkout is mounted read-only (check.sh works on a copy) except for
-format, lock, gen and goldens. Named volumes keep the downloads and the
+format, lock, gen, goldens and gradle-verification. Named volumes keep the downloads and the
 core's build between runs: atalaia-app-pub-cache, atalaia-app-core,
 atalaia-app-ndk, atalaia-app-cmake and atalaia-app-gradle, each with
 $ATALAIA_VOLUME_SUFFIX appended (to keep two checkouts apart). `docker
@@ -75,7 +78,7 @@ NDK_VOLUME = "atalaia-app-ndk" + SUFFIX
 CMAKE_VOLUME = "atalaia-app-cmake" + SUFFIX
 GRADLE_VOLUME = "atalaia-app-gradle" + SUFFIX
 SDK = "/opt/android-sdk-linux"
-MODES = ("all", "check", "test", "ndk", "apk", "format", "lock", "gen", "goldens")
+MODES = ("all", "check", "test", "ndk", "apk", "gradle-verification", "format", "lock", "gen", "goldens")
 
 
 def fail(message: str) -> int:
@@ -129,7 +132,7 @@ def flutter(mode: str, args: list[str]) -> int:
     """app/tool/check.sh <mode> in the Flutter image; returns its exit code."""
     if not ensure_flutter_image():
         return fail("building the Flutter image failed")
-    writable = mode in ("format", "lock", "gen", "goldens")
+    writable = mode in ("format", "lock", "gen", "goldens", "gradle-verification")
     cmd = ["docker", "run", "--rm", "-v", f"{REPO}:/src" + ("" if writable else ":ro"),
            "-v", f"{PUB_VOLUME}:/root/.pub-cache", "-w", "/src"]
     if mode in ("check", "test"):
@@ -139,8 +142,10 @@ def flutter(mode: str, args: list[str]) -> int:
                 "-e", "ATALAIA_POD_HOST=/core-build/pod_host/pod_host",
                 "-e", "ATALAIA_MODEM_HOST=/core-build/modem_host/modem_host",
                 "-e", "ATALAIA_BOX_HOST=/core-build/box_host/box_host"]
-    if mode in ("ndk", "apk"):
+    if mode in ("ndk", "apk", "gradle-verification"):
         cmd += ["-v", f"{NDK_VOLUME}:{SDK}/ndk", "-v", f"{CMAKE_VOLUME}:{SDK}/cmake"]
+    if mode == "gradle-verification":
+        cmd += ["-v", f"{GRADLE_VOLUME}:/root/.gradle"]
     if mode == "apk":
         out = REPO / "app" / "build"
         out.mkdir(parents=True, exist_ok=True)
@@ -178,7 +183,7 @@ def main(argv: list[str]) -> int:
         mode, argv = argv[0], argv[1:]
     elif argv and not argv[0].startswith("-"):
         return fail(f"unknown command {argv[0]!r}; use one of {', '.join(MODES)}")
-    if mode in ("all", "ndk", "apk") and argv:
+    if mode in ("all", "ndk", "apk", "gradle-verification") and argv:
         return fail(f"{mode} takes no arguments")
     try:
         if subprocess.call(["docker", "info"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0:
@@ -186,7 +191,7 @@ def main(argv: list[str]) -> int:
     except FileNotFoundError:
         return fail("the docker command was not found; install Docker Desktop")
     try:
-        if mode in ("format", "lock", "gen", "goldens", "ndk", "apk"):
+        if mode in ("format", "lock", "gen", "goldens", "ndk", "apk", "gradle-verification"):
             return flutter(mode, argv)
         code = build_core()
         if code != 0:

@@ -798,7 +798,7 @@ Decisions APX-1 to APX-3 (`app/`; not tried on a real phone): a marshal's phone 
 
 ## The release-signed APK on GitHub releases (APK-1 to APK-8, 2026-11-06)
 
-- **The app is attached to each release from v0.9.0, signed with the project's Android key** (alias `atalaia`, RSA 4096, in the `release` environment's secrets; certificate SHA-256 in `docs/community/keys.md`). `release.yml`'s job `apk` builds it with `app/tool/check.sh apk-release` and fails unless `apksigner` reports that certificate; updates then install over each other and keep the phone controller's data. APP-2's "the maintainer has not yet made the release keystore" is done.
+- **The app is attached to each release from v0.9.0, signed with the project's Android key** (alias `atalaia`, RSA 4096, in the `release` environment's secrets; certificate SHA-256 in `docs/community/keys.md`). `release.yml`'s job `apk` builds it unsigned with `app/tool/check.sh apk-release` (no key in that networked build; Gradle dependency verification since APS-5), signs it with `app/tool/sign_apk.sh` in a container with no network, and fails unless `apksigner` reports that certificate (APS-1 to APS-6); updates then install over each other and keep the phone controller's data. APP-2's "the maintainer has not yet made the release keystore" is done.
 - **Once only**, phones with a debug-signed app uninstall it before the first release APK (the manuals' update sections say what each role loses).
 - **Not done:** the first tag with this job has not run yet; a real phone has not installed the release APK over another release APK; the maintainer's offline backup of the keystore is not confirmed here.
 
