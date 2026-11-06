@@ -19,9 +19,9 @@ multimeter. You do not need to write code.
 > that was on bare boards. **Not yet tested on a real board:** the 2.8-inch
 > screen, the keypad, the LED ring, the NFC reader, the amplifier, the
 > battery gauge, button 3 and button 4, the power path (fuse, switch, boost
-> converter, charging), the Wi-Fi setup page, the field's logo on the screen
-> and the range through an enclosure. The pin assignments are checked
-> automatically against the firmware (see
+> converter, charging), the Wi-Fi setup page and the range through an
+> enclosure. The pin assignments are checked automatically against the
+> firmware (see
 > [Regenerating the diagrams](#14-regenerating-the-diagrams)). Steps marked
 > **Verify at the first build** are open questions; please report what you
 > find in an issue so the manual can be corrected. Photos will be added after
@@ -884,7 +884,7 @@ log both go over it.
    from v0.5:** a box flashed with v0.4.0 or earlier has the old partition
    table (2 MB slots); an update over the air cannot change it, so write
    it with this command, without the erase step (the settings and the
-   adoption stay; the box fetches its modes and logo again). A box still
+   adoption stay; the box fetches its modes again). A box still
    on the old table shows "Flash over USB". If the connection fails,
    put the board in download mode by hand (hold its PRG/BOOT button, press
    and release RST, release PRG; or hold PRG while plugging the cable in)
@@ -1019,7 +1019,7 @@ made again (see section 11, step 1); keep a note of it inside the box lid.
 | The board stopped booting when the buzzer was fitted | Something pulls GPIO 45 up: a buzzer module's pull-up, or the transistor circuit's 10 kohm missing. Take the buzzer off and check ([section 9.7](#97-audio-optional)) |
 | Phone cannot see the `atalaia-XXXX` Wi-Fi | 2.4 GHz antenna missing or on the wrong connector; phone too far; the box is already set up (the setup Wi-Fi opens only on a new box or after **Wi-Fi setup**: [firmware guide](../../docs/manuals/en/firmware.md#5-first-boot-and-setup)) |
 | The setup page does not open by itself | Open `http://192.168.4.1` in the phone's browser; switch off mobile data and private DNS for a minute |
-| The field's logo does not show on the big screen | It is fetched over the field Wi-Fi when a game is joined: the box needs the field Wi-Fi name and password, and the logo must be a PNG. See the [firmware guide](../../docs/manuals/en/firmware.md#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi) |
+| The field's logo does not show on the box | That is expected: the box shows only the Atalaia tower (decision LOGO-5); the field's logo shows in the app, on the scoreboard and on the poster. To build a box with another splash image, see the [firmware guide](../../docs/manuals/en/firmware.md#4-the-options-a-builder-sets) |
 | Fuse blows at switch-on | Battery reversed (the diode did its job: fix the battery wiring) or a short on BAT+ or 5 V |
 | Box does not charge | Switch off: charging needs the switch on ([section 7](#7-power-and-battery-safety)) |
 | Anything hot, a smell, smoke | Switch off at once, take the fuse out, take the cells out into a fire-safe bag. Look for reversed polarity or a short before powering again |

@@ -20,8 +20,7 @@ multímetro. Não precisas de escrever código.
 > placa real:** o ecrã de 2,8 polegadas, o teclado, o anel de LEDs, o leitor
 > NFC, o amplificador, o medidor de bateria, o botão 3 e o botão 4, o circuito
 > de energia (fusível, interruptor, conversor elevador, carga), a página de
-> configuração por Wi-Fi, o logótipo do campo no ecrã e o alcance através de
-> um invólucro. As atribuições de pinos são verificadas automaticamente em
+> configuração por Wi-Fi e o alcance através de um invólucro. As atribuições de pinos são verificadas automaticamente em
 > relação ao firmware (vê
 > [Regenerar os diagramas](#14-regenerar-os-diagramas)). Os passos marcados
 > **Verifica na primeira montagem** são perguntas em aberto; diz-nos o que
@@ -937,7 +936,7 @@ como o registo de arranque passam por ela.
    anterior tem a tabela de partições antiga (espaços de 2 MB); uma
    atualização pelo ar não a consegue mudar, por isso escreve-a com este
    comando, sem o passo de apagar (as definições e a adoção ficam; a caixa
-   volta a obter os modos e o logótipo). Uma caixa ainda com a tabela antiga
+   volta a obter os modos). Uma caixa ainda com a tabela antiga
    mostra «Instala por USB». Se a ligação falhar, põe a
    placa em modo de gravação à mão (mantém premido o botão PRG/BOOT, carrega e
    larga o RST, larga o PRG; ou mantém o PRG premido enquanto ligas o cabo) e
@@ -1080,7 +1079,7 @@ dentro da tampa da caixa.
 | A placa deixou de arrancar quando se montou o besouro | Algo puxa o GPIO 45 para cima: o pull-up de um módulo, ou falta a resistência de 10 kohm do circuito com transístor. Tira o besouro e verifica ([secção 9.7](#97-áudio-opcional)) |
 | O telemóvel não vê o Wi-Fi `atalaia-XXXX` | Antena de 2,4 GHz em falta ou no conector errado; telemóvel longe demais; a caixa já está configurada (o Wi-Fi de configuração só abre numa caixa nova ou depois de **Configurar o Wi-Fi**: [guia do firmware](../../docs/manuals/pt/firmware.md#5-primeiro-arranque-e-configuração)) |
 | A página de configuração não abre sozinha | Abre `http://192.168.4.1` no browser do telemóvel; desliga os dados móveis e o DNS privado durante um minuto |
-| O logótipo do campo não aparece no ecrã grande | É obtido pelo Wi-Fi do campo quando se entra num jogo: a caixa precisa do nome e da palavra-passe do Wi-Fi do campo, e o logótipo tem de ser um PNG. Vê o [guia do firmware](../../docs/manuals/pt/firmware.md#7-atualizações-pelo-ar-e-o-que-mais-usa-o-wi-fi-do-campo) |
+| O logótipo do campo não aparece na caixa | É assim mesmo: a caixa mostra só a torre da Atalaia (decisão LOGO-5); o logótipo do campo aparece na app, no marcador e no cartaz. Para compilar uma caixa com outra imagem de arranque, vê o [guia do firmware](../../docs/manuals/pt/firmware.md#4-as-opções-de-quem-monta) |
 | O fusível queima ao ligar | Bateria invertida (o díodo fez o seu trabalho: corrige as ligações da bateria) ou um curto-circuito em BAT+ ou nos 5 V |
 | A caixa não carrega | Interruptor desligado: a carga precisa do interruptor ligado ([secção 7](#7-energia-e-segurança-da-bateria)) |
 | Qualquer coisa quente, um cheiro, fumo | Desliga logo, tira o fusível, tira as células para um saco antifogo. Procura uma polaridade invertida ou um curto-circuito antes de voltar a ligar |
