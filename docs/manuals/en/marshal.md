@@ -63,10 +63,10 @@ A player without the app: in **Replicas to chrono** ([section 3](#3-the-queue-re
 
 Players who registered on the field's site come with a **check-in ticket**: a QR code in the app, or on paper. With the app they pick their registration when they check in, and need nothing from you.
 
-- **A printed ticket is scanned in the GM console, not in the marshal app.** Send the player to the GM (or to whoever runs the console at the desk). In **Check-in**, under **Printed ticket**, the GM scans or pastes the code (`atalaia:ticket:…`) and taps **Check in**. The player is checked in at once.
+- **A printed ticket is scanned in the GM console, not in the marshal app.** Send the player to the GM (or to whoever runs the console at the desk). In **Check-in**, under **Printed ticket**, the GM scans or pastes the code (`atalaia:ticket:…`) and taps **Check in**. The player is checked in at once, except when the field checks membership cards: then the check-in waits until you (or the GM) tap **Card seen, matches** ([Check the membership card](#check-the-membership-card)). Only the newest ticket of a registration works.
 - **A registered player without the ticket** shows as **expected** in the console's list. Once you have seen who they are, the GM taps **Arrived**.
 - **Do not use Check in by hand for a registered player.** It makes a new check-in beside their registration, and the registration stays **expected**.
-- The console's check-in needs the GM code, or a day code with **Full GM**. A **Read and manage marshals** day code does not check players in.
+- The desk's console runs with the GM code, or a day code with **Full GM**. A **Read and manage marshals** day code can neither confirm check-ins nor take tickets.
 - If a ticket is refused, the console says why: a newer ticket was made for the registration (ask the player for the newest one), or the registration is for another game.
 
 ## 3. The queue: replicas to chrono

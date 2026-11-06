@@ -63,10 +63,10 @@ Alguém sem a app: em **Réplicas por cronografar** ([secção 3](#3-a-lista-ré
 
 Quem se inscreveu no site do campo traz um **bilhete de check-in**: um código QR na app, ou em papel. Com a app, escolhe a inscrição ao fazer o check-in e não precisa de nada de ti.
 
-- **Um bilhete impresso lê-se na consola da organização, não na app de marshal.** Manda a pessoa à organização (ou a quem estiver com a consola na receção). Em **Check-in**, em **Bilhete impresso**, a organização lê ou cola o código (`atalaia:ticket:…`) e toca em **Fazer o check-in**. O check-in fica feito logo.
+- **Um bilhete impresso lê-se na consola da organização, não na app de marshal.** Manda a pessoa à organização (ou a quem estiver com a consola na receção). Em **Check-in**, em **Bilhete impresso**, a organização lê ou cola o código (`atalaia:ticket:…`) e toca em **Fazer o check-in**. O check-in fica feito logo, exceto quando o campo confere cartões de filiação: aí o check-in espera até tu (ou a organização) tocares em **Cartão visto, confere** ([Conferir o cartão de filiação](#conferir-o-cartão-de-filiação)). Só o bilhete mais recente de uma inscrição funciona.
 - **Quem tem inscrição mas não traz o bilhete** aparece como **por chegar** na lista da consola. Depois de veres quem é, a organização toca em **Chegou**.
 - **Não uses o Check-in à mão para quem tem inscrição.** Cria um check-in novo ao lado da inscrição, e a inscrição continua **por chegar**.
-- O check-in na consola precisa do código da organização, ou de um código temporário **GM completo**. Um código **Ler e gerir marshals** não faz check-ins.
+- A consola da receção funciona com o código da organização, ou com um código temporário **GM completo**. Um código **Ler e gerir marshals** não confirma check-ins nem aceita bilhetes.
 - Se um bilhete for recusado, a consola diz porquê: foi feito um bilhete mais recente para essa inscrição (pede à pessoa o mais recente), ou a inscrição é de outro jogo.
 
 ## 3. A lista: réplicas por cronografar
