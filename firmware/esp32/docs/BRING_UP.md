@@ -768,6 +768,11 @@ is in [README.md](../README.md#the-modems-oled).
    WIFI-7): none for an open network, 8-63 characters, or exactly 64 hex digits; a 64-character
    password that is not all hex digits, or a 65th character, is refused with *The field Wi-Fi
    password is 8-63 characters, 64 hex digits, or none* and nothing is saved.
+   The field Wi-Fi name follows the console's rule too (`wifi_ssid_valid`, decision WIFI-10):
+   1-32 bytes after the form's decoding, counted in UTF-8 bytes (an accented letter is 2, a
+   Chinese character 3). A longer name is refused with *The field Wi-Fi name is 1-32 bytes*
+   and nothing is saved; before, it was cut to 32 bytes without a word. The page's
+   `maxlength="32"` counts characters, so it does not stop such a name.
 6. Verify: node reboots into normal mode.
 
 ## Step 12: Full Game Test (2 Hours) -- Phase 1 Gate

@@ -39,6 +39,9 @@ typedef enum {
 wifi_args_result_t wifi_args_parse(const char *args, char ssid[WIFI_SSID_MAX + 1],
                                    char pass[WIFI_PASS_MAX + 1]);
 
+/* True for a network name the box can use: 1-32 bytes (UTF-8 counts bytes, not characters). */
+bool wifi_ssid_valid(const char *ssid);
+
 /* True for a password the box can use: none, 8-63 characters, or 64 hex digits. */
 bool wifi_pass_valid(const char *pass);
 

@@ -105,6 +105,11 @@ static const char *const messages[WS_MSG_COUNT][BOX_LANG_COUNT] = {
          "ou nenhuma",
          "Das WLAN-Passwort des Felds hat 8-63 Zeichen, 64 Hex-Ziffern, oder keins",
          "場地 Wi-Fi 密碼需為 8 到 63 個字元、64 位十六進位數字，或不設密碼"},
+    [WS_MSG_WIFI_SSID] = {"The field Wi-Fi name is 1-32 bytes (an accented letter takes 2 or more)",
+                          "O nome do Wi-Fi do campo tem 1 a 32 bytes (uma letra acentuada ocupa 2 "
+                          "ou mais)",
+                          "Der WLAN-Name des Felds hat 1-32 Bytes (ein Umlaut belegt 2 oder mehr)",
+                          "場地 Wi-Fi 名稱需為 1 到 32 個位元組（一個中文字佔 3 個位元組）"},
     [WS_MSG_SAVED] = {"Saved. Rebooting...", "Guardado. A reiniciar...", "Gespeichert. Neustart...",
                       "已儲存，正在重新啟動..."},
 };
@@ -137,6 +142,13 @@ const char *wifi_setup_wifi_pass_problem_in(box_lang_t lang, const char *pass)
     /* The console's rule (wifi_args.h, decision WIFI-7 as changed on 2026-11-05). */
     if (pass != NULL && wifi_pass_valid(pass)) return NULL;
     return wifi_setup_msg(lang, WS_MSG_WIFI_PASS);
+}
+
+const char *wifi_setup_wifi_ssid_problem_in(box_lang_t lang, const char *ssid)
+{
+    /* The console's rule (wifi_args.h, decision WIFI-10): refused, never cut to 32 bytes. */
+    if (ssid != NULL && wifi_ssid_valid(ssid)) return NULL;
+    return wifi_setup_msg(lang, WS_MSG_WIFI_SSID);
 }
 
 /* A tag of Accept-Language ("pt-PT", "zh-TW", "en;q=0.8"): its language if the box has it
@@ -431,10 +443,12 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     }
 
     /* The field Wi-Fi a firmware update uses (protocol/firmware-update.md), optional. */
-    /* One byte more than the longest password, so one that is too long is seen, not cut. */
-    char wifi_ssid[WIFI_SSID_MAX + 1], wifi_pass[WIFI_PASS_MAX + 2];
+    /* One byte more than the longest name and password, so one too long is seen, not cut. */
+    char wifi_ssid[WIFI_SSID_MAX + 2], wifi_pass[WIFI_PASS_MAX + 2];
     bool have_wifi =
         parse_form_field(buf, "wifissid", wifi_ssid, sizeof(wifi_ssid)) && wifi_ssid[0] != '\0';
+    const char *ssid_problem = have_wifi ? wifi_setup_wifi_ssid_problem_in(lang, wifi_ssid) : NULL;
+    if (ssid_problem != NULL) return send_problem(req, lang, ssid_problem);
     if (!parse_form_field(buf, "wifipass", wifi_pass, sizeof(wifi_pass))) wifi_pass[0] = '\0';
     const char *pass_problem = have_wifi ? wifi_setup_wifi_pass_problem_in(lang, wifi_pass) : NULL;
     if (pass_problem != NULL) return send_problem(req, lang, pass_problem);

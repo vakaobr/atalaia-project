@@ -502,8 +502,7 @@ void fw_update_esp_offer(const char *params_json)
 
 bool fw_update_esp_set_wifi(const char *ssid, const char *password)
 {
-    size_t ns = strlen(ssid);
-    if (ns < 1 || ns > WIFI_SSID_MAX || !wifi_pass_valid(password)) return false;
+    if (!wifi_ssid_valid(ssid) || !wifi_pass_valid(password)) return false;
     config_store_set_str("wifi_ssid", ssid);
     config_store_set_str("wifi_pass", password);
     return true;
