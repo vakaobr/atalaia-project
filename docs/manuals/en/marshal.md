@@ -47,7 +47,7 @@ Below, **Who you are** has **Chronograph's id** (a name for your device, for exa
 
 ## 2. The check-in desk
 
-Before the game, players come to the field's check-in desk. As a marshal you can do three things there: check a membership card, check in a player who has no app, and send a player with a printed ticket to the GM console. Players with the app check themselves in ([player manual](player.md#3-check-in-at-the-field)).
+Before the game, players come to the field's check-in desk. As a marshal you can do three things there: check a membership card, check in a player who has no app, and send a player with a printed ticket to the GM console. Players with the app check themselves in ([player manual](player.md#3-check-in-at-the-field)). The desk's console side is in the [game master manual](game-master.md#the-check-in-desk).
 
 ### Check the membership card
 

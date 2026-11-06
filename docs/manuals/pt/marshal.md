@@ -47,7 +47,7 @@ Mais abaixo, **Quem és** tem **Identificador do cronógrafo** (um nome para o t
 
 ## 2. A receção
 
-Antes do jogo, quem joga passa pela receção do campo. Como marshal podes fazer lá três coisas: conferir um cartão de filiação, fazer o check-in de quem não tem a app e mandar quem traz um bilhete impresso à consola da organização. Quem tem a app faz o próprio check-in ([manual de quem joga](player.md#3-faz-o-check-in-no-campo)).
+Antes do jogo, quem joga passa pela receção do campo. Como marshal podes fazer lá três coisas: conferir um cartão de filiação, fazer o check-in de quem não tem a app e mandar quem traz um bilhete impresso à consola da organização. Quem tem a app faz o próprio check-in ([manual de quem joga](player.md#3-faz-o-check-in-no-campo)). O lado da consola está no [manual da organização](game-master.md#the-check-in-desk).
 
 ### Conferir o cartão de filiação
 
