@@ -796,6 +796,12 @@ Decisions APX-1 to APX-3 (`app/`; not tried on a real phone): a marshal's phone 
 - **Sign-up in the app (S17-16 unblocked).** *Create an account* after the privacy notice has been opened, with the notice and *I am 16 or older* boxes ticked; the social buttons need the same two. With no notice published the sign-up is closed.
 - **Not done:** none of this has been tried on a real phone or at a field.
 
+## The release-signed APK on GitHub releases (APK-1 to APK-8, 2026-11-06)
+
+- **The app is attached to each release from v0.9.0, signed with the project's Android key** (alias `atalaia`, RSA 4096, in the `release` environment's secrets; certificate SHA-256 in `docs/community/keys.md`). `release.yml`'s job `apk` builds it with `app/tool/check.sh apk-release` and fails unless `apksigner` reports that certificate; updates then install over each other and keep the phone controller's data. APP-2's "the maintainer has not yet made the release keystore" is done.
+- **Once only**, phones with a debug-signed app uninstall it before the first release APK (the manuals' update sections say what each role loses).
+- **Not done:** the first tag with this job has not run yet; a real phone has not installed the release APK over another release APK; the maintainer's offline backup of the keystore is not confirmed here.
+
 ## The phone controller's security parity, kept results, the player's event list (2026-10-30, software only)
 
 - **The phone controller catches up with the Pi's security review (FU30-5 to FU30-12, SR-55 to SR-57).** Signed-mode revocation fails closed: `revoked.json` is fetched again before every install and upload, a missing, unreadable or malformed list installs nothing, the last good list is kept across restarts, and `revocation_max_age_days` and `min_versions` are set on the *Mode packages* screen (four languages). The staff ATAK feed can use TLS with a pinned CA (`staff_tls`, `staff_tls_ca`, `staff_tls_cert`, `staff_tls_key` as PEM text, `staff_tls_name`; port 8089; TLS 1.2 or later; no system roots). Revocation is tested in Dart with the Pi's own cases and the floor is a shared contract case; the TLS feed has not been tried against a real ATAK device.

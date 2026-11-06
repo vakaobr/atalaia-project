@@ -718,7 +718,10 @@ try:
   app:
     title: Na telefonie z Androidem
     text: >-
-      Zbuduj debugowy APK aplikacji za pomocą Dockera i zainstaluj go na telefonie z Androidem 8.0 lub nowszym albo
+      Od v0.9.0 każde <a href="https://github.com/vakaobr/atalaia-project/releases">wydanie na GitHubie</a> zawiera APK aplikacji, podpisany
+      kluczem projektu, więc każde wydanie instaluje się na poprzednie (aplikację zainstalowaną ze
+      starszej wersji debugowej trzeba najpierw raz odinstalować: instrukcje mówią, co się wtedy
+      traci). Możesz też sam zbudować debugowy APK za pomocą Dockera i zainstalować go na telefonie z Androidem 8.0 lub nowszym albo
       w emulatorze Androida, jak wyjaśnia
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/app/README.md#install-it-on-an-android-phone-from-windows">poradnik
       aplikacji</a>. Działała na emulatorach, jeszcze nie na prawdziwym telefonie.
