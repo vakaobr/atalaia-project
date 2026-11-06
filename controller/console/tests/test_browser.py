@@ -4777,7 +4777,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v24').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v25').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js", "/console/labels.js", "/console/qr-svg.js"):
@@ -5139,8 +5139,20 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("ticket-input").fill(ticket)
         page.get_by_test_id("ticket-submit").click()
         expect(page.get_by_test_id("toast")).to_contain_text("Mocho já tinha chegado")
+        # A registered player who checked in alone and waits for staff: the scan confirms them (TKT-7).
+        raw2 = os.urandom(32)
+        regs.append({"registration_id": str(uuid.uuid4()), "player_id": "p-gaiogaiogaio", "display_name": "Gaio",
+                     "ticket_sha256": hashlib.sha256(raw2).hexdigest(), "replicas": []})
+        ctrl.checkin.apply_roster(gid, {"registrations": regs})
+        expect(page.get_by_test_id("checkin-row-p-gaiogaiogaio")).to_contain_text("por chegar")
+        self.field.bundle.store.update_checkin(gid, "p-gaiogaiogaio", status="pending")
+        page.get_by_test_id("ticket-input").fill(checkin_ticket.make(
+            {"registration_id": regs[2]["registration_id"], "player_id": "p-gaiogaiogaio", "secret": raw2}))
+        page.get_by_test_id("ticket-submit").click()
+        expect(page.get_by_test_id("toast")).to_contain_text("Gaio esperava por uma confirmação da organização")
+        expect(page.get_by_test_id("checkin-row-p-gaiogaiogaio")).to_contain_text("com check-in")
         self.check_in(gid, "Zé")
-        expect(page.get_by_test_id("checkin-registered")).to_contain_text("2 já chegaram · sem inscrição: 1")
+        expect(page.get_by_test_id("checkin-registered")).to_contain_text("3 já chegaram · sem inscrição: 1")
 
     def test_checkin_tab_with_squads(self):
         page = self.console()

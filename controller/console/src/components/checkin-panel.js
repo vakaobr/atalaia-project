@@ -351,7 +351,7 @@ export class CheckinPanel extends Component {
             this.setState({ ticket: '' });
             this.onStream({ type: 'checkin', game: g.id, checkin: row });
             // TKT-5: what the scan did: in, waiting for the card check (the APD rule), or nothing (already there).
-            const key = row.already ? 'checkin.ticket_already'
+            const key = row.confirmed ? 'checkin.ticket_confirmed' : row.already ? 'checkin.ticket_already'
                 : row.status === 'pending' ? 'checkin.ticket_pending' : 'checkin.ticket_done';
             this.props.app.showToast(t(key, { name: row.display_name || row.player_id }));
         }

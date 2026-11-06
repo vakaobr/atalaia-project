@@ -1011,6 +1011,7 @@
     "ticket_label": "Código do bilhete",
     "ticket_submit": "Fazer o check-in",
     "ticket_done": "Check-in feito: {name}.",
+    "ticket_confirmed": "{name} esperava por uma confirmação da organização: check-in confirmado agora.",
     "ticket_pending": "{name} está na lista e espera pela verificação do cartão (\"Cartão visto, confere\").",
     "ticket_already": "{name} já tinha chegado: nada mudou.",
     "schedule_title": "Da agenda do site",

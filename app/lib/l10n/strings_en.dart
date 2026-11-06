@@ -531,10 +531,13 @@ const Map<String, String> enStrings = {
   'ticket.pending':
       '{name} is on the list and waits for the card check: see their '
       'federation card and tick "Card seen, matches" in Replicas to chrono.',
+  'ticket.confirmed':
+      '{name} was waiting for a staff confirmation: confirmed now, checked '
+      'in.',
   'ticket.already': '{name} was already checked in: nothing changed.',
   'ticket.already_pending':
-      '{name} has already arrived and waits for the card check or a '
-      'confirmation: see Replicas to chrono.',
+      '{name} has already arrived and waits for the card check: see Replicas '
+      'to chrono.',
   'ticket.not_newest':
       'This is not the newest ticket for this registration: a newer one was '
       'made and this one no longer works. Ask the player for the new ticket, '

@@ -337,6 +337,65 @@ class ArrivalTests(GameDayCase):
         self.assertEqual(r.json()["status"], "checked_in")
         self.assertEqual(r.json()["ticket_scanned_by"], r.json()["card_checked_by"])
 
+    def staff_confirms(self, **apd: Any) -> str:
+        """A marshal's token, then the "staff confirms" rule (and the APD rule if given): the marshal is checked
+        in first, so the rule does not leave them pending."""
+        _, token = self.make_marshal(self.gid)
+        body: dict[str, Any] = {"confirm": "staff"}
+        if apd:
+            body["apd"] = apd
+        r = self.client.put("/api/v1/checkin/settings", headers=GM, json=body)
+        self.assertEqual(r.status_code, 200, r.text)
+        return token
+
+    def test_a_scan_confirms_a_pending_self_check_in(self) -> None:
+        """TKT-7: a player who checked in with the app waits as pending under "staff confirms"; the marshal's
+        scan of their ticket is the staff confirmation, recorded as the scan; a second scan changes nothing."""
+        token = self.staff_confirms()
+        marshal_pid = self.svc.resolve(token).player_id
+        out = self.app_checkin(self.gid, self.ident, self.reg, self.ticket_text)
+        self.assertEqual(out["status"], "pending")
+        with self.assertLogs("atalaia", level="INFO") as logs:
+            row = self.scan(self.printed(), bearer(token))
+        self.assertEqual((row["status"], row["already"], row["confirmed"], row["checked_in_at"]),
+                         ("checked_in", False, True, self.now))
+        self.assertEqual((row["ticket_scanned_by"], row["ticket_scanned_at"]), (marshal_pid, self.now))
+        self.assertFalse(row["apd_override"])
+        self.assertIn(f"{self.reg['player_id']} by {marshal_pid}, checked_in (confirmed)",
+                      next(m for m in logs.output if "ticket check-in" in m))
+        again = self.scan(self.printed(), bearer(token))
+        self.assertEqual((again["status"], again["already"], again["confirmed"]), ("checked_in", True, False))
+
+    def test_a_scan_leaves_the_card_check_to_do(self) -> None:
+        """TKT-7 with TKT-4: under the APD rule's card check a scan confirms the staff step only; the player stays
+        pending until "card seen, matches", and the scan is recorded once."""
+        token = self.staff_confirms(accepted=["fpa"], checkin=True)
+        marshal_pid = self.svc.resolve(token).player_id
+        self.assertEqual(self.app_checkin(self.gid, self.ident, self.reg, self.ticket_text)["status"], "pending")
+        row = self.scan(self.printed(), bearer(token))
+        self.assertEqual((row["status"], row["already"], row["confirmed"], row["checked_in_at"]),
+                         ("pending", False, False, None))
+        self.assertEqual(row["ticket_scanned_by"], marshal_pid)
+        again = self.scan(self.printed(), {**GM})
+        self.assertEqual((again["status"], again["already"], again["ticket_scanned_by"]),
+                         ("pending", True, marshal_pid))
+        r = self.client.patch(f"/api/v1/games/{self.gid}/checkins/{self.reg['player_id']}", headers=bearer(token),
+                              json={"federation_seen": True})
+        self.assertEqual(r.json()["status"], "checked_in", r.text)
+        after = self.scan(self.printed(), bearer(token))
+        self.assertEqual((after["status"], after["already"], after["confirmed"]), ("checked_in", True, False))
+
+    def test_a_scan_of_a_confirmed_player_changes_nothing(self) -> None:
+        """TKT-7: a player already confirmed (here by hand) is "already"; the scan records nothing."""
+        token = self.staff_confirms()
+        self.app_checkin(self.gid, self.ident, self.reg, self.ticket_text)
+        r = self.client.patch(f"/api/v1/games/{self.gid}/checkins/{self.reg['player_id']}", headers=GM,
+                              json={"status": "checked_in"})
+        self.assertEqual(r.json()["status"], "checked_in", r.text)
+        row = self.scan(self.printed(), bearer(token))
+        self.assertEqual((row["status"], row["already"], row["confirmed"]), ("checked_in", True, False))
+        self.assertEqual((row["ticket_scanned_by"], row["ticket_scanned_at"]), (None, None))
+
     def test_who_may_take_a_ticket(self) -> None:
         """TKT-1: staff only. A player's token, the read token and a "marshals" day code (access token) are
         refused; a "gm" day code is staff like the GM token."""
