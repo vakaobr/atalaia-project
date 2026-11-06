@@ -516,7 +516,7 @@ Com um modem mais antigo a lista diz **O modem de rádio não consegue dizer que
 <a id="take-a-box-out-of-its-game"></a>
 ### Tirar uma caixa do jogo
 
-Na própria caixa, com o PIN de administração dela. Também serve para tirar uma caixa de um jogo ainda a decorrer: a consola passa a ver essa caixa como terminada, e o jogo continua para as outras. **A partir da v0.9.0 (ainda não publicada)** no firmware da caixa.
+Na própria caixa, com o PIN de administração dela. Também serve para tirar uma caixa de um jogo ainda a decorrer: **põe primeiro o jogo em pausa**, porque o menu não abre com o jogo a decorrer e o controlador ao alcance (assim quem joga não o abre a meio do jogo). A consola passa a ver essa caixa como terminada, e o jogo continua para as outras. Uma caixa presa não ouve nada do controlador, por isso o menu dela abre 5 minutos depois de ser ligada. **A partir da v0.9.0 (ainda não publicada)** no firmware da caixa.
 
 1. Mantém `*` premido 3 segundos.
 2. Escreve o PIN de administração e carrega em `#`.

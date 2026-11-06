@@ -321,16 +321,16 @@ The GM's side of all this is in the [GM manual, Recover from problems](game-mast
 
 **Leave the game at the box** (the box's admin menu; not the player app's **Leave the game**, which only erases a player's name):
 
-1. Hold `*` for 3 seconds. The press itself still goes to the game, as one `*`.
+1. Hold `*` for 3 seconds. The press itself still goes to the game, as one `*`. The menu opens only when the game cannot take keys from players: the box is waiting for the start, the game is paused, or the box has heard nothing from its controller for 5 minutes (a stuck box: wait 5 minutes after switching it on). While a game runs with its controller in reach, holding `*` does nothing more.
 2. **Enter the admin PIN.** `#` confirms. `*` deletes; with nothing typed, `*` goes back to the game.
 3. **ADMIN** lists one entry, **Leave the game**. Press `#`.
 4. **LEAVE THE GAME?**: `#` leaves, `*` goes back.
 
 The box ends the game as if the organisers had ended it: the game's last screen, then **READY** after 30 seconds. It never joins that game again. It keeps its field, its join key, its Wi-Fi, its admin PIN and its games. It can be invited, or take a join card, at once.
 
-- It works in a game that is still running too, so the organisers can pull a box out: their console then sees that box as ended, and the game goes on for the other boxes.
-- The menu shows only while the box is in a game from the controller or a join card. It closes by itself after 30 seconds without a key, or when the game ends.
-- Five wrong PINs make you wait, as everywhere else.
+- To pull a box out of a game that is still running (a broken button, a box on the wrong spot), **pause the game** in the console first, then hold `*`. Or use `@leave <admin PIN>` on the USB console, which works at any time. The organisers' console then sees that box as ended, and the game goes on for the other boxes once resumed.
+- The menu shows only while the box is in a game from the controller or a join card. It closes by itself after 30 seconds without a key, when the game ends, or when the game runs again (resumed, or the controller heard again).
+- Five wrong PINs in this menu make you wait before the next try in this menu (1, 2, 4 ... minutes, as everywhere else). These tries have their own count: they never lock the game picker, adoption or `@leave` on the USB console, so a player who types wrong PINs cannot lock the GM out of the box.
 - A box with no keypad (a Satellite) does the same on the USB console: `@leave <admin PIN>`. The box answers `leave: game N is over on this box; it is free for the next game` ([firmware guide, section 5](firmware.md#5-first-boot-and-setup)).
 
 Tested on a computer only; not yet tried on hardware.

@@ -14,6 +14,8 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+- **The Field Box's admin menu over a field game opens only when the game takes no keys from players** (decisions AMG-1 to AMG-5; `firmware/esp32/main/box_game.c`, `box_game.h`, `radio/field_link.c`, `radio/field_link.h`, `admin_pin.c`, `admin_pin.h`, `shell.c`; `firmware/esp32/test/test_box_game.c`, `test_admin_pin.c`; `docs/manuals/en` and `pt`: `field-box.md`, `game-master.md`; `firmware/esp32/docs/BRING_UP.md`; `protocol/adoption.md`): holding `*` for 3 s opens it while the box waits for the start, while the game is paused, or after 5 minutes without a TIME from the game's controller (a box stuck in a game that ended while it was off); while the game runs with its controller in reach the hold opens nothing, and an open menu closes when the game runs again. PIN tries in that menu have their own count in NVS (`pin_fails_g`, the same waits), so they never lock the game picker, adoption or `@leave` on the USB console. To pull a box out of a running game, pause the game first, or use `@leave <admin PIN>`. No new screen text, no wire change.
+
 ## [0.9.0](https://github.com/vakaobr/atalaia-project/compare/v0.8.0...v0.9.0) (2026-11-06)
 
 ### Features
