@@ -12,8 +12,9 @@ CONTRIBUTING.md, "Pull request titles and commit messages"); optional hand-writt
 `## [Unreleased]` and move into the next release's section as "Details". The sections up to 0.5.0
 were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.9.0](https://github.com/vakaobr/atalaia-project/compare/v0.8.0...v0.9.0) (2026-11-06)
+## [Unreleased]
 
+## [0.9.0](https://github.com/vakaobr/atalaia-project/compare/v0.8.0...v0.9.0) (2026-11-06)
 
 ### Features
 
@@ -49,7 +50,7 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 * the game master manual task-first, and a site server manual ([#112](https://github.com/vakaobr/atalaia-project/issues/112)) ([f30864b](https://github.com/vakaobr/atalaia-project/commit/f30864b3f170fb7792d41cdcfd7c7f64c3906ca1))
 * the README's v0.6.1 upgrade path matches the Field Box manual ([#115](https://github.com/vakaobr/atalaia-project/issues/115)) ([c9a5419](https://github.com/vakaobr/atalaia-project/commit/c9a541978f065e7299c981c4dfe583f73c95cc0c))
 
-## [Unreleased]
+### Details
 
 - **Every setting in the site server's table reaches a server deployed with Docker Compose** (decisions SRVENV-1 to SRVENV-4; `server/docker-compose.yml`, `docker-compose.hosted.yml`, `server/tests/test_config.py`, server/README.md, server/docs/DEPLOY.md, docs/runbooks/preview-server.md): Compose passes a container only the variables its file names, so `ATALAIA_APP_ANDROID_PACKAGE`, `ATALAIA_APP_ANDROID_SHA256`, `ATALAIA_APP_IOS_APP_IDS`, `ATALAIA_PASSWORD_LOGIN`, `ATALAIA_DB_POOL_SIZE`, `ATALAIA_DB_MAX_OVERFLOW`, `ATALAIA_DB_TIMEOUT_S`, `ATALAIA_ATAK_CERT_DAYS`, `ATALAIA_LANG_FROM_BROWSER`, `ATALAIA_DEFAULT_LANG` and a hub's `ATALAIA_QUOTA_STORED_MB` were silently ignored when set in `.env` (the preview's `/.well-known/assetlinks.json` stayed a 404). Each is now passed as `"${NAME:-}"` (empty: the server's default); `ATALAIA_TEST_ADAPTER`, `ATALAIA_ALLOW_SIGNUP_WITHOUT_NOTICE`, `ATALAIA_ATAK_RELAY_PORT` and `ATALAIA_BACKUP_DAYS` stay out on purpose, and a test fails when a setting the server reads or the README lists reaches no container.
 
