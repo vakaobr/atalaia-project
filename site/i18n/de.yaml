@@ -90,7 +90,7 @@ hero:
     Pre-Alpha · Software der Phasen 1 und 2 fertig; echte Boards spielen auf dem Labortisch ganze
     Spiele mit dem Feld-Controller, mit Tastenfeld; Phase 3 in Software fertig, die iOS-App auf
     einem iPhone geprüft; der Site-Server aus Phase 4 läuft auf einem Testserver; Phase 5 in
-    Software gebaut · neueste Version v0.8.0 · noch nicht feldtauglich
+    Software gebaut · neueste Version v0.9.0 · noch nicht feldtauglich
   title: Die offene Plattform für <span class="nowrap">Force-on-Force</span>
   lead: >-
     Atalaia ist eine offene Plattform für die elektronischen Props von Airsoft, Paintball und
@@ -758,13 +758,18 @@ try:
   app:
     title: Auf einem Android-Handy
     text: >-
-      Ab v0.9.0 enthält jedes <a href="https://github.com/vakaobr/atalaia-project/releases">GitHub-Release</a> die APK der App, signiert mit dem
-      Schlüssel des Projekts, sodass sich jedes Release über das vorherige installiert (eine App aus
-      einem älteren Debug-Build muss vorher einmal deinstalliert werden: Die Handbücher sagen, was
-      dabei verloren geht). Oder bau die Debug-APK selbst mit Docker und installiere sie auf einem Handy mit Android 8.0 oder
-      neuer oder im Android-Emulator, wie die
-      <a href="https://github.com/vakaobr/atalaia-project/blob/main/app/README.md#install-it-on-an-android-phone-from-windows">Anleitung
-      zur App</a> (auf Englisch und Portugiesisch) erklärt. Sie lief auf Emulatoren, noch nicht auf einem echten Handy.
+      <a href="https://github.com/vakaobr/atalaia-project/releases/tag/v0.9.0">v0.9.0</a> (6.
+      November 2026) ist das erste GitHub-Release mit der App: atalaia-app-0.9.0.apk, signiert mit
+      dem Schlüssel des Projekts, sodass sich jedes Release über das vorherige installiert. Der
+      SHA-256-Fingerabdruck des Zertifikats ist <code
+      class="fingerprint">9C:35:0D:17:37:D6:C5:35:CD:3E:D1:04:28:8E:65:AD:7D:B4:FA:CE:8E:4E:6F:27:75:3B:7B:7C:38:40:A1:99</code>;
+      Android lehnt ein Update ab, das mit einem anderen Schlüssel signiert ist. Eine App aus einem
+      älteren Debug-Build muss vorher einmal deinstalliert werden (die Handbücher sagen, was dabei
+      verloren geht). Oder bau die Debug-APK selbst mit Docker und installiere sie auf einem Handy
+      mit Android 8.0 oder neuer oder im Android-Emulator, wie die <a
+      href="https://github.com/vakaobr/atalaia-project/blob/main/app/README.md#install-it-on-an-android-phone-from-windows">Anleitung
+      zur App</a> (auf Englisch und Portugiesisch) erklärt. Sie lief auf Emulatoren, noch nicht auf
+      einem echten Handy.
   manuals:
     title: Spielen und ausrichten
     text: >-
@@ -782,11 +787,10 @@ roadmap:
     Hardware voraus: Die Phasen 1 bis 3 sind in Software fertig (echte Boards spielen auf dem
     Labortisch ganze Spiele, und die iOS-App hat ihre Checkliste auf einem iPhone bestanden); die
     Phasen 4 und 5 sind in Software gebaut. Die Gates warten auf gebaute Boxen, Feldtests, einen
-    echten Server und den Registry-Schlüssel des Projekts. Die neueste Version ist v0.8.0 (4.
-    November 2026), die erste, die mit dem neuen Release-Schlüssel des Projekts signiert ist. Als
-    Nächstes kommt v0.9.0: Das Freigeben von Boxen, die in einem beendeten Spiel hängengeblieben
-    sind, und die WLAN-Regeln der Box sind in Software gebaut, noch nicht veröffentlicht und noch
-    nicht auf Hardware.
+    echten Server und den Registry-Schlüssel des Projekts. Die neueste Version ist v0.9.0 (6.
+    November 2026): Der Controller gibt Boxen frei, die in einem beendeten Spiel hängengeblieben
+    sind (bisher ein Test auf dem Labortisch), dazu die WLAN-Regeln der Box und die erste
+    Android-App, die mit dem Schlüssel des Projekts signiert ist.
   more: Die ganze Roadmap, mit dem Inhalt jeder Phase und ihrem Gate →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
   # hardware), in progress, designed (research, architecture and plan written; no code).
@@ -815,8 +819,8 @@ roadmap:
     short: >-
       Firmware der Field Box und ein Bauhandbuch; auf dem Labortisch spielt ein echtes Board ganze
       Spiele, inzwischen mit Display, Tastenfeld und Tastern an losen Kabeln (Foto und Clip auf der
-      Bauseite). Ein beendetes Spiel an der Box verlassen ist in Software für v0.9.0 gebaut. Es
-      fehlt noch eine zusammengebaute Box.
+      Bauseite). Ein beendetes Spiel an der Box verlassen kam mit v0.9.0, noch nicht an einer echten
+      Box ausprobiert. Es fehlt noch eine zusammengebaute Box.
     done:
       - ESP32-Firmware der Field Box mit Presets auf dem Gerät, lauffähig in einem Emulator.
       - Der kleine Bildschirm der Box zeigt Haltebalken, Punkte und Haltezeit, in vier Sprachen.
@@ -838,7 +842,7 @@ roadmap:
       - "Ein wackeliger I2C-Bus startet eine Box nicht mehr neu: Tastenfeld, kleiner Bildschirm, NFC-Leser und Akku-Messchip nutzen den neueren ESP-IDF-Treiber mit Zeitlimits, Bus-Reset und einem Backoff, der ein ausfallendes Teil beiseitelegt; ein defektes Tastenfeld liest sich als keine Taste, und das Spiel läuft weiter. Ein Neustart meldet jetzt seinen wirklichen Grund (Spannung, Unterspannung, Software, Absturz, Watchdog) statt immer \"Spannung\", und die Spielleitungs-Konsole sagt \"Eine Box ist abgestürzt und neu gestartet\". Auf dem Labortisch gefunden: Ein Tastenfeld mit schlechten Lötstellen startete ein Board in drei Minuten sechsmal neu. Nur Host-Tests; der Labortisch-Test der Korrektur steht aus."
       - "Ein Bildschirmtext, der nicht passt, wird beim Prüfen eines Modus abgelehnt, und ein Text, der sich nicht zeichnen lässt, zeigt \"?\" statt leer zu bleiben (ein langer Text in vier Sprachen wurde auf einer Box bisher kommentarlos leer). Tests auf einem Computer."
       - "Eine Anzahl von eins steht im Singular (\"1 Punkt\", nicht \"1 Punkte\") auf den Bildschirmen der Box, in der App, in der Spielleitungs-Konsole und auf den Personalseiten. Tests in Software."
-      - "Eine Box, die in einem Spiel hängt, das endete, während sie aus war, verlässt es an der Box: * 3 Sekunden halten, die Admin-PIN eingeben, dann Spiel verlassen (oder @leave auf ihrer USB-Konsole). Sie behält Feld, WLAN und Modi. In Software, ab v0.9.0: noch nicht veröffentlicht, noch nicht auf Hardware."
+      - "Eine Box, die in einem Spiel hängt, das endete, während sie aus war, verlässt es an der Box: * 3 Sekunden halten, die Admin-PIN eingeben, dann Spiel verlassen (oder @leave auf ihrer USB-Konsole). Sie behält Feld, WLAN und Modi. In v0.9.0 (6. November 2026); noch nicht an einer echten Box ausprobiert."
     next:
       - Eine gebaute Box, die ein zweistündiges Club-Spiel ohne Neustart durchhält.
       - "Die Zeitleiste an einem echten Display sehen."
@@ -847,7 +851,7 @@ roadmap:
       - "Die neue Partitionstabelle auf einem echten Board flashen (einmal per USB, ohne Löschen, bei einer Box mit der alten)."
       - "Ein gehärtetes Release-Image (Flash-Verschlüsselung, Secure Boot): nur als Plan aufgeschrieben, nichts gebaut und auf keinem Board ausprobiert."
       - "Die I2C-Fehlerbehandlung auf einem Board mit schlecht angeschlossenem Tastenfeld ausprobieren, dazu den Startbildschirm und die neuen Bildschirme auf mehr als dem ersten Labortisch-Board."
-      - "v0.9.0 veröffentlichen und Spiel verlassen an einer echten Box ausprobieren."
+      - "Spiel verlassen an einer echten Box ausprobieren."
     gate: >-
       Gate: Eine Box läuft ein zweistündiges Club-Spiel ohne Neustart. <strong>Offen</strong>, bis
       eine gebaute Box das schafft.
@@ -857,8 +861,8 @@ roadmap:
       Skirmesh-RF über LoRa, Feld-Controller, API, GM-Konsole und ein Modus-Paket, in Software
       getestet; auf dem Labortisch spielen echte Boards ganze Spiele mit dem Controller über Funk,
       und was der Labortisch gezeigt hat, ist in Software behoben. Das Freigeben von Boxen, die in
-      einem beendeten Spiel hängengeblieben sind, ist in Software für v0.9.0 gebaut. Es warten 5
-      gebaute Boxen auf einem Feld.
+      einem beendeten Spiel hängengeblieben sind, kam mit v0.9.0 und hat seinen ersten Test auf dem
+      Labortisch bestanden. Es warten 5 gebaute Boxen auf einem Feld.
     done:
       - Das verschlüsselte Funkprotokoll Skirmesh-RF und das USB-Funkmodem.
       - Der Feld-Controller mit seiner API.
@@ -904,8 +908,8 @@ roadmap:
       - "Der Feld-Controller übersteht eine falsche Uhr (ein Raspberry Pi 4 hat keine eigene Uhr und kann bei 1970 starten): Spielzeiten und Zeitlimits hängen nicht mehr davon ab, die Konsole warnt die Spielleitung, die die Zeit in der Konsole stellt (nur vorwärts), seine Zertifikate bleiben für Handys mit der richtigen Zeit gültig, und das Löschen alter Daten wartet. Tests auf einem Computer, noch nicht auf einem echten Pi."
       - "Kurzlebige Zugriffs-Tokens: Die Spielleitung kann dem Handy eines Marshals, einem Testlauf oder einem Bildschirm fürs Publikum ein Token geben, das nur liest, nur das Spiel leitet oder nur Marshals verwaltet, für ein Spiel oder alle, standardmäßig 8 Stunden (höchstens 7 Tage), und es sofort widerrufen. Tests auf einem Computer."
       - "Over-the-Air-Updates für die eigenen Builds des Prüfstands: Ein Prüfstands-Release-Schlüssel, dem der Prüfstand neben den Projektschlüsseln vertraut, signiert tägliche Builds; am 2. November 2026 ging eine Box von der Konsole aus in etwa 22 Sekunden von einem Build zum nächsten, bestätigt nach ihrem Selbsttest."
-      - "Der Controller gibt eine Box frei, die in einem Spiel hängt, das endete, während sie aus war: Das USB-Modem meldet sie, der Controller sendet das Ende dieses Spiels erneut, und die GM-Konsole listet solche Boxen unter „In einem beendeten Spiel hängengeblieben“ mit einer Schaltfläche „Freigeben“. Ein Controller, der sein Spiel verloren hat (neu installiert oder Daten verloren), kann jede Box freigeben, die nicht im laufenden Spiel ist. In Software, ab v0.9.0: noch nicht veröffentlicht, noch nicht auf Hardware. Das Modem braucht die neue Firmware, per USB geflasht."
-      - "Die WLAN-Einrichtung der Box: @wifi nimmt einen WLAN-Namen und ein Passwort mit Leerzeichen in doppelten Anführungszeichen, und die Einrichtungsseite lehnt ab, was die Box nicht nutzen kann: einen Namen über 32 Bytes oder ein Passwort, das nicht leer ist, nicht 8–63 Zeichen hat und nicht aus 64 Hex-Ziffern besteht. In Software, ab v0.9.0: noch nicht veröffentlicht, noch nicht auf Hardware."
+      - "Der Controller gibt eine Box frei, die in einem Spiel hängt, das endete, während sie aus war: Das USB-Modem meldet sie, der Controller sendet das Ende dieses Spiels erneut, und die GM-Konsole listet solche Boxen unter „In einem beendeten Spiel hängengeblieben“ mit einer Schaltfläche „Freigeben“. Ein Controller, der sein Spiel verloren hat (neu installiert oder Daten verloren), kann jede Box freigeben, die nicht im laufenden Spiel ist. In v0.9.0 (6. November 2026). Ein Test auf dem Labortisch am 6. November 2026 bestanden: Eine Heltec-V4.3-Box wurde mitten im Spiel ausgeschaltet, das Spiel endete, sie wurde wieder eingeschaltet und vom Controller binnen Sekunden freigegeben. Das Modem braucht die Firmware von v0.9.0, per USB geflasht."
+      - "Die WLAN-Einrichtung der Box: @wifi nimmt einen WLAN-Namen und ein Passwort mit Leerzeichen in doppelten Anführungszeichen, und die Einrichtungsseite lehnt ab, was die Box nicht nutzen kann: einen Namen über 32 Bytes oder ein Passwort, das nicht leer ist, nicht 8–63 Zeichen hat und nicht aus 64 Hex-Ziffern besteht. In v0.9.0 (6. November 2026)."
     next:
       - Die Funk-Boards und 5 gebaute Boxen für den Feldtest.
       - Ein Feldtest mit 20 Boxen, mit und ohne Hören vor dem Senden.
@@ -914,7 +918,7 @@ roadmap:
       - "Das Replay-Fenster und die gehärteten Controller auf echten Boards und einem echten Pi ausprobieren (ein aufgezeichneter Befehl, auf dem Prüfstand wieder eingespielt)."
       - "Den Epochenspeicher einer Box auf zwei Labor-Boards löschen und prüfen, dass sie wiedergefunden wird, zweimal hintereinander und mit einem wieder aufgenommenen früheren Leiter-Controller (das Runbook ist geschrieben)."
       - "Die Uhr stellen und Zugriffs-Tokens auf einem echten Raspberry Pi auf einem Feld ohne Internet nutzen."
-      - "v0.9.0 veröffentlichen, dann das Freigeben hängengebliebener Boxen und die WLAN-Regeln auf echten Boards und einem echten Modem ausprobieren."
+      - "Das Freigeben hängengebliebener Boxen und die WLAN-Regeln auf weiteren Boards ausprobieren (das Freigeben hat am 6. November 2026 einen Test auf dem Labortisch bestanden)."
     gate: >-
       Gate: 5 Boxen auf einem <a href="{{ page.to.glossary }}#glossar-cqb">CQB</a>-Gelände und einem
       Outdoor-Feld, keine verlorene Einnahme. <strong>Offen.</strong>
@@ -1035,7 +1039,7 @@ roadmap:
         - "Der eigene Bildschirm des Handy-Controllers importiert eine Anmeldeliste (eine CSV- oder JSON-Datei, gewählt mit der Dateiauswahl von Android), ganz ohne GM-Konsole."
         - "Ein Bereitschafts-Controller übernimmt die Beacon-Einstellungen der Boxen (den Feldschalter, die abgeschalteten Boxen, die Räume) und die Plätze der Boxen aus seinem Beitritt, sodass Handys nach einem Failover dasselbe Beacon-Verzeichnis bekommen; eine Konsole, die auf dem Bereitschafts-Controller schon offen ist, verschiebt die Marker der Boxen sofort, ohne Neuladen. In Software, in beiden Controllern; die Verschiebung der Marker ist in einem Headless-Browser getestet."
         - "Der Handy-Controller zieht mit der Sicherheitsprüfung des Pi-Controllers gleich: Der Widerruf signierter Modi schlägt sicher fehl (mit einer Untergrenze je Modus und einer Altersgrenze für ein Handy ohne Netz, beides im Bildschirm Modus-Pakete), und der ATAK-Feed für die Spielleitung läuft über TLS mit einer festgelegten Zertifizierungsstelle. In Software getestet; nicht auf einem Handy im Feld."
-        - "Der Android-Controller gibt Boxen, die in einem beendeten Spiel hängengeblieben sind, frei wie der Raspberry Pi, mit einem USB-Funkmodem (ein I/O-Pod kann solche Boxen nicht melden), und hat den Uhrenschutz des Pi. In Software, ab v0.9.0: noch nicht veröffentlicht, noch nicht auf einem echten Handy."
+        - "Der Android-Controller gibt Boxen, die in einem beendeten Spiel hängengeblieben sind, frei wie der Raspberry Pi, mit einem USB-Funkmodem (ein I/O-Pod kann solche Boxen nicht melden), und hat den Uhrenschutz des Pi. In v0.9.0 (6. November 2026); noch nicht auf einem echten Handy."
     g_ios:
       title: iOS
       items:
@@ -1283,8 +1287,9 @@ roadmap:
     short: >-
       Visueller Modus-Editor, signierte Modus-Pakete, die Modus-Registry als Vorlage, Deutsch und
       traditionelles Chinesisch, Bauanleitungen, das Ziel- und das Ausgangsmodul des
-      Erweiterungsanschlusses. Alle Software-Schritte sind gebaut. Die neueste Version, v0.8.0, ist
-      mit dem neuen Release-Schlüssel des Projekts signiert.
+      Erweiterungsanschlusses. Alle Software-Schritte sind gebaut. Die neueste Version, v0.9.0, ist
+      mit dem Release-Schlüssel des Projekts signiert und enthält die Android-App, signiert mit dem
+      Android-Schlüssel des Projekts.
     done:
       - "<strong>Der visuelle Modus-Editor</strong>: eine Seite des Simulators, auf der ein Modus
         aus Blöcken zusammengesetzt wird (was passiert, wenn ein Team den Knopf hält, Timer, Punkte,
@@ -2357,10 +2362,10 @@ glossary:
     text: >-
       Eine Box, die aus oder außer Reichweite war, als ihr Spiel endete, und deshalb noch glaubt, in
       diesem Spiel zu sein: Sie zeigt das alte Spiel und lehnt neue Einladungen ab („in einem
-      anderen Spiel“). Ab v0.9.0 (in Software, noch nicht veröffentlicht, noch nicht auf Hardware)
-      sendet der Controller das Ende dieses Spiels erneut, wenn er so eine Box hört, die GM-Konsole
-      listet sie mit einer Schaltfläche „Freigeben“, und das Admin-Menü der Box hat „Spiel
-      verlassen“.
+      anderen Spiel“). Ab v0.9.0 (veröffentlicht am 6. November 2026; bisher ein Test auf dem
+      Labortisch) sendet der Controller das Ende dieses Spiels erneut, wenn er so eine Box hört, die
+      GM-Konsole listet sie mit einer Schaltfläche „Freigeben“, und das Admin-Menü der Box hat
+      „Spiel verlassen“.
   microcontroller:
     id: glossar-mikrocontroller
     term: Mikrocontroller
