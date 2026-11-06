@@ -11,6 +11,7 @@
 
 #include "box_text.h"
 #include "check.h"
+#include "wifi_args.h"
 #include "wifi_setup.h"
 
 /* ---- parse_form_field tests ---- */
@@ -155,6 +156,51 @@ static void test_portal_refuses_trivial_pins(void)
         const char *why = wifi_setup_pin_problem(easy[i]);
         CHECK(why != NULL && strstr(why, "too easy to guess") != NULL);
     }
+}
+
+/* The portal's field Wi-Fi password: the console's rule (decision WIFI-7, changed by the
+ * maintainer on 2026-11-05): none, 8-63 characters, or 64 hex digits. */
+static void test_portal_wifi_pass_rule(void)
+{
+    char p63[64], p64hex[65], p64[65], p65[66];
+    memset(p63, 'a', 63), p63[63] = '\0';
+    memset(p64hex, 'F', 64), p64hex[64] = '\0';
+    p64hex[10] = '0', p64hex[20] = 'c';
+    memcpy(p64, p64hex, sizeof(p64));
+    p64[30] = 'g'; /* not a hex digit */
+    memset(p65, 'a', 65), p65[65] = '\0';
+
+    CHECK(wifi_setup_wifi_pass_problem_in(BOX_LANG_EN, "") == NULL); /* an open network */
+    CHECK(wifi_setup_wifi_pass_problem_in(BOX_LANG_EN, "12345678") == NULL);
+    CHECK(wifi_setup_wifi_pass_problem_in(BOX_LANG_EN, "pass word") == NULL);
+    CHECK(wifi_setup_wifi_pass_problem_in(BOX_LANG_EN, p63) == NULL);
+    CHECK(wifi_setup_wifi_pass_problem_in(BOX_LANG_EN, p64hex) == NULL);
+    const char *en = wifi_setup_msg(BOX_LANG_EN, WS_MSG_WIFI_PASS);
+    CHECK(wifi_setup_wifi_pass_problem_in(BOX_LANG_EN, "1234567") == en);
+    CHECK(wifi_setup_wifi_pass_problem_in(BOX_LANG_EN, p64) == en);
+    CHECK(wifi_setup_wifi_pass_problem_in(BOX_LANG_EN, p65) == en);
+    CHECK(wifi_setup_wifi_pass_problem_in(BOX_LANG_EN, NULL) == en);
+    CHECK(strstr(en, "8-63") != NULL && strstr(en, "64 hex") != NULL);
+    CHECK(wifi_setup_wifi_pass_problem_in(BOX_LANG_PT, p64) ==
+          wifi_setup_msg(BOX_LANG_PT, WS_MSG_WIFI_PASS));
+    CHECK(strstr(wifi_setup_msg(BOX_LANG_PT, WS_MSG_WIFI_PASS), "8 a 63") != NULL);
+    CHECK(strstr(wifi_setup_msg(BOX_LANG_DE, WS_MSG_WIFI_PASS), "8-63") != NULL);
+    CHECK(strstr(wifi_setup_msg(BOX_LANG_ZH_TW, WS_MSG_WIFI_PASS), "63") != NULL);
+
+    /* As the form handler reads it: one byte more than the longest, so 65 is seen, not cut
+     * to 64 (which, all 'a', would still be refused; 65 hex digits cut to 64 would not). */
+    char body[200], out[WIFI_PASS_MAX + 2];
+    memset(p65, 'A', 65);
+    snprintf(body, sizeof(body), "wifissid=Field&wifipass=%s", p65);
+    CHECK(parse_form_field(body, "wifipass", out, sizeof(out)));
+    CHECK(strlen(out) == 65);
+    CHECK(wifi_setup_wifi_pass_problem_in(BOX_LANG_EN, out) == en);
+    snprintf(body, sizeof(body), "wifipass=%s", p64hex);
+    CHECK(parse_form_field(body, "wifipass", out, sizeof(out)));
+    CHECK(wifi_setup_wifi_pass_problem_in(BOX_LANG_EN, out) == NULL);
+    CHECK(parse_form_field("wifipass=pass+word%21", "wifipass", out, sizeof(out)));
+    CHECK(strcmp(out, "pass word!") == 0 &&
+          wifi_setup_wifi_pass_problem_in(BOX_LANG_EN, out) == NULL);
 }
 
 /* ---- the page's language ---- */
@@ -383,4 +429,5 @@ void run_wifi_setup_tests(void)
     test_validate_non_digit_pin();
     test_validate_short_pin();
     test_portal_refuses_trivial_pins();
+    test_portal_wifi_pass_rule();
 }

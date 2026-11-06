@@ -237,7 +237,7 @@ Uma Field Box ou um Satélite novo faz isto no primeiro arranque. A antena de 2,
    - **PIN de administração**: 4 a 8 algarismos. Anota-o. 1234, 0000, uma sequência como 9876 e um par repetido como 1212 são recusados.
    - **Brilho do ecrã** e **Volume do som**.
    - **Chave de ligação ao campo** (opcional): os 64 algarismos hexadecimais que a organização te dá. Podes juntá-la depois, por adoção.
-   - **Nome do Wi-Fi do campo** e **Palavra-passe do Wi-Fi do campo** (opcionais, mas precisos para as atualizações e para os modos de jogo obtidos: [secção 7](#7-atualizações-pelo-ar-e-o-que-mais-usa-o-wi-fi-do-campo)). O Wi-Fi do campo tem de ser de 2,4 GHz.
+   - **Nome do Wi-Fi do campo** e **Palavra-passe do Wi-Fi do campo** (opcionais, mas precisos para as atualizações e para os modos de jogo obtidos: [secção 7](#7-atualizações-pelo-ar-e-o-que-mais-usa-o-wi-fi-do-campo)). O Wi-Fi do campo tem de ser de 2,4 GHz. A palavra-passe tem 8 a 63 caracteres, 64 algarismos hexadecimais, ou nenhuma numa rede aberta, como na consola USB; a página recusa qualquer outra.
 5. Toca em **Guardar e reiniciar**. A caixa reinicia.
 
 Depois, uma caixa sem campo mostra **Emparelhar caixa** e um código de 6 algarismos ([secção 6](#6-adoção)). Uma caixa que já está adotada mostra **PRONTA**.
