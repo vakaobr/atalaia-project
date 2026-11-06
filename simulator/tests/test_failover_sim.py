@@ -43,9 +43,9 @@ NODES = (1, 2)
 class Field:
     """A radio model with controllers and plain nodes, driven in 100 ms steps."""
 
-    def __init__(self, backups: dict[int, int], mode: str = "auto") -> None:
+    def __init__(self, backups: dict[int, int], mode: str = "auto", primary_mode: str | None = None) -> None:
         self.radio = RadioModel(config=RadioConfig(loss_rate=0.0), rng=random.Random(7))
-        primary_election = Election(0, priority=16_000, mode=mode)
+        primary_election = Election(0, priority=16_000, mode=primary_mode or mode)
         primary_election.lead(1, 0)
         self.primary = FieldController(radio=self.radio, teams=["red", "blue"], node_id=0,
                                        election=primary_election)
@@ -110,10 +110,11 @@ class FailoverTests(unittest.TestCase):
     def test_backup_takes_over_and_nodes_hear_the_new_term(self):
         f = Field({9: 12_000})
         f.primary.start_game(duration_ms=600_000, now_ms=0)
-        f.run_until(20_000)
+        f.run_until(60_000)  # the standby has heard the leader's 10 s beacons (decision FAIL-2)
+        self.assertEqual(f.ctrls[1].election.leader_beacon_ms, 10_000)
         f.kill_primary()
         down_at = f.t
-        f.run_until(100_000)
+        f.run_until(140_000)
         backup = f.ctrls[1]
         self.assertEqual(backup.election.role, LEADER)
         self.assertEqual(backup.election.term, 2)
@@ -133,22 +134,61 @@ class FailoverTests(unittest.TestCase):
         self.assertEqual({h[1] for h in new_beacons}, set(NODES))
         # The game clock continued across the takeover.
         self.assertEqual(backup.game_state, GAME_RUNNING)
-        self.assertGreater(backup.game_time_ms, 90_000)
+        self.assertGreater(backup.game_time_ms, 130_000)
+
+    def test_killed_before_its_cadence_is_known_the_backup_waits_for_the_slowest(self):
+        # Right after the start the standby has heard only the start's TIME and its repeats: it counts
+        # the slowest beacons (3 x 30 s), as it would behind a manual leader (decision FAIL-2).
+        f = Field({9: 12_000})
+        f.primary.start_game(duration_ms=600_000, now_ms=0)
+        f.run_until(15_000)
+        f.kill_primary()
+        f.run_until(200_000)
+        backup = f.ctrls[1]
+        self.assertEqual(backup.election.role, LEADER)
+        stood = next(t for t, role, _ in backup.election.history if role == "candidate")
+        last_heard = max(t for t, _, src, _ in f.heard if src == 0)
+        self.assertGreaterEqual(stood - last_heard, 90_000 - 100)
+        self.assertLessEqual(stood - last_heard, 90_000 + 200)
+
+    def test_an_auto_backup_never_takes_over_a_working_manual_primary(self):
+        # The bug of decision FAIL-1: the standby counted its own 10 s beacons and claimed 30 s after the
+        # manual primary's last beacon, while that primary still worked.
+        f = Field({9: 12_000}, mode="auto", primary_mode="manual")
+        f.primary.start_game(duration_ms=900_000, now_ms=0)
+        f.run_until(100_000)
+        f.kill_primary()  # one of its beacons is lost: a gap of 60 s, still under 3 x 30 s
+        f.run_until(125_000)
+        f.radio.heal()
+        f.run_until(600_000)
+        backup = f.ctrls[1]
+        self.assertEqual(f.leaders(), [0])
+        self.assertEqual(f.primary.election.term, 1)
+        self.assertEqual([role for _, role, _ in backup.election.history if role != FOLLOWER], [])
+        self.assertFalse([e for e in backup.event_log if e["type"] == "claim_sent"])
+        self.assertEqual(backup.election.leader_failover_mode, "manual")
+        # It still takes over when the primary does fail: after three missed 30 s beacons.
+        f.kill_primary()
+        f.run_until(800_000)
+        self.assertIn(9, f.live_leaders())
+        stood = next(t for t, role, _ in backup.election.history if role == "candidate")
+        last_heard = max(t for t, _, src, _ in f.heard if src == 0)
+        self.assertGreaterEqual(stood - last_heard, 90_000 - 100)
 
     def test_old_controller_steps_down_when_it_comes_back(self):
         f = Field({9: 12_000})
         f.primary.start_game(duration_ms=600_000, now_ms=0)
         f.run_until(20_000)
         f.kill_primary()
-        f.run_until(80_000)
+        f.run_until(140_000)
         self.assertEqual(sorted(f.leaders()), [0, 9])  # the cut-off primary still thinks it leads
         f.radio.heal()
-        f.run_until(100_000)
+        f.run_until(160_000)
         self.assertEqual(f.leaders(), [9])
         self.assertEqual(f.primary.election.role, FOLLOWER)
         self.assertEqual(f.primary.election.term, 2)
         # After stepping down it sends no more beacons.
-        healed_beacons = [h for h in f.heard if h[2] == 0 and h[0] > 95_000]
+        healed_beacons = [h for h in f.heard if h[2] == 0 and h[0] > 155_000]
         self.assertEqual(healed_beacons, [])
         with self.assertRaises(NotController):
             f.primary.send_cmd("message", {"text": "hello"}, now_ms=f.t)
@@ -158,7 +198,7 @@ class FailoverTests(unittest.TestCase):
         f.primary.start_game(now_ms=0)
         f.run_until(10_000)
         f.kill_primary()
-        f.run_until(80_000)
+        f.run_until(140_000)
         self.assertEqual(f.live_leaders(), [9])
         loser = f.ctrls[1]
         self.assertEqual(loser.election.role, FOLLOWER)
@@ -170,7 +210,7 @@ class FailoverTests(unittest.TestCase):
         f.primary.start_game(now_ms=0)
         f.run_until(10_000)
         f.kill_primary()
-        f.run_until(80_000)
+        f.run_until(140_000)
         self.assertEqual(f.live_leaders(), [8])
 
     def test_claim_payload_matches_the_schema(self):
@@ -188,7 +228,7 @@ class FailoverTests(unittest.TestCase):
             return orig(**kw)
 
         f.radio.send = spy  # type: ignore[method-assign]
-        f.run_until(60_000)
+        f.run_until(120_000)
         self.assertEqual(len(claims), 1)
         claim = claims[0]
         self.assertEqual(claim["term"], 2)
@@ -219,9 +259,9 @@ class FailoverTests(unittest.TestCase):
         self.assertEqual(backup.total_scores, f.primary.total_scores)
         self.assertEqual(backup.total_scores, {"red": 11, "blue": 4})
         f.kill_primary()
-        f.run_until(60_000)
+        f.run_until(120_000)
         f.node_state(1, {1: 12, 2: 4})
-        f.run_until(61_000)
+        f.run_until(121_000)
         self.assertEqual(backup.total_scores, {"red": 13, "blue": 4})
 
 

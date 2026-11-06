@@ -154,6 +154,10 @@
     "promote": "提升為控制器",
     "confirm_promote": "這台控制器將接手這場遊戲。要繼續嗎？",
     "promote_hint": "主控制器沒有回應時，提升一台備援控制器（手動故障轉移）。",
+    "takeover_after": "接手前的靜默",
+    "takeover_after_s": "{seconds} 秒",
+    "failover_mismatch_manual": "負責的控制器（無線電 ID {leader}）使用手動故障轉移，這台備援控制器使用自動：要靜默 {seconds} 秒後才會接手。請讓這場遊戲的所有控制器使用相同的故障轉移模式。",
+    "failover_mismatch_auto": "負責的控制器（無線電 ID {leader}）使用自動故障轉移，這台備援控制器使用手動：它不會自行接手。主控制器故障時請提升它，或讓這場遊戲的所有控制器使用相同的故障轉移模式。",
     "missing_areas": "這台控制器尚未提供控制台的這些部分，因此已隱藏：{areas}。",
     "roles": {
       "leader": "負責的控制器",

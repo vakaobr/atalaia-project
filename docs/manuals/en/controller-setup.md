@@ -206,6 +206,8 @@ Its **End** button reads **Leave the game**: it stops following, and the game go
 6. On both, the **Controller** tab shows the **Role** (**controller in charge** or **standby**), the **Failover** mode and the **Priority**.
 7. Generate the join again and paste it again after you move a box, change its room or disable one: the join text carries where the boxes are and the beacon choices, so a standby that takes over places players the same way.
 
+<a id="failover-mode"></a>
+
 ### `failover_mode`: manual or automatic
 
 In `[controller]` of `/etc/atalaia/controller.toml`:
@@ -213,7 +215,14 @@ In `[controller]` of `/etc/atalaia/controller.toml`:
 - `failover_mode = "manual"` (the default): nothing happens by itself. When the main controller stops answering, open the standby's console, **Controller** tab, and tap **Promote to controller**. It asks *This controller will take charge of the game. Continue?*
 - `failover_mode = "auto"`: the main controller sends its time beacon every 10 seconds instead of 30. A standby that misses three in a row (about **30 seconds** of silence) stands for the role and, a few seconds later, takes over. The project's example settings say to use `auto` only after field testing, which has not happened yet.
 
-If the old controller comes back, it hears the newer one and steps down. Give every controller of a game the same `failover_mode`: a standby set to `auto` counts beacons as 10 seconds apart, so behind a main controller set to `manual` (a beacon every 30 seconds) it would take over while the main one still works.
+A standby set to `auto` counts the beacons it actually hears from the main controller, not the ones its own setting gives. It waits for **about 90 seconds** of silence (three missed 30-second beacons) until it has heard three beacons in a row 10 seconds apart, about 40 seconds after it joins or hears a new controller. It also waits 90 seconds after two beacons in a row go missing, and the whole time behind a main controller set to `manual`. So a different setting no longer makes a standby take over a main controller that still works. The beacons a start, a pause or a resume sends again in the next 10 seconds do not count. The standby's **Controller** tab shows **Takes over after** with the silence it waits for.
+
+If the old controller comes back, it hears the newer one and steps down.
+
+Give every controller of a game the same `failover_mode` anyway. When the two differ, the standby's console says so in the **Controller** tab, and its log has a warning:
+
+- the standby is on `auto` and the main controller on `manual`: the standby takes over only after 90 seconds of silence;
+- the standby is on `manual` and the main controller on `auto`: the standby never takes over by itself, so promote it by hand.
 
 ### `power_source`: who wins when two stand
 
@@ -349,6 +358,7 @@ Update the modem too when the log says `the radio modem's firmware cannot report
 | A box does not hear the controller | Same region and channel? Antennas fitted? See the [Game master manual](game-master.md#recover-from-problems) |
 | A box is stuck in a game that is over, and the console says the radio modem cannot report it | The modem's image is older than v0.9.0: update it (section 11). Until then, take the box out at the box ([Field Box manual](field-box.md#take-a-box-out-of-its-game)) |
 | **Promote to controller** is missing, or the standby never takes over | The standby has not joined this game (section 9, steps 4 and 5), or `failover_mode` is `manual`: promote it by hand |
+| A standby on `auto` took about 90 s, not 30 s, to take over | It had not yet heard three beacons in a row 10 s apart (it had just joined or heard a new controller, or two beacons in a row were missed), or the main controller is on `manual`: section 9, [`failover_mode`](#failover-mode) |
 | I forgot the codes | Run the `tokens` and `join-key` commands again (section 5) |
 
 Found a step that does not match? Open an issue or tell us in [Discussions](https://github.com/vakaobr/atalaia-project/discussions).

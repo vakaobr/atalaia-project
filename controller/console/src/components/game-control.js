@@ -420,6 +420,9 @@ export class ControllerPanel extends Component {
         const failover = app.serves('failover');
         const canPromote = failover && role === 'gm' && game && game.live && status.role && status.role !== 'leader';
         const missing = app.missingAreas();
+        // A standby whose failover mode differs from the leader's, as its beacons show it (decision FAIL-4).
+        const mismatch = status.role === 'follower' && status.leader_failover_mode
+            && status.leader_failover_mode !== status.failover_mode ? status.leader_failover_mode : null;
         return html`<section class="card" aria-labelledby="ctl-h">
             <h2 id="ctl-h">${t('controller.title')}</h2>
             <dl class="facts" data-testid="controller-status">
@@ -428,6 +431,8 @@ export class ControllerPanel extends Component {
                 <dt>${t('controller.term')}</dt><dd>${status.term === null ? '–' : status.term}</dd>
                 <dt>${t('controller.leader')}</dt><dd>${status.leader === null || status.leader === undefined ? '–' : status.leader}</dd>
                 <dt>${t('controller.failover')}</dt><dd>${t(`controller.failover_modes.${status.failover_mode}`)}</dd>
+                ${status.takeover_after_s !== null && status.takeover_after_s !== undefined && html`<dt>${t('controller.takeover_after')}</dt>
+                    <dd data-testid="takeover-after">${t('controller.takeover_after_s', { seconds: status.takeover_after_s })}</dd>`}
                 <dt>${t('controller.priority')}</dt><dd>${status.priority}</dd>
                 <dt>${t('controller.radio')}</dt><dd>${t(`controller.radio_states.${status.radio}`)}</dd>
                 <dt>${t('controller.modem')}</dt><dd>${ident.fw ? `${ident.fw} ${ident.fw_version || ''}` : '–'}</dd>
@@ -438,6 +443,8 @@ export class ControllerPanel extends Component {
             </dl>
             ${canPromote && html`<div class="actions"><${ConfirmButton} testid="promote" class="danger" label=${t('controller.promote')}
                 question=${t('controller.confirm_promote')} onConfirm=${() => app.call('POST', '/controller/promote').then((s) => s && app.setState({ status: s }))} /></div>`}
+            ${mismatch && html`<p class="notice" data-testid="failover-mismatch">${t(`controller.failover_mismatch_${mismatch}`,
+                { leader: status.leader, seconds: status.takeover_after_s })}</p>`}
             ${failover && html`<p class="muted small">${t('controller.promote_hint')}</p>`}
             ${missing.length > 0 && html`<p class="notice" data-testid="controller-missing">${t('controller.missing_areas', {
                 areas: missing.map((a) => t(`areas.${a}`)).join(', ') })}</p>`}

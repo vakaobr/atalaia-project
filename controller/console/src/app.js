@@ -411,6 +411,10 @@ class App extends Component {
         else if (msg.kind === 'modem.error') this.alert('warn', t('alerts.modem_error', { message: msg.message }));
         else if (msg.kind === 'role') this.alert('info', t('alerts.role', { role: t(`controller.roles.${msg.role}`), term: msg.term }));
         else if (msg.kind === 'start.forced') this.alert('warn', t('alerts.start_forced', { roles: (msg.missing || []).join(', ') }));
+        else if (msg.kind === 'failover.mismatch') { // decision FAIL-4
+            this.alert('warn', t(`controller.failover_mismatch_${msg.leader_failover_mode === 'manual' ? 'manual' : 'auto'}`,
+                { leader: msg.leader, seconds: msg.takeover_after_s }));
+        }
         this.refreshStatus();
     }
 

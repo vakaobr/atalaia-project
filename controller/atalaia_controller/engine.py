@@ -48,7 +48,7 @@ from typing import Any, Callable, Optional
 from atalaia_sim import join as joinfmt
 from atalaia_sim import regions
 from atalaia_sim.core import Core, Emitted, FieldOps, Node
-from atalaia_sim.election import LEADER, Election, priority_score
+from atalaia_sim.election import FOLLOWER, LEADER, Election, priority_score
 from atalaia_sim.field_controller import (
     BROADCAST,
     CMD_OPCODES,
@@ -406,6 +406,7 @@ class Controller:
         self._output_rate = outputs.RateLimit()
         self._meta_cache: dict[str, tuple[int, Optional[scenarios.Meta]]] = {}
         self.key_lost = False
+        self._failover_warned: Optional[tuple[Any, ...]] = None  # the mismatch last warned of (FAIL-4)
         self._key = b""
         self.tx_status: Counter[str] = Counter()
         self._last_time_save = 0
@@ -2128,6 +2129,13 @@ class Controller:
                 "priority": self.priority,
                 "role": fc.election.role if fc else None,
                 "term": fc.term if fc else None,
+                # The leader's beacon interval as heard, its failover mode as that shows, and the silence
+                # after which this standby stands on its own (decisions FAIL-1 to FAIL-4).
+                "leader_beacon_s": (fc.election.leader_beacon_ms // 1000
+                                    if fc and fc.election.leader_beacon_ms is not None else None),
+                "leader_failover_mode": fc.election.leader_failover_mode if fc else None,
+                "takeover_after_s": (fc.election.takeover_after_ms // 1000
+                                     if fc and fc.election.takeover_after_ms is not None else None),
                 "live_game": self.game["id"] if self.game else None,
                 "clock": self.clock_guard.status(),
                 "key_lost": self.key_lost,
@@ -2182,6 +2190,7 @@ class Controller:
             if self.transport is not None:
                 self.transport.pump(now)  # the next paced frame, if its gap has passed
             fc.tick(now)
+            self._check_failover_modes(fc)
             if self.positions is not None:
                 self.positions.tick()
             if self.field is not None and fc.game_state == GAME_RUNNING:
@@ -2430,6 +2439,31 @@ class Controller:
             msg["projected"] = {t: int(projected.get(t, 0)) for t in self.game["teams"]}
         self._last_gains = self.fc.projected_gains() if projected is not None and self.fc else {}
         self._emit(msg)
+
+    def _check_failover_modes(self, fc: FieldController) -> None:
+        """A standby whose failover_mode differs from the leader's, as the leader's beacons show it, is
+        logged and told to the consoles once per leader and term (decision FAIL-4). The election already
+        counts the leader's interval, so this is a warning, not a refusal."""
+        e = fc.election
+        leader_mode = e.leader_failover_mode if e.role == FOLLOWER else None
+        if leader_mode is None or leader_mode == self.cfg.failover_mode:
+            return
+        key = (e.leader, e.term, leader_mode)
+        if key == self._failover_warned:
+            return
+        self._failover_warned = key
+        after = e.takeover_after_ms
+        if leader_mode == "manual":
+            log.warning("the controller in charge (node %s) beacons every 30 s (failover_mode manual) and this "
+                        "standby is on auto: it takes over only after %d s of silence; give every controller "
+                        "of the game the same failover_mode", e.leader, (after or 0) // 1000)
+        else:
+            log.warning("the controller in charge (node %s) is on automatic failover and this standby on "
+                        "manual: it never takes over by itself (promote it); give every controller of the game "
+                        "the same failover_mode", e.leader)
+        self._emit({"type": "system", "kind": "failover.mismatch", "failover_mode": self.cfg.failover_mode,
+                    "leader": e.leader, "leader_failover_mode": leader_mode,
+                    "takeover_after_s": after // 1000 if after is not None else None})
 
     def _on_role(self, role: str, term: int) -> None:
         if self.game is not None:

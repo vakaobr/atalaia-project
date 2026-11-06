@@ -157,6 +157,10 @@
     "promote": "Promover a controlador",
     "confirm_promote": "Este controlador passa a mandar no jogo. Continuar?",
     "promote_hint": "Promove um controlador de reserva quando o principal deixa de responder (substituição manual).",
+    "takeover_after": "Assume depois de",
+    "takeover_after_s": "{seconds} s de silêncio",
+    "failover_mismatch_manual": "O controlador ativo (identificador no rádio {leader}) está em substituição manual e este de reserva em automática: só assume depois de {seconds} s de silêncio. Dá a todos os controladores do jogo o mesmo modo de substituição.",
+    "failover_mismatch_auto": "O controlador ativo (identificador no rádio {leader}) está em substituição automática e este de reserva em manual: nunca assume sozinho. Promove-o se o principal falhar, ou dá a todos os controladores do jogo o mesmo modo de substituição.",
     "missing_areas": "Este controlador ainda não serve estas partes da consola, por isso estão escondidas: {areas}.",
     "roles": {
       "leader": "controlador ativo",

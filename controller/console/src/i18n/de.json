@@ -157,6 +157,10 @@
     "promote": "Zum Controller hochstufen",
     "confirm_promote": "Dieser Controller übernimmt die Leitung des Spiels. Fortfahren?",
     "promote_hint": "Stufe einen Bereitschafts-Controller hoch, wenn der Haupt-Controller nicht mehr antwortet (manuelle Ausfallübernahme).",
+    "takeover_after": "Übernimmt nach",
+    "takeover_after_s": "{seconds} s Stille",
+    "failover_mismatch_manual": "Der leitende Controller (Funk-ID {leader}) nutzt manuelle Ausfallübernahme, dieser Bereitschafts-Controller automatische: Er übernimmt erst nach {seconds} s Stille. Gib allen Controllern des Spiels denselben Übernahmemodus.",
+    "failover_mismatch_auto": "Der leitende Controller (Funk-ID {leader}) nutzt automatische Ausfallübernahme, dieser Bereitschafts-Controller manuelle: Er übernimmt nie von selbst. Stufe ihn hoch, wenn der Haupt-Controller ausfällt, oder gib allen Controllern des Spiels denselben Übernahmemodus.",
     "missing_areas": "Dieser Controller bietet diese Teile der Konsole noch nicht an, daher sind sie ausgeblendet: {areas}.",
     "roles": {
       "leader": "leitender Controller",
