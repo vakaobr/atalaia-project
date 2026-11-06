@@ -561,6 +561,29 @@ class StuckGameTests(GameOverTests):
         [stuck] = self.client.get("/api/v1/boxes", headers=GM).json()["stuck"]
         self.assertEqual((stuck["nodes"], stuck["game_over_resent"]), ([4, 5], 2))
 
+    def test_a_game_unheard_for_two_minutes_leaves_the_list_and_comes_back_when_heard(self):
+        """STUCK-71 (the bench finding of 2026-11-06): a freed box looked stuck for two hours. The list
+        shows a game heard within SHOWN_MS; what was heard stays FORGET_MS, so a box heard again keeps
+        its game's resend count and its once-a-minute limit."""
+        from atalaia_controller.stuck_games import FORGET_MS, SHOWN_MS
+        gid, _ = self.ended_game_with_a_stuck_box()
+        self.modem.other_game(gid, 4)
+        self.assertEqual(self.drain(10), lobby.GAME_OVER_REPEATS)
+        self.clock.advance(SHOWN_MS / 1000 - 10)  # two minutes after it was heard: still listed
+        [stuck] = self.client.get("/api/v1/boxes", headers=GM).json()["stuck"]
+        self.assertEqual((stuck["game"], stuck["last_heard_s"]), (gid, SHOWN_MS // 1000))
+        self.clock.advance(1)  # then silent (freed, or switched off): gone from the list and the stream's
+        self.assertEqual(self.client.get("/api/v1/boxes", headers=GM).json()["stuck"], [])
+        self.assertEqual(self.ctrl.reinvite.stuck_view()["stuck"], [])
+        self.assertIn(gid, self.ctrl.stuck.games)  # remembered
+        self.modem.other_game(gid, 5)  # heard again: listed again, the count goes on
+        self.drain(10)
+        [stuck] = self.client.get("/api/v1/boxes", headers=GM).json()["stuck"]
+        self.assertEqual((stuck["nodes"], stuck["last_heard_s"], stuck["game_over_resent"]), ([4, 5], 10, 2))
+        self.clock.advance(FORGET_MS / 1000 + 1)
+        self.assertEqual(self.client.get("/api/v1/boxes", headers=GM).json()["stuck"], [])
+        self.assertNotIn(gid, self.ctrl.stuck.games)  # forgotten after two hours, as before
+
     def test_after_a_restart_without_the_key(self):
         gid, key = self.ended_game_with_a_stuck_box(persist_game_key=False)
         self.restart(persist_game_key=False)

@@ -183,6 +183,37 @@ void main() {
     );
   });
 
+  test('a game unheard for two minutes leaves the list and comes back when '
+      'heard (STUCK-71)', () {
+    // The bench finding of 2026-11-06: a freed box looked stuck for two
+    // hours. What was heard stays stuckForgetMs, so a box heard again keeps
+    // its game's resend count and once-a-minute limit.
+    final gid = endedGame();
+    radio.otherGame(gid, 4);
+    expect(drain(10000), gameOverRepeats);
+    now += stuckShownMs - 10000; // two minutes after it was heard: listed
+    var entry = (boxes.boxes()['stuck']! as List).single as Map;
+    expect([entry['game'], entry['last_heard_s']], [gid, stuckShownMs ~/ 1000]);
+    now += 1000; // then silent (freed, or switched off): gone
+    expect(boxes.boxes()['stuck'], isEmpty);
+    expect(boxes.stuckView()['stuck'], isEmpty);
+    expect(stuck.games, contains(gid)); // remembered
+    radio.otherGame(gid, 5); // heard again: listed again, the count goes on
+    drain(10000);
+    entry = (boxes.boxes()['stuck']! as List).single as Map;
+    expect(
+      [entry['nodes'], entry['last_heard_s'], entry['game_over_resent']],
+      [
+        [4, 5],
+        10,
+        2,
+      ],
+    );
+    now += stuckForgetMs + 1000;
+    expect(boxes.boxes()['stuck'], isEmpty);
+    expect(stuck.games, isNot(contains(gid))); // forgotten after two hours
+  });
+
   test('the key tag outlives a restart without the key', () {
     final gid = endedGame();
     final tag = tagOf(gid);
