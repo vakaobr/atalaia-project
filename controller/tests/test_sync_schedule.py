@@ -348,31 +348,87 @@ class ArrivalTests(GameDayCase):
         self.assertEqual(r.status_code, 200, r.text)
         return token
 
-    def test_a_scan_confirms_a_pending_self_check_in(self) -> None:
-        """TKT-7: a player who checked in with the app waits as pending under "staff confirms"; the marshal's
-        scan of their ticket is the staff confirmation, recorded as the scan; a second scan changes nothing."""
+    def scan_with(self, headers: dict[str, str], expect: int = 200, **choice: Any) -> dict[str, Any]:
+        r = self.client.post(f"/api/v1/games/{self.gid}/checkins/ticket", json={"ticket": self.printed(), **choice},
+                             headers=headers)
+        self.assertEqual(r.status_code, expect, r.text)
+        return r.json()
+
+    def test_a_scan_asks_before_confirming_an_app_check_in(self) -> None:
+        """TKS-1, TKS-2 (TKT-7 kept): a pending check-in made in the app is not confirmed by the scan alone. The
+        answer is a decision with the app's name, when it checked in and the roster's name, and nothing changes;
+        the same ticket with "app_checkin": "confirm" is the staff confirmation, recorded as the scan."""
         token = self.staff_confirms()
         marshal_pid = self.svc.resolve(token).player_id
-        out = self.app_checkin(self.gid, self.ident, self.reg, self.ticket_text)
+        app_at = self.now
+        out = self.app_checkin(self.gid, self.ident, self.reg, self.ticket_text, name="Falcão no telemóvel")
         self.assertEqual(out["status"], "pending")
+        self.now += 60
         with self.assertLogs("atalaia", level="INFO") as logs:
             row = self.scan(self.printed(), bearer(token))
+        self.assertEqual((row["status"], row["already"], row["confirmed"], row["discarded"]),
+                         ("pending", False, False, False))
+        self.assertEqual(row["decision"], {"kind": "app_checkin", "name": "Falcão no telemóvel", "at": app_at,
+                                           "roster_name": "Falcão"})
+        self.assertEqual((row["ticket_scanned_by"], row["checked_in_at"]), (None, None))
+        self.assertNotIn("Falcão", "\n".join(logs.output))
+        self.assertIn("staff to decide (app_checkin)", "\n".join(logs.output))
+        # A choice the controller does not know is refused.
+        self.scan_with(bearer(token), expect=400, app_checkin="maybe")
+        self.scan_with(bearer(token), expect=400, override="yes")
+        with self.assertLogs("atalaia", level="INFO") as logs:
+            row = self.scan_with(bearer(token), app_checkin="confirm")
         self.assertEqual((row["status"], row["already"], row["confirmed"], row["checked_in_at"]),
                          ("checked_in", False, True, self.now))
+        self.assertNotIn("decision", row)
         self.assertEqual((row["ticket_scanned_by"], row["ticket_scanned_at"]), (marshal_pid, self.now))
+        self.assertEqual(row["display_name"], "Falcão no telemóvel")
         self.assertFalse(row["apd_override"])
         self.assertIn(f"{self.reg['player_id']} by {marshal_pid}, checked_in (confirmed)",
                       next(m for m in logs.output if "ticket check-in" in m))
+        # The app keeps working, and a choice sent again changes nothing.
+        self.assertEqual(self.svc.resolve(out["token"]).player_id, self.reg["player_id"])
+        again = self.scan_with(bearer(token), app_checkin="discard")
+        self.assertEqual((again["status"], again["already"], again["discarded"]), ("checked_in", True, False))
+
+    def test_staff_discard_an_app_check_in_for_the_ticket_holder(self) -> None:
+        """TKS-3, TKS-4: staff discard the pending app check-in. What the app sent goes (its name, team preference,
+        position sharing), the ticket holder arrives with the roster's name, the app's token stops working and its
+        field identity is dropped, so the ticket holder's own app can check in with the ticket."""
+        token = self.staff_confirms()
+        out = self.app_checkin(self.gid, self.ident, self.reg, self.ticket_text, name="Outro", team_preference="red")
+        r = self.client.put("/api/v1/checkin/me/position-sharing", headers=bearer(out["token"]),
+                            json={"share_position": True})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertIn("decision", self.scan(self.printed(), bearer(token)))
+        with self.assertLogs("atalaia", level="INFO") as logs:
+            row = self.scan_with(bearer(token), app_checkin="discard")
+        self.assertEqual((row["status"], row["discarded"], row["confirmed"], row["already"]),
+                         ("checked_in", True, False, False))
+        self.assertEqual((row["display_name"], row["team_preference"], row["position_share"]), ("Falcão", None, False))
+        self.assertIn("app check-in discarded", "\n".join(logs.output))
+        self.assertNotIn("Outro", "\n".join(logs.output))
+        r = self.client.get("/api/v1/checkin/me", headers=bearer(out["token"]))
+        self.assertEqual(r.status_code, 401, r.text)
+        self.assertIsNone(self.bundle.store.field_player(self.reg["player_id"]))
+        # The ticket holder's own phone checks in with the ticket and is bound from then on.
+        mine = (self.reg["player_id"], new_identity()[1])
+        back = self.app_checkin(self.gid, mine, self.reg, self.ticket_text, expect=200, name="Falcão")
+        self.assertEqual(back["status"], "checked_in")
+        self.assertEqual(self.client.get("/api/v1/checkin/me", headers=bearer(back["token"])).status_code, 200)
+        self.app_checkin(self.gid, self.ident, self.reg, self.ticket_text, expect=409)  # the old phone: no more
+        # A later scan sees a check-in staff already matched: nothing to decide.
         again = self.scan(self.printed(), bearer(token))
-        self.assertEqual((again["status"], again["already"], again["confirmed"]), ("checked_in", True, False))
+        self.assertEqual((again["already"], "decision" in again), (True, False))
 
     def test_a_scan_leaves_the_card_check_to_do(self) -> None:
-        """TKT-7 with TKT-4: under the APD rule's card check a scan confirms the staff step only; the player stays
-        pending until "card seen, matches", and the scan is recorded once."""
+        """TKT-7 with TKT-4: under the APD rule's card check, a confirmed app check-in's scan is the staff step only;
+        the player stays pending until "card seen, matches", and the scan is recorded once."""
         token = self.staff_confirms(accepted=["fpa"], checkin=True)
         marshal_pid = self.svc.resolve(token).player_id
         self.assertEqual(self.app_checkin(self.gid, self.ident, self.reg, self.ticket_text)["status"], "pending")
-        row = self.scan(self.printed(), bearer(token))
+        self.assertEqual(self.scan(self.printed(), bearer(token))["decision"]["kind"], "app_checkin")
+        row = self.scan_with(bearer(token), app_checkin="confirm")
         self.assertEqual((row["status"], row["already"], row["confirmed"], row["checked_in_at"]),
                          ("pending", False, False, None))
         self.assertEqual(row["ticket_scanned_by"], marshal_pid)
@@ -384,6 +440,24 @@ class ArrivalTests(GameDayCase):
         self.assertEqual(r.json()["status"], "checked_in", r.text)
         after = self.scan(self.printed(), bearer(token))
         self.assertEqual((after["status"], after["already"], after["confirmed"]), ("checked_in", True, False))
+
+    def test_a_scan_does_not_override_a_failing_membership(self) -> None:
+        """TKS-5: a scan that would confirm over a stored verdict other than valid answers the verdict and changes
+        nothing; only "override": true (the marshal's explicit call) confirms, with apd_override recorded."""
+        token = self.staff_confirms(accepted=["fpa"], checkin=True)
+        self.app_checkin(self.gid, self.ident, self.reg, self.ticket_text)
+        # A pending check-in staff already matched with the ticket, whose card check stored "expired".
+        self.store_update(card_checked_at=self.now, card_checked_by="gm", apd_verdict="expired",
+                          ticket_scanned_at=self.now, ticket_scanned_by="gm")
+        row = self.scan(self.printed(), bearer(token))
+        self.assertEqual((row["status"], row["already"], row["confirmed"]), ("pending", False, False))
+        self.assertEqual(row["decision"], {"kind": "membership", "verdict": "expired"})
+        self.assertFalse(row["apd_override"])
+        row = self.scan_with(bearer(token), override=True)
+        self.assertEqual((row["status"], row["confirmed"], row["apd_override"]), ("checked_in", True, True))
+
+    def store_update(self, **fields: Any) -> None:
+        self.bundle.store.update_checkin(self.gid, self.reg["player_id"], **fields)
 
     def test_a_scan_of_a_confirmed_player_changes_nothing(self) -> None:
         """TKT-7: a player already confirmed (here by hand) is "already"; the scan records nothing."""

@@ -555,6 +555,28 @@ const Map<String, String> enStrings = {
   'ticket.session': 'Your check-in has run out: check in again.',
   'ticket.refused': 'The field controller refused the ticket: {error}',
   'ticket.recent': 'Taken just now',
+  'ticket.app_checkin_title': 'An app check-in waits for this ticket',
+  'ticket.app_checkin_body':
+      'Someone checked in with the app as "{app_name}" at {time}, and waits '
+      'for a staff confirmation. The ticket is for "{roster_name}" on the '
+      "game's list. Confirm only if the person in front of you is the one who "
+      'checked in with that phone.',
+  'ticket.app_checkin_confirm': 'It is them: confirm the app check-in',
+  'ticket.app_checkin_discard':
+      'Not them: discard the app check-in and check in the ticket holder',
+  'ticket.membership_title': 'The membership does not pass',
+  'ticket.membership_body':
+      '{verdict}. Check them in anyway only if the field lets you: the '
+      'override is recorded.',
+  'ticket.membership_override': 'Check in anyway (override)',
+  'ticket.decision_cancelled': 'Nothing changed.',
+  'ticket.unknown_name': '(no name)',
+  'ticket.discarded':
+      'The app check-in was discarded: {name}, the ticket holder, is checked '
+      'in. Their own app can check in with the ticket.',
+  'ticket.discarded_pending':
+      'The app check-in was discarded: {name}, the ticket holder, waits for '
+      'the card check: see Replicas to chrono.',
 
   // Tags
   'tags.title': "Players' tags",

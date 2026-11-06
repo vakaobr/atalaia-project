@@ -120,35 +120,111 @@ void main() {
     expect(result(tester).text, s.t('ticket.already', {'name': 'Falcão'}));
   });
 
-  testWidgets('a pending self check-in is confirmed by the scan (TKT-7)', (
-    tester,
-  ) async {
+  /// A pending check-in the app made as [appName] (TKS-1).
+  void appCheckin(String pid, String appName, String rosterName) {
+    field.rows[pid]!
+      ..['status'] = 'pending'
+      ..['display_name'] = appName
+      ..['roster_name'] = rosterName
+      ..['app_checkin_at'] =
+          DateTime(2026, 11, 6, 9, 41).millisecondsSinceEpoch / 1000;
+  }
+
+  testWidgets('a pending app check-in is shown to the marshal, who confirms '
+      'it (TKT-7, TKS-1, TKS-2)', (tester) async {
     final text = field.registerExpected('p-falcaofalcao', 'Falcão', _reg1);
-    field.rows['p-falcaofalcao']!['status'] = 'pending'; // checked in alone
+    appCheckin('p-falcaofalcao', 'Falcão do telemóvel', 'Falcão');
     final (_, s) = await open(tester, marshal);
     await type(tester, text);
+    // Nothing confirmed yet: the names and the time are shown.
+    expect(field.rows['p-falcaofalcao']!['status'], 'pending');
+    expect(find.byKey(const Key('ticket-decision-app')), findsOneWidget);
+    expect(
+      find.text(
+        s.t('ticket.app_checkin_body', {
+          'app_name': 'Falcão do telemóvel',
+          'time': '09:41',
+          'roster_name': 'Falcão',
+        }),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('ticket-result')), findsNothing);
+    await tester.tap(find.byKey(const Key('ticket-confirm-app')));
+    await tester.pumpAndSettle();
+    expect(field.ticketBodies.last['app_checkin'], 'confirm');
     expect(field.rows['p-falcaofalcao']!['status'], 'checked_in');
     expect(
       field.rows['p-falcaofalcao']!['ticket_scanned_by'],
       'p-marshalmarsh',
     );
-    expect(result(tester).text, s.t('ticket.confirmed', {'name': 'Falcão'}));
-    expect(result(tester).kind, NoticeKind.ok);
     expect(
-      s.t('ticket.confirmed', {'name': 'Falcão'}),
-      isNot(s.t('ticket.done', {'name': 'Falcão'})),
+      result(tester).text,
+      s.t('ticket.confirmed', {'name': 'Falcão do telemóvel'}),
     );
+    expect(result(tester).kind, NoticeKind.ok);
     await type(tester, text);
-    expect(result(tester).text, s.t('ticket.already', {'name': 'Falcão'}));
+    expect(
+      result(tester).text,
+      s.t('ticket.already', {'name': 'Falcão do telemóvel'}),
+    );
   });
 
-  testWidgets('a pending self check-in under the APD rule waits for the '
-      'card check (TKT-7)', (tester) async {
-    field.cardRule = true;
-    final text = field.registerExpected('p-corvocorvoco', 'Corvo', _reg1);
-    field.rows['p-corvocorvoco']!['status'] = 'pending';
+  testWidgets('the marshal discards an app check-in for the ticket holder, '
+      'or cancels (TKS-3)', (tester) async {
+    final text = field.registerExpected('p-falcaofalcao', 'Falcão', _reg1);
+    appCheckin('p-falcaofalcao', 'Outro', 'Falcão');
     final (_, s) = await open(tester, marshal);
     await type(tester, text);
+    await tester.tap(find.byKey(const Key('ticket-decision-cancel')));
+    await tester.pumpAndSettle();
+    expect(field.rows['p-falcaofalcao']!['status'], 'pending');
+    expect(result(tester).text, s.t('ticket.decision_cancelled'));
+    await type(tester, text);
+    await tester.tap(find.byKey(const Key('ticket-discard-app')));
+    await tester.pumpAndSettle();
+    expect(field.ticketBodies.last['app_checkin'], 'discard');
+    expect(field.rows['p-falcaofalcao']!['status'], 'checked_in');
+    expect(result(tester).text, s.t('ticket.discarded', {'name': 'Falcão'}));
+  });
+
+  testWidgets('a membership that does not pass needs the override (TKS-5)', (
+    tester,
+  ) async {
+    field.cardRule = true;
+    final text = field.registerExpected('p-corvocorvoco', 'Corvo', _reg1);
+    field.rows['p-corvocorvoco']!
+      ..['status'] = 'pending'
+      ..['ticket_scanned_by'] = 'gm'
+      ..['card_checked_by'] = 'gm'
+      ..['apd_verdict'] = 'expired';
+    final (_, s) = await open(tester, marshal);
+    await type(tester, text);
+    expect(field.rows['p-corvocorvoco']!['status'], 'pending');
+    expect(find.byKey(const Key('ticket-decision-membership')), findsOneWidget);
+    expect(
+      find.text(
+        s.t('ticket.membership_body', {'verdict': s.t('apd.status.expired')}),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('ticket-override')));
+    await tester.pumpAndSettle();
+    expect(field.ticketBodies.last['override'], true);
+    expect(field.rows['p-corvocorvoco']!['status'], 'checked_in');
+    expect(field.rows['p-corvocorvoco']!['apd_override'], true);
+    expect(result(tester).text, s.t('ticket.confirmed', {'name': 'Corvo'}));
+  });
+
+  testWidgets('a pending app check-in under the APD rule, once confirmed, '
+      'waits for the card check (TKT-7)', (tester) async {
+    field.cardRule = true;
+    final text = field.registerExpected('p-corvocorvoco', 'Corvo', _reg1);
+    appCheckin('p-corvocorvoco', 'Corvo', 'Corvo');
+    final (_, s) = await open(tester, marshal);
+    await type(tester, text);
+    await tester.tap(find.byKey(const Key('ticket-confirm-app')));
+    await tester.pumpAndSettle();
     expect(field.rows['p-corvocorvoco']!['status'], 'pending');
     expect(result(tester).text, s.t('ticket.pending', {'name': 'Corvo'}));
     await type(tester, text);
@@ -250,6 +326,26 @@ void main() {
       TicketOutcome.fromRow({'player_id': 'p-x', 'status': 'checked_in'}).args,
       {'name': 'p-x'},
     );
+    expect(
+      TicketOutcome.fromRow({
+        'display_name': 'F',
+        'status': 'pending',
+        'discarded': true,
+      }).key,
+      'ticket.discarded_pending',
+    );
+    final d = TicketDecision.fromRow(
+      {
+        'decision': {'kind': 'membership', 'verdict': 'expired'},
+      },
+      't',
+      appCheckin: 'confirm',
+    )!;
+    expect(
+      (d.kind, d.verdict, d.appCheckin, d.ticket),
+      ('membership', 'expired', 'confirm', 't'),
+    );
+    expect(TicketDecision.fromRow({'status': 'checked_in'}, 't'), isNull);
     expect(normaliseTicketText(' AB\nCD '), 'atalaia:ticket:ABCD');
     expect(normaliseTicketText('atalaia:ticket:AB CD'), 'atalaia:ticket:ABCD');
     expect(normaliseTicketText('   '), '');

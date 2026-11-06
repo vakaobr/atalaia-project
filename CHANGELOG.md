@@ -14,6 +14,12 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+- **Check-in tickets (TKS-1 to TKS-6):** a staff ticket scan no longer confirms a pending check-in made in the
+  player's app on its own. The marshal app and the GM console show the app's name and check-in time next to the
+  ticket's name on the list, and the marshal confirms it or discards it for the ticket holder (the discarded app's
+  tokens stop working). A scan no longer sets `apd_override` over a failing membership verdict: the marshal
+  decides with an explicit override. Both controllers, Pi schema 22, console service worker v26, four languages.
+
 ## [0.9.0](https://github.com/vakaobr/atalaia-project/compare/v0.8.0...v0.9.0) (2026-11-06)
 
 ### Features

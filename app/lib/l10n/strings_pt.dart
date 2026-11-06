@@ -569,6 +569,28 @@ const Map<String, String> ptStrings = {
   'ticket.session': 'O teu check-in expirou: faz o check-in outra vez.',
   'ticket.refused': 'O controlador do campo recusou o bilhete: {error}',
   'ticket.recent': 'Lidos agora',
+  'ticket.app_checkin_title': 'Há um check-in na app à espera deste bilhete',
+  'ticket.app_checkin_body':
+      'Alguém fez o check-in na app como "{app_name}" às {time} e espera pela '
+      'confirmação da organização. O bilhete é de "{roster_name}", na lista do '
+      'jogo. Confirma só se a pessoa à tua frente for quem fez o check-in '
+      'nesse telemóvel.',
+  'ticket.app_checkin_confirm': 'É a mesma pessoa: confirmar o check-in da app',
+  'ticket.app_checkin_discard':
+      'Não é: anular o check-in da app e fazer o check-in a quem tem o bilhete',
+  'ticket.membership_title': 'A filiação não passa',
+  'ticket.membership_body':
+      '{verdict}. Faz o check-in mesmo assim só se o campo o permitir: a '
+      'exceção fica registada.',
+  'ticket.membership_override': 'Fazer o check-in mesmo assim (exceção)',
+  'ticket.decision_cancelled': 'Nada mudou.',
+  'ticket.unknown_name': '(sem nome)',
+  'ticket.discarded':
+      'O check-in da app foi anulado: {name}, quem tem o bilhete, tem o '
+      'check-in feito. A app dessa pessoa pode fazer o check-in com o bilhete.',
+  'ticket.discarded_pending':
+      'O check-in da app foi anulado: {name}, quem tem o bilhete, espera pela '
+      'verificação do cartão: vê Réplicas por cronografar.',
 
   // Etiquetas
   'tags.title': 'Etiquetas de quem joga',

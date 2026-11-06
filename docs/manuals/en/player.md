@@ -289,7 +289,7 @@ On the login screen, **Read the privacy notice** shows the field's notice in the
 4. Pick the game, fill in the form and tap **Register**.
 5. The app keeps your **check-in ticket**. At the field, pick your registration under **Online registration** at **Check in at the field**, or show the ticket's QR code to a marshal with the app or at the check-in desk.
 
-Do not share the ticket. Whoever has it can check in in your place. You can change or cancel a registration while it is open: **Change your registration** or **Cancel the registration**. The field erases your registration data 30 days after the game.
+Do not share the ticket, not even a photo of it. Like an NFC tag, it works for whoever holds a copy: they can check in in your place. If someone checked in with your ticket before you arrive, a marshal sees that app check-in when they scan your ticket and can discard it and check you in; your app can then check in with the ticket. If you think a copy got out, tap **Ask for a new ticket** on the registration page: the old one stops working. You can change or cancel a registration while it is open: **Change your registration** or **Cancel the registration**. The field erases your registration data 30 days after the game.
 
 ### Register in the browser, without the app
 
