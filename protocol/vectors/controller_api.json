@@ -1326,6 +1326,22 @@
       ]
     },
     {
+      "name": "check-in: a marshal's own token takes a printed ticket; a player's token and the read token cannot (TKT-1; without a roster every ticket is 404)",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Tickets", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"], "assignments": {"4": "zone"}}}, "status": 201, "save": {"gid": "id"}},
+        {"request": {"method": "POST", "path": "/api/v1/checkin", "token": "none", "body": {"game_id": "${gid}", "player_id": "p-mmmmmmmmmmmm", "player_secret": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc", "display_name": "Marta", "notice_version": 2}}, "status": 201, "save": {"m0": "token"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/checkins/ticket", "bearer": "${m0}", "body": {"ticket": "atalaia:ticket:AaMBeCQ3YTAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwYWECbnAtZmZmZmZmZmZmZmZmA1ggCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk"}}, "status": 403, "json": {"detail": "$any"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/checkins/ticket", "token": "read", "body": {"ticket": "atalaia:ticket:AaMBeCQ3YTAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwYWECbnAtZmZmZmZmZmZmZmZmA1ggCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk"}}, "status": 403},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/checkins/ticket", "token": "none", "body": {"ticket": "atalaia:ticket:AaMBeCQ3YTAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwYWECbnAtZmZmZmZmZmZmZmZmA1ggCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk"}}, "status": 401},
+        {"request": {"method": "PATCH", "path": "/api/v1/games/${gid}/checkins/p-mmmmmmmmmmmm", "token": "gm", "body": {"role": "marshal"}}, "status": 200, "json": {"role": "marshal"}},
+        {"request": {"method": "POST", "path": "/api/v1/checkin/token", "bearer": "${m0}"}, "status": 200, "json": {"role": "marshal"}, "save": {"m": "token"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/checkins/ticket", "bearer": "${m}", "body": {"ticket": "atalaia:checkin:AA"}}, "status": 400},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/checkins/ticket", "bearer": "${m}", "body": {"ticket": "atalaia:ticket:AaMBeCQ3YTAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwYWECbnAtZmZmZmZmZmZmZmZmA1ggCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk", "extra": 1}}, "status": 400},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/checkins/ticket", "bearer": "${m}", "body": {"ticket": "atalaia:ticket:AaMBeCQ3YTAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwYWECbnAtZmZmZmZmZmZmZmZmA1ggCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk"}}, "status": 404, "json": {"detail": "$any"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/checkins/ticket", "token": "gm", "body": {"ticket": "atalaia:ticket:AaMBeCQ3YTAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwYWECbnAtZmZmZmZmZmZmZmZmA1ggCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk"}}, "status": 404}
+      ]
+    },
+    {
       "name": "check-in: position sharing is its own unticked choice, taken at check-in, changeable and recorded (LEG-12 to LEG-16)",
       "steps": [
         {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sharing", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"], "assignments": {"4": "zone"}}}, "status": 201, "save": {"gid": "id"}},

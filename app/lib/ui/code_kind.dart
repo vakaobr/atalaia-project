@@ -8,6 +8,7 @@ library;
 
 import '../player/field_feed.dart';
 import '../protocol/checkin_poster.dart' show isPosterText;
+import '../protocol/checkin_ticket.dart' show isTicketText;
 import '../protocol/join_payload.dart' show joinTextPrefix;
 import '../site/site_link.dart';
 
@@ -23,7 +24,11 @@ enum CodeKind {
   siteLink('code.is_site_link'),
 
   /// The scoreboard's address with its access code: Player > Follow a game.
-  scoreboard('code.is_scoreboard');
+  scoreboard('code.is_scoreboard'),
+
+  /// A registered player's check-in ticket (`atalaia:ticket:…`): Marshal >
+  /// Check in a ticket, or the GM console's "Printed ticket" (TKT-1).
+  ticket('code.is_ticket');
 
   const CodeKind(this.messageKey);
 
@@ -35,6 +40,7 @@ enum CodeKind {
 CodeKind? classifyCode(String text) {
   if (isPosterText(text)) return CodeKind.poster;
   if (text.trim().startsWith(joinTextPrefix)) return CodeKind.joinCard;
+  if (isTicketText(text)) return CodeKind.ticket;
   if (SiteGameLink.parse(text) != null) return CodeKind.siteLink;
   if (FieldLink.parse(text) != null) return CodeKind.scoreboard;
   return null;

@@ -303,6 +303,10 @@ const Map<String, String> deStrings = {
   'code.is_scoreboard':
       'Das ist der Link zur Anzeigetafel eines Spiels. Nutze ihn unter '
       'Spielen > Ein Spiel ohne Check-in verfolgen.',
+  'code.is_ticket':
+      'Das ist das Check-in-Ticket einer Anmeldung. Zeig es Marshals '
+      '(Marshal > Ticket einchecken) oder am Check-in-Tisch; um in der App '
+      'einzuchecken, scanne das Plakat des Felds.',
   'player.bad_link': 'Adresse oder Zugangscode fehlt.',
   'player.link_unreachable':
       'Der Controller antwortet nicht. Bist du im WLAN des Felds?',
@@ -529,6 +533,52 @@ const Map<String, String> deStrings = {
   'replica.type_sniper': 'Sniper',
   'replica.type_pistol': 'Pistole',
   'replica.type_shotgun': 'Shotgun',
+
+  // Das gedruckte Ticket einer Anmeldung, von Marshals angenommen (TKT-1)
+  'ticket.title': 'Ticket einchecken',
+  'ticket.hint': 'Scanne oder tippe das Check-in-Ticket einer Anmeldung.',
+  'ticket.intro':
+      'Wer sich online angemeldet hat, bringt ein Check-in-Ticket mit: einen '
+      'QR-Code auf Papier oder auf einem Bildschirm, mit dem Text darunter. '
+      'Scanne ihn oder tippe den Text, und der Feldcontroller checkt die '
+      'Person ein. Sei im WLAN des Felds.',
+  'ticket.for_game': 'Spiel: {game}',
+  'ticket.scan': 'Ticket scannen',
+  'ticket.scan_hint': 'Richte die Kamera auf den QR-Code des Tickets',
+  'ticket.text': 'Der Text des Tickets',
+  'ticket.text_hint': 'atalaia:ticket:… wie unter dem QR-Code',
+  'ticket.submit': 'Einchecken',
+  'ticket.sending': 'Frage den Feldcontroller…',
+  'ticket.no_camera':
+      'Dieses Handy kann keine QR-Codes scannen: Tippe den Text des Tickets.',
+  'ticket.done': '{name} ist eingecheckt.',
+  'ticket.pending':
+      '{name} steht auf der Liste und wartet auf die Ausweisprüfung: Sieh dir '
+      'den Verbandsausweis an und tippe "Ausweis gesehen, stimmt" in Repliken '
+      'zum Chronen.',
+  'ticket.already': '{name} war schon eingecheckt: Nichts geändert.',
+  'ticket.already_pending':
+      '{name} ist schon da und wartet auf die Ausweisprüfung oder eine '
+      'Bestätigung: Siehe Repliken zum Chronen.',
+  'ticket.not_newest':
+      'Das ist nicht das neueste Ticket dieser Anmeldung: Es wurde ein neues '
+      'gemacht, und dieses gilt nicht mehr. Frag nach dem neuen Ticket oder '
+      'nach dem Namen am Check-in-Tisch.',
+  'ticket.not_listed':
+      'Die Anmeldung dieses Tickets steht nicht auf der Liste dieses Spiels '
+      '(ein anderes Spiel, oder die Liste der Website ist noch nicht da). Frag '
+      'die Orga.',
+  'ticket.bad': 'Das ist kein Check-in-Ticket, oder es wurde falsch getippt.',
+  'ticket.ended':
+      'Das Spiel ist beendet: Tickets werden nicht mehr angenommen.',
+  'ticket.too_many':
+      'Zu viele Tickets in einer Minute: Warte kurz und versuch es nochmal.',
+  'ticket.offline':
+      'Der Feldcontroller ist nicht erreichbar: Verbinde dich mit dem WLAN '
+      'des Felds und versuch es nochmal.',
+  'ticket.session': 'Dein Check-in ist abgelaufen: Check erneut ein.',
+  'ticket.refused': 'Der Feldcontroller hat das Ticket abgelehnt: {error}',
+  'ticket.recent': 'Gerade angenommen',
 
   // Tags
   'tags.title': 'Tags der Spielenden',

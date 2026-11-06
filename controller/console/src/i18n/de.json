@@ -1011,6 +1011,8 @@
     "ticket_label": "Ticket-Code",
     "ticket_submit": "Einchecken",
     "ticket_done": "{name} ist eingecheckt.",
+    "ticket_pending": "{name} steht auf der Liste und wartet auf die Ausweisprüfung (\"Ausweis gesehen, stimmt\").",
+    "ticket_already": "{name} war schon da: Nichts geändert.",
     "schedule_title": "Aus dem Spielplan",
     "schedule_intro": "Die veröffentlichten Spiele der nächsten Tage vom Site-Server. Ein daraus erstelltes Spiel übernimmt Titel, Modus und Teams; die angemeldeten Spielenden erscheinen dann hier als erwartet.",
     "schedule_create": "Spiel erstellen",

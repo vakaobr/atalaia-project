@@ -284,6 +284,10 @@ const Map<String, String> enStrings = {
   'code.is_scoreboard':
       "This is a game scoreboard's link. Use it under Player > Follow a game "
       'without checking in.',
+  'code.is_ticket':
+      "This is a registered player's check-in ticket. Show it to a marshal "
+      '(Marshal > Check in a ticket) or at the check-in desk; to check in '
+      "with the app, scan the field's poster.",
   'player.bad_link': 'The address or the access code is missing.',
   'player.link_unreachable':
       'The controller does not answer. Are you on the field\'s Wi-Fi?',
@@ -505,6 +509,49 @@ const Map<String, String> enStrings = {
   'replica.type_sniper': 'Sniper',
   'replica.type_pistol': 'Pistol',
   'replica.type_shotgun': 'Shotgun',
+
+  // A registered player's printed ticket, taken by a marshal (TKT-1)
+  'ticket.title': 'Check in a ticket',
+  'ticket.hint': "Scan or type a registered player's check-in ticket.",
+  'ticket.intro':
+      'Players who registered online carry a check-in ticket: a QR code, on '
+      'paper or on a screen, with its text under it. Scan it or type the '
+      "text, and the field controller checks the player in. Be on the field's "
+      'Wi-Fi.',
+  'ticket.for_game': 'Game: {game}',
+  'ticket.scan': 'Scan the ticket',
+  'ticket.scan_hint': "Point the camera at the ticket's QR code",
+  'ticket.text': "The ticket's text",
+  'ticket.text_hint': 'atalaia:ticket:… as written under the QR code',
+  'ticket.submit': 'Check in',
+  'ticket.sending': 'Asking the field controller…',
+  'ticket.no_camera':
+      "This phone cannot scan QR codes: type the ticket's text instead.",
+  'ticket.done': '{name} is checked in.',
+  'ticket.pending':
+      '{name} is on the list and waits for the card check: see their '
+      'federation card and tick "Card seen, matches" in Replicas to chrono.',
+  'ticket.already': '{name} was already checked in: nothing changed.',
+  'ticket.already_pending':
+      '{name} has already arrived and waits for the card check or a '
+      'confirmation: see Replicas to chrono.',
+  'ticket.not_newest':
+      'This is not the newest ticket for this registration: a newer one was '
+      'made and this one no longer works. Ask the player for the new ticket, '
+      'or for their name at the check-in desk.',
+  'ticket.not_listed':
+      "This ticket's registration is not on this game's list (another game, "
+      'or the list from the site has not arrived yet). Ask the game master.',
+  'ticket.bad': 'This is not a check-in ticket, or it was typed wrong.',
+  'ticket.ended': 'The game has ended: tickets are no longer taken.',
+  'ticket.too_many':
+      'Too many tickets in a minute: wait a moment and try again.',
+  'ticket.offline':
+      "The field controller cannot be reached: join the field's Wi-Fi and try "
+      'again.',
+  'ticket.session': 'Your check-in has run out: check in again.',
+  'ticket.refused': 'The field controller refused the ticket: {error}',
+  'ticket.recent': 'Taken just now',
 
   // Tags
   'tags.title': "Players' tags",

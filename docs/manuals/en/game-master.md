@@ -119,7 +119,7 @@ On a phone controller, tap **Show the codes** under **Access codes**.
 2. Type a label, for example *Referee Ana, Saturday*.
 3. Choose what the code may do:
    - **Read only**: watch the game;
-   - **Read and manage marshals**: watch, plus add, change and remove marshals. Nothing else: this code cannot confirm check-ins or take tickets;
+   - **Read and manage marshals**: watch, plus add, change and remove marshals. Nothing else: this code cannot confirm check-ins or take tickets (a marshal takes tickets with their own marshal check-in, in the app);
    - **Full GM**: everything the GM code does except making codes. Give this one to the check-in desk, limited to one game.
 4. Choose how long it lasts (8 hours is a game day, 7 days the most) and, if you like, one game only.
 5. Tap **Make access token**. The code is shown **once**, with a QR code. The person scans it with the phone's camera and the console opens already signed in (a read-only code opens the scoreboard). Copy it now: it cannot be shown again.
@@ -344,7 +344,7 @@ A box can answer **refused: in another game** ([A box is stuck in an ended game]
 
 ### The check-in desk
 
-Check-in is open from the moment a game is created. **Close check-in** stops it and **Open check-in** reopens it. The desk works in the console's **Check-in** tab, with the GM code or a **Full GM** [day code](#access-codes-and-day-codes). Marshals can also check players in by hand and do the card check in their app ([marshal manual](marshal.md)).
+Check-in is open from the moment a game is created. **Close check-in** stops it and **Open check-in** reopens it. The desk works in the console's **Check-in** tab, with the GM code or a **Full GM** [day code](#access-codes-and-day-codes). Marshals can also check players in by hand, do the card check and take printed tickets in their app, with their own marshal check-in: no GM code or day code needed ([marshal manual](marshal.md#printed-tickets-and-registered-players)).
 
 **Players who checked in with the app**
 
@@ -355,7 +355,7 @@ Check-in is open from the moment a game is created. **Close check-in** stops it 
 **Registered players and printed tickets** (games made **From the schedule** of a site server, or from an imported list):
 
 1. Registered players show as **expected** until they arrive.
-2. A player with the app checks in as usual. A player with a **printed ticket**: in the **Printed ticket** card, scan or paste its code (`atalaia:ticket:…`) and tap **Check in**. It says ***name* checked in.** Scanning it twice changes nothing.
+2. A player with the app checks in as usual. A player with a **printed ticket**: in the **Printed ticket** card, scan or paste its code (`atalaia:ticket:…`) and tap **Check in**, or let a marshal take it with **Marshal › Check in a ticket** in the app. It says ***name* checked in.**, or that the player waits for the card check when the APD rule is on. Scanning it twice changes nothing, and says so. The check-in records who took the ticket and when (**ticket_scanned_by**, **ticket_scanned_at** in the CSV: a marshal's player id, or *gm*); each phone (and the GM code) can take up to 60 tickets a minute.
 3. A ticket is refused if it is not on this game's roster, or if the player has asked for a newer ticket since (only the newest works).
 4. A registered player with no ticket and no app: tap **Arrived** on their row.
 

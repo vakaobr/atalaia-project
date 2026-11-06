@@ -4777,7 +4777,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v23').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v24').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js", "/console/labels.js", "/console/qr-svg.js"):
@@ -5134,6 +5134,11 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("ticket-input").fill(ticket)
         page.get_by_test_id("ticket-submit").click()
         expect(page.get_by_test_id("checkin-row-p-mochomochomo")).to_contain_text("com check-in")
+        expect(page.get_by_test_id("toast")).to_contain_text("Check-in feito: Mocho")
+        # The same ticket again changes nothing, and says so (TKT-5).
+        page.get_by_test_id("ticket-input").fill(ticket)
+        page.get_by_test_id("ticket-submit").click()
+        expect(page.get_by_test_id("toast")).to_contain_text("Mocho já tinha chegado")
         self.check_in(gid, "Zé")
         expect(page.get_by_test_id("checkin-registered")).to_contain_text("2 já chegaram · sem inscrição: 1")
 

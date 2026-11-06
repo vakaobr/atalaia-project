@@ -13,7 +13,7 @@ Uma página para o dia do jogo. Em inglês: [Quick start](../en/quick-start.md).
 
 1. Instala a app Atalaia (Android 8.0 ou mais recente, ou iPhone). Toca na **roda dentada** e em **Língua** › a que preferires.
 2. Liga-te ao Wi-Fi do campo. Se o telemóvel disser «sem internet», fica ligado.
-3. **Participante › Check-in no campo › Ler o cartaz.** Lê o aviso, escreve o teu **Nome ou alcunha** e toca em **Fazer o check-in**. Inscreveste-te online? Escolhe a tua inscrição em **Inscrição online**, ou mostra o bilhete impresso na receção.
+3. **Participante › Check-in no campo › Ler o cartaz.** Lê o aviso, escreve o teu **Nome ou alcunha** e toca em **Fazer o check-in**. Inscreveste-te online? Escolhe a tua inscrição em **Inscrição online**, ou mostra o bilhete impresso a um marshal ou na receção.
 4. **Escolhe as réplicas** que vais usar. Leva-as a um marshal para a *cronografagem*.
 5. **Segue o jogo.** Captura as caixas na caixa: **mantém premido o botão da tua equipa** até a barra encher.
 6. Opcional: **Partilhar a minha posição**. Deixa **Vibrar nos eventos do jogo** ligado.
@@ -34,7 +34,7 @@ Firmware novo para as caixas: [Atualizar as caixas](field-box.md#update-the-boxe
 
 1. Faz o check-in como participante. Pede à organização que te acrescente em **Check-in › Marshals**.
 2. **Marshal** mostra **O teu identificador de marshal é M-01**. Fica no Wi-Fi do campo pelo menos de 2 em 2 horas.
-3. Na receção: compara os cartões de filiação e toca em **Cartão visto, confere**; faz o check-in de quem não tem a app com **Check-in à mão**. Manda quem traz um bilhete impresso à consola da organização ([a receção](marshal.md#2-a-receção)).
+3. Na receção: compara os cartões de filiação e toca em **Cartão visto, confere**; faz o check-in de quem não tem a app com **Check-in à mão**. Aceita o bilhete impresso de quem se inscreveu em **Marshal › Check-in com bilhete** ([a receção](marshal.md#2-a-receção)).
 4. **Réplicas por cronografar** › toca numa réplica › **Entrada** › escolhe o **Peso da BB**, escreve a velocidade e **Registar o disparo** em cada disparo.
 5. **Enviar ao controlador**. Durante o jogo, usa **Verificação**.
 

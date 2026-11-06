@@ -804,3 +804,8 @@ Decisions APX-1 to APX-3 (`app/`; not tried on a real phone): a marshal's phone 
 - **The Traditional Chinese age box in the sign-up reads 年滿 16 歲 (LEG-34)**, with the test font's subsets made again.
 - **The app's live stream** sends the token as `Authorization: Bearer`, not in the address (SR-124).
 - **Not done:** none of this has been tried on a real phone or at a field.
+
+## Marshals take printed check-in tickets (2026-11-06, software only)
+
+- **Marshal > Check in a ticket (TKT-1 to TKT-6).** A marshal scans a registered player's printed ticket with the camera, or types its text, and the field controller checks the player in with the marshal's own token, the route the GM console's **Printed ticket** card uses (staff only; the `marshals` day code stays refused). The answer is said in words: checked in, waiting for the card check under the APD rule, already there, not the newest ticket, not on this game's list. The check-in records who took the ticket and when (`ticket_scanned_by`, `ticket_scanned_at`, in the list and the CSV, Pi schema 21), the controller logs it without the name, and each staff id can take 60 tickets a minute. Both controllers, a shared contract case, the console's toast (pending and already), four languages.
+- **Not done:** not tried on a real phone or at a field.
