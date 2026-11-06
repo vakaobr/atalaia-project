@@ -14,6 +14,44 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/vakaobr/atalaia-project/compare/v0.8.0...v0.9.0) (2026-11-06)
+
+### Features
+
+* **app:** marshals take printed check-in tickets in the app (TKT-1 to TKT-6) ([#119](https://github.com/vakaobr/atalaia-project/issues/119)) ([86d35d5](https://github.com/vakaobr/atalaia-project/commit/86d35d5f48f6846f0a9deb1e59b2a59e0d977a4b))
+* **app:** the Android controller frees boxes stuck in an ended game (STUCK-60 to STUCK-67) ([#96](https://github.com/vakaobr/atalaia-project/issues/96)) ([040e567](https://github.com/vakaobr/atalaia-project/commit/040e567a69c630e4476f4a79bff3493a0287a29a))
+* **console:** boxes stuck in an ended game listed, with a Release button ([#93](https://github.com/vakaobr/atalaia-project/issues/93)) ([f67b705](https://github.com/vakaobr/atalaia-project/commit/f67b705cd200c1d4fe3e4212bf425c831cc09182))
+* **controller:** a staff ticket scan confirms a pending self check-in (TKT-7) ([#122](https://github.com/vakaobr/atalaia-project/issues/122)) ([43261ef](https://github.com/vakaobr/atalaia-project/commit/43261efd92d8a9fc02ce05b0d8e3ea6dc6a66aaf))
+* **firmware:** a box stuck in a game leaves it from the admin menu or the USB console's leave command, with the admin PIN ([6538148](https://github.com/vakaobr/atalaia-project/commit/6538148c1f7c7646b114b130e80b16f6662754dc))
+* **firmware:** the USB console's Wi-Fi command takes a network name and password with spaces, in double quotes (WIFI-1 to WIFI-9) ([502a1c4](https://github.com/vakaobr/atalaia-project/commit/502a1c46bcd59f0103379ce155ce9531cdb19a69))
+* **modem:** the modem reports packets from other games, and the controller frees a box stuck in an ended game ([#92](https://github.com/vakaobr/atalaia-project/issues/92)) ([5fd995d](https://github.com/vakaobr/atalaia-project/commit/5fd995de9f25e1ae7f1e4c6f0419358f416703db))
+* **protocol:** RELEASE frees every box not in the live game (RFC 0001 Amendment 28) ([cbf0e9f](https://github.com/vakaobr/atalaia-project/commit/cbf0e9f5141e279b6ad03a3e2f02240c370aebcd))
+* **release:** attach the phone app's release-signed APK to each GitHub release ([#120](https://github.com/vakaobr/atalaia-project/issues/120)) ([fefe366](https://github.com/vakaobr/atalaia-project/commit/fefe3668db5234c7c098e6966b8fbdbead129437))
+* **site:** the project page in Polish, an AI draft awaiting a native review (SITE-PL-1..9) ([#108](https://github.com/vakaobr/atalaia-project/issues/108)) ([633867e](https://github.com/vakaobr/atalaia-project/commit/633867e1da6c55b84c0943989943c941da1b82b5))
+* the maintainer's stuck-box decisions (STUCK-62/64 changed, STUCK-68 to STUCK-70, TIME on the corrected clock) ([#99](https://github.com/vakaobr/atalaia-project/issues/99)) ([05e999c](https://github.com/vakaobr/atalaia-project/commit/05e999c14c4ee3e74afac7f47018a649c0961beb))
+
+
+### Bug Fixes
+
+* **controller:** a freed box leaves the stuck list within two minutes (STUCK-71 to STUCK-73) ([#118](https://github.com/vakaobr/atalaia-project/issues/118)) ([4aa1088](https://github.com/vakaobr/atalaia-project/commit/4aa1088125fbf1c1be2ff0edf831ebebef4e3758))
+* **controller:** a standby on auto no longer takes over a working manual main controller (FAIL-1 to FAIL-6) ([#114](https://github.com/vakaobr/atalaia-project/issues/114)) ([9a014f8](https://github.com/vakaobr/atalaia-project/commit/9a014f8a49a1879efaa457d32fe0b082a2ebea46))
+* **firmware:** the setup portal refuses a Wi-Fi name over 32 bytes (WIFI-10) ([#107](https://github.com/vakaobr/atalaia-project/issues/107)) ([1916576](https://github.com/vakaobr/atalaia-project/commit/191657665b273249c72099a6920d41b3c067d834))
+* **firmware:** the setup portal takes the console's Wi-Fi password rule (WIFI-7) ([#100](https://github.com/vakaobr/atalaia-project/issues/100)) ([1654e93](https://github.com/vakaobr/atalaia-project/commit/1654e93e86c9357c1cd0f317016f26eeced2b879))
+* **preview:** the live demo's image copies firmware/module-core, which the host box now builds ([#89](https://github.com/vakaobr/atalaia-project/issues/89)) ([ba42681](https://github.com/vakaobr/atalaia-project/commit/ba42681523cb3894fbeb4911d2cdae4b0b7d3975))
+* **server:** pass every documented setting to the Compose deployment ([#123](https://github.com/vakaobr/atalaia-project/issues/123)) ([825c066](https://github.com/vakaobr/atalaia-project/commit/825c0663a2216eb5ffb5528a08484ee11133c05c))
+
+
+### Documentation
+
+* bring the front door up to date (README, manuals index, quick start, player, marshal, project page) ([#109](https://github.com/vakaobr/atalaia-project/issues/109)) ([70815e6](https://github.com/vakaobr/atalaia-project/commit/70815e60f0542c1618d777555a89561b4abb1c18))
+* **controller:** controller setup, phone controller and modem guides reworked ([#110](https://github.com/vakaobr/atalaia-project/issues/110)) ([57025f5](https://github.com/vakaobr/atalaia-project/commit/57025f569c1be33604e6b9c53e4155e3a549d9b1))
+* drop the stale field-logo claims left after LOGO-5 ([#113](https://github.com/vakaobr/atalaia-project/issues/113)) ([04a470d](https://github.com/vakaobr/atalaia-project/commit/04a470dfd306a9c6b23874cd814cb940a59724ee))
+* the Field Box, firmware and phone prop manuals by task, checked against the code ([#111](https://github.com/vakaobr/atalaia-project/issues/111)) ([351a3ca](https://github.com/vakaobr/atalaia-project/commit/351a3cae94d1c64639277307d478d9526d368e7e))
+* the game master manual task-first, and a site server manual ([#112](https://github.com/vakaobr/atalaia-project/issues/112)) ([f30864b](https://github.com/vakaobr/atalaia-project/commit/f30864b3f170fb7792d41cdcfd7c7f64c3906ca1))
+* the README's v0.6.1 upgrade path matches the Field Box manual ([#115](https://github.com/vakaobr/atalaia-project/issues/115)) ([c9a5419](https://github.com/vakaobr/atalaia-project/commit/c9a541978f065e7299c981c4dfe583f73c95cc0c))
+
+### Details
+
 - **Every setting in the site server's table reaches a server deployed with Docker Compose** (decisions SRVENV-1 to SRVENV-4; `server/docker-compose.yml`, `docker-compose.hosted.yml`, `server/tests/test_config.py`, server/README.md, server/docs/DEPLOY.md, docs/runbooks/preview-server.md): Compose passes a container only the variables its file names, so `ATALAIA_APP_ANDROID_PACKAGE`, `ATALAIA_APP_ANDROID_SHA256`, `ATALAIA_APP_IOS_APP_IDS`, `ATALAIA_PASSWORD_LOGIN`, `ATALAIA_DB_POOL_SIZE`, `ATALAIA_DB_MAX_OVERFLOW`, `ATALAIA_DB_TIMEOUT_S`, `ATALAIA_ATAK_CERT_DAYS`, `ATALAIA_LANG_FROM_BROWSER`, `ATALAIA_DEFAULT_LANG` and a hub's `ATALAIA_QUOTA_STORED_MB` were silently ignored when set in `.env` (the preview's `/.well-known/assetlinks.json` stayed a 404). Each is now passed as `"${NAME:-}"` (empty: the server's default); `ATALAIA_TEST_ADAPTER`, `ATALAIA_ALLOW_SIGNUP_WITHOUT_NOTICE`, `ATALAIA_ATAK_RELAY_PORT` and `ATALAIA_BACKUP_DAYS` stay out on purpose, and a test fails when a setting the server reads or the README lists reaches no container.
 
 - **A staff ticket scan confirms a player who checked in with the app and waits for staff** (decision TKT-7; `controller/atalaia_controller/checkin.py`, `controller/tests/test_sync_schedule.py`; `app/lib/controller/controller_checkin.dart`, `app/lib/marshal/ticket_checkin.dart`, the app's strings in four languages; the console's printed-ticket toast, service worker v25; `protocol/checkin.md`, the marshal and game master manuals). Under "staff confirms" the scan is the confirmation; with the APD rule's card check still to do the player stays pending for it; a confirmed player is unchanged. The answer has `confirmed`, and the app and the console say *confirmed* rather than *checked in*.
