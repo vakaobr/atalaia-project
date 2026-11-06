@@ -14,8 +14,12 @@ cost some air, never a game.
 
 A standby controller never sends it (its games run on the primary). What it has heard is kept for
 the console (``stuck`` in GET /api/v1/boxes): per game, when a box in it was last heard, from
-which node ids, and how many times its GAME_OVER went again. The GM's console lists them and can
-say a game's GAME_OVER at once (``release``, the Release button), within a short rate limit.
+which node ids, and how many times its GAME_OVER went again. The GM's console lists the games heard
+within SHOWN_MS (STUCK-71: a box in a game sends STATE every 15 s, and the modem reports a game at
+most every 10 s, so a box still in it is heard well within two minutes; a freed box, or one switched
+off, is silent and leaves the list) and can say a game's GAME_OVER at once (``release``, the Release
+button), within a short rate limit. What was heard of a game stays FORGET_MS, so a box heard again
+keeps its game's resend count and once-a-minute limit.
 """
 
 from __future__ import annotations
@@ -33,7 +37,8 @@ log = logging.getLogger("atalaia.stuck")
 RESEND_MS = 60_000           # one GAME_OVER burst per game in this time at most
 RELEASE_MS = 10_000          # the GM's Release: one burst per game in this time at most (STUCK-44)
 RELEASE_FIELD_MS = 30_000    # the field-wide RELEASE (Amendment 28): one burst in this time at most
-FORGET_MS = 2 * 3_600_000    # a game not heard of for this long leaves the list (as a free box)
+SHOWN_MS = 120_000           # the console lists a game heard within this time (STUCK-71)
+FORGET_MS = 2 * 3_600_000    # a game not heard of for this long is forgotten (its resend count and rate limit)
 KEY_TAGS_KEPT = 50           # the ended games whose key tag the controller keeps
 
 
@@ -187,7 +192,8 @@ class StuckGames:
             return {"live_game": live_id, "time": time_s, "release_frame": "sent"}
 
     def public(self) -> list[dict[str, Any]]:
-        """The games a box was heard still in, the most recent first, with their names."""
+        """The games a box was heard still in within SHOWN_MS, the most recent first, with their names
+        (STUCK-71: a game whose boxes went silent, freed or switched off, is not shown)."""
         with self.ctl._lock:
             now = self.ctl.now_ms()
             for gid in [g for g, s in self.games.items() if now - s.heard_ms > FORGET_MS]:
@@ -196,6 +202,8 @@ class StuckGames:
                 del self.released[gid]
             out = []
             for s in sorted(self.games.values(), key=lambda s: -s.heard_ms):
+                if now - s.heard_ms > SHOWN_MS:
+                    continue
                 game = self.ctl.store.game(s.game_id)
                 out.append(s.public(now, game.get("name") if game is not None else None))
             return out
