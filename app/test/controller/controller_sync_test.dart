@@ -1416,6 +1416,153 @@ void main() {
       expect(call('POST', path, 'g', {'ticket': gaio}).status, 200);
     });
 
+    test('a ticket scan confirms a pending self check-in under "staff '
+        'confirms"; the card check still waits; a confirmed player is '
+        'already (TKT-7)', () async {
+      site.gets['/api/v1/sync/schedule'] = scheduled();
+      site.gets['/api/v1/sync/claims'] = {
+        'sync_version': 1,
+        'claims': <Object?>[],
+      };
+      final c = client();
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      final made = api.handle(
+        'POST',
+        Uri.parse('/api/v1/schedule/$scheduledId/game'),
+        authorization: 'Bearer g',
+        body: '{}',
+      );
+      final gid = (made.body! as Map)['id']! as int;
+      final r = roster();
+      (r['registrations']! as List).add({
+        'registration_id': '7a000000-0000-4000-8000-000000000003',
+        'player_id': 'p-cccccccccccc',
+        'display_name': 'Gaio',
+        'ticket_sha256': sha256.convert(List.filled(32, 7)).toString(),
+        'replicas': <Object?>[],
+      });
+      site.gets['/api/v1/sync/roster'] = r;
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      final logged = <String>[];
+      checkin.audit = logged.add;
+      ApiResponse call(
+        String method,
+        String path,
+        String? token, [
+        Object? b,
+      ]) => api.handle(
+        method,
+        Uri.parse(path),
+        authorization: token == null ? null : 'Bearer $token',
+        body: b == null ? '' : jsonEncode(b),
+      );
+      String b64(int seed) =>
+          base64Url.encode(List.filled(32, seed)).replaceAll('=', '');
+      String ticket(String reg, String pid, int seed) => tkt.ticketToText(
+        tkt.encodeTicket(
+          tkt.CheckinTicket(
+            registrationId: reg,
+            playerId: pid,
+            secret: Uint8List.fromList(List.filled(32, seed)),
+          ),
+        ),
+      );
+      ApiResponse selfCheckin(String reg, String pid, int seed, int key) =>
+          call('POST', '/api/v1/checkin', null, {
+            'game_id': gid,
+            'player_id': pid,
+            'player_secret': b64(key),
+            'display_name': 'X',
+            'notice_version': 2,
+            'registration_id': reg,
+            'ticket': b64(seed),
+          });
+      expect(
+        call('POST', '/api/v1/games/$gid/checkin/open', 'g', {}).status,
+        200,
+      );
+      final first = call('POST', '/api/v1/checkin', null, {
+        'game_id': gid,
+        'player_id': 'p-mmmmmmmmmmmm',
+        'player_secret': b64(3),
+        'display_name': 'Marta',
+        'notice_version': 2,
+      });
+      final plain = (first.body! as Map)['token']! as String;
+      expect(
+        call('PATCH', '/api/v1/games/$gid/checkins/p-mmmmmmmmmmmm', 'g', {
+          'role': 'marshal',
+        }).status,
+        200,
+      );
+      final m =
+          (call('POST', '/api/v1/checkin/token', plain).body! as Map)['token']!
+              as String;
+      expect(
+        call('PUT', '/api/v1/checkin/settings', 'g', {
+          'confirm': 'staff',
+          'federation': 'optional',
+        }).status,
+        200,
+      );
+      const falcaoReg = '7a000000-0000-4000-8000-000000000001';
+      const gaioReg = '7a000000-0000-4000-8000-000000000003';
+      var a = selfCheckin(falcaoReg, 'p-aaaaaaaaaaaa', 9, 4);
+      expect((a.status, (a.body! as Map)['status']), (201, 'pending'));
+      // The scan is the staff confirmation, recorded as the scan.
+      final path = '/api/v1/games/$gid/checkins/ticket';
+      final falcao = ticket(falcaoReg, 'p-aaaaaaaaaaaa', 9);
+      a = call('POST', path, m, {'ticket': falcao});
+      var row = a.body! as Map;
+      expect(
+        (row['status'], row['already'], row['confirmed'], row['checked_in_at']),
+        ('checked_in', false, true, wall),
+      );
+      expect(row['ticket_scanned_by'], 'p-mmmmmmmmmmmm');
+      expect(row['apd_override'], isFalse);
+      expect(logged.single, contains('by p-mmmmmmmmmmmm, checked_in'));
+      expect(logged.single, contains('(confirmed)'));
+      // A confirmed player: already, nothing logged.
+      row = call('POST', path, m, {'ticket': falcao}).body! as Map;
+      expect(
+        (row['already'], row['confirmed'], logged.length),
+        (true, false, 1),
+      );
+      // With the APD rule's card check the player stays pending for it.
+      expect(
+        call('PUT', '/api/v1/checkin/settings', 'g', {
+          'apd': {
+            'accepted': ['fpa'],
+            'checkin': true,
+          },
+        }).status,
+        200,
+      );
+      a = selfCheckin(gaioReg, 'p-cccccccccccc', 7, 5);
+      expect((a.status, (a.body! as Map)['status']), (201, 'pending'));
+      final gaio = ticket(gaioReg, 'p-cccccccccccc', 7);
+      row = call('POST', path, m, {'ticket': gaio}).body! as Map;
+      expect(
+        (row['status'], row['already'], row['confirmed'], row['checked_in_at']),
+        ('pending', false, false, null),
+      );
+      expect(row['ticket_scanned_by'], 'p-mmmmmmmmmmmm');
+      row = call('POST', path, 'g', {'ticket': gaio}).body! as Map;
+      expect(
+        (row['status'], row['already'], row['ticket_scanned_by']),
+        ('pending', true, 'p-mmmmmmmmmmmm'),
+      );
+      final card = call(
+        'PATCH',
+        '/api/v1/games/$gid/checkins/p-cccccccccccc',
+        m,
+        {'federation_seen': true},
+      );
+      expect((card.body! as Map)['status'], 'checked_in');
+      row = call('POST', path, m, {'ticket': gaio}).body! as Map;
+      expect((row['already'], row['confirmed']), (true, false));
+    });
+
     test('the schedule, a game made from it, its roster until the start, '
         'claims, and the outcomes after the end', () async {
       site.gets['/api/v1/sync/schedule'] = scheduled();

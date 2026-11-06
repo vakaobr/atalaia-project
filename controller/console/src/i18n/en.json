@@ -1011,6 +1011,7 @@
     "ticket_label": "Ticket code",
     "ticket_submit": "Check in",
     "ticket_done": "{name} checked in.",
+    "ticket_confirmed": "{name} was waiting for a staff confirmation: confirmed now.",
     "ticket_pending": "{name} is on the list and waits for the card check (\"Card seen, matches\").",
     "ticket_already": "{name} had already arrived: nothing changed.",
     "schedule_title": "From the schedule",

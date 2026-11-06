@@ -17,7 +17,14 @@ void main() {
   late StreamHub hub;
 
   setUp(() {
-    engine = ControllerEngine(transport: RecordingRadio());
+    // Fixed clocks: the hello carries engine.status(), whose clock reads the
+    // wall to the millisecond, so a real clock made the hello and the
+    // expected status, read a moment apart, differ by 1 ms now and then.
+    engine = ControllerEngine(
+      transport: RecordingRadio(),
+      clockMs: () => 5000,
+      wallSeconds: () => 1800000000.25,
+    );
     hub = StreamHub(engine);
   });
 

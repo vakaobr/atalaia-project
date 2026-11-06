@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // A marshal takes a registered player's printed ticket (lib/marshal/
-// ticket_checkin.dart, decisions TKT-1 to TKT-6) against a fake field
+// ticket_checkin.dart, decisions TKT-1 to TKT-7) against a fake field
 // controller: scanned or typed, sent with the marshal's own token; the
-// answers said in words (checked in, waiting for the card check, already
-// there, not the newest ticket, not on the list, refused); a text that is no
-// ticket never leaves the phone.
+// answers said in words (checked in, confirmed, waiting for the card check,
+// already there, not the newest ticket, not on the list, refused); a text
+// that is no ticket never leaves the phone.
 
 import 'package:atalaia_app/checkin/checkin_client.dart';
 import 'package:atalaia_app/checkin/field_trust.dart';
@@ -118,6 +118,44 @@ void main() {
     await tester.tap(find.byKey(const Key('ticket-scan')));
     await tester.pumpAndSettle();
     expect(result(tester).text, s.t('ticket.already', {'name': 'Falcão'}));
+  });
+
+  testWidgets('a pending self check-in is confirmed by the scan (TKT-7)', (
+    tester,
+  ) async {
+    final text = field.registerExpected('p-falcaofalcao', 'Falcão', _reg1);
+    field.rows['p-falcaofalcao']!['status'] = 'pending'; // checked in alone
+    final (_, s) = await open(tester, marshal);
+    await type(tester, text);
+    expect(field.rows['p-falcaofalcao']!['status'], 'checked_in');
+    expect(
+      field.rows['p-falcaofalcao']!['ticket_scanned_by'],
+      'p-marshalmarsh',
+    );
+    expect(result(tester).text, s.t('ticket.confirmed', {'name': 'Falcão'}));
+    expect(result(tester).kind, NoticeKind.ok);
+    expect(
+      s.t('ticket.confirmed', {'name': 'Falcão'}),
+      isNot(s.t('ticket.done', {'name': 'Falcão'})),
+    );
+    await type(tester, text);
+    expect(result(tester).text, s.t('ticket.already', {'name': 'Falcão'}));
+  });
+
+  testWidgets('a pending self check-in under the APD rule waits for the '
+      'card check (TKT-7)', (tester) async {
+    field.cardRule = true;
+    final text = field.registerExpected('p-corvocorvoco', 'Corvo', _reg1);
+    field.rows['p-corvocorvoco']!['status'] = 'pending';
+    final (_, s) = await open(tester, marshal);
+    await type(tester, text);
+    expect(field.rows['p-corvocorvoco']!['status'], 'pending');
+    expect(result(tester).text, s.t('ticket.pending', {'name': 'Corvo'}));
+    await type(tester, text);
+    expect(
+      result(tester).text,
+      s.t('ticket.already_pending', {'name': 'Corvo'}),
+    );
   });
 
   testWidgets('under the APD rule the ticket is not the card: pending', (

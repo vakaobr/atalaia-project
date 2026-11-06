@@ -67,8 +67,9 @@ Quem se inscreveu no site do campo traz um **bilhete de check-in**: um código Q
 - **Aceita o bilhete com o teu telemóvel.** No ecrã **Marshal**, abre **Check-in com bilhete** e toca em **Ler o bilhete**; aponta a câmara para o código QR (em papel ou no ecrã de quem joga). Sem câmara, ou com o código borratado: escreve o texto que está por baixo do QR (`atalaia:ticket:…`) em **O texto do bilhete** e toca em **Fazer o check-in**. Liga-te ao Wi-Fi do campo: é o controlador do campo que decide, com o teu próprio check-in de marshal, por isso não precisas do código da organização. Na receção, **Check-in › Bilhete impresso** na consola da organização faz o mesmo.
 - **O que a resposta diz:**
   - **… tem o check-in feito.** Pronto.
-  - **… está na lista e espera pela verificação do cartão**: o campo confere cartões de filiação, e o bilhete não é o cartão. Vê o cartão e toca em **Cartão visto, confere** em **Réplicas por cronografar** ([Conferir o cartão de filiação](#conferir-o-cartão-de-filiação)).
-  - **… já tinha o check-in feito** (ou **já chegou**): o bilhete já tinha sido aceite, ou a pessoa fez o check-in na app. Nada mudou.
+  - **… esperava por uma confirmação da organização: check-in confirmado agora.** A pessoa tinha feito o check-in na app e o campo pede à equipa que confirme os check-ins; a tua leitura é essa confirmação. Pronto.
+  - **… está na lista e espera pela verificação do cartão**: o campo confere cartões de filiação, e o bilhete não é o cartão (também para quem fez o check-in na app e espera pela equipa: a leitura não substitui a verificação do cartão). Vê o cartão e toca em **Cartão visto, confere** em **Réplicas por cronografar** ([Conferir o cartão de filiação](#conferir-o-cartão-de-filiação)).
+  - **… já tinha o check-in feito** (ou **já chegou**): o bilhete já tinha sido aceite, ou a pessoa fez o check-in na app e já estava confirmada. Nada mudou.
   - **Este não é o bilhete mais recente desta inscrição**: foi feito um bilhete novo e este deixou de valer. Pede o novo.
   - **A inscrição deste bilhete não está na lista deste jogo**: é de outro jogo, ou a lista do site ainda não chegou ao campo. Fala com a organização.
   - **O controlador do campo recusou o bilhete: …**: segue-se o motivo (por exemplo, a organização removeu este check-in, ou o jogo está cheio).

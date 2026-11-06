@@ -546,10 +546,13 @@ const Map<String, String> ptStrings = {
       '{name} está na lista e espera pela verificação do cartão: vê o cartão '
       'da federação e marca "Cartão visto, confere" em Réplicas por '
       'cronografar.',
+  'ticket.confirmed':
+      '{name} esperava por uma confirmação da organização: check-in '
+      'confirmado agora.',
   'ticket.already': '{name} já tinha o check-in feito: nada mudou.',
   'ticket.already_pending':
-      '{name} já chegou e espera pela verificação do cartão ou por uma '
-      'confirmação: vê Réplicas por cronografar.',
+      '{name} já chegou e espera pela verificação do cartão: vê Réplicas por '
+      'cronografar.',
   'ticket.not_newest':
       'Este não é o bilhete mais recente desta inscrição: foi feito um novo e '
       'este deixou de valer. Pede o bilhete novo, ou o nome na receção.',

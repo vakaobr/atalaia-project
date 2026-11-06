@@ -34,12 +34,16 @@ final class TicketOutcome {
   final NoticeKind kind;
   final Map<String, Object?> args;
 
-  /// From an answer of 200: checked in, waiting for the card check, or
-  /// already there (the scan changed nothing).
+  /// From an answer of 200: checked in, a pending self check-in confirmed
+  /// (TKT-7), waiting for the card check, or already there (the scan
+  /// changed nothing).
   factory TicketOutcome.fromRow(Map<String, Object?> row) {
     final name = row['display_name'] ?? row['player_id'] ?? '';
     final pending = row['status'] == 'pending';
     final args = {'name': name};
+    if (row['confirmed'] == true) {
+      return TicketOutcome('ticket.confirmed', NoticeKind.ok, args);
+    }
     if (row['already'] == true) {
       return pending
           ? TicketOutcome('ticket.already_pending', NoticeKind.warning, args)

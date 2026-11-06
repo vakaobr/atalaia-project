@@ -476,13 +476,30 @@ class FakeField {
           );
         }
         final r = rows[reg.player]!;
-        final arriving = r['status'] == 'expected';
-        if (arriving) {
+        var changed = false;
+        var confirmed = false;
+        if (r['status'] == 'expected') {
+          changed = true;
           r
             ..['status'] = cardRule ? 'pending' : 'checked_in'
             ..['ticket_scanned_by'] = who;
+        } else if (r['status'] == 'pending') {
+          // A pending self check-in: the scan confirms it unless the card
+          // check is still to do (TKT-7); the scan is recorded once.
+          if (r['ticket_scanned_by'] == null) {
+            r['ticket_scanned_by'] = who;
+            changed = true;
+          }
+          if (!cardRule || r['card_checked_by'] != null) {
+            r['status'] = 'checked_in';
+            changed = confirmed = true;
+          }
         }
-        return FieldResponse(200, {...r, 'already': !arriving});
+        return FieldResponse(200, {
+          ...r,
+          'already': !changed,
+          'confirmed': confirmed,
+        });
       case 'GET /games/42/chrono-list':
         if (who == null || _role(token!, who) != 'marshal') {
           return err(403, 'staff only');
