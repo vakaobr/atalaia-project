@@ -203,6 +203,57 @@ static void test_portal_wifi_pass_rule(void)
           wifi_setup_wifi_pass_problem_in(BOX_LANG_EN, out) == NULL);
 }
 
+/* The portal's field Wi-Fi name: the console's rule (decision WIFI-10): 1-32 bytes after URL
+ * decoding, UTF-8 counted in bytes; a longer one is refused, not cut to 32. */
+static void test_portal_wifi_ssid_rule(void)
+{
+    char s32[33], s33[34];
+    memset(s32, 'n', 32), s32[32] = '\0';
+    memset(s33, 'n', 33), s33[33] = '\0';
+    const char *en = wifi_setup_msg(BOX_LANG_EN, WS_MSG_WIFI_SSID);
+
+    CHECK(wifi_setup_wifi_ssid_problem_in(BOX_LANG_EN, "My Field") == NULL);
+    CHECK(wifi_setup_wifi_ssid_problem_in(BOX_LANG_EN, "x") == NULL);
+    CHECK(wifi_setup_wifi_ssid_problem_in(BOX_LANG_EN, s32) == NULL);
+    CHECK(wifi_setup_wifi_ssid_problem_in(BOX_LANG_EN, s33) == en);
+    CHECK(wifi_setup_wifi_ssid_problem_in(BOX_LANG_EN, "") == en);
+    CHECK(wifi_setup_wifi_ssid_problem_in(BOX_LANG_EN, NULL) == en);
+    CHECK(wifi_ssid_valid(s32) && !wifi_ssid_valid(s33) && !wifi_ssid_valid(""));
+    CHECK(strstr(en, "1-32 bytes") != NULL);
+    CHECK(wifi_setup_wifi_ssid_problem_in(BOX_LANG_PT, s33) ==
+          wifi_setup_msg(BOX_LANG_PT, WS_MSG_WIFI_SSID));
+    CHECK(strstr(wifi_setup_msg(BOX_LANG_PT, WS_MSG_WIFI_SSID), "1 a 32 bytes") != NULL);
+    CHECK(strstr(wifi_setup_msg(BOX_LANG_DE, WS_MSG_WIFI_SSID), "1-32 Bytes") != NULL);
+    CHECK(strstr(wifi_setup_msg(BOX_LANG_ZH_TW, WS_MSG_WIFI_SSID), "32") != NULL);
+
+    /* As the form handler reads it: one byte more than the longest, so 33 is seen, not cut. */
+    char body[400], out[WIFI_SSID_MAX + 2];
+    snprintf(body, sizeof(body), "name=Box&wifissid=%s&wifipass=", s33);
+    CHECK(parse_form_field(body, "wifissid", out, sizeof(out)));
+    CHECK(strlen(out) == 33 && wifi_setup_wifi_ssid_problem_in(BOX_LANG_EN, out) == en);
+    snprintf(body, sizeof(body), "wifissid=%s", s32);
+    CHECK(parse_form_field(body, "wifissid", out, sizeof(out)));
+    CHECK(strlen(out) == 32 && wifi_setup_wifi_ssid_problem_in(BOX_LANG_EN, out) == NULL);
+
+    /* Multi-byte UTF-8 at the boundary: ten "中" (3 bytes each, %E4%B8%AD) and two letters
+     * are 32 bytes in 12 characters: taken; one more letter, 33 bytes in 13 characters (well
+     * under the page's maxlength of 32 characters), is refused. */
+    char enc[200] = "wifissid=";
+    for (int i = 0; i < 10; i++) strcat(enc, "%E4%B8%AD");
+    strcat(enc, "ab");
+    CHECK(parse_form_field(enc, "wifissid", out, sizeof(out)));
+    CHECK(strlen(out) == 32 && (unsigned char)out[0] == 0xE4 && out[31] == 'b');
+    CHECK(wifi_setup_wifi_ssid_problem_in(BOX_LANG_EN, out) == NULL);
+    strcat(enc, "c");
+    CHECK(parse_form_field(enc, "wifissid", out, sizeof(out)));
+    CHECK(strlen(out) == 33 && wifi_setup_wifi_ssid_problem_in(BOX_LANG_EN, out) == en);
+    /* A 3-byte letter that crosses byte 32 (31 + 3 = 34 bytes) is refused, not split. */
+    char cross[200];
+    snprintf(cross, sizeof(cross), "wifissid=%.31s%%E4%%B8%%AD", s33);
+    CHECK(parse_form_field(cross, "wifissid", out, sizeof(out)));
+    CHECK(strlen(out) == 33 && wifi_setup_wifi_ssid_problem_in(BOX_LANG_EN, out) == en);
+}
+
 /* ---- the page's language ---- */
 
 static void test_pick_lang(void)
@@ -430,4 +481,5 @@ void run_wifi_setup_tests(void)
     test_validate_short_pin();
     test_portal_refuses_trivial_pins();
     test_portal_wifi_pass_rule();
+    test_portal_wifi_ssid_rule();
 }
