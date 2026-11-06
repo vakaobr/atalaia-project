@@ -1002,6 +1002,8 @@
     "ticket_label": "票券代碼",
     "ticket_submit": "報到",
     "ticket_done": "{name} 已報到。",
+    "ticket_pending": "{name} 在名單上，正在等待查驗會員卡（「已看會員卡，相符」）。",
+    "ticket_already": "{name} 之前已經到場：沒有任何變更。",
     "schedule_title": "從賽程",
     "schedule_intro": "場地伺服器公布的近日遊戲。由此建立的遊戲會沿用它的標題、模式和隊伍；已報名的玩家接著會以「預計到場」出現在這裡。",
     "schedule_create": "建立遊戲",

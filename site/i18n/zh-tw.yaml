@@ -517,6 +517,7 @@ try:
   app:
     title: 在 Android 手機上
     text: >-
+      從 v0.9.0 起，每個 <a href="https://github.com/vakaobr/atalaia-project/releases">GitHub 版本</a>都附有 App 的 APK，以專案的金鑰簽署，因此每個版本都能直接覆蓋安裝前一版（從舊的除錯版安裝的 App 必須先解除安裝一次：使用手冊說明會遺失哪些資料）。也可以自己
       用 Docker 建置 App 的除錯版 APK，安裝到 Android 8.0 以上的手機或 Android 模擬器上，詳見
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/app/README.md#install-it-on-an-android-phone-from-windows">App 指南</a>（英文）。它已在模擬器上執行過，還沒在真正的手機上跑過。
   manuals:

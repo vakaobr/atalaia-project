@@ -758,7 +758,10 @@ try:
   app:
     title: Auf einem Android-Handy
     text: >-
-      Bau die Debug-APK der App mit Docker und installiere sie auf einem Handy mit Android 8.0 oder
+      Ab v0.9.0 enthält jedes <a href="https://github.com/vakaobr/atalaia-project/releases">GitHub-Release</a> die APK der App, signiert mit dem
+      Schlüssel des Projekts, sodass sich jedes Release über das vorherige installiert (eine App aus
+      einem älteren Debug-Build muss vorher einmal deinstalliert werden: Die Handbücher sagen, was
+      dabei verloren geht). Oder bau die Debug-APK selbst mit Docker und installiere sie auf einem Handy mit Android 8.0 oder
       neuer oder im Android-Emulator, wie die
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/app/README.md#install-it-on-an-android-phone-from-windows">Anleitung
       zur App</a> (auf Englisch und Portugiesisch) erklärt. Sie lief auf Emulatoren, noch nicht auf einem echten Handy.

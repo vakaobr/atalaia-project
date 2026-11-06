@@ -84,6 +84,8 @@ STATES = ("pending", "passed", "refused", "withdrawn")
 NAME_MAX = 32
 # What a check-in forgets of the card check (leaving, removal, retention): protocol/apd.md "The card check".
 ERASED_CARD = {"apd_verdict": None, "apd_verdict_on": None, "card_checked_by": None, "card_checked_at": None}
+ERASED_SCAN = {"ticket_scanned_by": None, "ticket_scanned_at": None}  # who took the printed ticket (TKT-3)
+TICKET_NOT_NEWEST = "ticket_not_newest: this ticket is not this registration's (was a newer one made?)"
 FEDERATION_MAX = 32
 SERIES_MAX = 50
 MARSHAL_VALID_FOR_S = 2 * 3600  # how long a phone may act as a marshal offline after the controller said yes (MR-4)
@@ -398,6 +400,8 @@ class Checkin:
         self._use_site_limits()
         self.rate = RateLimit(self.cfg.rate_per_minute)
         self.info_rate = RateLimit(max(60, self.cfg.rate_per_minute * 6))
+        # Printed tickets scanned, per staff id (a marshal's player id, or "gm"): a desk's pace, never a flood (TKT-2).
+        self.ticket_rate = RateLimit(max(60, self.cfg.rate_per_minute * 6))
         self._last_purge = 0.0
         controller.checkin = self
 
@@ -1054,7 +1058,7 @@ class Checkin:
                 if match["player_id"] != pid:
                     raise Conflict("this registration is for another player id at this field")
                 if not match["ticket_sha256"] or not hmac.compare_digest(match["ticket_sha256"], ticket_hex or ""):
-                    raise Forbidden("this ticket is not this registration's (was a newer one made?)")
+                    raise Forbidden(TICKET_NOT_NEWEST)
                 return match
         if row is not None and row["from_roster"] and known is None:
             raise Forbidden("this player id is registered for the game: check in with the registration's ticket")
@@ -1114,6 +1118,8 @@ class Checkin:
                         "apd_verdict_on": row.get("apd_verdict_on"),
                         "card_checked_by": row.get("card_checked_by"),
                         "card_checked_at": row.get("card_checked_at"),
+                        "ticket_scanned_by": row.get("ticket_scanned_by"),
+                        "ticket_scanned_at": row.get("ticket_scanned_at"),
                         "country": st["country"]})  # the words of the verdict: protocol/apd.md
         if declarations:
             out["declarations"] = self._decl_views(game["id"], row["player_id"])
@@ -1203,8 +1209,8 @@ class Checkin:
             self.store.update_checkin(gid, pid, status="left", display_name=None, federation_number=None,
                                       apd_id=None, membership_expires=None, apd_override=False,
                                       federation_seen=False, team_preference=None, updated_at=now,
-                                      erased_at=now, **ERASED_CARD, position_share=False,
-                                      position_share_at=now)
+                                      erased_at=now, **ERASED_CARD, **ERASED_SCAN,
+                                      position_share=False, position_share_at=now)
             self.store.delete_player_position(gid, pid)
             for d in self.store.declarations(gid, pid):
                 if d["state"] == "pending":
@@ -1442,7 +1448,7 @@ class Checkin:
             self.store.update_checkin(game_id, pid, status="removed", display_name=None,
                                       federation_number=None, apd_id=None, membership_expires=None,
                                       apd_override=False, federation_seen=False, team_preference=None,
-                                      updated_at=now, erased_at=now, **ERASED_CARD, position_share=False,
+                                      updated_at=now, erased_at=now, **ERASED_CARD, **ERASED_SCAN, position_share=False,
                                       position_share_at=now)
             self.store.delete_player_position(game_id, pid)
             for d in self.store.declarations(game_id, pid):
@@ -1454,10 +1460,17 @@ class Checkin:
     # --- registrations from a site server (plan phase 16) -----------------------------------
 
     def ticket_checkin(self, viewer: Viewer, game_id: int, body: dict[str, Any]) -> dict[str, Any]:
-        """POST /api/v1/games/{id}/checkins/ticket: a marshal scans a registered player's printed
-        ``atalaia:ticket:`` code. The registration must be in this game's roster and the ticket its own;
-        the player is checked in at once (staff saw them). Scanning it again changes nothing."""
+        """POST /api/v1/games/{id}/checkins/ticket: staff (the GM token, a ``gm`` access token or a marshal's own
+        token for this game, TKT-1) scan a registered player's printed ``atalaia:ticket:`` code. The registration
+        must be in this game's roster and the ticket its own (403 ``ticket_not_newest`` otherwise); an expected
+        player arrives at once, or waits for "card seen, matches" under the APD rule (the ticket is not the
+        card). The answer is the row with ``already``: true when the scan changed nothing (the player had
+        arrived). Who scanned and when are kept with the arrival and logged (TKT-3); at most ``ticket_rate``
+        scans a minute per staff id (TKT-2)."""
         game = self._staff(viewer, game_id)
+        staff = self._staff_id(viewer)
+        if not self.ticket_rate.allow(staff):
+            raise TooMany("too many tickets scanned; wait a minute")
         if game["state"] == "ended":
             raise Conflict("the game has ended")
         if set(body) - {"ticket"}:
@@ -1474,7 +1487,7 @@ class Checkin:
                 raise NotFound("this ticket's registration is not on this game's roster")
             if row["player_id"] != ticket["player_id"] or not row["ticket_sha256"] \
                     or not hmac.compare_digest(row["ticket_sha256"], digest):
-                raise Forbidden("this ticket is not this registration's (was a newer one made?)")
+                raise Forbidden(TICKET_NOT_NEWEST)
             if row["status"] == "removed":
                 raise Forbidden("staff removed this check-in")
             arriving = row["status"] == "expected"
@@ -1483,18 +1496,21 @@ class Checkin:
                 st = self.settings()
                 if self.store.count_checkins(game_id) >= st["max_players"]:
                     raise Forbidden(f"game {game_id} is full ({st['max_players']} players)")
+                scan = {"ticket_scanned_by": staff, "ticket_scanned_at": now, "updated_at": now}
                 if st["apd"]["checkin"]:  # the ticket is not the card: pending until "card seen, matches"
-                    self.store.update_checkin(game_id, row["player_id"], status="pending", updated_at=now)
+                    self.store.update_checkin(game_id, row["player_id"], status="pending", **scan)
                 else:
                     emit = True
                     self.store.update_checkin(game_id, row["player_id"], status="checked_in", checked_in_at=now,
-                                              updated_at=now)
+                                              **scan)
             row = self.store.checkin(game_id, row["player_id"])
             assert row is not None
+        if arriving:
+            log.info("ticket check-in: game %d, %s by %s, %s", game_id, row["player_id"], staff, row["status"])
         if emit:
             self._emit_checkin_event(game, row)
         self._notify(game_id, row["player_id"])
-        return self.row_view(game, row)
+        return {**self.row_view(game, row), "already": not arriving}
 
     def apply_shared_chrono(self, game_id: int, roster_players: list[str], answer: dict[str, Any]) -> dict[str, Any]:
         """Other fields' records of the game's roster players, from ``GET /api/v1/sync/chrono`` (S14-5,
@@ -1808,7 +1824,8 @@ class Checkin:
         out = io.StringIO()
         w = csv.writer(out, lineterminator="\r\n")
         w.writerow(["player_id", "display_name", "status", "team", "squad", "role", "federation_number",
-                    "apd_id", "membership_expires", "apd_status", "card_seen", "card_checked_by", "card_checked_at", "manual", "checked_in_at", "declaration_id", "replica_id", "type", "class",
+                    "apd_id", "membership_expires", "apd_status", "card_seen", "card_checked_by", "card_checked_at", "ticket_scanned_by", "ticket_scanned_at", "manual",
+                    "checked_in_at", "declaration_id", "replica_id", "type", "class",
                     "make_model", "chrono"])
         st, now = self.settings(), self._wall()
         for r in self.store.checkins(game_id):
@@ -1818,6 +1835,7 @@ class Checkin:
                     self._row_verdict(st, r, now) or "",
                     "yes" if r["federation_seen"] else "",
                     r.get("card_checked_by") or "", _iso(r.get("card_checked_at")),
+                    r.get("ticket_scanned_by") or "", _iso(r.get("ticket_scanned_at")),
                     "yes" if r["manual"] else "",
                     _iso(r["checked_in_at"])]
             decls = self.store.declarations(game_id, r["player_id"]) or [None]

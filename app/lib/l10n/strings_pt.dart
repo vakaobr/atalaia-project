@@ -295,6 +295,10 @@ const Map<String, String> ptStrings = {
   'code.is_scoreboard':
       'Isto é a ligação do marcador de um jogo. Usa-a em Participante > '
       'Seguir um jogo sem check-in.',
+  'code.is_ticket':
+      'Isto é o bilhete de check-in de uma inscrição. Mostra-o a um marshal '
+      '(Marshal > Check-in com bilhete) ou na receção; para fazer o check-in '
+      'na app, lê o cartaz do campo.',
   'player.bad_link': 'Falta o endereço ou o código de acesso.',
   'player.link_unreachable':
       'O controlador não responde. Estás ligado à rede Wi-Fi do campo?',
@@ -519,6 +523,49 @@ const Map<String, String> ptStrings = {
   'replica.type_sniper': 'Sniper',
   'replica.type_pistol': 'Pistola',
   'replica.type_shotgun': 'Caçadeira',
+
+  // O bilhete impresso de quem se inscreveu, lido por um marshal (TKT-1)
+  'ticket.title': 'Check-in com bilhete',
+  'ticket.hint': 'Lê ou escreve o bilhete de check-in de quem se inscreveu.',
+  'ticket.intro':
+      'Quem se inscreveu online traz um bilhete de check-in: um código QR, em '
+      'papel ou num ecrã, com o texto por baixo. Lê-o ou escreve o texto e o '
+      'controlador do campo faz o check-in dessa pessoa. Liga-te ao Wi-Fi do '
+      'campo.',
+  'ticket.for_game': 'Jogo: {game}',
+  'ticket.scan': 'Ler o bilhete',
+  'ticket.scan_hint': 'Aponta a câmara para o código QR do bilhete',
+  'ticket.text': 'O texto do bilhete',
+  'ticket.text_hint': 'atalaia:ticket:… como está escrito por baixo do QR',
+  'ticket.submit': 'Fazer o check-in',
+  'ticket.sending': 'A perguntar ao controlador do campo…',
+  'ticket.no_camera':
+      'Este telemóvel não lê códigos QR: escreve o texto do bilhete.',
+  'ticket.done': '{name} tem o check-in feito.',
+  'ticket.pending':
+      '{name} está na lista e espera pela verificação do cartão: vê o cartão '
+      'da federação e marca "Cartão visto, confere" em Réplicas por '
+      'cronografar.',
+  'ticket.already': '{name} já tinha o check-in feito: nada mudou.',
+  'ticket.already_pending':
+      '{name} já chegou e espera pela verificação do cartão ou por uma '
+      'confirmação: vê Réplicas por cronografar.',
+  'ticket.not_newest':
+      'Este não é o bilhete mais recente desta inscrição: foi feito um novo e '
+      'este deixou de valer. Pede o bilhete novo, ou o nome na receção.',
+  'ticket.not_listed':
+      'A inscrição deste bilhete não está na lista deste jogo (é de outro '
+      'jogo, ou a lista do site ainda não chegou). Fala com a organização.',
+  'ticket.bad': 'Isto não é um bilhete de check-in, ou foi mal escrito.',
+  'ticket.ended': 'O jogo terminou: já não se aceitam bilhetes.',
+  'ticket.too_many':
+      'Demasiados bilhetes num minuto: espera um pouco e tenta outra vez.',
+  'ticket.offline':
+      'Não é possível falar com o controlador do campo: liga-te ao Wi-Fi do '
+      'campo e tenta outra vez.',
+  'ticket.session': 'O teu check-in expirou: faz o check-in outra vez.',
+  'ticket.refused': 'O controlador do campo recusou o bilhete: {error}',
+  'ticket.recent': 'Lidos agora',
 
   // Etiquetas
   'tags.title': 'Etiquetas de quem joga',

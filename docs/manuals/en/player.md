@@ -20,15 +20,19 @@ For people who play on an Atalaia field. You install the app, check in at the fi
 
 ## 1. Install the app
 
-The app is **not in Google Play or the App Store yet**. Ask the organisers: they may give you the installation file (`atalaia-debug.apk`), or you can build it yourself with the [app guide](../../../app/README.md#install-it-on-an-android-phone-from-windows).
+The app is **not in Google Play or the App Store yet**. From v0.9.0 on, every [GitHub release](https://github.com/vakaobr/atalaia-project/releases) has the Android app attached: `atalaia-app-<version>.apk`, with `atalaia-app-<version>.apk.sha256` (its SHA-256 checksum) next to it. The organisers may also give you the file, or you can build it yourself with the [app guide](../../../app/README.md#install-it-on-an-android-phone-from-windows) (a build of your own is debug-signed: see the warning below).
 
 ### Android
 
-1. Get the `atalaia-debug.apk` file onto your phone (USB cable, memory card or a shared folder). It is about 150 MB.
+1. Download `atalaia-app-<version>.apk` from the release page, on the phone or on a computer, and get it onto the phone (USB cable, memory card or a shared folder). It is about 80 MB.
 2. Open it in the phone's file manager.
 3. If Android asks, allow **Install unknown apps** for that file manager.
 4. Tap **Install**, then open **Atalaia**.
 5. Allow the permissions the app asks for when you use them: camera, location and notifications.
+
+**Updates.** From v0.9.0 on, the release APKs are all signed with the project's one Android key: download the new release's APK and install it over the old one. Android keeps your settings, your tickets and the fields you trust. The certificate's SHA-256 fingerprint is in [the project's keys](../../community/keys.md#the-android-app); Android refuses an APK that claims to be Atalaia but is signed with another key.
+
+**Once only: an app from an older file.** Before v0.9.0 the app was given out as `atalaia-debug.apk`, signed with the key of whichever computer built it. Android will not install the release APK over it (*App not installed*, or *conflicts with an existing package*). Uninstall Atalaia once, then install the release APK; after that, updates install in place. Uninstalling deletes what the app keeps: your language and settings, your check-in ticket and the fields you trusted. After installing again, choose your language, scan the field's poster, trust the field and check in again (or ask the marshal for a new ticket). **If this phone is a field's phone controller or a game prop, read the warning in the [Phone controller manual](phone-controller.md#10-updates) or the [Phone prop guide](phone-prop.md#2-set-up-the-phone) first**: those lose more.
 
 ### iPhone
 
@@ -283,7 +287,7 @@ On the login screen, **Read the privacy notice** shows the field's notice in the
 2. The app shows the site's name and asks if it is the right one. Tap **This is the site, go on**.
 3. Log in with your **Username** and **Password**. If your account has two-step verification, type the 6-digit code. If the site offers them, you can instead tap **Log in with a passkey** (the phone asks for your fingerprint, face or screen lock), or **Log in with Google** (or Microsoft, or Apple): the phone's browser opens, you sign in there and it brings you back to the app. The very first time with Google, Microsoft or Apple, tick the box that agrees to a new account being made; if you forget, the app says so and you try again. Passkeys need Android 14 or newer.
 4. Pick the game, fill in the form and tap **Register**.
-5. The app keeps your **check-in ticket**. At the field, pick your registration under **Online registration** at **Check in at the field**, or show the ticket's QR code at the check-in desk.
+5. The app keeps your **check-in ticket**. At the field, pick your registration under **Online registration** at **Check in at the field**, or show the ticket's QR code to a marshal with the app or at the check-in desk.
 
 Do not share the ticket. Whoever has it can check in in your place. You can change or cancel a registration while it is open: **Change your registration** or **Cancel the registration**. The field erases your registration data 30 days after the game.
 
@@ -294,7 +298,7 @@ On an iPhone without the app, or on a computer, you can do it all on the field's
 1. Open the game's page, tap **Register**, then **Register here**.
 2. Log in: **Log in with a passkey**, **Continue with Google** (or Microsoft, or Apple), or your username and password if the site takes them (then the 6-digit code, if your account has one). The first time with Google, Microsoft or Apple makes your account: first tap **Read the privacy notice** (the box *I have read the privacy notice* works only after that), tick it, and tick **I am 16 or older**. If one is missing, the page says so next to the boxes and nothing is made. A site that has not published its privacy notice makes no new accounts.
 3. Fill in the form: your name or callsign (the name the organisers and marshals see), the team you prefer, your federation or APD membership number if the field asks for it, and the replicas you will use if the game asks (type, class, and make and model if you like). Tap **Register**. The page checks what the app checks, and the field gets the same as from the app.
-4. The page shows your **check-in ticket** once: a QR code and its text. Before you leave the page, tap **Print the ticket**, take a screenshot or save the text: the site keeps only a digest and cannot show it again. At the field, show it at the check-in desk: the GM scans it in the console.
+4. The page shows your **check-in ticket** once: a QR code and its text. Before you leave the page, tap **Print the ticket**, take a screenshot or save the text: the site keeps only a digest and cannot show it again. At the field, show it to a marshal with the app or at the check-in desk: they scan it (or type its text) and the field controller checks you in.
 
 Come back to the same page to see, change or cancel your registration. If you lost the ticket, tap **Ask for a new ticket**: the old one stops working. **Open in the Atalaia app** takes the game to the app if you install it later; the app does not get the page's ticket and asks for a new one, which replaces the page's. After registering, **Add a passkey** lets you log in next time with your face, your fingerprint or the device's PIN (an account with a password adds it on the account page, **Your account**). An account can make only 20 registrations and new tickets an hour. Not yet tested on a real deployment or an iPhone.
 

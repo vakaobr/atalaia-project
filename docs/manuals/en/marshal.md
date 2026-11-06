@@ -39,6 +39,7 @@ If the organisers take you off the list, your phone stops being a marshal at onc
 | Card | What it is for |
 | --- | --- |
 | **Replicas to chrono** | The field's list of declared replicas that still need the chrono. |
+| **Check in a ticket** | Take a registered player's check-in ticket: scan its QR code or type its text. |
 | **Chronograph** | Check-in and spot checks: record shots and see PASS, WARN or FAIL. |
 | **Replica registry** | The replicas registered on this phone. |
 | **Players' tags** | Write signed NFC tags for a game. |
@@ -47,7 +48,7 @@ Below, **Who you are** has **Chronograph's id** (a name for your device, for exa
 
 ## 2. The check-in desk
 
-Before the game, players come to the field's check-in desk. As a marshal you can do three things there: check a membership card, check in a player who has no app, and send a player with a printed ticket to the GM console. Players with the app check themselves in ([player manual](player.md#3-check-in-at-the-field)). The desk's console side is in the [game master manual](game-master.md#the-check-in-desk).
+Before the game, players come to the field's check-in desk. As a marshal you can do three things there: check a membership card, check in a player who has no app, and take a registered player's check-in ticket. Players with the app check themselves in ([player manual](player.md#3-check-in-at-the-field)). The desk's console side is in the [game master manual](game-master.md#the-check-in-desk).
 
 ### Check the membership card
 
@@ -63,11 +64,17 @@ A player without the app: in **Replicas to chrono** ([section 3](#3-the-queue-re
 
 Players who registered on the field's site come with a **check-in ticket**: a QR code in the app, or on paper. With the app they pick their registration when they check in, and need nothing from you.
 
-- **A printed ticket is scanned in the GM console, not in the marshal app.** Send the player to the GM (or to whoever runs the console at the desk). In **Check-in**, under **Printed ticket**, the GM scans or pastes the code (`atalaia:ticket:…`) and taps **Check in**. The player is checked in at once, except when the field checks membership cards: then the check-in waits until you (or the GM) tap **Card seen, matches** ([Check the membership card](#check-the-membership-card)). Only the newest ticket of a registration works.
+- **Take the ticket with your phone.** On the **Marshal** screen, open **Check in a ticket** and tap **Scan the ticket**, then point the camera at the QR code (on paper or on the player's screen). No camera, or a smudged code: type the text printed under the QR code (`atalaia:ticket:…`) in **The ticket's text** and tap **Check in**. Be on the field's Wi-Fi: the field controller decides, with your own marshal check-in, so you need no GM code. The GM console's **Check-in › Printed ticket** does the same at the desk.
+- **What the answer says:**
+  - **… is checked in.** Done.
+  - **… is on the list and waits for the card check**: the field checks membership cards, and the ticket is not the card. Look at the card and tap **Card seen, matches** in **Replicas to chrono** ([Check the membership card](#check-the-membership-card)).
+  - **… was already checked in** (or **has already arrived**): the ticket was taken before, or the player checked in with the app. Nothing changed.
+  - **This is not the newest ticket for this registration**: a newer ticket was made and this one no longer works. Ask the player for the new one.
+  - **… is not on this game's list**: the registration is for another game, or the field's list from the site has not arrived yet. Ask the GM.
+  - **The field controller refused the ticket: …**: the reason follows (for example, staff removed this check-in, or the game is full).
+- The controller records **your id and the time** with the check-in, so the GM can see who took each ticket. Only staff can take tickets: your marshal check-in, the GM code or a **Full GM** day code. A **Read and manage marshals** day code cannot.
 - **A registered player without the ticket** shows as **expected** in the console's list. Once you have seen who they are, the GM taps **Arrived**.
 - **Do not use Check in by hand for a registered player.** It makes a new check-in beside their registration, and the registration stays **expected**.
-- The desk's console runs with the GM code, or a day code with **Full GM**. A **Read and manage marshals** day code can neither confirm check-ins nor take tickets.
-- If a ticket is refused, the console says why: a newer ticket was made for the registration (ask the player for the newest one), or the registration is for another game.
 
 ## 3. The queue: replicas to chrono
 
@@ -172,7 +179,8 @@ Plan to be back on the field's Wi-Fi every couple of hours.
 | **This check-in is no longer valid: check in again.** | Check in again at the field. |
 | **Ask the GM to add you as a marshal** | The organisers must add you in **Check-in › Marshals**. Then tap **Ask again**. |
 | **The GM took you off the marshal list** | The organisers removed you. The unsent series stay on the phone. Ask them to add you again. |
-| A player shows a printed ticket | The marshal app cannot read it. Send the player to the GM console: **Check-in › Printed ticket** ([the check-in desk](#printed-tickets-and-registered-players)). |
+| A player shows a printed ticket | **Marshal › Check in a ticket**: scan it or type its text ([the check-in desk](#printed-tickets-and-registered-players)). |
+| **Too many tickets in a minute** | More than 60 tickets in a minute from your phone. Wait a moment and try again. |
 | **Record the shot** is grey | You need a replica, a limit for its class and a velocity. Pick a replica first. |
 | **Not sent … It stays on this phone to send later.** | The controller could not be reached. Join the field's Wi-Fi and tap **Send** *n* **series not sent yet** in the queue. |
 | **n series were not accepted because the controller does not have you on its marshal list** | Ask the organisers to add you again. The series wait on your phone. |

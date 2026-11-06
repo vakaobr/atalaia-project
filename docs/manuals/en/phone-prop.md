@@ -41,7 +41,7 @@ An **I/O pod** is a small board (a Heltec V4, like a box) that lends the phone w
 
 Do this once, before the game day.
 
-1. Install the Atalaia app and open it. On **What will this phone do?**, choose **Game prop**.
+1. Install the Atalaia app ([Player manual, Install the app](player.md#1-install-the-app): from v0.9.0, the APK attached to the [GitHub release](https://github.com/vakaobr/atalaia-project/releases)) and open it. On **What will this phone do?**, choose **Game prop**.
 2. Open **Settings** and set:
    - **Field join key**: the 64 hex digits the organisers give you. Without it the phone cannot join the field's games.
    - **Admin PIN**: 4 to 8 digits. The app asks for it to start, pause, end and leave a game, and for the **Game master** menu. Without a PIN, anyone can pause or end a game on this prop.
@@ -49,6 +49,8 @@ Do this once, before the game day.
    - **Mode keys for fetched modes**, only if the organisers use modes the app does not carry ([section 8](#8-modes-the-app-does-not-carry)).
 3. Open **Battery and background** (in **Settings**, or from the warning on the prop's screen) and take Atalaia out of battery optimisation. The screen gives the steps for Samsung, Xiaomi, Huawei, OnePlus and other makers. Without it, Android may stop the app during a game.
 4. Charge the phone. A game of a few hours on the screen uses a lot of battery: bring a power bank.
+
+**Updates.** From v0.9.0, install the new release's APK over the old one, between games: every release APK is signed with the project's one Android key, so the settings above stay. **Once only:** a prop whose app came from an `atalaia-debug.apk` (before v0.9.0, or built by someone) must uninstall Atalaia before the first release APK, because Android refuses to install it over an app signed with another key. Uninstalling deletes the prop's settings: the field join key, the admin PIN, kiosk mode, the mode keys, the linked I/O pod and the battery exception. Do it between game days, with the join key at hand (the organisers have it), then set up the phone again from step 1 and link the pod again ([section 3](#3-link-an-io-pod)).
 
 ## 3. Link an I/O pod
 

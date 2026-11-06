@@ -39,6 +39,7 @@ Se a organização te tirar da lista, o teu telemóvel deixa logo de ser de mars
 | Cartão | Para que serve |
 | --- | --- |
 | **Réplicas por cronografar** | A lista do campo com as réplicas declaradas que ainda precisam do cronógrafo. |
+| **Check-in com bilhete** | Aceita o bilhete de check-in de quem se inscreveu: lê o código QR ou escreve o texto. |
 | **Cronógrafo** | Entrada e verificações: regista disparos e vê PASSA, ATENÇÃO ou CHUMBA. |
 | **Registo de réplicas** | As réplicas registadas neste telemóvel. |
 | **Etiquetas de quem joga** | Grava etiquetas NFC assinadas para um jogo. |
@@ -47,7 +48,7 @@ Mais abaixo, **Quem és** tem **Identificador do cronógrafo** (um nome para o t
 
 ## 2. A receção
 
-Antes do jogo, quem joga passa pela receção do campo. Como marshal podes fazer lá três coisas: conferir um cartão de filiação, fazer o check-in de quem não tem a app e mandar quem traz um bilhete impresso à consola da organização. Quem tem a app faz o próprio check-in ([manual de quem joga](player.md#3-faz-o-check-in-no-campo)). O lado da consola está no [manual da organização](game-master.md#the-check-in-desk).
+Antes do jogo, quem joga passa pela receção do campo. Como marshal podes fazer lá três coisas: conferir um cartão de filiação, fazer o check-in de quem não tem a app e aceitar o bilhete de check-in de quem se inscreveu. Quem tem a app faz o próprio check-in ([manual de quem joga](player.md#3-faz-o-check-in-no-campo)). O lado da consola está no [manual da organização](game-master.md#the-check-in-desk).
 
 ### Conferir o cartão de filiação
 
@@ -63,11 +64,17 @@ Alguém sem a app: em **Réplicas por cronografar** ([secção 3](#3-a-lista-ré
 
 Quem se inscreveu no site do campo traz um **bilhete de check-in**: um código QR na app, ou em papel. Com a app, escolhe a inscrição ao fazer o check-in e não precisa de nada de ti.
 
-- **Um bilhete impresso lê-se na consola da organização, não na app de marshal.** Manda a pessoa à organização (ou a quem estiver com a consola na receção). Em **Check-in**, em **Bilhete impresso**, a organização lê ou cola o código (`atalaia:ticket:…`) e toca em **Fazer o check-in**. O check-in fica feito logo, exceto quando o campo confere cartões de filiação: aí o check-in espera até tu (ou a organização) tocares em **Cartão visto, confere** ([Conferir o cartão de filiação](#conferir-o-cartão-de-filiação)). Só o bilhete mais recente de uma inscrição funciona.
+- **Aceita o bilhete com o teu telemóvel.** No ecrã **Marshal**, abre **Check-in com bilhete** e toca em **Ler o bilhete**; aponta a câmara para o código QR (em papel ou no ecrã de quem joga). Sem câmara, ou com o código borratado: escreve o texto que está por baixo do QR (`atalaia:ticket:…`) em **O texto do bilhete** e toca em **Fazer o check-in**. Liga-te ao Wi-Fi do campo: é o controlador do campo que decide, com o teu próprio check-in de marshal, por isso não precisas do código da organização. Na receção, **Check-in › Bilhete impresso** na consola da organização faz o mesmo.
+- **O que a resposta diz:**
+  - **… tem o check-in feito.** Pronto.
+  - **… está na lista e espera pela verificação do cartão**: o campo confere cartões de filiação, e o bilhete não é o cartão. Vê o cartão e toca em **Cartão visto, confere** em **Réplicas por cronografar** ([Conferir o cartão de filiação](#conferir-o-cartão-de-filiação)).
+  - **… já tinha o check-in feito** (ou **já chegou**): o bilhete já tinha sido aceite, ou a pessoa fez o check-in na app. Nada mudou.
+  - **Este não é o bilhete mais recente desta inscrição**: foi feito um bilhete novo e este deixou de valer. Pede o novo.
+  - **A inscrição deste bilhete não está na lista deste jogo**: é de outro jogo, ou a lista do site ainda não chegou ao campo. Fala com a organização.
+  - **O controlador do campo recusou o bilhete: …**: segue-se o motivo (por exemplo, a organização removeu este check-in, ou o jogo está cheio).
+- O controlador guarda **o teu identificador e a hora** com o check-in, para a organização ver quem aceitou cada bilhete. Só a equipa pode aceitar bilhetes: o teu check-in de marshal, o código da organização ou um código temporário **GM completo**. Um código **Ler e gerir marshals** não pode.
 - **Quem tem inscrição mas não traz o bilhete** aparece como **por chegar** na lista da consola. Depois de veres quem é, a organização toca em **Chegou**.
 - **Não uses o Check-in à mão para quem tem inscrição.** Cria um check-in novo ao lado da inscrição, e a inscrição continua **por chegar**.
-- A consola da receção funciona com o código da organização, ou com um código temporário **GM completo**. Um código **Ler e gerir marshals** não confirma check-ins nem aceita bilhetes.
-- Se um bilhete for recusado, a consola diz porquê: foi feito um bilhete mais recente para essa inscrição (pede à pessoa o mais recente), ou a inscrição é de outro jogo.
 
 ## 3. A lista: réplicas por cronografar
 
@@ -172,7 +179,8 @@ Conta voltar ao Wi-Fi do campo de duas em duas horas.
 | **Este check-in já não é válido: faz o check-in outra vez.** | Faz o check-in outra vez no campo. |
 | **Pede à organização para te acrescentar como marshal** | A organização tem de te acrescentar em **Check-in › Marshals**. Depois toca em **Perguntar outra vez**. |
 | **A organização retirou-te da lista de marshals** | A organização retirou-te. As séries por enviar ficam no telemóvel. Pede-lhe que te volte a acrescentar. |
-| Alguém mostra um bilhete impresso | A app de marshal não o lê. Manda a pessoa à consola da organização: **Check-in › Bilhete impresso** ([a receção](#bilhetes-impressos-e-inscrições)). |
+| Alguém mostra um bilhete impresso | **Marshal › Check-in com bilhete**: lê-o ou escreve o texto ([a receção](#bilhetes-impressos-e-inscrições)). |
+| **Demasiados bilhetes num minuto** | Mais de 60 bilhetes num minuto a partir do teu telemóvel. Espera um pouco e tenta outra vez. |
 | **Registar o disparo** está cinzento | Precisas de uma réplica, de um limite para a classe dela e de uma velocidade. Escolhe primeiro uma réplica. |
 | **Não foi enviado … Fica neste telemóvel para enviar depois.** | Não foi possível chegar ao controlador. Liga-te ao Wi-Fi do campo e toca em **Enviar** *n* **séries por enviar** (ou **Enviar 1 série por enviar**) na lista. |
 | **n séries não foram aceites porque o controlador não te tem na lista de marshals** (**1 série não foi aceite …**, se for só uma) | Pede à organização que te volte a acrescentar. As séries esperam no teu telemóvel. |

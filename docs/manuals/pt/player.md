@@ -20,15 +20,19 @@ Para quem joga num campo com a Atalaia. Instalas a app, fazes o check-in no camp
 
 ## 1. Instala a app
 
-A app **ainda não está no Google Play nem na App Store**. Pergunta à organização: pode dar-te o ficheiro de instalação (`atalaia-debug.apk`), ou podes fazê-lo tu com o [guia da app](../../../app/README.md#install-it-on-an-android-phone-from-windows) (em inglês).
+A app **ainda não está no Google Play nem na App Store**. A partir da v0.9.0, cada [versão no GitHub](https://github.com/vakaobr/atalaia-project/releases) traz a app Android: `atalaia-app-<versão>.apk`, com o `atalaia-app-<versão>.apk.sha256` (a soma SHA-256) ao lado. A organização também te pode dar o ficheiro, ou podes fazê-lo tu com o [guia da app](../../../app/README.md#install-it-on-an-android-phone-from-windows) (em inglês; uma compilação tua é assinada com a chave de depuração: vê o aviso abaixo).
 
 ### Android
 
-1. Põe o ficheiro `atalaia-debug.apk` no telemóvel (cabo USB, cartão de memória ou uma pasta partilhada). Tem cerca de 150 MB.
+1. Descarrega o `atalaia-app-<versão>.apk` da página da versão, no telemóvel ou num computador, e põe-no no telemóvel (cabo USB, cartão de memória ou uma pasta partilhada). Tem cerca de 80 MB.
 2. Abre-o no gestor de ficheiros do telemóvel.
 3. Se o Android perguntar, permite **Instalar apps desconhecidas** a esse gestor de ficheiros.
 4. Toca em **Instalar** e abre a **Atalaia**.
 5. Aceita as autorizações que a app pedir quando as usares: câmara, localização e notificações.
+
+**Atualizações.** A partir da v0.9.0, os APK das versões são todos assinados com a única chave Android do projeto: descarrega o APK da versão nova e instala-o por cima do antigo. O Android mantém as tuas definições, os teus bilhetes e os campos em que confias. A impressão digital SHA-256 do certificado está nas [chaves do projeto](../../community/keys.md#the-android-app) (em inglês); o Android recusa um APK que diga ser a Atalaia mas esteja assinado com outra chave.
+
+**Só uma vez: uma app instalada de um ficheiro antigo.** Antes da v0.9.0, a app era distribuída como `atalaia-debug.apk`, assinada com a chave do computador que a compilou. O Android não instala o APK da versão por cima dela (*App não instalada*, ou *em conflito com um pacote existente*). Desinstala a Atalaia uma vez e instala depois o APK da versão; a partir daí, as atualizações instalam-se por cima. Desinstalar apaga o que a app guarda: a língua e as definições, o bilhete de check-in e os campos em que confiavas. Depois de instalares de novo, escolhe a língua, lê o cartaz do campo, confia no campo e faz o check-in outra vez (ou pede um bilhete novo ao marshal). **Se este telemóvel for o telemóvel controlador de um campo ou um dispositivo de jogo, lê primeiro o aviso no [Manual do telemóvel controlador](phone-controller.md#10-updates) ou no [Guia do telemóvel como dispositivo de jogo](phone-prop.md#2-set-up-the-phone)**: esses perdem mais.
 
 ### iPhone
 
@@ -283,7 +287,7 @@ No ecrã de entrada, **Ler o aviso de privacidade** mostra o aviso do campo na l
 2. A app mostra o nome do site e pergunta se é o certo. Toca em **É este o site, continuar**.
 3. Entra com o teu **Nome de utilizador** e a tua **Palavra-passe**. Se a conta tiver verificação em dois passos, escreve o código de 6 algarismos. Se o site as oferecer, podes em alternativa tocar em **Entrar com uma chave de acesso** (o telemóvel pede a impressão digital, a cara ou o bloqueio do ecrã) ou em **Entrar com Google** (ou Microsoft, ou Apple): abre-se o navegador do telemóvel, entras lá e ele traz-te de volta à app. À primeira vez com Google, Microsoft ou Apple, marca a caixa que autoriza criar uma conta nova; se te esqueceres, a app diz e tentas de novo. As chaves de acesso precisam do Android 14 ou mais recente.
 4. Escolhe o jogo, preenche o formulário e toca em **Fazer a inscrição**.
-5. A app guarda o teu **bilhete de check-in**. No campo, escolhe a tua inscrição em **Inscrição online**, em **Check-in no campo**, ou mostra o código QR do bilhete na receção.
+5. A app guarda o teu **bilhete de check-in**. No campo, escolhe a tua inscrição em **Inscrição online**, em **Check-in no campo**, ou mostra o código QR do bilhete a um marshal com a app ou na receção.
 
 Não partilhes o bilhete. Quem o tiver pode fazer o check-in no teu lugar. Podes alterar ou cancelar uma inscrição enquanto estiver aberta: **Alterar a inscrição** ou **Cancelar a inscrição**. O campo apaga os dados da inscrição 30 dias depois do jogo.
 
@@ -294,7 +298,7 @@ Num iPhone sem a app, ou num computador, podes fazer tudo nas páginas do campo:
 1. Abre a página do jogo, toca em **Fazer a inscrição** e depois em **Fazer a inscrição aqui**.
 2. Entra: **Entrar com chave de acesso**, **Continuar com Google** (ou Microsoft, ou Apple), ou o teu nome de utilizador e palavra-passe, se o site os aceitar (e depois o código de 6 algarismos, se a conta o tiver). À primeira vez com Google, Microsoft ou Apple a conta é criada: primeiro toca em **Ler o aviso de privacidade** (a caixa *Li o aviso de privacidade* só fica ativa depois disso), marca-a e marca **Tenho 16 anos ou mais**. Se faltar alguma, a página diz junto das caixas e nada é criado. Um site que não publicou o aviso de privacidade não cria contas novas.
 3. Preenche o formulário: o teu nome ou alcunha (o nome que a organização e os marshals veem), a equipa preferida, o número de federado ou de associado da APD se o campo o pedir, e as réplicas que vais usar se o jogo as pedir (tipo, classe e, se quiseres, marca e modelo). Toca em **Fazer a inscrição**. A página verifica o mesmo que a app, e o campo recebe o mesmo que pela app.
-4. A página mostra o teu **bilhete de check-in** uma única vez: um código QR e o texto dele. Antes de saíres da página, toca em **Imprimir o bilhete**, faz uma captura de ecrã ou guarda o texto: o site só guarda um resumo e não o pode mostrar de novo. No campo, mostra-o na receção: a organização lê-o na consola.
+4. A página mostra o teu **bilhete de check-in** uma única vez: um código QR e o texto dele. Antes de saíres da página, toca em **Imprimir o bilhete**, faz uma captura de ecrã ou guarda o texto: o site só guarda um resumo e não o pode mostrar de novo. No campo, mostra-o a um marshal com a app ou na receção: leem-no (ou escrevem o texto) e o controlador do campo faz o teu check-in.
 
 Volta à mesma página para ver, alterar ou cancelar a inscrição. Se perdeste o bilhete, toca em **Pedir um bilhete novo**: o antigo deixa de valer. **Abrir na app Atalaia** leva o jogo para a app, se a instalares mais tarde; a app não recebe o bilhete da página e pede um novo, que substitui o da página. Depois da inscrição, **Juntar uma chave de acesso** deixa-te entrar da próxima vez com a cara, a impressão digital ou o PIN do dispositivo (uma conta com palavra-passe junta-a na página da conta, **A conta**). Uma conta pode fazer no máximo 20 inscrições e bilhetes novos por hora. Ainda não testado numa instalação real nem num iPhone.
 

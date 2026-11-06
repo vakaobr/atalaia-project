@@ -125,7 +125,7 @@ Os **códigos de um dia** são para quem mais precisar da consola durante algum 
 2. Escreve um nome, por exemplo *Árbitro Ana, sábado*.
 3. Escolhe o que o código pode fazer:
    - **Só ler**: acompanhar o jogo;
-   - **Ler e gerir marshals**: acompanhar, e ainda juntar, mudar e retirar marshals. Mais nada: este código não confirma check-ins nem aceita bilhetes;
+   - **Ler e gerir marshals**: acompanhar, e ainda juntar, mudar e retirar marshals. Mais nada: este código não confirma check-ins nem aceita bilhetes (um marshal aceita bilhetes com o próprio check-in de marshal, na app);
    - **GM completo**: tudo o que o código da organização faz, menos fazer códigos. É este que se dá à mesa do check-in, limitado a um jogo.
 4. Escolhe quanto tempo dura (8 horas é um dia de jogo, 7 dias o máximo) e, se quiseres, um só jogo.
 5. Toca em **Fazer código de acesso**. O código aparece **uma só vez**, com um código QR. A pessoa lê-o com a câmara do telemóvel e a consola abre com a sessão já iniciada (um código só de leitura abre o marcador). Copia-o logo: não volta a aparecer.
@@ -366,7 +366,7 @@ Uma caixa pode responder **recusou: noutro jogo** ([Uma caixa presa num jogo ter
 <a id="the-check-in-desk"></a>
 ### A mesa do check-in
 
-O check-in está aberto desde o momento em que o jogo é criado. **Fechar o check-in** pára-o e **Abrir o check-in** volta a abri-lo. A mesa trabalha no separador **Check-in** da consola, com o código da organização ou com um [código de um dia](#access-codes-and-day-codes) **GM completo**. Os marshals também podem fazer o check-in à mão e verificar o cartão na app deles ([manual de marshal](marshal.md)).
+O check-in está aberto desde o momento em que o jogo é criado. **Fechar o check-in** pára-o e **Abrir o check-in** volta a abri-lo. A mesa trabalha no separador **Check-in** da consola, com o código da organização ou com um [código de um dia](#access-codes-and-day-codes) **GM completo**. Os marshals também podem fazer o check-in à mão, verificar o cartão e aceitar bilhetes impressos na app deles, com o próprio check-in de marshal: sem código da organização nem código de um dia ([manual de marshal](marshal.md#bilhetes-impressos-e-inscrições)).
 
 **Quem fez o check-in com a app**
 
@@ -377,7 +377,7 @@ O check-in está aberto desde o momento em que o jogo é criado. **Fechar o chec
 **Inscrições e bilhetes impressos** (jogos feitos **Da agenda do site** de um servidor, ou a partir de uma lista importada):
 
 1. Quem se inscreveu aparece como **por chegar** até chegar.
-2. Quem tem a app faz o check-in como de costume. Quem traz um **bilhete impresso**: no cartão **Bilhete impresso**, lê ou cola o código (`atalaia:ticket:…`) e toca em **Fazer o check-in**. Diz **Check-in feito: *nome*.** Ler duas vezes não muda nada.
+2. Quem tem a app faz o check-in como de costume. Quem traz um **bilhete impresso**: no cartão **Bilhete impresso**, lê ou cola o código (`atalaia:ticket:…`) e toca em **Fazer o check-in**, ou deixa um marshal aceitá-lo em **Marshal › Check-in com bilhete** na app. Diz **Check-in feito: *nome*.**, ou que a pessoa espera pela verificação do cartão quando a regra de APD está ativa. Ler duas vezes não muda nada, e diz isso. O check-in guarda quem aceitou o bilhete e quando (**ticket_scanned_by**, **ticket_scanned_at** no CSV: o identificador de quem joga do marshal, ou *gm*); cada telemóvel (e o código da organização) aceita até 60 bilhetes por minuto.
 3. Um bilhete é recusado se não estiver na lista deste jogo, ou se a pessoa pediu entretanto um bilhete mais novo (só o mais recente serve).
 4. Quem se inscreveu e não tem bilhete nem app: toca em **Chegou** na linha dela.
 
