@@ -67,6 +67,30 @@ drop it. They are in
 [firmware/esp32/docs/RELEASE_SIGNING.md](../../firmware/esp32/docs/RELEASE_SIGNING.md#the-projects-release-keys),
 with the CI key's rotation and what to do if a CI key leaks.
 
+## The Android app
+
+The phone app's APK attached to each GitHub release from v0.9.0
+(`atalaia-app-<version>.apk`) is signed with the project's **Android release
+key**: alias `atalaia`, RSA 4096, a PKCS12 keystore valid 10000 days, kept as
+the `release` environment's secrets `ATALAIA_ANDROID_KEYSTORE_B64` and
+`ATALAIA_ANDROID_KEYSTORE_PASSWORD` only, with an offline backup held by the
+maintainer (decisions APK-1 to APK-8). Its certificate's SHA-256 fingerprint is
+
+```text
+9C:35:0D:17:37:D6:C5:35:CD:3E:D1:04:28:8E:65:AD:7D:B4:FA:CE:8E:4E:6F:27:75:3B:7B:7C:38:40:A1:99
+```
+
+To check a downloaded APK: `sha256sum -c atalaia-app-<version>.apk.sha256`, then
+`apksigner verify --print-certs atalaia-app-<version>.apk` (Android SDK
+build-tools) must print `Signer #1 certificate SHA-256 digest:` with these
+digits (lower case, no colons). On the phone, Android itself refuses to update
+the app with an APK signed by another key. A site server's
+`ATALAIA_APP_ANDROID_SHA256` (App Links and passkeys, app/README.md) takes
+this fingerprint for the release APK. This key is not an Ed25519 key and signs
+nothing but the APK. If it were lost or leaked, the next release would be
+signed with a new key and every phone would have to uninstall the app once more
+(firmware/esp32/docs/RELEASE_SIGNING.md, "The Android app's key").
+
 A field controller trusts the project's packages for its own installs only by
 listing these keys in `[modes] keys` (`controller/controller.example.toml`);
 `[modes] box_keys` defaults to them, as the firmware does.

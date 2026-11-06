@@ -17,7 +17,7 @@ Conteúdo: 1. O que é preciso · 2. Arrancar o controlador · 3. Códigos e a c
 
 | Precisas de | Notas |
 | --- | --- |
-| Um telemóvel Android com a app Atalaia | Android 8.0 ou mais recente. A app ainda não está no Google Play: vê o [Manual de quem joga](player.md) para a instalar. Mantém o telemóvel carregado, ou ligado a um powerbank: é ele que corre o jogo todo |
+| Um telemóvel Android com a app Atalaia | Android 8.0 ou mais recente. A app ainda não está no Google Play: vem com cada [versão no GitHub](https://github.com/vakaobr/atalaia-project/releases) a partir da v0.9.0, e o [Manual de quem joga](player.md) diz como a instalar. Mantém o telemóvel carregado, ou ligado a um powerbank: é ele que corre o jogo todo |
 | Um rádio para as caixas | Um **modem de rádio USB** (a placa modem do Pi, ligada ao USB do telemóvel) ou um **módulo de E/S** (por USB ou Bluetooth). Sem um deles, só jogam dispositivos de jogo Android por Wi-Fi. Qual escolher: [secção 6](#6-the-radio-usb-radio-modem-or-io-pod) |
 | Uma rede Wi-Fi do campo | O hotspot do próprio telemóvel, um router, ou uma rede que a app cria para o jogo ([secção 5](#5-the-network)). Não precisa de internet |
 | Um computador na rede Wi-Fi do campo | Para imprimir o cartaz de check-in e as etiquetas, e para exportar ([secção 8](#8-what-needs-a-computer)) |
@@ -153,7 +153,16 @@ O telemóvel controlador guarda os jogos, os códigos, a autoridade de certifica
 
 ## 10. Atualizações
 
-**A app.** Instala o `atalaia-debug.apk` novo por cima do antigo, entre jogos. O Android só mantém os dados da app (e, portanto, os jogos, os códigos e a chave do controlador) quando o ficheiro novo está assinado com a mesma chave que o antigo: pede a quem o compila para ti que use a mesma máquina. Se o Android recusar instalá-lo por cima do antigo, não desinstales a app antes de teres uma cópia da chave de entrada: desinstalar apaga tudo o que está na secção 9.
+**A app.** Descarrega o `atalaia-app-<versão>.apk` da [versão no GitHub](https://github.com/vakaobr/atalaia-project/releases) (a partir da v0.9.0; se quiseres, confere-o com o `.apk.sha256` ao lado) e instala-o por cima do antigo, entre jogos. A partir da v0.9.0, todos os APK das versões são assinados com a única chave Android do projeto ([a sua impressão digital](../../community/keys.md#the-android-app), em inglês), por isso o Android instala-o por cima e mantém os dados da app: os jogos, os códigos, a chave de entrada, o certificado e as definições do controlador.
+
+**Só uma vez, antes do primeiro APK de uma versão: faz cópia, depois desinstala.** Uma app instalada de um `atalaia-debug.apk` (todas as cópias anteriores à v0.9.0, ou uma que tenhas compilado tu) está assinada com a chave do computador que a compilou, e o Android recusa instalar o APK da versão por cima dela. Tem de ser desinstalada uma vez, e **desinstalar apaga tudo o que está na secção 9**: os jogos com as pontuações e os eventos, os códigos de acesso, a chave de entrada do campo, a autoridade de certificação do campo, a lista de check-in e todas as definições. Faz isto entre dias de jogo, nunca num, e por esta ordem:
+
+1. Antes do dia, confirma que tens a **chave de entrada do campo**. A app nunca mostra a chave inteira: se a escreveste tu, usa a tua cópia (ou o `join-key` do Pi). Se foi a app que a fez e não tens cópia, as caixas terão de ser adotadas de novo depois da mudança ([Manual da Field Box](field-box.md)).
+2. Aponta as outras definições que mudaste (Wi-Fi do campo, rádio, endereço e chave de API do servidor do site, chaves das versões do firmware, prazos de conservação) e exporta da consola o que quiseres guardar (o **Exportar CSV** da lista de check-in precisa de um computador: [secção 8](#8-what-needs-a-computer)). Termina primeiro todos os jogos, para nenhuma caixa ficar num.
+3. Desinstala a Atalaia, instala o APK da versão, escolhe **Controlador de campo**, escreve a chave de entrada nas **Definições** antes de arrancares o controlador e volta a definir o resto.
+4. A app faz códigos de acesso novos e um certificado novo: dá o código novo à organização do jogo, imprime o cartaz de check-in novo, e quem joga confia no campo outra vez.
+
+A partir daí, todas as atualizações se instalam por cima. Nunca desinstales para atualizar outra vez: se o Android alguma vez recusar o APK de uma versão, para e pergunta primeiro nas issues do projeto.
 
 **O rádio.** Um modem de rádio USB atualiza-se por USB a partir de um computador: [Montar o modem de rádio, Atualizar o modem](modem.md#update-the-modem). Um módulo de E/S: [Guia do telemóvel como dispositivo de jogo](phone-prop.md).
 

@@ -1,6 +1,7 @@
 name: Release
 
-# A release tag v* builds the firmware images (and the target and output modules' UF2 files), signs them with a CI release key and publishes a
+# A release tag v* builds the firmware images (and the target and output modules' UF2 files), signs them with a CI release key,
+# builds the phone app's APK signed with the Android release key (job apk), and publishes a
 # GitHub pre-release with them (docs/manuals/en/firmware.md, firmware/esp32/docs/RELEASE_SIGNING.md).
 # What decides is the ref the run is on, not the event: a tag v* is a real release, whether
 # release-please.yml named it (`gh workflow run release.yml --ref vX.Y.Z` after merging the release
@@ -206,9 +207,99 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  apk:
+    # The phone app's release APK (decisions APK-1 to APK-8; firmware/esp32/docs/RELEASE_SIGNING.md,
+    # "The Android app's key"): built as CI's flutter-build-android job builds the debug one (the
+    # pinned Flutter image, Gradle building the core with the NDK), but release and signed with the
+    # project's Android key, so each release installs over the one before. The key is a secret of the
+    # environment "release" only: pull requests and CI never see it and stay debug-signed. On a tag
+    # the keystore is decoded to the runner's temporary folder, apksigner must say the APK verifies
+    # with the one certificate whose SHA-256 is ANDROID_CERT_SHA256 (docs/community/keys.md), and the
+    # keystore is deleted; on a dry run a throw-away keystore made on the runner signs it instead.
+    name: Android app (release-signed APK)
+    needs: version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: release
+    permissions:
+      contents: read
+    env:
+      FW_VERSION: ${{ needs.version.outputs.version }}
+      # The certificate of the Android release key (alias atalaia, RSA 4096, PKCS12).
+      ANDROID_CERT_SHA256: 9C:35:0D:17:37:D6:C5:35:CD:3E:D1:04:28:8E:65:AD:7D:B4:FA:CE:8E:4E:6F:27:75:3B:7B:7C:38:40:A1:99
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # every branch: the tag must be an ancestor of origin/main
+          persist-credentials: false
+      - name: A release tag must be on main
+        if: github.ref_type == 'tag'
+        env:
+          TAG_COMMIT: ${{ github.sha }}
+        run: |
+          set -eu
+          # As in the publish job: defence in depth before a secret is read.
+          if ! git merge-base --is-ancestor "$TAG_COMMIT" origin/main; then
+            echo "::error::the commit of $GITHUB_REF_NAME ($TAG_COMMIT) is not on main: only a reviewed commit is signed"
+            exit 1
+          fi
+      - name: Build the pinned Flutter image (tools/dev/flutter/Dockerfile, SDK checked by SHA-256)
+        run: docker build -t atalaia-flutter:3.47.9 tools/dev/flutter
+      - name: Build, sign and verify the release APK (the Android key on a tag; a throw-away key on a dry run)
+        env:
+          # Only this step sees the secrets, and only on a tag. They are never echoed (GitHub masks
+          # them in the log), reach the container by name only (docker run -e NAME, never a value on
+          # a command line), and the keystore lives in RUNNER_TEMP, outside the checkout, and is
+          # deleted however the step ends.
+          KEYSTORE_B64: ${{ github.ref_type == 'tag' && secrets.ATALAIA_ANDROID_KEYSTORE_B64 || '' }}
+          ATALAIA_RELEASE_STORE_PASSWORD: ${{ github.ref_type == 'tag' && secrets.ATALAIA_ANDROID_KEYSTORE_PASSWORD || '' }}
+        run: |
+          set -eu
+          umask 077
+          keydir="$(mktemp -d "$RUNNER_TEMP/androidkey.XXXXXX")"
+          trap 'rm -rf "$keydir"' EXIT
+          mkdir -p dist
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            test -n "$KEYSTORE_B64" || { echo "::error::the secret ATALAIA_ANDROID_KEYSTORE_B64 is not set"; exit 1; }
+            test -n "$ATALAIA_RELEASE_STORE_PASSWORD" || { echo "::error::the secret ATALAIA_ANDROID_KEYSTORE_PASSWORD is not set"; exit 1; }
+            printf '%s' "$KEYSTORE_B64" | base64 -d > "$keydir/release.p12" ||
+              { echo "::error::the secret ATALAIA_ANDROID_KEYSTORE_B64 is not base64"; exit 1; }
+            unset KEYSTORE_B64
+            want="$ANDROID_CERT_SHA256"
+            echo "Signing with the Android release key (certificate SHA-256 $want)."
+          else
+            # A dry run: a keystore made here, so the signing and the checks run; nobody trusts it.
+            ATALAIA_RELEASE_STORE_PASSWORD="$(head -c 24 /dev/urandom | base64 | tr -d '/+=')"
+            echo "::add-mask::$ATALAIA_RELEASE_STORE_PASSWORD"
+            docker run --rm -v "$keydir:/key" -e ATALAIA_RELEASE_STORE_PASSWORD atalaia-flutter:3.47.9 \
+              sh -c 'keytool -genkeypair -keystore /key/release.p12 -storetype PKCS12 -alias atalaia \
+                -keyalg RSA -keysize 2048 -validity 1 -dname "CN=Atalaia dry run" \
+                -storepass:env ATALAIA_RELEASE_STORE_PASSWORD -keypass:env ATALAIA_RELEASE_STORE_PASSWORD' > /dev/null
+            want="$(docker run --rm -v "$keydir:/key:ro" -e ATALAIA_RELEASE_STORE_PASSWORD atalaia-flutter:3.47.9 \
+              keytool -list -v -keystore /key/release.p12 -storepass:env ATALAIA_RELEASE_STORE_PASSWORD |
+              sed -n 's/^[[:space:]]*SHA256: *//p' | head -n 1)"
+            echo "Dry run: signed with a throw-away key (certificate SHA-256 $want). A tag signs with $ANDROID_CERT_SHA256."
+          fi
+          # The key password is the store's (PKCS12 has one password).
+          ATALAIA_RELEASE_KEY_PASSWORD="$ATALAIA_RELEASE_STORE_PASSWORD"
+          export ATALAIA_RELEASE_STORE_PASSWORD ATALAIA_RELEASE_KEY_PASSWORD
+          docker run --rm -v "$PWD:/src:ro" -v "$keydir:/key:ro" -v "$PWD/dist:/apk-out" -w /src \
+            -e ATALAIA_RELEASE_STORE_FILE=/key/release.p12 -e ATALAIA_RELEASE_STORE_PASSWORD \
+            -e ATALAIA_RELEASE_KEY_ALIAS=atalaia -e ATALAIA_RELEASE_KEY_PASSWORD \
+            -e ATALAIA_APK_VERSION="$FW_VERSION" -e ATALAIA_APK_CERT_SHA256="$want" -e ATALAIA_APK_OUT=/apk-out \
+            atalaia-flutter:3.47.9 sh /src/app/tool/check.sh apk-release
+          rm -rf "$keydir"
+          ls -l dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-apk
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 7
+
   publish:
     name: Sign and publish
-    needs: [version, build, build-module]
+    needs: [version, build, build-module, apk]
     runs-on: ubuntu-latest
     # The protected environment "release" (required reviewers, set in the repository settings): the
     # signing secrets belong to it, so only a run a maintainer approved can read them (SC-1, SC-2).
@@ -250,6 +341,10 @@ jobs:
         with:
           pattern: firmware-*
           merge-multiple: true
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-apk
           path: dist
       - name: Sign the app images (the CI key on a tag; a throw-away key on a dry run)
         env:
@@ -305,11 +400,14 @@ jobs:
         working-directory: dist
         run: |
           set -eu
+          # The APK's own checksum file next to it, for a phone user who downloads only the APK.
+          for apk in atalaia-app-*.apk; do sha256sum "$apk" > "$apk.sha256"; done
           sha256sum atalaia-* > SHA256SUMS
           cat SHA256SUMS
           # usb.zip and merged.bin of three images, the Field Box's .bin and .release.json, the
-          # target module's two .uf2 files, the output module's .uf2, the sums.
-          test "$(find . -type f | wc -l)" -eq 12
+          # target module's two .uf2 files, the output module's .uf2, the app's .apk and .apk.sha256,
+          # the sums.
+          test "$(find . -type f | wc -l)" -eq 14
       - name: On a dry run, keep the files as a workflow artifact
         if: github.ref_type != 'tag'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

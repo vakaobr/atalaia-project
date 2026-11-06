@@ -8,7 +8,7 @@
   "prerelease": true,
   "always-update": true,
   "pull-request-title-pattern": "chore(release): v${version}",
-  "pull-request-header": "Merging this pull request releases this version: release-please tags the merge commit and makes the GitHub pre-release, then the Field Box, modem and I/O pod images are built, signed with the CI key once the `release` environment is approved, and attached (CONTRIBUTING.md, \"Releases\"). Closing it releases nothing.",
+  "pull-request-header": "Merging this pull request releases this version: release-please tags the merge commit and makes the GitHub pre-release, then the Field Box, modem and I/O pod images are built and signed with the CI key, and the Android app's APK is built and signed with the Android release key, once the `release` environment is approved, and attached (CONTRIBUTING.md, \"Releases\"). Closing it releases nothing.",
   "signoff": "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
   "bootstrap-sha": "c21cf05c7938888c474a4f4c24e4e53f0d551ba0",
   "changelog-sections": [

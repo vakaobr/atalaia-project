@@ -15,7 +15,7 @@ Contents: 1. What you need · 2. Start the controller · 3. Codes and the join k
 
 | You need | Notes |
 | --- | --- |
-| An Android phone with the Atalaia app | Android 8.0 or later. The app is not in Google Play yet: see the [Player manual](player.md) for installing it. Keep the phone charged, or on a power bank: it runs the whole game |
+| An Android phone with the Atalaia app | Android 8.0 or later. The app is not in Google Play yet: it is attached to each [GitHub release](https://github.com/vakaobr/atalaia-project/releases) from v0.9.0, and the [Player manual](player.md#1-install-the-app) says how to install it. Keep the phone charged, or on a power bank: it runs the whole game |
 | A radio for the boxes | A **USB radio modem** (the Pi's modem board, plugged into the phone's USB) or an **I/O pod** (over USB or Bluetooth). Without one, only Android props on Wi-Fi can play. Which to choose: [section 6](#6-the-radio-usb-radio-modem-or-io-pod) |
 | A field Wi-Fi network | The phone's own hotspot, a router, or a network the app makes for the game ([section 5](#5-the-network)). It does not need the internet |
 | A computer on the field's Wi-Fi | For printing the check-in poster and labels, and for exports ([section 8](#8-what-needs-a-computer)) |
@@ -137,7 +137,16 @@ The phone controller keeps its games, codes, the field's certificate authority a
 
 ## 10. Updates
 
-**The app.** Install the new `atalaia-debug.apk` over the old one, between games. Android keeps the app's data (and so the controller's games, codes and key) only when the new file is signed with the same key as the old one: ask whoever builds it for you to use the same build machine. If Android refuses to install it over the old one, do not uninstall the app before you have a copy of the join key: uninstalling deletes everything in section 9.
+**The app.** Download `atalaia-app-<version>.apk` from the [GitHub release](https://github.com/vakaobr/atalaia-project/releases) (from v0.9.0 on; check it against the `.apk.sha256` next to it if you like) and install it over the old one, between games. From v0.9.0 every release APK is signed with the project's one Android key ([its fingerprint](../../community/keys.md#the-android-app)), so Android installs it in place and keeps the app's data: the controller's games, codes, join key, certificate and settings.
+
+**Once only, before the first release APK: back up, then uninstall.** An app installed from an `atalaia-debug.apk` (every copy before v0.9.0, or one you built yourself) is signed with the key of the computer that built it, and Android refuses to install the release APK over it. It has to be uninstalled once, and **uninstalling deletes everything in section 9**: the games and their scores and events, the access codes, the field join key, the field's certificate authority, the check-in list and every setting. Do it between game days, not on one, and in this order:
+
+1. Before the day, make sure you have the **field join key**. The app never shows the whole key: if you typed it in, use your copy (or the Pi's `join-key`). If the app made it and you have no copy, the boxes will have to be adopted again after the move ([Field Box manual](field-box.md)).
+2. Note the other settings you changed (field Wi-Fi, radio, site server address and API key, firmware release keys, retention) and export anything you want to keep from the console (**Export CSV** of the check-in list needs a computer: [section 8](#8-what-needs-a-computer)). End every game first, so no box is left in one.
+3. Uninstall Atalaia, install the release APK, choose **Field controller**, type the join key into **Settings** before you start the controller, and set the rest again.
+4. The app makes new access codes and a new certificate: give the GM the new code, print the new check-in poster, and players trust the field again.
+
+After that, every update installs in place. Never uninstall to update again: if Android ever refuses a release APK, stop and ask on the project's issues first.
 
 **The radio.** A USB radio modem is updated over USB from a computer: [Set up the radio modem, Update the modem](modem.md#update-the-modem). An I/O pod: [Phone prop guide](phone-prop.md).
 
