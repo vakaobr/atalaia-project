@@ -7,7 +7,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 O **modem de rádio** é o rádio do controlador: uma placa Heltec WiFi LoRa 32 V4, gravada com a imagem do modem, ligada à porta USB do controlador. O controlador (um Raspberry Pi) não tem rádio próprio. Sem o modem, ele corre e a consola abre, mas nada chega às caixas e nada se ouve delas.
 
-Esta página é o caminho todo, de uma placa nova até uma caixa a juntar-se a um jogo através do modem. Os outros guias remetem para aqui: o [guia do firmware](firmware.md#9-a-placa-modem), o [guia de montagem do controlador](controller-setup.md#3-preparar-a-placa-modem) e o [Manual da organização](game-master.md#num-raspberry-pi-ou-outro-computador-linux). Em inglês: [Set up the radio modem](../en/modem.md).
+Esta página é o caminho todo, de uma placa nova até uma caixa a juntar-se a um jogo através do modem. Os outros guias remetem para aqui: o [guia do firmware](firmware.md), o [guia de montagem do controlador](controller-setup.md#3-preparar-a-placa-modem), o [Guia do telemóvel controlador](phone-controller.md) e o [Manual da organização](game-master.md). Para atualizar um modem que já tens, vai à [secção 10](#update-the-modem); para o usar com um telemóvel Android como controlador, à [secção 11](#with-a-phone-controller). Em inglês: [Set up the radio modem](../en/modem.md).
 
 > **O que foi testado e o que não foi.** Um modem gravado assim correu com o controlador e caixas reais numa bancada (2026-10-21): o controlador em Docker no Windows (WSL2), o modem numa porta COM do Windows, a que o contentor chegava por uma pequena ponte COM-para-TCP (vê a nota avançada na secção 7). **Ainda não correu num Raspberry Pi**: os nomes de portas do Linux, o grupo `dialout` e os passos de `systemd` abaixo seguem os ficheiros do projeto e o guia do controlador, e nenhum Pi os correu. No macOS (2026-11-02, um Mac mini com Apple silicon, macOS 27) a imagem do modem e imagens de caixa foram gravadas como na secção 4, e o controlador em Docker chegou ao modem por uma ponte no Mac (secção 7) e registou `modem link up`; um controlador a correr diretamente no macOS não foi experimentado. O gravador no navegador não foi experimentado com uma placa real. Não testado num campo.
 
@@ -22,7 +22,9 @@ Esta página é o caminho todo, de uma placa nova até uma caixa a juntar-se a u
 7. Confirma que o controlador e o modem falam um com o outro (secção 8).
 8. Junta uma caixa a um jogo através dele (secção 9).
 
-Se algo falhar, vai à tabela da [secção 10](#10-resolução-de-problemas).
+Mais tarde: atualiza o modem quando uma versão nova o pedir (secção 10). Com um telemóvel como controlador, as secções 6 e 7 dão lugar à secção 11.
+
+Se algo falhar, vai à tabela da [secção 12](#troubleshooting).
 
 ## 2. Antes de começar
 
@@ -36,22 +38,22 @@ Se algo falhar, vai à tabela da [secção 10](#10-resolução-de-problemas).
 
 ## 3. Obter a imagem do modem
 
-Há duas maneiras, como para as caixas ([guia do firmware, secção 2](firmware.md#2-obter-o-firmware-transferir-uma-versão-publicada-ou-compilá-lo)).
+Há duas maneiras, como para as caixas (o [guia do firmware](firmware.md), «Obter o firmware»).
 
 ### 3.1 Transferir uma versão publicada (o caminho fácil)
 
 1. Abre [a página das versões](https://github.com/vakaobr/atalaia-project/releases) e escolhe a mais recente. Todas estão marcadas como **pré-lançamento**: pré-alfa, não testadas num campo.
-2. Transfere dois ficheiros: **`atalaia-modem-<versão>-usb.zip`** e **`SHA256SUMS`**. (`atalaia-modem-<versão>-merged.bin` é a mesma imagem num só ficheiro, para um gravador no navegador: [guia do firmware](firmware.md#21-transferir-uma-versão-publicada-o-caminho-fácil).) O modem não tem atualização pelo ar: grava-se sempre por USB.
+2. Transfere dois ficheiros: **`atalaia-modem-<versão>-usb.zip`** e **`SHA256SUMS`**. (`atalaia-modem-<versão>-merged.bin` é a mesma imagem num só ficheiro, para um gravador no navegador: [guia do firmware](firmware.md).) O modem não tem atualização pelo ar: grava-se sempre por USB.
 3. Confirma a transferência. No Linux, na pasta dos ficheiros (os ficheiros que não transferiste aparecem como em falta: ignora-os):
 
    ```
    sha256sum -c --ignore-missing SHA256SUMS
    ```
 
-   No macOS: `shasum -a 256 -c SHA256SUMS`. No Windows `cmd`: `certutil -hashfile atalaia-modem-0.6.1-usb.zip SHA256` e compara a linha com a do `SHA256SUMS`.
+   No macOS: `shasum -a 256 -c SHA256SUMS`. No Windows `cmd`: `certutil -hashfile atalaia-modem-0.8.0-usb.zip SHA256` e compara a linha com a do `SHA256SUMS`.
 4. Descompacta-o para uma pasta própria. Tem o carregador de arranque, a tabela de partições, o programa, um ficheiro `flash_args` e um `README.txt` que repete os comandos abaixo.
 
-   Windows `cmd`: `mkdir atalaia-modem` e depois `tar -xf atalaia-modem-0.6.1-usb.zip -C atalaia-modem` (ou clica com o botão direito, *Extrair tudo*). Linux e macOS: `unzip atalaia-modem-0.6.1-usb.zip -d atalaia-modem`.
+   Windows `cmd`: `mkdir atalaia-modem` e depois `tar -xf atalaia-modem-0.8.0-usb.zip -C atalaia-modem` (ou clica com o botão direito, *Extrair tudo*). Linux e macOS: `unzip atalaia-modem-0.8.0-usb.zip -d atalaia-modem`.
 
 **O que é o modem publicado:** a Heltec **V4.3**, a região **EU868** (868 MHz), escuta antes de emitir ligada, uma antena de 2 dBi suposta, as chaves do projeto incluídas, o ecrã em inglês até o controlador lhe dizer a língua das caixas. **Para uma V4.2, para Taiwan (AS923), para uma antena de mais de 2 dBi ou para um ecrã que arranque noutra língua, compila-o tu.**
 
@@ -67,7 +69,7 @@ python tools/docker_fw.py modem
 
 No macOS e no Linux usa `python3` se `python` não for encontrado. A primeira compilação demora vários minutos. Acaba com `Modem firmware: firmware/esp32/build-modem/atalaia_esp32.bin`. A pasta de onde se grava é **`firmware/esp32/build-modem`**: tem o `flash_args` e os ficheiros que ele nomeia.
 
-Opções, todas só para a pasta de compilação do modem (a lista completa está no [guia do firmware, secção 4](firmware.md#4-as-opções-de-quem-monta)):
+Opções, todas só para a pasta de compilação do modem (a lista completa está no [guia do firmware](firmware.md), «As opções de quem monta»):
 
 | O quê | Como |
 | --- | --- |
@@ -174,9 +176,9 @@ DUTY  ...    left      o tempo de emissão que resta
 
 Sem controlador ainda, **`LINK waiting`** está certo. É um modem gravado e saudável. Qualquer outra coisa:
 
-- **RADIO FAULT** no lugar das últimas linhas: o chip de rádio não arrancou. Secção 10.
+- **RADIO FAULT** no lugar das últimas linhas: o chip de rádio não arrancou. Secção 12.
 - A torre e as palavras de uma Field Box (um ecrã de configuração ou PRONTA): gravaste a imagem da caixa. Grava outra vez a partir dos ficheiros `modem`.
-- Nada, de todo: secção 10.
+- Nada, de todo: secção 12.
 
 Agora desliga a placa e leva-a ao controlador, ou deixa-a ligada se gravaste no Pi.
 
@@ -241,28 +243,84 @@ sudo journalctl -u atalaia-controller -n 50 | grep -i modem
 
 Deves ver `atalaia.modem INFO modem link up` e, mesmo antes, `atalaia.modem INFO modem: {...}`: a identidade do modem, com o `fw_version` e a `region`. Uma falha aparece como `cannot open the modem at /dev/ttyACM0: ...`, `modem missed ping 1 of 3` ou `modem link lost; reconnecting`.
 
-A identidade de um modem compilado a partir desta versão diz também `"games": true`: o modem passa a avisar o controlador quando ouve uma caixa que continua num jogo já terminado (uma que estava desligada quando o jogo acabou), e o controlador liberta-a voltando a dizer-lhe que o jogo terminou. Funciona com um Raspberry Pi como controlador e com um telemóvel controlador (o modem ligado ao telemóvel por USB). Com um modem mais antigo, o Raspberry Pi regista uma vez `the radio modem's firmware cannot report boxes still in an ended game`, e um telemóvel di-lo no ecrã, em **Rádio**; grava esta imagem para ter a recuperação automática, ou tira essa caixa na própria caixa (**Sair do jogo** no menu de administração, ou `@leave` por USB: [manual da Field Box](field-box.md#d-tirar-uma-caixa-do-jogo)).
+**Consegue avisar das caixas presas?** A partir da v0.9.0 (ainda não publicada; até lá, compila-a a partir do `main`, secção 3.2), a identidade do modem diz também `"games": true`. Um modem assim avisa o controlador quando ouve uma caixa que continua num jogo já terminado (uma caixa que estava desligada quando o jogo acabou), e o controlador liberta-a voltando a enviar o fim desse jogo. Funciona com um Raspberry Pi como controlador e com um telemóvel controlador (secção 11). Uma imagem do modem da v0.8.0 ou anterior não o faz: um controlador Raspberry Pi da v0.9.0 regista então uma vez `the radio modem's firmware cannot report boxes still in an ended game`, o separador **Caixas** da consola diz que o modem de rádio não consegue dizer que caixas ficaram num jogo terminado, e um telemóvel controlador di-lo no ecrã, em **Rádio**. Atualiza o modem para ter a recuperação automática (secção 10); até lá, tira essa caixa do jogo na própria caixa ([manual da Field Box](field-box.md#take-a-box-out-of-its-game)).
 
-**Na consola da organização** ([Manual da organização, secção 3](game-master.md#3-abre-a-consola-da-organização)): a etiqueta em cima à direita diz **Rádio: ligado**. `a ligar` e `em baixo` ainda não são bom sinal, e **sem modem** quer dizer que a definição está vazia. Se o modem cair, um alerta diz **Rádio em baixo: o modem USB não responde.**, e **Rádio de volta.** quando volta. O separador **Controlador** mostra **Rádio**, **Modem** (o firmware do modem e a versão) e **Religações do modem**: uma contagem que não pára de subir quer dizer cabo, porta ou energia com problemas.
+**Na consola da organização** (vê o [Manual da organização](game-master.md)): a etiqueta em cima à direita diz **Rádio: ligado**. `a ligar` e `em baixo` ainda não são bom sinal, e **sem modem** quer dizer que a definição está vazia. Se o modem cair, um alerta diz **Rádio em baixo: o modem USB não responde.**, e **Rádio de volta.** quando volta. O separador **Controlador** mostra **Rádio**, **Modem** (o firmware do modem e a versão) e **Religações do modem**: uma contagem que não pára de subir quer dizer cabo, porta ou energia com problemas.
 
 **Mais duas verificações, nas Definições da consola:**
 
-- **Região.** Em **Região de rádio**, nenhuma mensagem vermelha sobre o modem. Se disser *O modem USB foi feito para …, mas o campo está em …*, o modem e o campo discordam da região e nenhum jogo pode começar (secção 10).
-- **Procurar.** Em **Canal de rádio do campo**, toca em **Procurar**. O modem escuta cada canal cerca de um minuto e lista-os do mais calmo para o mais ruidoso. Não emite nada, e só funciona com um rádio que arrancou: a consola diz *O modem USB não tem chip de rádio* se não arrancou.
+- **Região.** Em **Região de rádio**, nenhuma mensagem vermelha sobre o modem. Se disser *O modem USB foi feito para …, mas o campo está em …*, o modem e o campo discordam da região e nenhum jogo pode começar (secção 12).
+- **Procurar.** Em **Canal de rádio do campo**, toca em **Procurar**. O modem escuta os canais possíveis, cerca de 60 segundos no total, repartidos entre eles, e lista-os do mais calmo para o mais ruidoso. Nada muda até aceitares um canal. Não emite nada, e só funciona com um rádio que arrancou: a consola diz *O modem USB não tem chip de rádio* se não arrancou.
 
 ## 9. Uma caixa junta-se a um jogo através do modem
 
 Este é o teste a sério: uma caixa e o modem ouvem-se. Precisas de uma caixa adotada (mostra **PRONTA** depois de a ligares), na mesma região, com a antena montada, a poucos metros do modem.
 
-1. Se a caixa for nova, adota-a: separador **Adotar**, por cabo USB, por cartão ou por **Emparelhar por código (rádio)** ([Manual da organização, Adota as caixas](game-master.md#adota-as-caixas)). O emparelhamento por código usa o rádio do modem.
+1. Se a caixa for nova, adota-a: separador **Adotar**, por cabo USB, por cartão ou por **Emparelhar por código (rádio)** (vê o [Manual da organização](game-master.md)). O emparelhamento por código usa o rádio do modem.
 2. Cria um jogo (separador **Jogo**, **Criar jogo**). Abre a janela **Caixas para este jogo**.
-3. Liga a caixa. Em cerca de 20 segundos aparece na lista. Toca em **Procurar caixas** para perguntar já. Uma caixa que não apareça não ouve ou não é ouvida: secção 10.
+3. Liga a caixa. Em cerca de 20 segundos aparece na lista. Toca em **Procurar caixas** para perguntar já. Uma caixa que não apareça não ouve ou não é ouvida: secção 12.
 4. Marca a caixa, escolhe o **Papel** dela e toca em **Convidar**. O **Estado** passa por **a enviar**, **convidada**, **aceitou, a juntar-se**, **juntou-se**.
 5. No ecrã do modem, **JOGO** mostra agora o número do jogo e **TX** e **RX** sobem. No ecrã da caixa diz que está no jogo.
 
-Se aparecer **juntou-se**, o caminho de rádio funciona nos dois sentidos. Termina o jogo no separador **Jogo** quando acabares (nada começa até o começares). O resto está no [Manual da organização](game-master.md#6-atribui-as-caixas).
+Se aparecer **juntou-se**, o caminho de rádio funciona nos dois sentidos. Termina o jogo no separador **Jogo** quando acabares (nada começa até o começares). O resto está no [Manual da organização](game-master.md).
 
-## 10. Resolução de problemas
+<a id="update-the-modem"></a>
+
+## 10. Atualizar o modem
+
+O modem **não tem atualização pelo ar**: uma imagem nova escreve-se sempre por USB, como na secção 4.
+
+### Quando o atualizar
+
+- As notas de uma versão nova dizem que o modem mudou. Vê a [página das versões](https://github.com/vakaobr/atalaia-project/releases) e o CHANGELOG.
+- O registo do controlador diz `the radio modem's firmware cannot report boxes still in an ended game`, ou o separador **Caixas** da consola, ou o ecrã de um telemóvel controlador em **Rádio**, diz que o modem de rádio não consegue dizer que caixas ficaram num jogo terminado. Isso precisa de uma imagem do modem da **v0.9.0** (ainda não publicada; até lá, compila-a a partir do `main`, secção 3.2).
+- Foi gravado com a v0.4.0 ou anterior (a tabela de partições antiga, secção 4.3).
+
+Para ver que versão um modem tem: o separador **Controlador** da consola, **Modem**, ou o `fw_version` no registo do controlador (secção 8).
+
+Um modem e um controlador de versões diferentes continuam a falar: um controlador mais novo simplesmente não usa o que um modem mais antigo não sabe fazer. Não tens de atualizar os dois no mesmo dia, mas uma novidade que precise do modem só funciona quando os dois forem novos.
+
+### Como o atualizar
+
+1. Faz isto entre jogos: enquanto o modem está desligado, nenhuma caixa ouve o controlador.
+2. Obtém a imagem nova: transfere-a e confirma-a (secção 3.1), ou compila-a com as mesmas opções de antes (secção 3.2).
+3. Pára o controlador, para a porta ficar livre: `sudo systemctl stop atalaia-controller` num Raspberry Pi. Num telemóvel controlador, toca em **Parar o controlador** e desliga o modem do telemóvel.
+4. Liga o modem ao computador com que gravas (num Pi, pode ficar onde está).
+5. Escreve a imagem como na secção 4.3. Não precisas de `erase_flash`: o modem não guarda definições nem chaves suas.
+6. Confirma o ecrã: o arranque mostra a versão nova (secção 5).
+7. Volta a ligá-lo ao controlador e arranca o controlador: `sudo systemctl start atalaia-controller` num Pi, ou liga-o ao telemóvel e toca em **Arrancar o controlador**.
+8. Confirma como na secção 8: **LINK OK**, o `fw_version` novo no registo e no separador **Controlador**. A partir da v0.9.0, a identidade no registo diz também `"games": true`.
+
+<a id="with-a-phone-controller"></a>
+
+## 11. Com um telemóvel controlador
+
+Um telemóvel Android pode ser o controlador, com este modem como rádio ([Guia do telemóvel controlador](phone-controller.md)). O modem é a mesma placa e a mesma imagem que para um Raspberry Pi: as secções 2 a 5 não mudam. Ainda não experimentado com um telemóvel a sério.
+
+### Modem de rádio USB ou módulo de E/S
+
+Um telemóvel controlador também pode usar um **módulo de E/S** como rádio. O modem é o melhor rádio para as caixas; o módulo junta botões, luzes e uma sirene para o telemóvel.
+
+| | Modem de rádio USB | Módulo de E/S |
+| --- | --- | --- |
+| Ligação ao telemóvel | Só USB | USB ou Bluetooth |
+| Jogos, atualizações de firmware, procura de canal | Sim | Sim |
+| Convites, fim de jogo, emparelhamento por código | Sim | Só com um firmware do módulo que passe estas tramas |
+| Caixas presas num jogo terminado avisadas e libertadas sozinhas | Sim, a partir da v0.9.0 (ainda não publicada) | Não, nunca |
+
+### Ligá-lo ao telemóvel
+
+1. Monta a antena antes de a placa ter energia.
+2. Liga o modem ao telemóvel com um cabo USB-C de dados curto (um cabo USB-C para USB-C, ou um adaptador OTG se o telemóvel precisar). O telemóvel alimenta a placa.
+3. Na app, **Controlador de campo**, em **Rádio**, toca em **Procurar módulos**. O modem aparece na lista, como um módulo por USB. Toca nele. Se o Android perguntar se a app pode usar o dispositivo USB, autoriza. O controlador distingue um modem de um módulo pela resposta.
+4. Toca em **Arrancar o controlador**. O ecrã diz **Rádio ligado**, e o ecrã do modem diz **LINK OK**.
+
+O rádio escolhe-se antes de arrancar: para o mudar, toca primeiro em **Parar o controlador** (**Para mudar o rádio, para o controlador.**). Com um modem anterior à v0.9.0, o ecrã diz em **Rádio** que o firmware dele não consegue dizer que caixas ficaram num jogo terminado: atualiza-o (secção 10).
+
+<a id="10-resolução-de-problemas"></a>
+<a id="troubleshooting"></a>
+
+## 12. Resolução de problemas
 
 | O que vês | Causa provável e o que fazer |
 | --- | --- |
@@ -282,9 +340,11 @@ Se aparecer **juntou-se**, o caminho de rádio funciona nos dois sentidos. Termi
 | Registo: `WRONG PARTITION TABLE` | O modem tem a tabela antiga (v0.4.0 ou anterior). Funciona, e só o diz na UART0, por isso podes não o ver. Grava-o uma vez por USB sem `erase_flash` (secção 4.3). O `README.txt` do zip diz o mesmo |
 | Consola, Definições: **O modem USB foi feito para …, mas o campo está em …** | A região do modem e a do campo diferem. Nenhum jogo pode começar. Compila o modem para a região do campo (`--region=`) e grava outra vez, ou põe o campo de volta na região do modem |
 | O cabeçalho da consola diz **Rádio: sem modem** | `[modem] port` está vazio, ou a secção falta: secção 7 |
-| O modem está **OK** mas nenhuma caixa aparece em **Procurar caixas** | A caixa e o modem não estão na mesma região ou no mesmo canal; a caixa não está adotada; a caixa está noutro jogo (**recusou: noutro jogo**: desliga-a e volta a ligá-la); falta uma antena ou a caixa está longe demais. [Manual da organização, Resolução de problemas](game-master.md#resolução-de-problemas) |
+| O modem está **OK** mas nenhuma caixa aparece em **Procurar caixas** | A caixa e o modem não estão na mesma região ou no mesmo canal; a caixa não está adotada; a caixa continua noutro jogo (**recusou: noutro jogo**: liberta-a como no [Manual da organização](game-master.md#recover-from-problems), ou na própria caixa: [manual da Field Box](field-box.md#take-a-box-out-of-its-game)); falta uma antena ou a caixa está longe demais. [Manual da organização, Recuperar de problemas](game-master.md#recover-from-problems) |
 | `Rádio: ligado` mas **fail** (a linha TX) não pára de subir | As emissões falham. Olha para a linha **DUTY**: a `0.0s` o orçamento de tempo de emissão acabou, por isso espera. Se não, confirma a antena e o estado de falha do rádio |
 | **RX auth** não pára de subir | Pacotes do jogo que não decifram: uma caixa com uma chave antiga, ou outro jogo com o mesmo id por perto |
+| Registo: `the radio modem's firmware cannot report boxes still in an ended game` | A imagem do modem é anterior à v0.9.0. Atualiza-a (secção 10). Até lá, tira essa caixa do jogo na própria caixa ([manual da Field Box](field-box.md#take-a-box-out-of-its-game)) |
+| Telemóvel controlador: o modem não aparece na lista de **Procurar módulos** | Um cabo de dados, um adaptador OTG se o telemóvel precisar, a antena montada. Pára primeiro o controlador: o rádio escolhe-se antes de arrancar (secção 11) |
 | Funcionou, e depois de reiniciar o Pi já não | O nome da porta mudou. Usa o nome `by-id` (secção 6). Confirma que o serviço está ativo no arranque: `sudo systemctl enable atalaia-controller` |
 
 Não está na tabela? Pergunta nas [Discussions](https://github.com/vakaobr/atalaia-project/discussions) ou abre uma issue, com as linhas do registo do controlador sobre o modem, o que o ecrã diz e o teu sistema. Os pormenores do firmware do modem e do ecrã dele estão no [README do firmware](../../../firmware/esp32/README.md#usb-radio-modem-variant) (em inglês); as tramas no cabo estão em [protocol/usb-modem.md](../../../protocol/usb-modem.md).

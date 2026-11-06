@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Guia do firmware para quem monta
 
-Para quem monta uma caixa ou um adereço e tem de lhe pôr o software. Não precisas de escrever código. Precisas de um computador, de um cabo USB-C **de dados** e da placa. Os passos são os mesmos para todos os tipos de placa do projeto: a Field Box, o Satélite, o módulo de E/S e a placa modem do controlador. Em inglês: [Firmware guide for builders](../en/firmware.md).
+Para quem monta uma caixa ou um adereço e tem de lhe pôr o software. Não precisas de escrever código. Precisas de um computador, de um cabo USB-C **de dados** e da placa. Os passos são os mesmos para as placas ESP32 do projeto: a Field Box, o Satélite, o módulo de E/S e a placa modem do controlador. As duas placas RP2040 pequenas da porta de expansão (o módulo de alvo e o módulo de saídas) gravam-se de outra maneira, mais simples: [secção 11](#11-os-módulos-de-expansão-módulo-de-alvo-e-módulo-de-saídas). Em inglês: [Firmware guide for builders](../en/firmware.md).
 
 > **Ainda não está pronto para o campo.** As versões do firmware no GitHub estão marcadas como pré-lançamento (*pre-release*) por isso mesmo. A Atalaia está em pré-alfa. Placas Heltec V4.3 a sério já foram gravadas e usadas numa bancada com o controlador de campo: arranque, rádio, botões, o ecrã OLED da própria placa, adoção por cabo USB e por código, e uma atualização pelo ar. Mais nada neste guia correu numa placa a sério. Os passos que dependem de hardware que não foi experimentado dizem **Ainda não testado numa placa real**.
 
-O hardware está nos manuais de montagem: [Field Box](../../../hardware/field-box/BUILD.pt.md), [Satélite](../../../hardware/satellite/BUILD.md), [módulo de E/S](../../../hardware/io-pod/BUILD.md) (os dois últimos, em inglês). O controlador está no [guia de montagem do controlador](controller-setup.md), e a placa modem dele em [Montar o modem de rádio](modem.md).
+O hardware está nos manuais de montagem: [Field Box](../../../hardware/field-box/BUILD.pt.md), [Satélite](../../../hardware/satellite/BUILD.md) (em inglês), [módulo de E/S](../../../hardware/io-pod/BUILD.pt.md), [porta de expansão](../../../hardware/expansion-port/BUILD.pt.md), [módulo de alvo](../../../hardware/target-addon/BUILD.pt.md), [módulo de saídas](../../../hardware/output-module/BUILD.pt.md). Usar as caixas num campo (configuração, saídas, tirar uma caixa do jogo, atualizações) está no [Manual de operação da Field Box](field-box.md). O controlador está no [guia de montagem do controlador](controller-setup.md), e a placa modem dele em [Montar o modem de rádio](modem.md).
 
 ## Índice
 
@@ -23,10 +23,11 @@ O hardware está nos manuais de montagem: [Field Box](../../../hardware/field-bo
 8. [Uma caixa que não arranca](#8-uma-caixa-que-não-arranca)
 9. [A placa modem](#9-a-placa-modem)
 10. [As variantes do módulo de E/S](#10-as-variantes-do-módulo-de-es)
+11. [Os módulos de expansão: módulo de alvo e módulo de saídas](#11-os-módulos-de-expansão-módulo-de-alvo-e-módulo-de-saídas)
 
 ## 1. O que gravas
 
-Há um só projeto de firmware e quatro imagens que podes compilar a partir dele.
+Há um só projeto de firmware ESP32 e quatro imagens que podes compilar a partir dele, mais o firmware dos dois módulos de expansão.
 
 | Imagem | Comando de compilação | Pasta de saída | Para | Usa-se num jogo |
 | --- | --- | --- | --- | --- |
@@ -34,8 +35,9 @@ Há um só projeto de firmware e quatro imagens que podes compilar a partir dele
 | Modem de rádio USB | `python tools/docker_fw.py modem` | `firmware/esp32/build-modem/` | A segunda placa, ligada ao controlador | Sim |
 | Módulo de E/S | `python tools/docker_fw.py pod` | `firmware/esp32/build-pod/` | Uma placa que empresta os botões e o rádio a um telemóvel Android | Sim |
 | Bancada | `python tools/docker_fw.py bench` | `firmware/esp32/build-bench/` | Uma placa nua na tua secretária: teclas escritas na consola USB, sem página de configuração, PIN de administração 1234 | **Nunca** |
+| Módulo de alvo e módulo de saídas (RP2040, ficheiros UF2) | `python tools/docker_module.py build` | `firmware/target-module/build/`, `firmware/output-module/build/` | As placas da porta de expansão de uma caixa ou de um módulo de E/S | Sim ([secção 11](#11-os-módulos-de-expansão-módulo-de-alvo-e-módulo-de-saídas)) |
 
-Todas são feitas para a **Heltec WiFi LoRa 32 V4** (revisão V4.3 por omissão, V4.2 com uma alteração, vê a [secção 4](#4-as-opções-de-quem-monta)). Não grafes uma imagem feita para um tipo de placa noutro. De qualquer modo, uma caixa recusa uma atualização feita para outra variante ou outra placa.
+As quatro imagens ESP32 são feitas para a **Heltec WiFi LoRa 32 V4** (revisão V4.3 por omissão, V4.2 com uma alteração, vê a [secção 4](#4-as-opções-de-quem-monta)). Não grafes uma imagem feita para um tipo de placa noutro. De qualquer modo, uma caixa recusa uma atualização feita para outra variante ou outra placa.
 
 ## 2. Obter o firmware: transferir uma versão publicada, ou compilá-lo
 
@@ -43,7 +45,9 @@ Há duas maneiras. Transfere uma versão publicada se só queres pôr na placa o
 
 ### 2.1 Transferir uma versão publicada (o caminho fácil)
 
-O projeto publica o firmware no GitHub: [a página de Releases](https://github.com/vakaobr/atalaia-project/releases). Escolhe a mais recente (a v0.6.1 em 2026-11-02; a primeira foi a v0.4.0; a v0.6.0 não tem ficheiros, a compilação dela falhou). Cada uma está marcada como **pré-lançamento**: pré-alfa e **não testada num campo**. Lê primeiro as notas dela.
+O projeto publica o firmware no GitHub: [a página de Releases](https://github.com/vakaobr/atalaia-project/releases). Escolhe a mais recente: a **v0.8.0**, de 2026-11-04 (antes dela a v0.7.0, de 2026-11-03, e a v0.6.1, de 2026-11-02; a primeira foi a v0.4.0; a v0.6.0 não tem ficheiros, a compilação dela falhou). Cada uma está marcada como **pré-lançamento**: pré-alfa e **não testada num campo**. Lê primeiro as notas dela.
+
+**A v0.8.0 mudou as chaves de versões.** Está assinada com a chave da CI nova do projeto, em que as caixas na v0.6.1 ou anteriores não confiam. Grava essa caixa por USB, ou passa-a primeiro pela v0.7.0: [secção 7.1](#71-com-as-versões-publicadas-do-projeto). Algumas coisas deste guia chegam com a v0.9.0, que ainda não foi publicada; dizem-no, e até lá precisam de uma compilação a partir do `main`.
 
 Escolhe os ficheiros da tua placa:
 
@@ -52,9 +56,11 @@ Escolhe os ficheiros da tua placa:
 | Uma Field Box, ou um Satélite (a mesma imagem) | `atalaia-field-box-<version>-usb.zip` (esptool por USB) ou `atalaia-field-box-<version>-merged.bin` (gravador no browser) | O ficheiro simples `atalaia-field-box-<version>.bin` e o seu `.bin.release.json` servem para as atualizações pelo ar ([secção 7](#7-atualizações-pelo-ar-e-o-que-mais-usa-o-wi-fi-do-campo)); não precisas deles para gravar |
 | O modem de rádio USB do controlador | `atalaia-modem-<version>-usb.zip` ou `-merged.bin` | A segunda placa, ligada ao controlador |
 | Um módulo de E/S | `atalaia-io-pod-<version>-usb.zip` ou `-merged.bin` | |
+| Um módulo de alvo (a partir da v0.8.0) | `atalaia-target-module-<version>.uf2` (uma placa de alvo) ou `atalaia-target-module-2-<version>.uf2` (duas) | [Secção 11](#11-os-módulos-de-expansão-módulo-de-alvo-e-módulo-de-saídas) |
+| Um módulo de saídas (a partir da v0.8.0) | `atalaia-output-module-<version>.uf2` | Quatro relés, 30 s no máximo cada; outras cargas precisam de uma compilação tua ([secção 11](#11-os-módulos-de-expansão-módulo-de-alvo-e-módulo-de-saídas)) |
 | Nunca para um jogo | (a imagem de bancada não é publicada) | Compila-a tu, se precisares dela |
 
-Todos são para a Heltec WiFi LoRa 32 V4.3, região de rádio europeia (EU868), com ouvir antes de falar ligado e com as chaves do projeto incluídas. Para uma V4.2, para Taiwan (AS923) ou para as tuas próprias chaves, compila-o tu ([2.2](#22-compilar-por-ti)).
+Os ficheiros ESP32 são para a Heltec WiFi LoRa 32 V4.3, região de rádio europeia (EU868), com ouvir antes de falar ligado e com as chaves do projeto incluídas. Para uma V4.2, para Taiwan (AS923) ou para as tuas próprias chaves, compila-o tu ([2.2](#22-compilar-por-ti)).
 
 **Confirma o que transferiste.** Transfere também o `SHA256SUMS` e compara. No Linux e no macOS, na pasta dos ficheiros (`shasum -a 256 -c SHA256SUMS` no macOS; os ficheiros que não transferiste são indicados como em falta, ignora-os):
 
@@ -62,13 +68,13 @@ Todos são para a Heltec WiFi LoRa 32 V4.3, região de rádio europeia (EU868), 
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 
-No `cmd` do Windows: `certutil -hashfile atalaia-field-box-0.6.1-usb.zip SHA256` e compara a linha com a que está no `SHA256SUMS`. As somas provam que o ficheiro é o que a página da versão publicada lista. A assinatura prova quem fez uma imagem da Field Box: o `.release.json` é assinado com uma das chaves de versões da CI do projeto, em que todas as caixas confiam por omissão (`firmware/esp32/docs/RELEASE_SIGNING.md`). Uma caixa e um controlador verificam-na por ti antes de instalarem uma atualização.
+No `cmd` do Windows: `certutil -hashfile atalaia-field-box-0.8.0-usb.zip SHA256` e compara a linha com a que está no `SHA256SUMS`. As somas provam que o ficheiro é o que a página da versão publicada lista. A assinatura prova quem fez uma imagem da Field Box: o `.release.json` é assinado com uma das chaves de versões da CI do projeto, em que todas as caixas confiam por omissão (`firmware/esp32/docs/RELEASE_SIGNING.md`). Uma caixa e um controlador verificam-na por ti antes de instalarem uma atualização.
 
 **Grava o zip.** Descompacta-o. Nessa pasta segue a [secção 3](#3-grava-o) a partir da 3.1: os comandos são os mesmos, e o `README.txt` dentro do zip repete-os. A pasta tem o ficheiro `flash_args` que o comando usa, por isso salta a compilação e o passo `cd firmware/esp32/build`.
 
 **Grava o ficheiro «merged» a partir de um browser** (Chrome ou Edge, sem Python): abre o gravador web da Espressif, [https://espressif.github.io/esptool-js/](https://espressif.github.io/esptool-js/), liga a placa (em modo de gravação, se não aparecer, [3.2](#32-encontrar-a-porta-da-placa)), define o endereço de gravação como `0x0`, escolhe o ficheiro `-merged.bin` e programa. O projeto ainda não o experimentou com uma placa real; o ficheiro é o mesmo que o comando esptool produz a partir do zip.
 
-O número da versão publicada é o que a caixa mostra no arranque (`0.6.1`).
+O número da versão publicada é o que a caixa mostra no arranque (`0.8.0`).
 
 ### 2.2 Compilar por ti
 
@@ -87,7 +93,7 @@ python tools/docker_fw.py build
 
 No macOS e no Linux, usa `python3` se o `python` não for encontrado. A primeira compilação transfere as ferramentas de compilação e demora vários minutos (cerca de dez da primeira vez). Acaba com uma linha que nomeia o ficheiro `firmware/esp32/build/atalaia_esp32.bin`. Os outros ficheiros de que precisas estão na mesma pasta. Não precisas de os ler.
 
-Uma compilação feita a partir de um clone mostra uma versão como `0.6.1+12.g1a2b3c4` (ou `0.7.0-dev.12+g1a2b3c4` entre versões publicadas): o número da versão publicada, o número de alterações desde então e o identificador do código. Também aparece no ecrã pequeno da placa, no arranque. Guarda uma nota dela junto da caixa. Para obteres exatamente o firmware de uma versão publicada, faz checkout da etiqueta dela (`git checkout v0.6.1`) e compila aí: um checkout limpo de uma etiqueta diz apenas `0.6.1`.
+Uma compilação feita a partir de um clone mostra uma versão como `0.8.0+12.g1a2b3c4` (ou `0.9.0-dev.12+g1a2b3c4` entre versões publicadas): o número da versão publicada, o número de alterações desde então e o identificador do código. Também aparece no ecrã pequeno da placa, no arranque. Guarda uma nota dela junto da caixa. Para obteres exatamente o firmware de uma versão publicada, faz checkout da etiqueta dela (`git checkout v0.8.0`) e compila aí: um checkout limpo de uma etiqueta diz apenas `0.8.0`.
 
 **Chaves.** Uma compilação feita por ti confia, por omissão, nas duas chaves de versões e nas duas chaves de modos do projeto, tal como os ficheiros publicados, por isso um controlador teu aceita as versões assinadas do projeto. As tuas compilações não são assinadas pelo projeto: assina-as com uma chave tua e dá às caixas a metade pública dela (`--release-keys=`, [secção 7](#7-atualizações-pelo-ar-e-o-que-mais-usa-o-wi-fi-do-campo)).
 
@@ -152,7 +158,7 @@ Mantém as aspas: o PowerShell lê um `@` solto de maneira diferente. O `flash_a
 
 Para o modem e para o módulo de E/S, vai a `build-modem` ou a `build-pod`. O modem tem uma página própria, com estes comandos para cada sistema: [Montar o modem de rádio](modem.md).
 
-**É preciso instalar por USB uma vez, a partir da v0.5.** Uma caixa gravada com a v0.4.0 ou anterior tem a tabela de partições antiga (espaços de programa de 2 MB). A partir da v0.5 os espaços de programa têm 4 MB e uma atualização pelo ar não consegue mudar a tabela de partições, por isso grava essa caixa por USB uma vez, com o comando acima e **sem** `erase_flash`: as definições, as chaves e a adoção ficam onde estavam (as primeiras quatro partições da tabela não mudaram de sítio). Perde-se a partição de armazenamento, que mudou de sítio: a caixa formata-a no primeiro arranque e volta a obter os modos de jogo e o logótipo do campo na associação seguinte. Uma caixa ainda com a tabela antiga recusa-se a correr o firmware novo: o ecrã mostra *Instala por USB* e o registo diz `WRONG PARTITION TABLE`. Uma caixa a quem um firmware mais antigo ofereceu a imagem nova pelo ar volta sozinha à antiga. Depois dessa gravação por USB, as atualizações pelo ar funcionam como antes. O modem de rádio USB e o módulo de E/S partilham a tabela: um já gravado com a v0.4.0 ou anterior só regista `WRONG PARTITION TABLE` e continua a funcionar, mas grava-o também por USB uma vez (sem `erase_flash`) para ficar com a disposição nova.
+**É preciso instalar por USB uma vez, a partir da v0.5.** Uma caixa gravada com a v0.4.0 ou anterior tem a tabela de partições antiga (espaços de programa de 2 MB). A partir da v0.5 os espaços de programa têm 4 MB e uma atualização pelo ar não consegue mudar a tabela de partições, por isso grava essa caixa por USB uma vez, com o comando acima e **sem** `erase_flash`: as definições, as chaves e a adoção ficam onde estavam (as primeiras quatro partições da tabela não mudaram de sítio). Perde-se a partição de armazenamento, que mudou de sítio: a caixa formata-a no primeiro arranque e volta a obter os modos de jogo que lhe faltem na associação seguinte. Uma caixa ainda com a tabela antiga recusa-se a correr o firmware novo: o ecrã mostra *Instala por USB* e o registo diz `WRONG PARTITION TABLE`. Uma caixa a quem um firmware mais antigo ofereceu a imagem nova pelo ar volta sozinha à antiga. Depois dessa gravação por USB, as atualizações pelo ar funcionam como antes. O modem de rádio USB e o módulo de E/S partilham a tabela: um já gravado com a v0.4.0 ou anterior só regista `WRONG PARTITION TABLE` e continua a funcionar, mas grava-o também por USB uma vez (sem `erase_flash`) para ficar com a disposição nova.
 
 ### 3.4 Reiniciar e observar
 
@@ -188,7 +194,7 @@ A maior parte das opções são opções de compilação. Dá-as ao `docker_fw.p
 | Ouvir antes de falar | `--lbt=on` ou `--lbt=off` | ligado |
 | Ganho da antena | `--antenna-dbi=10` (o ganho indicado da antena montada, 0 a 20 dBi): o firmware baixa a potência de emissão nesse valor, para que uma antena de maior ganho fique dentro da potência radiada legal | 2 dBi |
 | Chaves de modos | `--mode-keys=<key>[,<key>...]` (até 4, em hexadecimal ou base64) | As duas chaves do projeto |
-| Chaves de versões | `--release-keys=<key>[,<key>...]` (até 4) | Nenhuma: toda a atualização é recusada |
+| Chaves de versões | `--release-keys=<key>[,<key>...]` (até 4, em hexadecimal ou base64) | As duas chaves de versões do projeto: a raiz `424d053af5cdbc35` e a da CI `a4f6002b0122b131` ([secção 7](#7-atualizações-pelo-ar-e-o-que-mais-usa-o-wi-fi-do-campo)) |
 | Versão | `--fw-version=0.4.1` | A do código |
 | Besouro piezoelétrico (no GPIO 45) | `--buzzer=on` | desligado |
 | Saída simples: um interruptor de relé RC para uma sirene, um estroboscópio ou o comando de uma máquina de fumo (GPIO 46 numa V4.3, 5 numa V4.2; ainda não experimentada em hardware) | `--simple-out=on`; `--simple-out=on2` junta uma segunda no GPIO 45 (não com o besouro); um número escolhe outro GPIO livre (uma placa de bancada) | desligada |
@@ -237,7 +243,7 @@ Uma Field Box ou um Satélite novo faz isto no primeiro arranque. A antena de 2,
    - **PIN de administração**: 4 a 8 algarismos. Anota-o. 1234, 0000, uma sequência como 9876 e um par repetido como 1212 são recusados.
    - **Brilho do ecrã** e **Volume do som**.
    - **Chave de ligação ao campo** (opcional): os 64 algarismos hexadecimais que a organização te dá. Podes juntá-la depois, por adoção.
-   - **Nome do Wi-Fi do campo** e **Palavra-passe do Wi-Fi do campo** (opcionais, mas precisos para as atualizações e para os modos de jogo obtidos: [secção 7](#7-atualizações-pelo-ar-e-o-que-mais-usa-o-wi-fi-do-campo)). O Wi-Fi do campo tem de ser de 2,4 GHz. A palavra-passe tem 8 a 63 caracteres, 64 algarismos hexadecimais, ou nenhuma numa rede aberta, como na consola USB; a página recusa qualquer outra. O nome tem no máximo 32 bytes, também como na consola USB: uma letra acentuada ocupa 2 e um carácter chinês 3, por isso um nome com elas pode ser recusado com menos de 32 caracteres.
+   - **Nome do Wi-Fi do campo** e **Palavra-passe do Wi-Fi do campo** (opcionais, mas precisos para as atualizações e para os modos de jogo obtidos: [secção 7](#7-atualizações-pelo-ar-e-o-que-mais-usa-o-wi-fi-do-campo)). O Wi-Fi do campo tem de ser de 2,4 GHz. O nome tem 1 a 32 bytes: uma letra acentuada ocupa 2 e um carácter chinês 3, por isso um nome com elas pode ser recusado com menos de 32 caracteres. A palavra-passe fica vazia (uma rede aberta), tem 8 a 63 caracteres, ou exatamente 64 algarismos hexadecimais. A partir da v0.9.0 (ainda não publicada) a página recusa tudo o resto e diz porquê, como a consola USB; a v0.8.0 e anteriores cortam um nome ou uma palavra-passe mais compridos sem avisar.
 5. Toca em **Guardar e reiniciar**. A caixa reinicia.
 
 Depois, uma caixa sem campo mostra **Emparelhar caixa** e um código de 6 algarismos ([secção 6](#6-adoção)). Uma caixa que já está adotada mostra **PRONTA**.
@@ -249,7 +255,7 @@ Depois, uma caixa sem campo mostra **Emparelhar caixa** e um código de 6 algari
 
 A caixa mantém a adoção e a chave do campo. Substitui o que a página pede. A compilação de bancada não tem página de configuração.
 
-**Tirar uma caixa do jogo.** Uma caixa que estava desligada quando o jogo terminou volta nesse jogo: o registo dela recusa todas as entradas (`join: a game is being played`) e a adoção por USB (`busy`). Não a apagues. Um controlador cujo modem de rádio USB tem o firmware de modem desta versão ou de uma posterior ouve-a e volta a enviar o GAME_OVER desse jogo, no máximo uma vez por minuto, e a caixa liberta-se sozinha (no registo: `game N is over (said by a field controller)`); grava primeiro o modem (`python tools/docker_fw.py modem`) para ter isto. Caso contrário: Na consola USB escreve `@leave` e o PIN de administração, e carrega em Enter. A caixa responde `leave: game N is over on this box; it is free for the next game`: termina o jogo como o fim dado pelo controlador o faria, nunca mais entra nesse jogo e mantém a adoção, a chave de entrada, o Wi-Fi, o PIN de administração e os modos. Um PIN errado conta para as esperas abaixo. Também funciona num jogo a decorrer. Uma caixa com teclado tem o mesmo no menu de administração: mantém `*` premido 3 segundos ([manual da Field Box](field-box.md#d-tirar-uma-caixa-do-jogo)). A compilação de bancada aceita `@leave` sozinho.
+**Tirar uma caixa do jogo.** Uma caixa que estava desligada quando o jogo terminou volta nesse jogo: o registo dela recusa todas as entradas (`join: a game is being played`) e a adoção por USB (`busy`). Não a apagues. A partir da v0.9.0 (ainda não publicada; até lá, compila a partir do `main`), escreve `@leave` e o PIN de administração na consola USB, e carrega em Enter. A caixa responde `leave: game N is over on this box; it is free for the next game`, e mantém a adoção, a chave de entrada, o Wi-Fi, o PIN de administração e os modos. Um PIN errado conta para as esperas abaixo. A compilação de bancada aceita `@leave` sozinho. As outras maneiras de sair (o menu de administração da caixa, e o controlador libertá-la sozinho com um modem na v0.9.0) estão no [manual da Field Box](field-box.md#take-a-box-out-of-its-game).
 
 **PIN esquecido.** Depois de cinco PIN errados, a caixa obriga-te a esperar 1, 2, 4... até 60 minutos. A espera sobrevive a um reinício. Se perdeste mesmo o PIN, apaga as definições ([secção 8](#8-uma-caixa-que-não-arranca)).
 
@@ -267,27 +273,47 @@ Uma caixa de outro campo pede o seu **PIN de administração**. **Mudar de campo
 
 ## 7. Atualizações pelo ar, e o que mais usa o Wi-Fi do campo
 
-Duas coisas usam o Wi-Fi do campo, e só entre jogos: as **atualizações de firmware** e os **modos de jogo que a caixa não tem** (obtidos do controlador, como pacotes assinados). Para as duas, a caixa precisa do **nome e da palavra-passe do Wi-Fi do campo** da página de configuração. Também os podes definir na consola USB: `@wifi <nome> <palavra-passe>`. Um nome ou uma palavra-passe com espaços vai entre aspas: `@wifi "O Meu Campo" "palavra passe"` (dentro das aspas, `\"` é uma aspa e `\\` uma barra invertida). O nome tem até 32 bytes; a palavra-passe tem 8 a 63 caracteres, 64 algarismos hexadecimais, ou nenhuma numa rede aberta. A caixa responde `field Wi-Fi: stored (network "O Meu Campo")`, ou `refused:` e o motivo (uma aspa por fechar, por exemplo), e nesse caso não guarda nada. O controlador tem de estar a correr com HTTPS ligado.
+Duas coisas usam o Wi-Fi do campo, e só entre jogos: as **atualizações de firmware** e os **modos de jogo que a caixa não tem** (obtidos do controlador, como pacotes assinados). Para as duas, a caixa precisa do **nome e da palavra-passe do Wi-Fi do campo** da página de configuração, e o controlador tem de estar a correr com HTTPS ligado.
+
+Também podes definir o Wi-Fi na consola USB: `@wifi <nome> <palavra-passe>`, ou `@wifi <nome>` numa rede aberta. A partir da v0.9.0 (ainda não publicada), um nome ou uma palavra-passe com espaços vai entre aspas: `@wifi "O Meu Campo" "palavra passe"` (dentro das aspas, `\"` é uma aspa e `\\` uma barra invertida). As regras são as da página de configuração ([secção 5](#5-primeiro-arranque-e-configuração)). A caixa responde `field Wi-Fi: stored (network "O Meu Campo")`, ou `field Wi-Fi: refused:` e o motivo (uma aspa por fechar, por exemplo), e nesse caso não guarda nada. Na v0.8.0, o `@wifi` não aceita espaços no nome.
 
 **As regras das atualizações de firmware.** A caixa só instala uma atualização se tudo isto for verdade:
 
 - Nenhum jogo está a decorrer.
-- A atualização está assinada por uma **chave de versões incluída no firmware da própria caixa** (`--release-keys`). Por omissão são as duas chaves de versões do projeto (a raiz e a da CI), por isso os ficheiros da Field Box de uma versão publicada no GitHub podem ser instalados como atualizações; uma caixa compilada com `--release-keys=` uma chave tua só confia nessa. As chaves do projeto e o que acontece se uma vazar estão em [RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md).
+- A atualização está assinada por uma **chave de versões incluída no firmware da própria caixa** (`--release-keys`, [secção 4](#4-as-opções-de-quem-monta)). Por omissão são as duas chaves de versões do projeto, por isso os ficheiros da Field Box de uma versão publicada no GitHub podem ser instalados como atualizações; uma caixa compilada com `--release-keys=` uma chave tua só confia nessa.
 - A versão é mais alta do que a que corre.
 - É da mesma variante e da mesma placa (uma imagem V4.2 nunca vai para uma V4.3).
 - A bateria está a 30 % ou mais, se a caixa tiver medidor.
 
-**O caminho curto.**
+O controlador também verifica a assinatura, quando a versão é carregada, com as suas próprias `[firmware] release_keys`: uma versão assinada por uma chave que não está na lista é recusada. Como a organização faz uma atualização na consola: [manual da Field Box, Atualizar as caixas](field-box.md#update-the-boxes).
 
-**Com as versões publicadas do projeto:** grava uma caixa uma vez por USB com uma versão publicada e depois carrega, no separador **Caixas** da consola, o `atalaia-field-box-<version>.bin` de uma versão posterior e o seu `.bin.release.json`. O `[firmware] release_keys` do controlador já tem por omissão as chaves do projeto (um Pi sem esta definição fica com a nova omissão quando arranca). Se o teu `controller.toml` as lista à mão (o ficheiro de exemplo listava-as), deixa na lista a chave raiz `5tzPkN0AJSn+g34CP59linCRf/fcaWFc7GAAg7qzYNc=` e a chave da CI `76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=`, e tira a chave antiga da CI `rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw=` (id `32b3c815ac30ad43`): as versões do projeto são assinadas com a chave da CI `a4f6002b0122b131` desde a versão seguinte à v0.7.0, e a chave antiga foi retirada. Nada a tira da tua lista por ti. O `ATALAIA_FIRMWARE_KEYS` de um servidor do site, se o definiste, também a deixa de ter. Uma caixa ainda na v0.6.1 ou anterior só confia na raiz e na chave antiga da CI: instala-lhe primeiro a v0.7.0 (pelo ar ou por USB) e depois as versões seguintes ([RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md#rotating-the-ci-key-2026-11)). Carrega em **Atualizar para** (passo 5). **Com uma chave tua:**
+### 7.1 Com as versões publicadas do projeto
+
+O projeto tem duas chaves de versões, listadas em [docs/community/keys.md](../../community/keys.md) e no [RELEASE_SIGNING.md](../../../firmware/esp32/docs/RELEASE_SIGNING.md) (em inglês):
+
+| Chave | Id da chave | Chave pública (base64, para o `controller.toml`) |
+| --- | --- | --- |
+| Raiz | `424d053af5cdbc35` | `5tzPkN0AJSn+g34CP59linCRf/fcaWFc7GAAg7qzYNc=` |
+| CI (assina as versões a partir da v0.8.0) | `a4f6002b0122b131` | `76eY5BoMQ4RHohhX/8iSUlIUA5o5Entfk7EFBUxpbSY=` |
+| CI antiga, **retirada** (assinou as versões até à v0.7.0) | `32b3c815ac30ad43` | `rIO8ogMU3LRLLtnt6Rys+URdKYfmNv5mxvuRJQsX9Tw=` |
+
+O firmware até à v0.6.1 confia na raiz e na chave antiga da CI; a v0.7.0 confia nas três; a v0.8.0 e seguintes só na raiz e na chave nova da CI. Para pôr um campo na v0.8.0 ou seguintes:
+
+1. **Grava cada caixa uma vez por USB** com uma versão publicada, se nunca foi gravada ([secção 3](#3-grava-o)).
+2. **Define as chaves do controlador.** Um Raspberry Pi cujo `controller.toml` não tem `release_keys` fica com as duas chaves atuais do projeto quando arranca. Se o `controller.toml` as lista à mão (o ficheiro de exemplo listava-as), deixa na lista exatamente a chave raiz e a chave nova da CI da tabela, e tira a antiga. Nada a tira por ti. Reinicia o controlador. Um telemóvel controlador que ficou com a omissão da app passa sozinho à lista nova; uma lista editada fica como está. O `ATALAIA_FIRMWARE_KEYS` de um servidor do site, se o definiste, também deixa de ter a chave antiga.
+3. **Caixas na v0.7.0 ou seguintes:** carrega no separador **Caixas** da consola o `atalaia-field-box-<versão>.bin` da versão mais recente e o seu `.bin.release.json`, e carrega em **Atualizar para**.
+4. **Caixas na v0.6.1 ou anteriores** recusam a v0.8.0 e seguintes. Ou gravas a versão mais recente por USB, sem `erase_flash` (as definições, as chaves e a adoção ficam), ou atualizas primeiro para a **v0.7.0** pelo ar e depois para a mais recente. A v0.7.0 está assinada com a chave antiga, por isso o controlador só aceita carregá-la enquanto as suas `release_keys` também tiverem a chave antiga: junta-a para esse passo e tira-a outra vez a seguir.
+5. **Confirma** que todas as caixas indicam a versão nova, e apaga qualquer versão que a consola marque como **chave já não aceite**.
+
+### 7.2 Com uma chave tua
 
 1. Faz uma chave com `tools/firmware_release.py keygen`. Guarda o ficheiro privado em segurança e fora do repositório.
-2. Compila as caixas com `--release-keys=<the public key>`. Grava-as por USB, uma vez. As atualizações não conseguem instalar um bootloader novo.
+2. Compila as caixas com `--release-keys=<a chave pública>` (junta outra vez as chaves do projeto se ainda quiseres as versões dele). Grava-as por USB, uma vez. As atualizações não conseguem instalar um bootloader novo.
 3. Põe a metade pública da chave na definição `[firmware] release_keys` do controlador.
-4. Para uma atualização, compila uma versão mais alta (`--fw-version=0.4.1`), assina-a com `tools/firmware_release.py sign` e carrega a imagem e o seu `.release.json` no separador **Caixas** da consola. Carrega em **Atualizar para**.
+4. Para uma atualização, compila uma versão mais alta (`--fw-version=0.8.1`), assina-a com `tools/firmware_release.py sign` e carrega a imagem e o seu `.release.json` no separador **Caixas** da consola. Carrega em **Atualizar para**.
 5. A caixa descarrega-a, volta a verificá-la, instala-a e reinicia. Se a imagem nova falhar o autoteste, a caixa volta sozinha à antiga.
 
-Feito uma vez numa placa real numa bancada, com uma chave descartável, enviada pelo controlador pelo rádio, numa rede Wi-Fi doméstica (cerca de 11 segundos). Ainda não testado num campo. Uma caixa gravada com firmware anterior às atualizações pelo ar precisa primeiro de uma gravação por USB, e uma caixa com a tabela de partições antiga (v0.4.0 ou anterior) também, antes de receber a v0.5 ([secção 3.3](#33-escrever-a-imagem)).
+Feito uma vez numa placa real numa bancada, com uma chave descartável, enviada pelo controlador pelo rádio, numa rede Wi-Fi doméstica (cerca de 11 segundos). Ainda não testado num campo. Uma caixa gravada com firmware anterior às atualizações pelo ar precisa primeiro de uma gravação por USB, e uma caixa com a tabela de partições antiga (v0.4.0 ou anterior) também, antes de receber a v0.5 ou seguintes ([secção 3.3](#33-escrever-a-imagem)).
 
 ## 8. Uma caixa que não arranca
 
@@ -324,7 +350,7 @@ O modem é a única imagem cuja porta USB leva tramas de dados, por isso o regis
 
 ## 10. As variantes do módulo de E/S
 
-Um módulo de E/S empresta os botões, o teclado, o anel, o som, o leitor NFC e o rádio a um telemóvel Android. As peças dele estão no [guia de montagem do módulo de E/S](../../../hardware/io-pod/BUILD.md) (em inglês).
+Um módulo de E/S empresta os botões, o teclado, o anel, o som, o leitor NFC e o rádio a um telemóvel Android. As peças dele estão no [guia de montagem do módulo de E/S](../../../hardware/io-pod/BUILD.pt.md).
 
 - Compilação: `python tools/docker_fw.py pod` (`--region` como acima). Grava a partir de `firmware/esp32/build-pod`. Edita o `build-pod/sdkconfig` para uma V4.2.
 - Um módulo de E/S não tem página de configuração, nem Wi-Fi, nem PIN de administração. Tem a antena de 2,4 GHz para o **Bluetooth** (`atalaia-pod-XXXX`), que é emparelhado e cifrado. O telemóvel emparelha com um **código de 6 dígitos** que o ecrã pequeno da placa mostra durante o emparelhamento; a janela do Android pede-o. Carrega 5 segundos no botão **PRG** da placa para o módulo esquecer todos os telemóveis ([guia de montagem do módulo de E/S, secção 10](../../../hardware/io-pod/BUILD.pt.md#10-ligá-lo-a-um-telemóvel)).
@@ -335,6 +361,37 @@ Um módulo de E/S empresta os botões, o teclado, o anel, o som, o leitor NFC e 
 - **Porta de expansão** (opcional): todas as compilações do módulo de E/S procuram módulos na sua porta de expansão (a tomada M12 no barramento I2C da placa, GPIO 17 e 18): os impactos de um módulo de alvo chegam ao jogo do telemóvel. `--module-outputs=on` empresta também ao telemóvel os relés de um módulo de saídas (`CONFIG_ATALAIA_POD_MODULE_OUTPUTS`; o seu tempo máximo ligados `CONFIG_ATALAIA_POD_MODULE_MAX_ON_S`, 30 s por omissão, nunca mais do que o do próprio módulo da porta); o módulo de E/S desliga-os quando o telemóvel se vai. `# CONFIG_ATALAIA_POD_PORT is not set` deixa a porta de fora. Ligações: [guia de montagem do módulo de E/S, secção 8.2](../../../hardware/io-pod/BUILD.pt.md#82-porta-de-expansão-opcional).
 - O ecrã pequeno da placa fica apagado, exceto enquanto um telemóvel emparelha: o código, depois **PAIRED**, **FAILED**, **TOO SLOW** ou **PAIR AGAIN** (em inglês: o módulo não tem idioma). O emparelhamento com código ainda não foi experimentado numa placa real.
 
-Ainda não testado numa placa real: tudo isto. O firmware do módulo de E/S já correu num computador, com a app e o controlador. O Satélite não é uma variante: é a imagem da Field Box com menos peças montadas ([guia de montagem do Satélite](../../../hardware/satellite/BUILD.md), em inglês). O módulo de alvo ainda não pode ser montado ([a página dele](../../../hardware/target-addon/BUILD.md), em inglês).
+Ainda não testado numa placa real: tudo isto. O firmware do módulo de E/S já correu num computador, com a app e o controlador. O Satélite não é uma variante: é a imagem da Field Box com menos peças montadas ([guia de montagem do Satélite](../../../hardware/satellite/BUILD.md), em inglês). Os módulos que um módulo de E/S ou uma caixa aceitam na porta de expansão estão na [secção 11](#11-os-módulos-de-expansão-módulo-de-alvo-e-módulo-de-saídas).
+
+## 11. Os módulos de expansão: módulo de alvo e módulo de saídas
+
+Uma Field Box ou um módulo de E/S com **porta de expansão** (uma tomada M12 no barramento I2C da placa) aceita módulos pequenos, cada um com uma placa RP2040 e firmware próprio. Todas as imagens da Field Box e do módulo de E/S os procuram; não há nada a definir na caixa. O que fazem num campo está no [manual da Field Box, secção 8](field-box.md#8-saídas-e-módulos).
+
+| Módulo | O que é | Endereço | Guia de montagem |
+| --- | --- | --- | --- |
+| **Módulo de alvo** | Uma placa para onde quem joga dispara, com um sensor piezoelétrico; uma placa de alvo, ou duas com o segundo ficheiro de firmware | 0x58, até 0x5B com os jumpers de endereço | [hardware/target-addon/BUILD.pt.md](../../../hardware/target-addon/BUILD.pt.md) |
+| **Módulo de saídas** | Até 4 relés ou MOSFET com alimentação própria, atrás de um isolador I2C; só cargas SELV, no máximo 24 V DC e 2 A por canal | 0x5C, até 0x5F com os jumpers de endereço | [hardware/output-module/BUILD.pt.md](../../../hardware/output-module/BUILD.pt.md) |
+
+Os dois firmwares estão escritos e testados num computador; **nenhum correu ainda numa placa**, e nenhum módulo foi montado a partir do seu guia.
+
+**Obter o ficheiro UF2.** Transfere-o de uma versão publicada (v0.8.0 ou seguinte; [secção 2.1](#21-transferir-uma-versão-publicada-o-caminho-fácil)), confirmado com o `SHA256SUMS`, ou compila os dois com o Docker:
+
+```
+python tools/docker_module.py build
+```
+
+Os ficheiros ficam em `firmware/target-module/build/` (`atalaia_target_module.uf2`, e `atalaia_target_module_2.uf2` para duas placas de alvo) e em `firmware/output-module/build/` (`atalaia_output_module.uf2`). Os ficheiros UF2 não são assinados: um módulo grava-se à mão e nunca se atualiza pelo ar.
+
+**Os canais do módulo de saídas.** O ficheiro publicado tem quatro relés, 30 segundos no máximo cada. Para outras cargas, define na compilação o tipo, o uso, o tempo máximo ligado e o tempo de descanso de cada canal (`OUTPUT_CHANNELS`, por exemplo `relay:siren:60:0,relay:strobe:120:0,relay:smoke:30:30:sense`) como em [firmware/output-module/README.md](../../../firmware/output-module/README.md) (em inglês). São os limites do próprio módulo: a administração da caixa só os pode baixar.
+
+**Gravar um módulo:**
+
+1. **Desliga o módulo da porta da caixa.** Nunca ligues ao mesmo tempo o cabo USB dele e o cabo da porta. No módulo de saídas, desliga também a alimentação própria: a placa RP2040 dele junta os 5 V do USB ao seu pino de 5 V.
+2. Mantém premido o botão **BOOT** (BOOTSEL) da placa e liga o cabo USB dela a um computador. Larga o botão.
+3. Aparece uma unidade chamada `RPI-RP2`. Copia o ficheiro UF2 para lá.
+4. A placa reinicia sozinha no firmware.
+5. Tira o cabo USB, liga o módulo à porta da caixa e confirma: o registo USB da caixa diz `expansion: 0x58 added: ...` (o endereço do módulo), e o `@modules` na consola USB dela lista-o (um alvo como `58:target/1.0.0:hit`).
+
+Mais, com os pinos e os testes no computador: [firmware/target-module/README.md](../../../firmware/target-module/README.md), [firmware/output-module/README.md](../../../firmware/output-module/README.md) (em inglês).
 
 Encontraste um passo que não corresponde ao que vês? Abre uma issue ou diz-nos nas [Discussions](https://github.com/vakaobr/atalaia-project/discussions).
