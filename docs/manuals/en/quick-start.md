@@ -13,7 +13,7 @@ One page for game day. In Portuguese: [Início rápido](../pt/quick-start.md). E
 
 1. Install the Atalaia app (Android 8.0 or later, or iPhone). Tap the **gear**, then **Language** › **English**.
 2. Join the field's Wi-Fi. If the phone says "no internet", stay connected.
-3. **Player › Check in at the field › Scan the poster.** Read the notice, type your **Name or callsign**, tap **Check in**. Registered online? Pick your registration under **Online registration**, or show your printed ticket at the check-in desk.
+3. **Player › Check in at the field › Scan the poster.** Read the notice, type your **Name or callsign**, tap **Check in**. Registered online? Pick your registration under **Online registration**, or show your printed ticket to a marshal or at the check-in desk.
 4. **Pick the replicas** you will use. Take them to a marshal for the *chrono*.
 5. **Follow the game.** Capture boxes at the box: **hold your team's button** until the bar is full.
 6. Optional: **Share my position**. Keep **Vibrate on game events** on.
@@ -34,7 +34,7 @@ New firmware for the boxes: [Update the boxes](field-box.md#update-the-boxes).
 
 1. Check in as a player. Ask the GM to add you under **Check-in › Marshals**.
 2. **Marshal** shows **You are marshal M-01**. Stay on the field's Wi-Fi at least every 2 hours.
-3. At the check-in desk: compare membership cards and tap **Card seen, matches**; check in a player without the app with **Check in by hand**. Send players with a printed ticket to the GM console ([the check-in desk](marshal.md#2-the-check-in-desk)).
+3. At the check-in desk: compare membership cards and tap **Card seen, matches**; check in a player without the app with **Check in by hand**. Take a registered player's printed ticket with **Marshal › Check in a ticket** ([the check-in desk](marshal.md#2-the-check-in-desk)).
 4. **Replicas to chrono** › tap a replica › **Check-in** › choose **BB weight**, type the velocity, **Record the shot** for each shot.
 5. **Send to the controller**. During the game, use **Spot check**.
 

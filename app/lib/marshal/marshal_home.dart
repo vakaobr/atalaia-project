@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 /// The marshal's tools: who the marshal is (the id and name the GM's list
-/// gave them, the Ed25519 key that signs their chrono records), the chrono
-/// check-in, the replica registry, writing players' tags, and erasing a
+/// gave them, the Ed25519 key that signs their chrono records), a registered
+/// player's printed ticket taken (TKT-1), the chrono check-in, the replica registry, writing players' tags, and erasing a
 /// player's readings on request; and (plan phase E) the field's "replicas to
 /// chrono" list, once the marshal has checked in at the field and the GM has
 /// given them the marshal role.
@@ -32,6 +32,7 @@ import 'chrono_queue.dart';
 import 'marshal_access.dart';
 import 'marshal_records.dart';
 import 'tag_writer.dart';
+import 'ticket_checkin.dart';
 
 class MarshalHomeScreen extends StatefulWidget {
   const MarshalHomeScreen({this.records, super.key});
@@ -124,6 +125,14 @@ class _MarshalHomeScreenState extends State<MarshalHomeScreen> {
     final field = _field;
     if (c == null || field == null || !access.allowed) return;
     _go(ChronoQueueScreen(checkin: c, field: field, records: records));
+  }
+
+  /// A registered player's printed ticket, scanned or typed (TKT-1).
+  void _ticket() {
+    final c = _checkin;
+    final field = _field;
+    if (c == null || field == null || !access.allowed) return;
+    _go(TicketCheckinScreen(checkin: c, field: field));
   }
 
   /// Players' tags: the field controller signs them for this phone to write.
@@ -273,6 +282,15 @@ class _MarshalHomeScreenState extends State<MarshalHomeScreen> {
                     title: Text(s.t('queue.title')),
                     subtitle: Text(s.t('queue.hint')),
                     onTap: _queue,
+                  ),
+                ),
+                Card(
+                  child: ListTile(
+                    key: const Key('marshal-ticket'),
+                    leading: const Icon(Icons.qr_code_scanner, size: 32),
+                    title: Text(s.t('ticket.title')),
+                    subtitle: Text(s.t('ticket.hint')),
+                    onTap: _ticket,
                   ),
                 ),
                 Card(

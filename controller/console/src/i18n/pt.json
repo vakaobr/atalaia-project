@@ -1011,6 +1011,8 @@
     "ticket_label": "Código do bilhete",
     "ticket_submit": "Fazer o check-in",
     "ticket_done": "Check-in feito: {name}.",
+    "ticket_pending": "{name} está na lista e espera pela verificação do cartão (\"Cartão visto, confere\").",
+    "ticket_already": "{name} já tinha chegado: nada mudou.",
     "schedule_title": "Da agenda do site",
     "schedule_intro": "Os jogos publicados no servidor do site para os próximos dias. Um jogo criado a partir de um deles fica com o título, o modo e as equipas; as inscrições aparecem depois aqui como “por chegar”.",
     "schedule_create": "Criar o jogo",

@@ -286,6 +286,83 @@ class ArrivalTests(GameDayCase):
                              headers=GM)
         self.assertEqual(r.status_code, 400)
 
+    def scan(self, text: str, headers: dict[str, str], expect: int = 200) -> dict[str, Any]:
+        r = self.client.post(f"/api/v1/games/{self.gid}/checkins/ticket", json={"ticket": text}, headers=headers)
+        self.assertEqual(r.status_code, expect, r.text)
+        return r.json()
+
+    def printed(self, reg: Optional[dict[str, Any]] = None, raw: Optional[bytes] = None) -> str:
+        reg = reg or self.reg
+        return checkin_ticket.make({"registration_id": reg["registration_id"], "player_id": reg["player_id"],
+                                    "secret": raw if raw is not None else self.raw})
+
+    def test_a_marshal_takes_the_ticket_with_their_own_token(self) -> None:
+        """TKT-1 to TKT-3: the marshal's token (staff for its game) takes the ticket; who and when are kept with
+        the arrival, in the list and the CSV, and logged without the name; a second scan changes nothing."""
+        _, token = self.make_marshal(self.gid)
+        marshal_pid = self.svc.resolve(token).player_id
+        with self.assertLogs("atalaia", level="INFO") as logs:
+            row = self.scan(self.printed(), bearer(token))
+        self.assertEqual((row["status"], row["already"], row["display_name"]), ("checked_in", False, "Falcão"))
+        self.assertEqual((row["ticket_scanned_by"], row["ticket_scanned_at"]), (marshal_pid, self.now))
+        line = next(m for m in logs.output if "ticket check-in" in m)
+        self.assertIn(f"{self.reg['player_id']} by {marshal_pid}", line)
+        self.assertNotIn("Falcão", "\n".join(logs.output))
+        again = self.scan(self.printed(), bearer(token))
+        self.assertEqual((again["already"], again["ticket_scanned_at"]), (True, self.now))
+        csv_text = self.client.get(f"/api/v1/games/{self.gid}/checkins.csv", headers=GM).content.decode("utf-8-sig")
+        header, line1 = csv_text.splitlines()[:2]
+        self.assertIn("card_checked_at,ticket_scanned_by,ticket_scanned_at,manual", header)
+        self.assertIn(marshal_pid, line1)
+        # A newer ticket replaced this one: said with a code the app can tell apart.
+        r = self.scan(self.printed(raw=os.urandom(32)), bearer(token), expect=403)
+        self.assertTrue(r["detail"].startswith("ticket_not_newest:"), r)
+        # Leaving erases who took the ticket with the rest of the row's data.
+        self.client.delete(f"/api/v1/games/{self.gid}/checkins/{self.reg['player_id']}", headers=GM)
+        stored = self.bundle.store.checkin(self.gid, self.reg["player_id"])
+        self.assertEqual((stored["ticket_scanned_by"], stored["ticket_scanned_at"]), (None, None))
+
+    def test_the_card_rule_holds_for_a_marshal_scan(self) -> None:
+        """TKT-4: under the APD rule the ticket is not the card: pending until "card seen, matches"."""
+        r = self.client.put("/api/v1/checkin/settings", headers=GM,
+                            json={"apd": {"accepted": ["fpa"], "checkin": True}})
+        self.assertEqual(r.status_code, 200, r.text)
+        _, token = self.make_marshal(self.gid)
+        row = self.scan(self.printed(), bearer(token))
+        self.assertEqual((row["status"], row["already"], row["checked_in_at"]), ("pending", False, None))
+        self.assertEqual(self.scan(self.printed(), bearer(token))["already"], True)
+        r = self.client.patch(f"/api/v1/games/{self.gid}/checkins/{self.reg['player_id']}", headers=bearer(token),
+                              json={"federation_seen": True})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["status"], "checked_in")
+        self.assertEqual(r.json()["ticket_scanned_by"], r.json()["card_checked_by"])
+
+    def test_who_may_take_a_ticket(self) -> None:
+        """TKT-1: staff only. A player's token, the read token and a "marshals" day code (access token) are
+        refused; a "gm" day code is staff like the GM token."""
+        plain = self.check_in(self.gid, name="Corvo")["token"]
+        self.scan(self.printed(), bearer(plain), expect=403)
+        self.scan(self.printed(), {"Authorization": "Bearer read-secret"}, expect=403)
+        def day_code(scope: str) -> str:
+            r = self.client.post("/api/v1/tokens", headers=GM, json={"label": f"desk {scope}", "scope": scope})
+            self.assertEqual(r.status_code, 201, r.text)
+            return r.json()["token"]
+        self.scan(self.printed(), bearer(day_code("marshals")), expect=403)
+        self.assertEqual(self.rows(self.gid)[self.reg["player_id"]]["status"], "expected")
+        row = self.scan(self.printed(), bearer(day_code("gm")))
+        self.assertEqual((row["status"], row["ticket_scanned_by"]), ("checked_in", "gm"))
+
+    def test_tickets_are_rate_limited_per_staff_id(self) -> None:
+        """TKT-2: at most max(60, 6 x rate_per_minute) scans a minute per staff id, bad ones included; another
+        marshal and the GM keep their own count."""
+        _, token = self.make_marshal(self.gid)
+        limit = self.svc.ticket_rate.per_minute
+        for _ in range(limit):
+            self.scan("atalaia:ticket:AA", bearer(token), expect=400)
+        r = self.scan(self.printed(), bearer(token), expect=429)
+        self.assertIn("too many", r["detail"])
+        self.assertEqual(self.scan(self.printed(), GM)["status"], "checked_in")
+
     def test_ticked_by_name(self) -> None:
         row = self.gm_patch(self.gid, self.reg["player_id"], status="checked_in")
         self.assertEqual(row["status"], "checked_in")
