@@ -20,16 +20,16 @@ On game day:
 | **Game masters**: the GM console, a game from start to end, recovering from problems, updating the boxes | [Game master manual](en/game-master.md) | [Manual da organização](pt/game-master.md) |
 | **Marshals**: the check-in desk, the chrono, spot checks, players' tags | [Marshal manual](en/marshal.md) | [Manual de marshal](pt/marshal.md) |
 | **Field Box operators**: switching on, joining a game, screens, outputs, taking a box out of its game, battery, updates | [Field Box operator manual](en/field-box.md) | [Manual de operação da Field Box](pt/field-box.md) |
-| **Game prop operators**: a phone as a game prop, with its I/O pod | [Phone prop manual](en/phone-prop.md) | [Manual do telemóvel como dispositivo de jogo](pt/phone-prop.md) |
+| **Game prop operators**: a phone as a game prop, with its I/O pod | [Phone prop and I/O pod](en/phone-prop.md) | [Telemóvel como dispositivo de jogo e módulo de E/S](pt/phone-prop.md) |
 
 Setting up a field (once, and for each update):
 
 | For | English | Português (pt-PT) |
 | --- | --- | --- |
 | **Organisers**: the field controller on a Raspberry Pi with its modem board, a standby controller, updates | [Controller setup guide](en/controller-setup.md) | [Guia de montagem do controlador](pt/controller-setup.md) |
-| **Organisers**: the field controller on an Android phone | [Phone controller guide](en/phone-controller.md) | [Guia do controlador no telemóvel](pt/phone-controller.md) |
+| **Organisers**: the field controller on an Android phone | [Phone controller guide (Android)](en/phone-controller.md) | [Guia do telemóvel controlador (Android)](pt/phone-controller.md) |
 | **Organisers and builders**: flash the controller's radio modem, plug it in, check it, update it | [Set up the radio modem](en/modem.md) | [Montar o modem de rádio](pt/modem.md) |
-| **Field admins**: the site server's staff pages, accounts, schedules, registrations, data and privacy | [Site admin manual](en/site-admin.md) | [Manual de administração do site](pt/site-admin.md) |
+| **Field admins**: the site server's staff pages, accounts, schedules, registrations, data and privacy | [Site server administration manual](en/site-admin.md) | [Manual da administração do servidor do site](pt/site-admin.md) |
 
 For people who **build** things (not for players or organisers on game day):
 
