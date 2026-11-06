@@ -9,6 +9,7 @@
 // automatic failover (the cross-controller behaviour against the Pi is
 // pinned by the shared contract cases' s7 block).
 
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:atalaia_app/controller/controller_engine.dart';
@@ -55,8 +56,14 @@ void main() {
   group('automatic', () {
     late Election e;
     setUp(() {
-      e = Election(5, 1000, mode: 'auto')..follow(0);
-      e.onTime(1, 0, 0);
+      // A leader on auto, heard beaconing every 10 s (the first TIME's gap
+      // is no evidence, then three steady gaps: decisions FAIL-1 to FAIL-3),
+      // the last one at 0.
+      e = Election(5, 1000, mode: 'auto')..follow(-40000);
+      for (var t = -40000; t <= 0; t += 10000) {
+        e.onTime(1, 0, t, gameState: 1);
+      }
+      expect(e.leaderBeaconMs, 10000);
     });
 
     test('heartbeats keep a follower quiet', () {
@@ -169,6 +176,126 @@ void main() {
     });
   });
 
+  group('mixed failover modes (decisions FAIL-1 to FAIL-6)', () {
+    const running = 1, paused = 2;
+    const repeats = [1000, 2500, 5000, 10000]; // Amendment 19
+
+    /// Feeds the leader's TIMEs at [times] and ticks every 100 ms; the first
+    /// CLAIM's time, or null.
+    int? runBeacons(
+      Election e,
+      List<int> times, {
+      List<int>? states,
+      int? until,
+    }) {
+      final beacons = <int, int>{
+        for (var i = 0; i < times.length; i++)
+          times[i]: states == null ? running : states[i],
+      };
+      final end = until ?? times.reduce(max);
+      for (var t = 0; t <= end; t += 100) {
+        final s = beacons[t];
+        if (s != null) e.onTime(1, 0, t, gameState: s);
+        if (e.tick(t) != null) return t;
+      }
+      return null;
+    }
+
+    test('an auto standby never takes over a working manual leader', () {
+      final e = Election(5, 1000, mode: 'auto')..follow(0);
+      // Before the fix: a claim 30 s after the first beacon.
+      expect(runBeacons(e, [for (var t = 0; t <= 600000; t += 30000) t]), null);
+      expect(e.role, electionFollower);
+      expect(e.leaderBeaconMs, 30000);
+      expect(e.leaderFailoverMode, 'manual');
+      expect(e.takeoverAfterMs, 90000);
+    });
+    test('a late manual beacon is not three missed ones', () {
+      // No game state given, as an older caller.
+      final e = Election(5, 1000, mode: 'auto')..follow(0);
+      for (var i = 0; i < 20; i++) {
+        e.onTime(1, 0, i * 30200);
+        for (var t = i * 30200; t < (i + 1) * 30200; t += 100) {
+          expect(e.tick(t), null, reason: 'a claim at $t ms');
+        }
+      }
+      expect(e.leaderFailoverMode, 'manual');
+    });
+    test('it takes over when the manual leader falls silent', () {
+      final e = Election(5, 1000, mode: 'auto')..follow(0);
+      expect(
+        runBeacons(e, [
+          for (var t = 0; t <= 120000; t += 30000) t,
+        ], until: 400000),
+        120000 + 90000,
+      );
+    });
+    test('a state change repeated as TIME is not taken for auto', () {
+      final e = Election(5, 1000, mode: 'auto')..follow(0);
+      final times = [0, 30000], states = [running, running];
+      var state = running, t = 30000;
+      for (final after in [10000, 10000, 12000, 9000, 10000]) {
+        t += after;
+        state = state == running ? paused : running;
+        final burst = [t, for (final r in repeats) t + r];
+        times.addAll(burst);
+        states.addAll([for (final _ in burst) state]);
+        t = burst.last;
+      }
+      for (var i = 0; i < 4; i++) {
+        t += 30000;
+        times.add(t);
+        states.add(state);
+      }
+      expect(runBeacons(e, times, states: states), null);
+      expect(e.leaderBeaconMs, isNot(10000));
+    });
+    test('a manual standby sees an auto leader and waits for the GM', () {
+      final e = Election(5, 1000)..follow(0);
+      expect(
+        runBeacons(e, [
+          for (var t = 0; t <= 100000; t += 10000) t,
+        ], until: 600000),
+        null,
+      );
+      expect(e.leaderFailoverMode, 'auto');
+      expect(e.takeoverAfterMs, null);
+    });
+    test('until the leader is heard the slowest interval counts', () {
+      final e = Election(5, 1000, mode: 'auto')..follow(0);
+      expect(e.leaderBeaconMs, null);
+      expect(e.takeoverAfterMs, 90000);
+      expect(e.tick(89999), null);
+      expect(e.tick(90000), isNotNull);
+    });
+    test('an auto leader is learned and a lost beacon keeps it', () {
+      final e = Election(5, 1000, mode: 'auto')..follow(0);
+      expect(runBeacons(e, [0, 10000, 20000, 30000]), null);
+      expect(e.leaderBeaconMs, null);
+      expect(runBeacons(e, [40000]), null);
+      expect(e.leaderBeaconMs, 10000);
+      e.onTime(1, 0, 60000, gameState: running); // 50 s was lost
+      expect(e.leaderBeaconMs, 10000);
+      expect(e.tick(89999), null);
+      expect(e.tick(90000), isNotNull);
+    });
+    test('two lost beacons forget the auto cadence', () {
+      final e = Election(5, 1000, mode: 'auto')..follow(0);
+      runBeacons(e, [0, 10000, 20000, 30000, 40000]);
+      expect(e.leaderBeaconMs, 10000);
+      e.onTime(1, 0, 70000, gameState: running);
+      expect(e.leaderBeaconMs, null);
+      expect(e.takeoverAfterMs, 90000);
+    });
+    test('a new leader or term is measured afresh', () {
+      final e = Election(5, 1000, mode: 'auto')..follow(0);
+      runBeacons(e, [0, 10000, 20000, 30000, 40000]);
+      e.onTime(2, 7, 45000, gameState: running);
+      expect(e.leaderBeaconMs, null);
+      expect(e.takeoverAfterMs, 90000);
+    });
+  });
+
   group('two FieldControllers on one air', () {
     // Each one's packets reach the other (a radio without loss).
     late _Air air;
@@ -198,15 +325,17 @@ void main() {
         'and the old leader steps down when it comes back', () {
       a.startGame(nowMs: 0, durationMs: 600000);
       expect((b.gameState, b.term, b.election.leader), (gameRunning, 1, 1));
-      for (var t = 1000; t <= 25000; t += 1000) {
+      // Long enough for b to hear a's 10 s beacons (decision FAIL-2).
+      for (var t = 1000; t <= 55000; t += 1000) {
         a.tick(t);
         b.tick(t);
       }
       expect(a.beaconInterval, 10000);
+      expect(b.election.leaderBeaconMs, 10000);
       expect(b.isController, isFalse);
       air.down.add(1); // the leader's radio goes quiet, both ways
-      var t = 25000;
-      while (!b.isController && t < 80000) {
+      var t = 55000;
+      while (!b.isController && t < 110000) {
         t += 1000;
         a.tick(t);
         b.tick(t);
@@ -223,6 +352,56 @@ void main() {
       expect(a.isController, isFalse);
       expect((a.term, a.election.leader), (2, 2));
     });
+  });
+
+  test('an auto standby behind a manual leader on one air never takes over '
+      'while the leader works, and does once it falls silent (FAIL-1)', () {
+    final air = _Air();
+    final a = FieldController(
+      transport: air.port(1),
+      gameId: 3,
+      teams: const ['red', 'blue'],
+      nodeId: 1,
+      election: Election(1, 20000)..lead(1, 0),
+    );
+    final b = FieldController(
+      transport: air.port(2),
+      gameId: 3,
+      teams: const ['red', 'blue'],
+      nodeId: 2,
+      election: Election(2, 5000, mode: 'auto')..follow(0),
+    );
+    air.controllers
+      ..[1] = a
+      ..[2] = b;
+    a.startGame(nowMs: 0, durationMs: 900000);
+    var t = 0;
+    void run(int until) {
+      while (t < until) {
+        t += 500;
+        a.tick(t);
+        b.tick(t);
+      }
+    }
+
+    run(100000);
+    air.down.add(1); // one beacon lost: a 60 s gap, under 3 x 30 s
+    run(125000);
+    air.down.remove(1);
+    run(600000);
+    expect(a.beaconInterval, 30000);
+    expect(a.isController, isTrue);
+    expect(b.isController, isFalse);
+    expect(b.election.history.where((h) => h.$2 != electionFollower), isEmpty);
+    expect(b.election.leaderFailoverMode, 'manual');
+    final lastBeacon = b.election.lastHeartbeatMs!;
+    air.down.add(1);
+    run(800000);
+    expect(b.isController, isTrue);
+    final stood = b.election.history.firstWhere(
+      (h) => h.$2 == electionCandidate,
+    );
+    expect(stood.$1 - lastBeacon, inInclusiveRange(90000, 90500));
   });
 }
 

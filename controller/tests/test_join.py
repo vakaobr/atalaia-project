@@ -372,6 +372,46 @@ class StandbyApiTests(unittest.TestCase):
         self.assertIsNone(self.b.ctrl.game)
         self.assertEqual(self.b.modem.cleared, 1)
 
+    def test_an_auto_standby_behind_a_manual_primary_warns_and_does_not_claim(self):
+        # Decisions FAIL-1 to FAIL-4: the primary beacons every 30 s (manual); a standby on auto counts
+        # that interval, says the leader's mode in its status, and warns once (log and stream).
+        c = Side(self.tmp.name, "c", node_id=0, failover_mode="auto")
+        try:
+            clock = [1000.0]
+            c.ctrl._clock = lambda: clock[0]
+            c.ctrl._t0 = 1000.0
+            told: list[dict] = []
+            c.ctrl.add_listener(told.append)
+            r = c.client.post("/api/v1/controller/join", headers=GM, json={"text": self.text})
+            self.assertEqual(r.status_code, 201, r.text)
+            status = c.client.get("/api/v1/controller", headers=READ).json()
+            self.assertEqual((status["leader_beacon_s"], status["leader_failover_mode"], status["takeover_after_s"]),
+                             (None, None, 90))
+            with self.assertLogs("atalaia.controller", "WARNING") as logs:
+                for seq in range(1, 11):  # TIMEs at 0, 30 ... 270 s; the controller ticks every second
+                    c.modem.rx(0, seq, "TIME", self.time_packet(1, seq * 30_000), game_id=self.game["id"], epoch=1)
+                    for _ in range(30):
+                        c.ctrl.tick()
+                        clock[0] += 1.0
+            self.assertEqual(c.modem.of("CLAIM"), [])  # before the fix: a claim 30 s after a beacon
+            status = c.client.get("/api/v1/controller", headers=READ).json()
+            self.assertEqual((status["role"], status["leader"]), ("follower", 0))
+            self.assertEqual((status["leader_beacon_s"], status["leader_failover_mode"], status["takeover_after_s"]),
+                             (30, "manual", 90))
+            warned = [m for m in told if m.get("kind") == "failover.mismatch"]
+            self.assertEqual(warned, [{"type": "system", "kind": "failover.mismatch", "failover_mode": "auto",
+                                       "leader": 0, "leader_failover_mode": "manual", "takeover_after_s": 90}])
+            mismatch = [m for m in logs.output if "failover_mode" in m]
+            self.assertEqual(len(mismatch), 1)
+            self.assertIn("only after 90 s of silence", mismatch[0])
+            # The primary falls silent: three missed 30 s beacons, then the claim.
+            for _ in range(95):
+                c.ctrl.tick()
+                clock[0] += 1.0
+            self.assertEqual(len(c.modem.of("CLAIM")), 1)
+        finally:
+            c.close()
+
     def beacon_view(self, side, headers):
         r = side.client.get("/api/v1/beacons", headers=headers)
         self.assertEqual(r.status_code, 200, r.text)

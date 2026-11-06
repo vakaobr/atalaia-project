@@ -22,6 +22,18 @@ Rules:
   once, so two controllers never both stay in charge.
 - With ``mode == "manual"`` (the Phase 2 default) nobody claims on their
   own: the GM promotes a standby controller with :meth:`promote`.
+- A follower counts missed beacons at the interval the **leader** is heard
+  beaconing at, not the one its own mode gives (decisions FAIL-1 to FAIL-6):
+  a leader on ``manual`` beacons every 30 s, so a standby on ``auto`` that
+  counted 10 s beacons took over a working controller after 30 s. The
+  follower measures the gaps between the leader's TIMEs; until it has heard
+  three in a row about 10 s apart it assumes the slowest interval (30 s, so
+  about 90 s of silence before a claim). TIMEs within 12.5 s of a change of
+  game state are no evidence (the controller repeats the state as TIME
+  1.0, 2.5, 5.0 and 10.0 s after it, RFC 0001 Amendment 19), and a gap that
+  fits neither interval forgets what was measured. Nothing changes on the
+  wire; :attr:`leader_failover_mode` tells the engines when the leader's
+  mode differs from this node's, so they can warn.
 """
 
 from __future__ import annotations
@@ -43,6 +55,12 @@ BEACON_INTERVAL_MS = 30_000
 BEACON_INTERVAL_FAILOVER_MS = 10_000
 MISSED_BEACONS = 3
 ELECTION_TIMEOUT_MS = 5_000
+
+# The leader's cadence as a follower measures it (decisions FAIL-1 to FAIL-6).
+STEADY_FAST_GAPS = 3  # gaps of about 10 s in a row before a follower counts 10 s beacons
+STEADY_SLOW_GAPS = 2  # gaps of about 30 s in a row before the leader counts as manual (the warning)
+CADENCE_TOLERANCE = 0.25  # a gap within 25 % of an interval fits it
+STATE_REPEAT_WINDOW_MS = 12_500  # the TIME repeats of a state change end at 10 s (Amendment 19)
 
 
 def priority_score(power_source: int, battery_pct: int, storage_ok: bool, link_quality: int) -> int:
@@ -66,6 +84,10 @@ class Claim:
     term: int
     priority: int
     node_id: int
+
+
+def _fits(gap_ms: int, interval_ms: int) -> bool:
+    return abs(gap_ms - interval_ms) <= interval_ms * CADENCE_TOLERANCE
 
 
 def _better(a_term: int, a_prio: int, a_node: int, b_term: int, b_prio: int, b_node: int) -> bool:
@@ -107,6 +129,75 @@ class Election:
         self.last_heartbeat_ms: Optional[int] = None
         self.candidate_since_ms: Optional[int] = None
         self.history: list[tuple[int, str, int]] = []  # (t_ms, role, term)
+        # The leader's beacon interval as measured from its TIMEs (None: not known yet).
+        self.leader_beacon_ms: Optional[int] = None
+        self._reset_cadence()
+
+    # --- the leader's cadence --------------------------------------------------
+
+    def _reset_cadence(self) -> None:
+        self.leader_beacon_ms = None
+        self._cadence_of: Optional[tuple[int, int]] = None  # (leader, term) being measured
+        self._last_time_ms: Optional[int] = None
+        self._last_state: Optional[int] = None
+        self._state_changed_ms: Optional[int] = None
+        self._fast_gaps = 0
+        self._slow_gaps = 0
+
+    def _observe(self, source: int, term: int, now_ms: int, game_state: Optional[int]) -> None:
+        """One more TIME of the leader: measures the gap since its last one."""
+        if self._cadence_of != (source, term):
+            self._reset_cadence()
+            self._cadence_of = (source, term)
+        if game_state is not None:
+            if self._last_state is None or game_state != self._last_state:
+                self._state_changed_ms = now_ms  # its repeats follow (or a leader heard first)
+            self._last_state = game_state
+        prev, self._last_time_ms = self._last_time_ms, now_ms
+        if prev is None:
+            return
+        if self._state_changed_ms is not None and now_ms - self._state_changed_ms < STATE_REPEAT_WINDOW_MS:
+            return  # a state change's repeats: no evidence either way
+        gap = now_ms - prev
+        if _fits(gap, BEACON_INTERVAL_FAILOVER_MS):
+            self._fast_gaps += 1
+            self._slow_gaps = 0
+        elif _fits(gap, BEACON_INTERVAL_MS):
+            self._slow_gaps += 1
+            self._fast_gaps = 0
+            if self.leader_beacon_ms == BEACON_INTERVAL_FAILOVER_MS:
+                self.leader_beacon_ms = None  # two lost beacons, or a leader that is not on auto
+        elif BEACON_INTERVAL_FAILOVER_MS < gap < BEACON_INTERVAL_MS:
+            return  # a lost 10 s beacon, a late one: neither interval's evidence
+        else:
+            self._fast_gaps = self._slow_gaps = 0
+            self.leader_beacon_ms = None
+            return
+        if self._fast_gaps >= STEADY_FAST_GAPS:
+            self.leader_beacon_ms = BEACON_INTERVAL_FAILOVER_MS
+        elif self._slow_gaps >= STEADY_SLOW_GAPS:
+            self.leader_beacon_ms = BEACON_INTERVAL_MS
+
+    @property
+    def liveness_interval(self) -> int:
+        """The beacon interval a follower counts missed beacons at: its own, but never shorter than the
+        leader's measured one, and the slowest (30 s) while the leader's is not known."""
+        measured = self.leader_beacon_ms if self.leader_beacon_ms is not None else BEACON_INTERVAL_MS
+        return max(self.beacon_interval, measured)
+
+    @property
+    def takeover_after_ms(self) -> Optional[int]:
+        """The silence after which this follower stands for election (auto only), else None."""
+        if self.role != FOLLOWER or self.mode != "auto" or not self.capable:
+            return None
+        return self.missed_beacons * self.liveness_interval
+
+    @property
+    def leader_failover_mode(self) -> Optional[str]:
+        """The leader's failover mode as its cadence shows it ("auto", "manual"), or None not known."""
+        if self.leader_beacon_ms is None:
+            return None
+        return "auto" if self.leader_beacon_ms == BEACON_INTERVAL_FAILOVER_MS else "manual"
 
     # --- state changes ---------------------------------------------------------
 
@@ -120,6 +211,7 @@ class Election:
         self.term = max(self.term, term)
         self.leader = self.node_id
         self.candidate_since_ms = None
+        self._reset_cadence()
         self._set_role(LEADER, now_ms)
 
     def follow(self, now_ms: int) -> None:
@@ -137,13 +229,15 @@ class Election:
         self.term += 1
         self.candidate_since_ms = now_ms
         self.leader = None
+        self._reset_cadence()
         self._set_role(CANDIDATE, now_ms)
         return Claim(self.term, self.priority, self.node_id)
 
     # --- what we hear ----------------------------------------------------------
 
-    def on_time(self, term: int, source: int, now_ms: int) -> bool:
-        """A TIME beacon from ``source``. Returns False if it should be ignored (stale term)."""
+    def on_time(self, term: int, source: int, now_ms: int, game_state: Optional[int] = None) -> bool:
+        """A TIME beacon from ``source`` (with its game state, when known). Returns False if it should
+        be ignored (stale term)."""
         if source == self.node_id:
             return True
         if term < self.term:
@@ -158,6 +252,7 @@ class Election:
         self.last_heartbeat_ms = now_ms
         self.candidate_since_ms = None
         self._set_role(FOLLOWER, now_ms)
+        self._observe(source, term, now_ms, game_state)
         return True
 
     def on_claim(self, term: int, priority: int, node_id: int, now_ms: int) -> None:
@@ -199,7 +294,7 @@ class Election:
             if self.last_heartbeat_ms is None:
                 self.last_heartbeat_ms = now_ms
             silence = now_ms - self.last_heartbeat_ms
-            if silence >= self.missed_beacons * self.beacon_interval:
+            if silence >= self.missed_beacons * self.liveness_interval:
                 return self._stand(now_ms)
         return None
 

@@ -206,6 +206,8 @@ O botão **Terminar** dele diz **Deixar o jogo**: deixa de acompanhar, e o jogo 
 6. Nos dois, o separador **Controlador** mostra o **Papel** (**controlador ativo** ou **de reserva**), a **Substituição** e a **Prioridade**.
 7. Gera outra vez os dados de entrada e cola-os outra vez depois de mudares uma caixa de sítio, de lhe mudares a sala ou de desativares uma: o texto leva onde estão as caixas e as escolhas das balizas, para que um de reserva que assuma o jogo coloque quem joga da mesma maneira.
 
+<a id="failover-mode"></a>
+
 ### `failover_mode`: manual ou automática
 
 Em `[controller]` de `/etc/atalaia/controller.toml`:
@@ -213,7 +215,14 @@ Em `[controller]` de `/etc/atalaia/controller.toml`:
 - `failover_mode = "manual"` (por omissão): nada acontece sozinho. Quando o controlador principal deixar de responder, abre a consola do de reserva, separador **Controlador**, e toca em **Promover a controlador**. Pergunta *Este controlador passa a mandar no jogo. Continuar?*
 - `failover_mode = "auto"`: o controlador principal envia o seu sinal de hora a cada 10 segundos em vez de 30. Um de reserva que falhe três seguidos (cerca de **30 segundos** de silêncio) candidata-se e, poucos segundos depois, assume o jogo. As definições de exemplo do projeto dizem para usar `auto` só depois de testes em campo, que ainda não houve.
 
-Se o controlador antigo voltar, ouve o mais recente e passa a reserva. Dá a todos os controladores de um jogo a mesma `failover_mode`: um de reserva em `auto` conta os sinais como se viessem de 10 em 10 segundos, por isso, atrás de um principal em `manual` (um sinal a cada 30 segundos), assumiria o jogo com o principal ainda a funcionar.
+Um de reserva em `auto` conta os sinais que ouve de facto do controlador principal, não os que a sua própria definição dá. Espera **cerca de 90 segundos** de silêncio (três sinais de 30 segundos em falta) até ter ouvido três sinais seguidos com 10 segundos de intervalo, cerca de 40 segundos depois de entrar no jogo ou de ouvir um controlador novo. Também espera 90 segundos depois de faltarem dois sinais seguidos, e o tempo todo atrás de um principal em `manual`. Assim, uma definição diferente já não faz um de reserva assumir o jogo de um principal que ainda funciona. Os sinais que um início, uma pausa ou um retomar repetem nos 10 segundos seguintes não contam. O separador **Controlador** do de reserva mostra **Assume depois de** com o silêncio por que espera.
+
+Se o controlador antigo voltar, ouve o mais recente e passa a reserva.
+
+Mesmo assim, dá a todos os controladores de um jogo a mesma `failover_mode`. Quando são diferentes, a consola do de reserva di-lo no separador **Controlador**, e o registo tem um aviso:
+
+- o de reserva está em `auto` e o principal em `manual`: o de reserva só assume depois de 90 segundos de silêncio;
+- o de reserva está em `manual` e o principal em `auto`: o de reserva nunca assume sozinho, por isso promove-o à mão.
 
 ### `power_source`: quem ganha quando dois se candidatam
 
@@ -351,6 +360,7 @@ Atualiza também o modem quando o registo disser `the radio modem's firmware can
 | Uma caixa não ouve o controlador | Mesma região e mesmo canal? Antenas montadas? Vê o [Manual da organização](game-master.md#recover-from-problems) |
 | Uma caixa ficou presa num jogo terminado, e a consola diz que o modem de rádio não o consegue dizer | A imagem do modem é anterior à v0.9.0: atualiza-a (secção 11). Até lá, tira a caixa do jogo na própria caixa ([manual da Field Box](field-box.md#take-a-box-out-of-its-game)) |
 | Não aparece **Promover a controlador**, ou o de reserva nunca assume | O de reserva não entrou neste jogo (secção 9, passos 4 e 5), ou a `failover_mode` é `manual`: promove-o à mão |
+| Um de reserva em `auto` demorou cerca de 90 s, e não 30 s, a assumir | Ainda não tinha ouvido três sinais seguidos com 10 s de intervalo (tinha acabado de entrar ou de ouvir um controlador novo, ou faltaram dois sinais seguidos), ou o principal está em `manual`: secção 9, [`failover_mode`](#failover-mode) |
 | Esqueci-me dos códigos | Corre outra vez os comandos `tokens` e `join-key` (secção 5) |
 
 Encontraste um passo que não corresponde? Abre uma issue ou diz-nos nas [Discussions](https://github.com/vakaobr/atalaia-project/discussions).

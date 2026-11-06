@@ -707,7 +707,8 @@ class FieldController:
         except Exception:
             return
         term = int(beacon.get("term", 0))
-        if not self.election.on_time(term, source, self._now):
+        state = beacon.get("game_state")
+        if not self.election.on_time(term, source, self._now, state if isinstance(state, int) else None):
             return
         # On standby, mirror the game clock so a takeover continues it.
         if isinstance(beacon.get("game_state"), int):

@@ -21,6 +21,18 @@
 /// - With `failover_mode = manual` (the default) nobody claims on their
 ///   own: the GM promotes a standby with [Election.promote]
 ///   (`POST /api/v1/controller/promote`).
+/// - A follower counts missed beacons at the interval the **leader** is
+///   heard beaconing at, not the one its own mode gives (decisions FAIL-1 to
+///   FAIL-6): a leader on `manual` beacons every 30 s, so a standby on `auto`
+///   that counted 10 s beacons took over a working controller after 30 s.
+///   The follower measures the gaps between the leader's TIMEs; until it has
+///   heard three in a row about 10 s apart it assumes the slowest interval
+///   (30 s, so about 90 s of silence before a claim). TIMEs within 12.5 s of
+///   a change of game state are no evidence (the controller repeats the
+///   state as TIME 1.0, 2.5, 5.0 and 10.0 s after it, RFC 0001 Amendment
+///   19). Nothing changes on the wire; [Election.leaderFailoverMode] tells
+///   the engine when the leader's mode differs from this node's, so it can
+///   warn.
 ///
 /// A pure state machine with no radio and no clock: the FieldController
 /// (field_controller.dart) feeds it the TIME and CLAIM it hears and sends
@@ -47,6 +59,19 @@ const beaconIntervalManualMs = 30000;
 const beaconIntervalFailoverMs = 10000;
 const missedBeacons = 3;
 const electionTimeoutMs = 5000;
+
+/// The leader's cadence as a follower measures it (election.py; decisions
+/// FAIL-1 to FAIL-6): gaps of about 10 s in a row before a follower counts
+/// 10 s beacons, gaps of about 30 s in a row before the leader counts as
+/// manual (the warning), the tolerance of a gap, and how long a state
+/// change's TIME repeats last (Amendment 19: the last at 10 s).
+const steadyFastGaps = 3;
+const steadySlowGaps = 2;
+const cadenceTolerance = 0.25;
+const stateRepeatWindowMs = 12500;
+
+bool _fits(int gapMs, int intervalMs) =>
+    (gapMs - intervalMs).abs() <= intervalMs * cadenceTolerance;
 
 /// The failover modes (config.py's `failover_mode`).
 const failoverModes = ['manual', 'auto'];
@@ -130,6 +155,92 @@ class Election {
   /// (t_ms, role, term) at each change of role.
   final history = <(int, String, int)>[];
 
+  /// The leader's beacon interval as measured from its TIMEs (null: not
+  /// known yet).
+  int? leaderBeaconMs;
+  (int, int)? _cadenceOf; // (leader, term) being measured
+  int? _lastTimeMs;
+  int? _lastState;
+  int? _stateChangedMs;
+  int _fastGaps = 0;
+  int _slowGaps = 0;
+
+  void _resetCadence() {
+    leaderBeaconMs = null;
+    _cadenceOf = null;
+    _lastTimeMs = null;
+    _lastState = null;
+    _stateChangedMs = null;
+    _fastGaps = 0;
+    _slowGaps = 0;
+  }
+
+  /// One more TIME of the leader: measures the gap since its last one.
+  void _observe(int source, int t, int nowMs, int? gameState) {
+    if (_cadenceOf != (source, t)) {
+      _resetCadence();
+      _cadenceOf = (source, t);
+    }
+    if (gameState != null) {
+      // Its repeats follow (or a leader heard for the first time).
+      if (_lastState == null || gameState != _lastState) {
+        _stateChangedMs = nowMs;
+      }
+      _lastState = gameState;
+    }
+    final prev = _lastTimeMs;
+    _lastTimeMs = nowMs;
+    if (prev == null) return;
+    final changed = _stateChangedMs;
+    if (changed != null && nowMs - changed < stateRepeatWindowMs) {
+      return; // a state change's repeats: no evidence either way
+    }
+    final gap = nowMs - prev;
+    if (_fits(gap, beaconIntervalFailoverMs)) {
+      _fastGaps++;
+      _slowGaps = 0;
+    } else if (_fits(gap, beaconIntervalManualMs)) {
+      _slowGaps++;
+      _fastGaps = 0;
+      if (leaderBeaconMs == beaconIntervalFailoverMs) {
+        leaderBeaconMs = null; // two lost beacons, or a leader not on auto
+      }
+    } else if (gap > beaconIntervalFailoverMs && gap < beaconIntervalManualMs) {
+      return; // a lost 10 s beacon, a late one: neither interval's evidence
+    } else {
+      _fastGaps = 0;
+      _slowGaps = 0;
+      leaderBeaconMs = null;
+      return;
+    }
+    if (_fastGaps >= steadyFastGaps) {
+      leaderBeaconMs = beaconIntervalFailoverMs;
+    } else if (_slowGaps >= steadySlowGaps) {
+      leaderBeaconMs = beaconIntervalManualMs;
+    }
+  }
+
+  /// The beacon interval a follower counts missed beacons at: its own, but
+  /// never shorter than the leader's measured one, and the slowest (30 s)
+  /// while the leader's is not known.
+  int get livenessInterval =>
+      max(beaconInterval, leaderBeaconMs ?? beaconIntervalManualMs);
+
+  /// The silence after which this follower stands for election (auto
+  /// only), else null.
+  int? get takeoverAfterMs =>
+      role == electionFollower && mode == 'auto' && capable
+      ? missed * livenessInterval
+      : null;
+
+  /// The leader's failover mode as its cadence shows it (`auto`, `manual`),
+  /// or null while it is not known.
+  String? get leaderFailoverMode => switch (leaderBeaconMs) {
+    null => null,
+    beaconIntervalFailoverMs => 'auto',
+    _ => 'manual',
+  };
+
   bool get isLeader => role == electionLeader;
 
   void _setRole(String r, int nowMs) {
@@ -144,6 +255,7 @@ class Election {
     term = max(term, t);
     leader = nodeId;
     candidateSinceMs = null;
+    _resetCadence();
     _setRole(electionLeader, nowMs);
   }
 
@@ -164,13 +276,14 @@ class Election {
     term += 1;
     candidateSinceMs = nowMs;
     leader = null;
+    _resetCadence();
     _setRole(electionCandidate, nowMs);
     return Claim(term, priority, nodeId);
   }
 
-  /// A TIME beacon from [source]. False when it is to be ignored (a stale
-  /// term).
-  bool onTime(int t, int source, int nowMs) {
+  /// A TIME beacon from [source] (with its game state, when known). False
+  /// when it is to be ignored (a stale term).
+  bool onTime(int t, int source, int nowMs, {int? gameState}) {
     if (source == nodeId) return true;
     if (t < term) return false; // an old controller that has not stepped down
     if (t == term && role == electionLeader) {
@@ -183,6 +296,7 @@ class Election {
     lastHeartbeatMs = nowMs;
     candidateSinceMs = null;
     _setRole(electionFollower, nowMs);
+    _observe(source, t, nowMs, gameState);
     return true;
   }
 
@@ -223,7 +337,7 @@ class Election {
     }
     if (role == electionFollower && mode == 'auto' && capable) {
       final last = lastHeartbeatMs ??= nowMs;
-      if (nowMs - last >= missed * beaconInterval) return _stand(nowMs);
+      if (nowMs - last >= missed * livenessInterval) return _stand(nowMs);
     }
     return null;
   }
