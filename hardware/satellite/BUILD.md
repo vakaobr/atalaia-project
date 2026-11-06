@@ -435,8 +435,7 @@ free.
    describes them). Use the USB cable and the console instead, and
    `@setup <PIN>` on the USB console to open the setup page again.
 5. **More about the setup page, adoption and updates:** the
-   [firmware guide](../../docs/manuals/en/firmware.md). The field's logo
-   needs a big screen, so a Satellite never shows it.
+   [firmware guide](../../docs/manuals/en/firmware.md).
 
 ## 12. Troubleshooting
 
