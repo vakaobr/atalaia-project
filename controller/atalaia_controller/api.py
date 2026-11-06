@@ -126,7 +126,7 @@ which browsers cannot give headers, takes it in the ``Sec-WebSocket-Protocol`` h
     PATCH|DELETE /api/v1/marshals/{id}     GM: rename or rebind / take a marshal off the list (revokes)
     GET|PUT /api/v1/checkin/settings       GM: confirm, federation, limits
     GET|PUT /api/v1/checkin/poster         GM: the check-in poster's text and fields
-    POST /api/v1/games/{id}/checkins/ticket  staff: a registered player's printed ticket, scanned
+    POST /api/v1/games/{id}/checkins/ticket  staff (the GM or a marshal, TKT-1): a printed ticket, scanned
     GET  /api/v1/schedule                  the site server's schedule as last pulled (plan phase 16)
     POST /api/v1/schedule/{id}/game        GM: a game made from a scheduled game, linked to it
     GET|DELETE /api/v1/players/{player}    GM (or the player): their data / erase it (?chrono=1: readings too)

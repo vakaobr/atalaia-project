@@ -245,6 +245,8 @@ const Map<String, String> zhTwStrings = {
   'code.is_join_card': '這是遊戲道具的加入代碼。請在「遊戲道具」>「加入遊戲」使用。',
   'code.is_site_link': '這是場地線上報名的連結。請在「玩家」>「線上報名」使用。',
   'code.is_scoreboard': '這是遊戲記分板的連結。請在「玩家」>「不報到，只追蹤遊戲」使用。',
+  'code.is_ticket':
+      '這是報名玩家的報到票券。請拿給裁判（「裁判」>「用票券報到」）或到報到處出示；要用 App 報到，請掃描場地的海報。',
   'player.bad_link': '缺少位址或存取碼。',
   'player.link_unreachable': '控制器沒有回應。你有連上場地的 Wi-Fi 嗎？',
   'player.link_mismatch': '回應的控制器不是這個代碼所屬的那一台。請不要繼續，並通知主辦。',
@@ -441,6 +443,34 @@ const Map<String, String> zhTwStrings = {
   'replica.type_sniper': 'Sniper',
   'replica.type_pistol': '手槍',
   'replica.type_shotgun': 'Shotgun',
+
+  // 報名玩家的列印票券，由裁判收取（TKT-1）
+  'ticket.title': '用票券報到',
+  'ticket.hint': '掃描或輸入報名玩家的報到票券。',
+  'ticket.intro':
+      '線上報名的玩家會帶著報到票券：印出的或螢幕上的 QR code，下面有它的文字。'
+      '掃描它或輸入文字，場地控制器就會為這位玩家完成報到。請連上場地的 Wi-Fi。',
+  'ticket.for_game': '遊戲：{game}',
+  'ticket.scan': '掃描票券',
+  'ticket.scan_hint': '把相機對準票券的 QR code',
+  'ticket.text': '票券的文字',
+  'ticket.text_hint': 'atalaia:ticket:…，寫在 QR code 下面',
+  'ticket.submit': '報到',
+  'ticket.sending': '正在詢問場地控制器…',
+  'ticket.no_camera': '這支手機不能掃描 QR code：請輸入票券的文字。',
+  'ticket.done': '{name} 已報到。',
+  'ticket.pending': '{name} 在名單上，正在等待查驗會員卡：請看他的協會會員卡，並在「待測速的槍」按「已看會員卡，相符」。',
+  'ticket.already': '{name} 之前已經報到：沒有任何變更。',
+  'ticket.already_pending': '{name} 已經到場，正在等待查驗會員卡或確認：請看「待測速的槍」。',
+  'ticket.not_newest': '這不是這筆報名最新的票券：已經產生了新的票券，這張不再有效。請向玩家要新的票券，或到報到處報名字。',
+  'ticket.not_listed': '這張票券的報名不在這場遊戲的名單上（是別場遊戲，或網站的名單還沒到）。請問主辦。',
+  'ticket.bad': '這不是報到票券，或是輸入錯誤。',
+  'ticket.ended': '遊戲已結束：不再收取票券。',
+  'ticket.too_many': '一分鐘內太多張票券：請稍等再試一次。',
+  'ticket.offline': '連不上場地控制器：請連上場地的 Wi-Fi 再試一次。',
+  'ticket.session': '你的報到已過期：請重新報到。',
+  'ticket.refused': '場地控制器拒絕了票券：{error}',
+  'ticket.recent': '剛剛收取',
 
   // Tags
   'tags.title': '玩家標籤',

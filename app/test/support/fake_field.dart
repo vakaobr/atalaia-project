@@ -15,6 +15,7 @@ import 'dart:typed_data';
 import 'package:atalaia_app/checkin/checkin_client.dart';
 import 'package:atalaia_app/checkin/field_trust.dart';
 import 'package:atalaia_app/protocol/checkin_poster.dart';
+import 'package:atalaia_app/protocol/checkin_ticket.dart' as tkt;
 import 'package:atalaia_app/security/bytes.dart';
 import 'package:atalaia_app/security/ndef.dart';
 import 'package:atalaia_app/security/nfc_tag_signer.dart';
@@ -108,6 +109,51 @@ class FakeField {
   final tagRequests = <Map<String, Object?>>[];
   var caFetches = 0;
   var offline = false;
+
+  /// A site server's roster (decision S16-8): registration id -> the player
+  /// and the SHA-256 of the newest ticket; the field's APD rule asks for the
+  /// card at check-in when [cardRule] (a ticket then leaves the player
+  /// pending, TKT-4); the tickets marshals sent.
+  final registrations = <String, ({String player, String sha})>{};
+  var cardRule = false;
+  final ticketRequests = <String>[];
+
+  /// A registration on the roster as an expected row; the printed ticket's
+  /// text, with a secret of 32 bytes of [seed].
+  String registerExpected(
+    String pid,
+    String name,
+    String registrationId, {
+    int seed = 9,
+  }) {
+    final secret = Uint8List.fromList(List.filled(32, seed));
+    registrations[registrationId] = (
+      player: pid,
+      sha: sha256.convert(secret).toString(),
+    );
+    rows[pid] = {
+      'player_id': pid,
+      'status': 'expected',
+      'role': 'player',
+      'display_name': name,
+      'team': null,
+      'squad': 0,
+      'declarations': <Map<String, Object?>>[],
+    };
+    return ticketFor(pid, registrationId, seed: seed);
+  }
+
+  /// A ticket's text for [registrationId] (a newer secret: another [seed]).
+  String ticketFor(String pid, String registrationId, {int seed = 9}) =>
+      tkt.ticketToText(
+        tkt.encodeTicket(
+          tkt.CheckinTicket(
+            registrationId: registrationId,
+            playerId: pid,
+            secret: Uint8List.fromList(List.filled(32, seed)),
+          ),
+        ),
+      );
   var _tokenN = 0;
 
   Future<String> fetchCa(Uri url) async {
@@ -400,6 +446,43 @@ class FakeField {
           'ndef': hexEncode(ndefMimeRecord(payload, tagNdefType)),
           'memory': hexEncode(tagToNdefMemory(payload)),
         });
+      case 'POST /games/42/checkins/ticket':
+        // As both controllers (TKT-1): staff only, the roster's newest
+        // ticket, pending under the card rule, `already` on a second scan.
+        if (who == null || _role(token!, who) != 'marshal') {
+          return err(403, "staff only: the GM token or a marshal's token");
+        }
+        final text = b['ticket'];
+        ticketRequests.add('$text');
+        final tkt.CheckinTicket t;
+        try {
+          t = tkt.parseTicket(text is String ? text : '');
+        } on tkt.TicketException catch (e) {
+          return err(400, 'ticket: ${e.message}');
+        }
+        final reg = registrations[t.registrationId];
+        if (reg == null) {
+          return err(
+            404,
+            "this ticket's registration is not on this game's roster",
+          );
+        }
+        if (reg.player != t.playerId ||
+            reg.sha != sha256.convert(t.secret).toString()) {
+          return err(
+            403,
+            "ticket_not_newest: this ticket is not this registration's "
+            '(was a newer one made?)',
+          );
+        }
+        final r = rows[reg.player]!;
+        final arriving = r['status'] == 'expected';
+        if (arriving) {
+          r
+            ..['status'] = cardRule ? 'pending' : 'checked_in'
+            ..['ticket_scanned_by'] = who;
+        }
+        return FieldResponse(200, {...r, 'already': !arriving});
       case 'GET /games/42/chrono-list':
         if (who == null || _role(token!, who) != 'marshal') {
           return err(403, 'staff only');

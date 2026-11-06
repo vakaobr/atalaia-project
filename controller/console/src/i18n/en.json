@@ -1011,6 +1011,8 @@
     "ticket_label": "Ticket code",
     "ticket_submit": "Check in",
     "ticket_done": "{name} checked in.",
+    "ticket_pending": "{name} is on the list and waits for the card check (\"Card seen, matches\").",
+    "ticket_already": "{name} had already arrived: nothing changed.",
     "schedule_title": "From the schedule",
     "schedule_intro": "The site server's published games of the coming days. A game made from one takes its title, mode and teams; its registered players then appear here as expected.",
     "schedule_create": "Create the game",

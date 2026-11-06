@@ -561,6 +561,22 @@ class CheckinClient {
         body: {'status': 'checked_in'},
       );
 
+  /// A registered player's printed ticket (`atalaia:ticket:…`), scanned or
+  /// typed by a marshal (decision TKT-1): the answer is the player's row
+  /// (`status` checked_in, or pending under the APD rule's card check) with
+  /// `already` true when the player had arrived before. Staff only; 403
+  /// `ticket_not_newest` for a ticket a newer one replaced.
+  Future<Map<String, Object?>> ticketCheckin(
+    String token,
+    int gameId,
+    String ticket,
+  ) => _call(
+    'POST',
+    '/games/$gameId/checkins/ticket',
+    token: token,
+    body: {'ticket': ticket},
+  );
+
   /// The marshal's phone registers the key that signs its readings, for the
   /// id the GM's list gave this player (decision MR-2): the controller
   /// answers 403 when the player is not on the list.

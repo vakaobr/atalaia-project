@@ -433,6 +433,7 @@ class ControllerCheckin {
        _limits = LimitTemplate.parse(config.limitsYaml),
        rate = RateLimit(config.ratePerMinute),
        infoRate = RateLimit(max(60, config.ratePerMinute * 6)),
+       ticketRate = RateLimit(max(60, config.ratePerMinute * 6)),
        _random = random ?? Random.secure() {
     _load();
     engine.checkin = this;
@@ -469,13 +470,18 @@ class ControllerCheckin {
   LimitTemplate get limits => _limits;
   bool _siteManaged = false;
 
-  /// Where a marshal's override of a membership that does not pass is logged
-  /// (the player id and the verdict, never the number).
+  /// Where a marshal's override of a membership that does not pass, a card
+  /// check and a printed ticket taken are logged (the player id, the staff
+  /// id and the verdict or status, never the number or the name).
   void Function(String message) audit = _auditDefault;
   static void _auditDefault(String m) =>
       developer.log(m, name: 'atalaia.checkin', level: 800);
   final RateLimit rate;
   final RateLimit infoRate;
+
+  /// Printed tickets scanned, per staff id (a marshal's player id, or "gm"):
+  /// a desk's pace, never a flood (TKT-2).
+  final RateLimit ticketRate;
   final Random _random;
   double _lastPurge = 0;
 
@@ -660,6 +666,8 @@ class ControllerCheckin {
       'apd_verdict_on': null,
       'card_checked_by': null,
       'card_checked_at': null,
+      'ticket_scanned_by': null,
+      'ticket_scanned_at': null,
       'position_share': false,
       'position_share_at': null,
       'position_share_notice': null,
@@ -1213,6 +1221,17 @@ class ControllerCheckin {
     'card_checked_by': null,
     'card_checked_at': null,
   };
+
+  /// Who took a registered player's printed ticket, and when (TKT-3):
+  /// erased with the card check's columns when the row's data goes.
+  static const _erasedScan = <String, Object?>{
+    'ticket_scanned_by': null,
+    'ticket_scanned_at': null,
+  };
+
+  static const _ticketNotNewest =
+      "ticket_not_newest: this ticket is not this registration's "
+      '(was a newer one made?)';
 
   /// A marshal's confirmation that is not a card check, or whose verdict
   /// does not pass, is never refused, but it is logged (reason, no number)
@@ -1996,9 +2015,7 @@ class ControllerCheckin {
               utf8.encode(want),
               utf8.encode(ticketHex ?? ''),
             )) {
-          throw _forbidden(
-            "this ticket is not this registration's (was a newer one made?)",
-          );
+          throw _forbidden(_ticketNotNewest);
         }
         return match;
       }
@@ -2094,6 +2111,8 @@ class ControllerCheckin {
         'apd_verdict_on': row['apd_verdict_on'],
         'card_checked_by': row['card_checked_by'],
         'card_checked_at': row['card_checked_at'],
+        'ticket_scanned_by': row['ticket_scanned_by'],
+        'ticket_scanned_at': row['ticket_scanned_at'],
         'country': country(),
       });
     }
@@ -2467,6 +2486,7 @@ class ControllerCheckin {
       'membership_expires': null,
       'apd_override': false,
       ..._erasedCard,
+      ..._erasedScan,
       'position_share': false,
       'position_share_at': now,
       'team_preference': null,
@@ -2811,16 +2831,29 @@ class ControllerCheckin {
     return {'game_id': game['id'], 'player_id': pid, 'status': 'removed'};
   }
 
-  /// POST /api/v1/games/{id}/checkins/ticket: a marshal scans a registered
-  /// player's printed ticket. Without a roster from a site server (slice
-  /// S7) no registration is on the list, so this is 404, as on a Pi
-  /// without one.
+  /// POST /api/v1/games/{id}/checkins/ticket: staff (the GM token or a
+  /// marshal's own token for this game, TKT-1) scan a registered player's
+  /// printed ticket. The registration must be in this
+  /// game's roster and the ticket its own (403 `ticket_not_newest`); an
+  /// expected player arrives at once, or waits for "card seen, matches"
+  /// under the APD rule. The answer is the row with `already`: true when the
+  /// scan changed nothing. Who scanned and when are kept with the arrival
+  /// and logged (TKT-3); at most [ticketRate] scans a minute per staff id
+  /// (TKT-2). Without a roster no registration is on the list: 404, as on a
+  /// Pi without one.
   Map<String, Object?> ticketCheckin(
     ApiViewer viewer,
     int gameId,
     Map<String, Object?> body,
   ) {
     final game = _staff(viewer, gameId);
+    final staff = _staffId(viewer);
+    if (!ticketRate.allow(staff)) {
+      throw ControllerError(
+        'too many tickets scanned; wait a minute',
+        status: 429,
+      );
+    }
     if (game['state'] == 'ended') {
       throw ControllerError.conflict('the game has ended');
     }
@@ -2849,9 +2882,7 @@ class ControllerCheckin {
         want == null ||
         want.isEmpty ||
         !constantTimeEquals(utf8.encode(want), utf8.encode(digest))) {
-      throw _forbidden(
-        "this ticket is not this registration's (was a newer one made?)",
-      );
+      throw _forbidden(_ticketNotNewest);
     }
     if (row['status'] == 'removed') {
       throw _forbidden('staff removed this check-in');
@@ -2864,23 +2895,31 @@ class ControllerCheckin {
       if (_count(gameId) >= (st['max_players']! as int)) {
         throw _forbidden('game $gameId is full (${st['max_players']} players)');
       }
+      final scan = {
+        'ticket_scanned_by': staff,
+        'ticket_scanned_at': now,
+        'updated_at': now,
+      };
       if (apdRule().checkin) {
         // The ticket is not the card: pending until "card seen, matches".
-        _update(gameId, pid, {'status': 'pending', 'updated_at': now});
+        _update(gameId, pid, {'status': 'pending', ...scan});
       } else {
         emit = true;
         _update(gameId, pid, {
           'status': 'checked_in',
           'checked_in_at': now,
-          'updated_at': now,
+          ...scan,
         });
       }
       _save();
     }
     row = _row(gameId, pid)!;
+    if (arriving) {
+      audit('ticket check-in: game $gameId, $pid by $staff, ${row['status']}');
+    }
     if (emit) _emitCheckinEvent(game, row);
     _notify(gameId, pid);
-    return rowView(game, row);
+    return {...rowView(game, row), 'already': !arriving};
   }
 
   /// GET /api/v1/games/{id}/checkins.csv (the GM token): one line per
@@ -2907,6 +2946,8 @@ class ControllerCheckin {
       'card_seen',
       'card_checked_by',
       'card_checked_at',
+      'ticket_scanned_by',
+      'ticket_scanned_at',
       'manual',
       'checked_in_at',
       'declaration_id',
@@ -2931,6 +2972,8 @@ class ControllerCheckin {
         r['federation_seen'] == true ? 'yes' : '',
         r['card_checked_by'] ?? '',
         _iso(r['card_checked_at'] as num?),
+        r['ticket_scanned_by'] ?? '',
+        _iso(r['ticket_scanned_at'] as num?),
         r['manual'] == true ? 'yes' : '',
         _iso(r['checked_in_at'] as num?),
       ];
@@ -4414,6 +4457,8 @@ class ControllerCheckin {
             ..['apd_verdict_on'] = null
             ..['card_checked_by'] = null
             ..['card_checked_at'] = null
+            ..['ticket_scanned_by'] = null
+            ..['ticket_scanned_at'] = null
             ..['team_preference'] = null
             ..['erased_at'] = now;
           erased++;

@@ -70,7 +70,7 @@
 ///     POST /api/v1/games/{id}/checkins/import  GM: a registration CSV/JSON list into the expected
 ///                                            check-ins (dry_run first; PKE-1)
 ///     PATCH|DELETE /api/v1/games/{id}/checkins/{player}  staff changes / GM removal
-///     POST /api/v1/games/{id}/checkins/ticket  staff: a registered player's ticket, scanned
+///     POST /api/v1/games/{id}/checkins/ticket  staff (the GM or a marshal, TKT-1): a ticket, scanned
 ///     GET  /api/v1/games/{id}/chrono-list    staff: the "replicas to chrono" list
 ///     POST /api/v1/games/{id}/checkin/open|close  GM
 ///     POST /api/v1/chrono/readings           a marshal's signed series of readings

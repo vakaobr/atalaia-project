@@ -30,6 +30,7 @@ import 'package:atalaia_app/controller/controller_sync.dart';
 import 'package:atalaia_app/controller/controller_sync_format.dart';
 import 'package:atalaia_app/ffi/bindings.dart';
 import 'package:atalaia_app/protocol/apd.dart';
+import 'package:atalaia_app/protocol/checkin_ticket.dart' as tkt;
 import 'package:atalaia_app/radio/rf_codec.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1260,6 +1261,159 @@ void main() {
           }
         },
       );
+    });
+
+    test('a marshal takes a printed ticket with their own token: in at '
+        'once, or pending under the APD rule; who is kept and logged '
+        '(TKT-1 to TKT-4)', () async {
+      site.gets['/api/v1/sync/schedule'] = scheduled();
+      site.gets['/api/v1/sync/claims'] = {
+        'sync_version': 1,
+        'claims': <Object?>[],
+      };
+      final c = client();
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      final made = api.handle(
+        'POST',
+        Uri.parse('/api/v1/schedule/$scheduledId/game'),
+        authorization: 'Bearer g',
+        body: '{}',
+      );
+      final gid = (made.body! as Map)['id']! as int;
+      final r = roster();
+      (r['registrations']! as List).add({
+        'registration_id': '7a000000-0000-4000-8000-000000000003',
+        'player_id': 'p-cccccccccccc',
+        'display_name': 'Gaio',
+        'ticket_sha256': sha256.convert(List.filled(32, 7)).toString(),
+        'replicas': <Object?>[],
+      });
+      site.gets['/api/v1/sync/roster'] = r;
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      final logged = <String>[];
+      checkin.audit = logged.add;
+      ApiResponse call(
+        String method,
+        String path,
+        String? token, [
+        Object? b,
+      ]) => api.handle(
+        method,
+        Uri.parse(path),
+        authorization: token == null ? null : 'Bearer $token',
+        body: b == null ? '' : jsonEncode(b),
+      );
+      String ticket(String reg, String pid, int seed) => tkt.ticketToText(
+        tkt.encodeTicket(
+          tkt.CheckinTicket(
+            registrationId: reg,
+            playerId: pid,
+            secret: Uint8List.fromList(List.filled(32, seed)),
+          ),
+        ),
+      );
+      final falcao = ticket(
+        '7a000000-0000-4000-8000-000000000001',
+        'p-aaaaaaaaaaaa',
+        9,
+      );
+      final gaio = ticket(
+        '7a000000-0000-4000-8000-000000000003',
+        'p-cccccccccccc',
+        7,
+      );
+      expect(
+        call('POST', '/api/v1/games/$gid/checkin/open', 'g', {}).status,
+        200,
+      );
+      // A player the GM makes a marshal; their token is renewed for the role.
+      final first = call('POST', '/api/v1/checkin', null, {
+        'game_id': gid,
+        'player_id': 'p-mmmmmmmmmmmm',
+        'player_secret': base64Url
+            .encode(List.filled(32, 3))
+            .replaceAll('=', ''),
+        'display_name': 'Marta',
+        'notice_version': 2,
+      });
+      expect(first.status, 201, reason: '${first.body}');
+      final plain = (first.body! as Map)['token']! as String;
+      expect(
+        call('PATCH', '/api/v1/games/$gid/checkins/p-mmmmmmmmmmmm', 'g', {
+          'role': 'marshal',
+          'status': 'checked_in',
+        }).status,
+        200,
+      );
+      // A player's token and the read token are no staff.
+      final path = '/api/v1/games/$gid/checkins/ticket';
+      expect(call('POST', path, plain, {'ticket': falcao}).status, 403);
+      expect(call('POST', path, 'r', {'ticket': falcao}).status, 403);
+      final m =
+          (call('POST', '/api/v1/checkin/token', plain).body! as Map)['token']!
+              as String;
+      var a = call('POST', path, m, {'ticket': falcao});
+      expect(a.status, 200, reason: '${a.body}');
+      var row = a.body! as Map;
+      expect(
+        (row['status'], row['already'], row['display_name']),
+        ('checked_in', false, 'Falcão'),
+      );
+      expect(row['ticket_scanned_by'], 'p-mmmmmmmmmmmm');
+      expect(row['ticket_scanned_at'], wall);
+      expect(logged.single, contains('p-aaaaaaaaaaaa by p-mmmmmmmmmmmm'));
+      expect(logged.single, isNot(contains('Falcão')));
+      // Again: nothing changes, nothing is logged.
+      a = call('POST', path, m, {'ticket': falcao});
+      expect(((a.body! as Map)['already'], logged.length), (true, 1));
+      // A ticket a newer one replaced.
+      a = call('POST', path, m, {
+        'ticket': ticket(
+          '7a000000-0000-4000-8000-000000000001',
+          'p-aaaaaaaaaaaa',
+          8,
+        ),
+      });
+      expect(a.status, 403);
+      expect(
+        ((a.body! as Map)['detail']! as String).startsWith('ticket_not_newest'),
+        isTrue,
+      );
+      // The APD rule holds: the ticket is not the card.
+      expect(
+        call('PUT', '/api/v1/checkin/settings', 'g', {
+          'federation': 'optional',
+          'apd': {
+            'accepted': ['fpa'],
+            'checkin': true,
+          },
+        }).status,
+        200,
+      );
+      a = call('POST', path, m, {'ticket': gaio});
+      row = a.body! as Map;
+      expect((row['status'], row['already']), ('pending', false));
+      final card = call(
+        'PATCH',
+        '/api/v1/games/$gid/checkins/p-cccccccccccc',
+        m,
+        {'federation_seen': true},
+      );
+      expect(
+        ((card.body! as Map)['status'], (card.body! as Map)['card_checked_by']),
+        ('checked_in', 'p-mmmmmmmmmmmm'),
+      );
+      // The CSV keeps who took the ticket.
+      final csv = call('GET', '/api/v1/games/$gid/checkins.csv', 'g');
+      expect(csv.text, contains('ticket_scanned_by,ticket_scanned_at'));
+      // A desk's pace, never a flood: 60 a minute per staff id.
+      var limited = 0;
+      for (var i = 0; i < 61 && limited == 0; i++) {
+        if (call('POST', path, m, {'ticket': gaio}).status == 429) limited++;
+      }
+      expect(limited, 1);
+      // The GM token has its own count.
+      expect(call('POST', path, 'g', {'ticket': gaio}).status, 200);
     });
 
     test('the schedule, a game made from it, its roster until the start, '

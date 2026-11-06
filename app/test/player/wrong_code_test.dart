@@ -65,6 +65,12 @@ void main() {
     expect(classifyCode(_siteLink), CodeKind.siteLink);
     expect(classifyCode('https://campo.example.pt/f/campo'), CodeKind.siteLink);
     expect(classifyCode(_scoreboard), CodeKind.scoreboard);
+    final ticket = FakeField().ticketFor(
+      'p-falcaofalcao',
+      '7a000000-0000-4000-8000-000000000001',
+    );
+    expect(classifyCode(ticket), CodeKind.ticket);
+    expect(wrongCodeMessage(ticket, CodeKind.poster), 'code.is_ticket');
     expect(classifyCode('hello'), isNull);
     expect(classifyCode('atalaia:checkin:'), CodeKind.poster);
     expect(wrongCodeMessage(poster, CodeKind.poster), isNull);
