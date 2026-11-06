@@ -5,7 +5,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Manual de marshal
 
-Para os marshals de um campo: quem faz a cronografagem à entrada e as verificações durante o jogo. Em inglês: [Marshal manual](../en/marshal.md).
+Para os marshals de um campo: quem ajuda na receção, faz a cronografagem à entrada e as verificações durante o jogo. Em inglês: [Marshal manual](../en/marshal.md).
 
 > **Ainda não está pronta para o campo.** A Atalaia está em pré-alfa. Nenhum telemóvel a sério foi usado num campo até hoje. Cada passo abaixo corresponde ao que a app mostra hoje. Os passos que dependem de hardware dizem **Ainda não testado num campo**. As palavras em *itálico* estão no [glossário](https://atalaia-project.link/glossario/).
 
@@ -32,7 +32,7 @@ A app cria a tua **chave de assinatura** sozinha. Cada disparo que registas é a
 
 Se a organização te tirar da lista, o teu telemóvel deixa logo de ser de marshal. As medições que ainda não enviaste ficam no telemóvel. Seguem se a organização te voltar a acrescentar.
 
-## 2. O ecrã Marshal
+### O ecrã Marshal
 
 **Marshal** abre uma lista:
 
@@ -45,11 +45,29 @@ Se a organização te tirar da lista, o teu telemóvel deixa logo de ser de mars
 
 Mais abaixo, **Quem és** tem **Identificador do cronógrafo** (um nome para o teu aparelho, por exemplo *chrono-1*) e **Chave de assinatura**. **Medições guardadas** diz quantas medições estão neste telemóvel. Guardam-se 365 dias e depois são apagadas. **Apagar as medições de alguém** apaga as medições de uma pessoa: escreve o **Identificador de quem joga** e toca em **Apagar**.
 
-## 2b. O veredicto da filiação em APD à receção
+## 2. A receção
 
-Quando o campo verifica a filiação em APD, o cartão de quem joga na lista mostra a APD, o número e a validade com um selo: **Filiação válida**, **Filiação caducada**, **APD não aceite aqui** ou **Filiação em falta**. A app não verifica nada: compara o número e a data com o cartão da pessoa. **O campo tem de conferir o cartão físico com o que a pessoa escreveu de antemão** (uma obrigação legal nos campos em Portugal, art. 6.º, n.º 1, al. c), do RGPD; o interesse legítimo do campo nos outros, al. f)). Por isso, quando a regra verifica no check-in, **toda a gente fica à espera**, mesmo com selo válido e confirmação automática, até veres o cartão e tocares em **Cartão visto, confere**. Isso admite a pessoa e regista **o teu identificador e a hora**; o controlador **apaga então o número de associado** e guarda só a APD, a validade, o veredicto desse dia (*Filiação válida em 2027-01-15*) e quem verificou, durante o prazo normal de retenção do check-in. Se o cartão não confere, corrige primeiro a APD, o número ou a validade na linha da pessoa, na consola, ou não toques. **Admitir sem o cartão** (aparece em vez de **Admitir** quando a regra verifica no check-in) admite a pessoa na mesma: nunca ficas bloqueado. O controlador regista-o com o motivo (*sem cartão*, ou o veredicto) e nunca o número, guarda o número, e o cartão passa a dizer **admitido sem o cartão**. A lista mostra quem declarou réplicas e também quem está **à espera de confirmação** sem réplicas, para veres a filiação e admitires a pessoa a partir do telemóvel; depois de admitida e sem réplicas, deixa de estar na lista. A consola do GM lista toda a gente.
+Antes do jogo, quem joga passa pela receção do campo. Como marshal podes fazer lá três coisas: conferir um cartão de filiação, fazer o check-in de quem não tem a app e mandar quem traz um bilhete impresso à consola da organização. Quem tem a app faz o próprio check-in ([manual de quem joga](player.md#3-faz-o-check-in-no-campo)). O lado da consola está no [manual da organização](game-master.md#the-check-in-desk).
+
+### Conferir o cartão de filiação
+
+Quando o campo verifica a filiação em APD, o cartão de quem joga na lista (**Réplicas por cronografar**) mostra a APD, o número e a validade com um selo: **Filiação válida**, **Filiação caducada**, **APD não aceite aqui** ou **Filiação em falta**. A app não verifica nada: compara o número e a data com o cartão da pessoa. **O campo tem de conferir o cartão físico com o que a pessoa escreveu de antemão** (uma obrigação legal nos campos em Portugal, art. 6.º, n.º 1, al. c), do RGPD; o interesse legítimo do campo nos outros, al. f)). Por isso, quando a regra verifica no check-in, **toda a gente fica à espera**, mesmo com selo válido e confirmação automática, até veres o cartão e tocares em **Cartão visto, confere**. Isso admite a pessoa e regista **o teu identificador e a hora**; o controlador **apaga então o número de associado** e guarda só a APD, a validade, o veredicto desse dia (*Filiação válida em 2027-01-15*) e quem verificou, durante o prazo normal de retenção do check-in. Se o cartão não confere, corrige primeiro a APD, o número ou a validade na linha da pessoa, na consola, ou não toques. **Admitir sem o cartão** (aparece em vez de **Admitir** quando a regra verifica no check-in) admite a pessoa na mesma: nunca ficas bloqueado. O controlador regista-o com o motivo (*sem cartão*, ou o veredicto) e nunca o número, guarda o número, e o cartão passa a dizer **admitido sem o cartão**. A lista mostra quem declarou réplicas e também quem está **à espera de confirmação** sem réplicas, para veres a filiação e admitires a pessoa a partir do telemóvel; depois de admitida e sem réplicas, deixa de estar na lista. A consola do GM lista toda a gente.
 
 **Fora de Portugal** os mesmos ecrãs falam de **filiação numa associação**: o país do campo (definido pelo GM) decide as palavras, por isso o selo diz **Associação não aceite aqui** e o cartão mostra a associação em vez de uma APD. O que verificas é o mesmo: o número e a data contra o cartão da pessoa.
+
+### Fazer o check-in à mão
+
+Alguém sem a app: em **Réplicas por cronografar** ([secção 3](#3-a-lista-réplicas-por-cronografar)), toca em **Check-in à mão**, escreve o nome e toca em **Fazer o check-in**. Quando o campo pede filiação, o formulário tem também a **APD** (ou associação), o **número de associado** e a **validade** (AAAA-MM-DD): escreve o que diz o cartão da pessoa e marca **Cartão visto, confere** enquanto tens o cartão na mão (o número é então apagado, como acima; desmarcado, é um check-in sem o cartão). O formulário tem ainda uma caixa separada, **Partilhar a minha posição com o jogo durante este jogo**: marca-a só se a pessoa concordar; desmarcada não muda o check-in. Nada é verificado e nunca és impedido por causa do veredicto; uma exceção fica registada sem o número. O controlador dá-lhe um identificador.
+
+### Bilhetes impressos e inscrições
+
+Quem se inscreveu no site do campo traz um **bilhete de check-in**: um código QR na app, ou em papel. Com a app, escolhe a inscrição ao fazer o check-in e não precisa de nada de ti.
+
+- **Um bilhete impresso lê-se na consola da organização, não na app de marshal.** Manda a pessoa à organização (ou a quem estiver com a consola na receção). Em **Check-in**, em **Bilhete impresso**, a organização lê ou cola o código (`atalaia:ticket:…`) e toca em **Fazer o check-in**. O check-in fica feito logo, exceto quando o campo confere cartões de filiação: aí o check-in espera até tu (ou a organização) tocares em **Cartão visto, confere** ([Conferir o cartão de filiação](#conferir-o-cartão-de-filiação)). Só o bilhete mais recente de uma inscrição funciona.
+- **Quem tem inscrição mas não traz o bilhete** aparece como **por chegar** na lista da consola. Depois de veres quem é, a organização toca em **Chegou**.
+- **Não uses o Check-in à mão para quem tem inscrição.** Cria um check-in novo ao lado da inscrição, e a inscrição continua **por chegar**.
+- A consola da receção funciona com o código da organização, ou com um código temporário **GM completo**. Um código **Ler e gerir marshals** não confirma check-ins nem aceita bilhetes.
+- Se um bilhete for recusado, a consola diz porquê: foi feito um bilhete mais recente para essa inscrição (pede à pessoa o mais recente), ou a inscrição é de outro jogo.
 
 ## 3. A lista: réplicas por cronografar
 
@@ -59,7 +77,7 @@ Quando o campo verifica a filiação em APD, o cartão de quem joga na lista mos
 4. Para encontrar uma réplica pela etiqueta, toca no ícone de **ler** e aponta a câmara à etiqueta QR dela.
 5. Toca numa réplica para a cronografar ([secção 4](#4-cronografa-uma-réplica)).
 6. Se cronografares várias réplicas sem ligação, toca em **Enviar** *n* **séries por enviar** (**Enviar 1 série por enviar**, se for só uma) quando voltares ao Wi-Fi do campo. Uma série que o controlador não aceita fica no teu telemóvel.
-7. Alguém sem a app: toca em **Check-in à mão**, escreve o nome e toca em **Fazer o check-in**. Quando o campo pede filiação, o formulário tem também a **APD** (ou associação), o **número de associado** e a **validade** (AAAA-MM-DD): escreve o que diz o cartão da pessoa e marca **Cartão visto, confere** enquanto tens o cartão na mão (o número é então apagado, como acima; desmarcado, é um check-in sem o cartão). O formulário tem ainda uma caixa separada, **Partilhar a minha posição com o jogo durante este jogo**: marca-a só se a pessoa concordar; desmarcada não muda o check-in. Nada é verificado e nunca és impedido por causa do veredicto; uma exceção fica registada sem o número. O controlador dá-lhe um identificador.
+7. Alguém sem a app: vê [Fazer o check-in à mão](#fazer-o-check-in-à-mão).
 
 A organização também vê esta lista na consola dela. A lista precisa de a organização confirmar que és marshal.
 
@@ -154,6 +172,7 @@ Conta voltar ao Wi-Fi do campo de duas em duas horas.
 | **Este check-in já não é válido: faz o check-in outra vez.** | Faz o check-in outra vez no campo. |
 | **Pede à organização para te acrescentar como marshal** | A organização tem de te acrescentar em **Check-in › Marshals**. Depois toca em **Perguntar outra vez**. |
 | **A organização retirou-te da lista de marshals** | A organização retirou-te. As séries por enviar ficam no telemóvel. Pede-lhe que te volte a acrescentar. |
+| Alguém mostra um bilhete impresso | A app de marshal não o lê. Manda a pessoa à consola da organização: **Check-in › Bilhete impresso** ([a receção](#bilhetes-impressos-e-inscrições)). |
 | **Registar o disparo** está cinzento | Precisas de uma réplica, de um limite para a classe dela e de uma velocidade. Escolhe primeiro uma réplica. |
 | **Não foi enviado … Fica neste telemóvel para enviar depois.** | Não foi possível chegar ao controlador. Liga-te ao Wi-Fi do campo e toca em **Enviar** *n* **séries por enviar** (ou **Enviar 1 série por enviar**) na lista. |
 | **n séries não foram aceites porque o controlador não te tem na lista de marshals** (**1 série não foi aceite …**, se for só uma) | Pede à organização que te volte a acrescentar. As séries esperam no teu telemóvel. |

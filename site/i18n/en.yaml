@@ -81,7 +81,10 @@ header:
 
 hero:
   status: >-
-    Pre-alpha · phases 1 and 2 done in software; real boards play whole games with the field controller on the bench, keypad included; phase 3 done in software, the iOS app checked on an iPhone; phase 4's site server running on a test server; phase 5 built in software · not field-ready yet
+    Pre-alpha · phases 1 and 2 done in software; real boards play whole games with the field
+    controller on the bench, keypad included; phase 3 done in software, the iOS app checked on an
+    iPhone; phase 4's site server running on a test server; phase 5 built in software · newest
+    release v0.8.0 · not field-ready yet
   title: The open <span class="nowrap">force-on-force</span> platform
   lead: >-
     Atalaia is an open platform for the electronic props of airsoft, paintball and milsim: the
@@ -271,11 +274,14 @@ radio:
       869.4–869.65&nbsp;MHz, the only part of the European 868&nbsp;MHz band where a device may
       transmit up to 10% of the time at up to 500&nbsp;mW. Elsewhere in 868–870&nbsp;MHz the rules
       allow 1% of the time (0.1% on 868.7–869.2&nbsp;MHz) at 25&nbsp;mW: about a tenth of the
-      airtime, and much less range. 868.1, 868.3 and 868.5&nbsp;MHz are LoRaWAN's default
-      channels and often busy. The default is shared too: LoRaWAN gateways send some replies on
+      airtime, and much less range. 868.1, 868.3 and 868.5&nbsp;MHz are LoRaWAN's default channels
+      and often busy. The default is shared too: LoRaWAN gateways send some replies on
       869.525&nbsp;MHz and Meshtastic's European default uses it, so near such users the GM can let
-      the controller listen to every legal channel for a minute and pick the quietest, draw one at
-      random, or choose by hand. The boxes then follow the chosen channel's own limits.
+      the controller listen to the legal channels (about 60 seconds in all) and pick the quietest,
+      draw one at random, or choose by hand. The boxes then follow the chosen channel's own limits.
+      When the GM changes the channel, the controller tells the free boxes on the old channel, three
+      times, where it went; a box that is off or out of range misses it, and is found again with
+      <em>Look for boxes</em> or adopted again.
   region:
     title: "Radio regions: Europe and Taiwan"
     lead: >-
@@ -719,15 +725,22 @@ try:
   manuals:
     title: Playing and running it
     text: >-
-      Manuals for the people who use Atalaia, not for developers: for
-      <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/README.md">players, organisers, marshals, box operators and the people who build the boxes</a>, in English
-      and Portuguese, with a one-page quick start. They say what the software shows today and mark
-      what has not been tried on a field.
+      Manuals for the people who use Atalaia, not for developers: for <a
+      href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/README.md">players,
+      organisers, marshals, box and phone-prop operators, field admins and the people who build the
+      boxes</a>, in English and Portuguese, with a one-page quick start. They say what the software
+      shows today and mark what has not been tried on a field.
 
 roadmap:
   title: Roadmap
   intro: >-
-    Six phases, each closed by a real field test: its gate. The software is ahead of the hardware: phases 1 to 3 are done in software (real boards play whole games on the bench, and the iOS app has passed its checklist on an iPhone); phases 4 and 5 are built in software. The gates wait for built boxes, field tests, a real server and the project's registry key.
+    Six phases, each closed by a real field test: its gate. The software is ahead of the hardware:
+    phases 1 to 3 are done in software (real boards play whole games on the bench, and the iOS app
+    has passed its checklist on an iPhone); phases 4 and 5 are built in software. The gates wait for
+    built boxes, field tests, a real server and the project's registry key. The newest release is
+    v0.8.0 (4 November 2026), the first signed with the project's new release key. Next is v0.9.0:
+    freeing boxes left in an ended game and the box's Wi-Fi rules are in software, not released, not
+    yet on hardware.
   more: The full roadmap, with what each phase holds and its gate →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
   # hardware), in progress, designed (research, architecture and plan written; no code).
@@ -756,7 +769,8 @@ roadmap:
     short: >-
       Field Box firmware and a build manual; a real board plays whole games on the bench, now with
       its screen, keypad and buttons wired up on loose wires (photo and clip on the build page).
-      Still waiting for an assembled box.
+      Leaving an ended game at the box is in software for v0.9.0. Still waiting for an assembled
+      box.
     done:
       - ESP32 firmware for the Field Box, with presets on the device, running in an emulator.
       - The box's small screen shows the hold bar, points and held time, in four languages.
@@ -778,6 +792,7 @@ roadmap:
       - "A flaky I2C bus no longer reboots a box: the keypad, small screen, NFC reader and battery gauge use the newer ESP-IDF driver with time-outs, a bus reset and a back-off that sets a failing part aside, so a bad keypad reads as no key and the game runs on. A restart now reports its real reason (power, brownout, software, crash, watchdog) instead of always \"power\", and the GM console says \"A box crashed and restarted\". Found on the bench: a keypad with bad solder joints rebooted a board six times in three minutes. Host tests only; the bench test of the fix is still to do."
       - "A screen text that does not fit is refused when a mode is checked, and a text that fails to draw shows a \"?\" instead of a blank (a long text in four languages used to go silently empty on a box). Tests on a computer."
       - "A count of one takes the singular (\"1 ponto\", not \"1 pontos\") on the box's screens, in the app, the GM console and the staff pages. Tests in software."
+      - "A box left in a game that ended while it was off can leave it at the box: hold * for 3 seconds, type the admin PIN, then Leave the game (or @leave on its USB console). It keeps its field, Wi-Fi and modes. In software, from v0.9.0: not released, not yet on hardware."
     next:
       - A built box that runs a 2-hour club game with no restarts.
       - "Seeing the timer bar on a real panel."
@@ -786,6 +801,7 @@ roadmap:
       - "Flashing the new partition table on a real board (one USB flash, no erase, for a box on the old one)."
       - "A hardened release image (flash encryption, secure boot): written down as a plan only, nothing built or tried on a board."
       - "Trying the I2C fault handling on a board with a bad keypad connection, and the boot splash and the new screens on more than the first bench board."
+      - "Releasing v0.9.0 and trying Leave the game on a real box."
     gate: >-
       Gate: one box runs a 2-hour club game with no restarts. <strong>Open</strong> until a built
       box does.
@@ -794,7 +810,8 @@ roadmap:
     short: >-
       Skirmesh-RF over LoRa, field controller, API, GM console and a mode pack, tested in software;
       on the bench, real boards play whole games with the controller over the radio, and what the
-      bench found is fixed in software. Waiting for 5 built boxes on a field.
+      bench found is fixed in software. Freeing boxes left in an ended game is in software for
+      v0.9.0. Waiting for 5 built boxes on a field.
     done:
       - The encrypted Skirmesh-RF radio protocol, and the USB radio modem.
       - The field controller with its API.
@@ -838,6 +855,8 @@ roadmap:
       - "The field controller survives a wrong clock (a Raspberry Pi 4 has no clock of its own and can start at 1970): game times and timeouts no longer depend on it, the console warns the GM, who sets the time from the console (forward only), its certificates stay valid for phones with the right time, and the data purge waits. Tests on a computer, not yet on a real Pi."
       - "Short-lived access tokens: the GM can give a referee's phone, a test run or a spectator screen a token that only reads, runs the game or manages marshals, for one game or all, for 8 hours by default (at most 7 days), and revoke it at once. Tests on a computer."
       - "Updates over the air for the bench's own builds: a bench release key, trusted on the bench beside the project's keys, signs daily builds; on 2 November 2026 a box went from one build to the next from the console in about 22 seconds, confirmed after its self-test."
+      - "The controller frees a box left in a game that ended while it was off: the USB modem reports it, the controller sends that game's end again, and the GM console lists such boxes under Stuck in an ended game, with a Release button. A controller that lost its game (reinstalled, or its data lost) can release every box not in the live game. In software, from v0.9.0: not released, not yet on hardware. The modem needs the new firmware, flashed over USB."
+      - "The box's Wi-Fi setup: @wifi takes a Wi-Fi name and password with spaces, in double quotes, and the setup page refuses what the box cannot use: a name over 32 bytes, or a password that is not empty, 8–63 characters or 64 hex digits. In software, from v0.9.0: not released, not yet on hardware."
     next:
       - The radio boards, and 5 built boxes for the field test.
       - A 20-box field test with listen-before-talk on and off.
@@ -846,6 +865,7 @@ roadmap:
       - "Trying the replay window and the hardened controllers on real boards and a real Pi (a recorded command played back on the bench)."
       - "Wiping a box's epoch store on two bench boards to see it found again, twice in a row and with a former leader rejoined (the runbook is written)."
       - "Setting the clock and using access tokens on a real Raspberry Pi on a field with no internet."
+      - "Releasing v0.9.0, then trying the stuck-box recovery and the Wi-Fi rules on real boards and a real modem."
     gate: >-
       Gate: 5 boxes on a <a href="{{ page.to.glossary }}#glossary-cqb">CQB</a> site and an outdoor
       field, zero lost captures. <strong>Open.</strong>
@@ -956,6 +976,7 @@ roadmap:
         - "The phone controller's own screen imports a registration list (a CSV or JSON file chosen with Android's file chooser), with no GM console needed."
         - "A standby controller takes the box-beacon choices (the field switch, the boxes disabled, the rooms) and the boxes' places from its join, so after a failover phones get the same beacon registry; a console already open on the standby moves the boxes' markers at once, with no reload. In software, in both controllers; the marker move is tested in a headless browser."
         - "The phone controller catches up with the Pi's security review: signed-mode revocation that fails closed (with a floor per mode and an age limit for an offline phone, both on the Mode packages screen), and the staff ATAK feed over TLS with a pinned certificate authority. Tested in software; not on a phone at a field."
+        - "The Android controller frees boxes left in an ended game as the Raspberry Pi does, with a USB radio modem (an I/O pod cannot report such boxes), and has the Pi's clock guard. In software, from v0.9.0: not released, not yet on a real phone."
     g_ios:
       title: iOS
       items:
@@ -1188,8 +1209,9 @@ roadmap:
     title: Community
     short: >-
       Visual mode editor, signed mode packages, the mode registry as a template, German and
-      Traditional Chinese, build guides, the expansion port's target and output modules. Every software
-      step is built.
+      Traditional Chinese, build guides, the expansion port's target and output modules. Every
+      software step is built. The newest release, v0.8.0, is signed with the project's new release
+      key.
     done:
       - "<strong>The visual mode editor</strong>: a page of the simulator where a mode is put
         together from blocks (what happens when a team holds the button, timers, points, screens
@@ -1239,8 +1261,9 @@ roadmap:
       - "The GM console's scenario blocks have a language list with all four languages."
       - "The project's mode keys: an offline root key and a key the registry uses to sign the verified badge. Boxes, the app and the controllers trust both by default."
       - "The firmware guide and the build manuals explain the one USB flash that a box on the old partition table needs, and that settings and keys survive it."
-      - "CI and release hardening from the security review: every action pinned by commit, the build image by digest, every pip install from a hash-pinned file, the signing job in a protected environment that refuses a tag not on main, and weekly dependency updates. The maintainer still has to create the protected environment and move the signing secrets into it (the steps are written down)."
+      - "CI and release hardening from the security review: every action pinned by commit, the build image by digest, every pip install from a hash-pinned file, the signing job in a protected environment that refuses a tag not on main, and weekly dependency updates. Since the key change of November 2026 the release signing key lives only in that protected environment."
       - "Lua string patterns and string.rep are metered in the sandbox (a hostile pattern could hang a box until the watchdog), skipping nested CBOR data is depth-limited, and the CBOR decoders have tests with hostile input."
+      - "Release keys: the project's CI release key was changed over the air. v0.7.0 trusted the old and the new key; v0.8.0 (4 November 2026) is signed with the new one, and the old one is retired. A box on v0.6.1 or older installs v0.7.0 first, then v0.8.0."
     next:
       - "The review of the German and the Chinese: if you play in German or in Chinese, help us
         review them. Translations into other languages start at docs/translations."
@@ -2186,6 +2209,15 @@ glossary:
       100&nbsp;m/s (about 328&nbsp;fps) carries 1 joule. Atalaia keeps each replica's readings, signed
       by the marshal, so marshals can run spot checks during the day (built in software, not yet
       used on a field); a person always decides any penalty.
+  stuck_box:
+    id: "glossary-stuck-box"
+    term: "Stuck box"
+    text: >-
+      A box that was switched off, or out of range, when its game ended, so it still thinks it is in
+      that game: it shows the old game and refuses new invites (“in another game”). From v0.9.0 (in
+      software, not released, not yet on hardware) the controller sends that game's end again when
+      it hears such a box, the GM console lists it with a Release button, and the box's admin menu
+      has Leave the game.
   microcontroller:
     id: glossary-microcontroller
     term: Microcontroller
@@ -2232,10 +2264,12 @@ glossary:
     term: Firmware and flashing
     text: >-
       Firmware is the program built into a device, which starts when you switch it on. Flashing
-      means writing a new version of it onto the device, usually over a USB cable. Atalaia boxes
-      are flashed by cable, and for now a new game mode comes with a new flash; later, modes will
-      arrive as scripts. Firmware updates now come from the field controller over Wi-Fi (built in
-      software, not yet tried on a real board), undoing themselves if a new version fails to start.
+      means writing a new version of it onto the device, usually over a USB cable. Atalaia boxes are
+      flashed by cable the first time; after that, firmware updates come from the field controller
+      over Wi-Fi (tried on bench boards since October 2026), undoing themselves if a new version
+      fails to start. A box installs only a release signed with one of the project's release keys
+      built into it. The project changed one of those keys in November 2026: a box on v0.6.1 or
+      older installs v0.7.0 before v0.8.0.
   lora:
     id: glossary-lora
     term: LoRa
@@ -2243,13 +2277,13 @@ glossary:
       Short for <em>long range</em>: a radio that sends small messages far on very little power,
       with no SIM card, mobile coverage or subscription. On a typical field it should reach roughly
       <span class="nowrap">0.5–2&nbsp;km</span> (a design estimate, still to be measured), and gets
-      through thick walls better than Wi-Fi.
-      The catch: messages must be short, and each device may transmit only a small share of the
-      time. Atalaia uses 869.525&nbsp;MHz by default, in the only EU868 sub-band that allows
-      a 10% duty cycle and 500&nbsp;mW, giving each box up to 6 minutes of airtime per hour —
-      enough for events, scores and time-sync beacons with headroom to spare. A field can choose
-      another channel, which allows 1% of the time or less and 25&nbsp;mW. Boxes send only what changes,
-      such as “red captured B”.
+      through thick walls better than Wi-Fi. The catch: messages must be short, and each device may
+      transmit only a small share of the time. Atalaia uses 869.525&nbsp;MHz by default, in the only
+      EU868 sub-band that allows a 10% duty cycle and 500&nbsp;mW, giving each box up to 6 minutes
+      of airtime per hour — enough for events, scores and time-sync beacons with headroom to spare.
+      A field can choose another channel, which allows 1% of the time or less and 25&nbsp;mW; when
+      the GM changes the channel, a box that was off misses the move and has to be found again.
+      Boxes send only what changes, such as “red captured B”.
   mesh:
     id: glossary-mesh
     term: Mesh

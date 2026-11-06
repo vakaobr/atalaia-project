@@ -5,7 +5,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Marshal manual
 
-For the marshals of a field: the people who run the *chrono* (chronograph) at check-in and spot checks during the game. In Portuguese: [Manual de marshal](../pt/marshal.md).
+For the marshals of a field: the people who help at the check-in desk, run the *chrono* (chronograph) at check-in and do spot checks during the game. In Portuguese: [Manual de marshal](../pt/marshal.md).
 
 > **Not field-ready yet.** Atalaia is pre-alpha. No real phone has been used on a field so far. Every step below matches what the app shows today. Steps that depend on hardware say **Not yet tested on a field**. Words in *italics* are in the [glossary](https://atalaia-project.link/en/glossary/).
 
@@ -32,7 +32,7 @@ The app makes your **signing key** by itself. Every shot you record is signed wi
 
 If the organisers take you off the list, your phone stops being a marshal at once. Readings you have not sent stay on the phone. They go out if the organisers add you again.
 
-## 2. The Marshal screen
+### The Marshal screen
 
 **Marshal** opens a list:
 
@@ -45,11 +45,29 @@ If the organisers take you off the list, your phone stops being a marshal at onc
 
 Below, **Who you are** has **Chronograph's id** (a name for your device, for example *chrono-1*) and **Signing key**. **Stored readings** says how many readings are on this phone. They are kept for 365 days and then deleted. **Erase someone's readings** erases one player's readings: type the **Player's id** and tap **Erase**.
 
-## 2b. The APD verdict at check-in
+## 2. The check-in desk
 
-When the field checks APD membership, a player's card in the queue shows their APD, membership number and expiry with a badge: **Valid membership**, **Membership expired**, **APD not accepted here** or **Membership missing**. The app does not verify anything: compare the number and the date with the player's card. **The field must check the physical card against what the player typed in advance** (a legal duty for fields in Portugal, Art. 6(1)(c) GDPR; the field's legitimate interest elsewhere, Art. 6(1)(f)). So when the rule checks at check-in, **every player waits**, even with a valid badge and automatic confirmation, until you look at the card and tap **Card seen, matches**. That lets the player in and records **your id and the time**; the controller then **erases the membership number** and keeps only the APD, the expiry date, the verdict as it stood that day (*Membership valid on 2027-01-15*) and who checked it, for the normal check-in retention. If the card does not match, correct the APD, number or expiry on the player's row in the console first, or refuse to tap. **Let in without the card** (shown instead of **Let in** when the rule checks at check-in) still admits a player: you are never blocked. The controller logs it with the reason (*no card*, or the verdict) and never the number, keeps the number, and the card says **let in without the card**. The queue lists players who declared replicas, and also any player who is **waiting for confirmation** without replicas, so you can see their membership and let them in from your phone; once they are in and have no replica, they leave the queue. The GM console lists everyone.
+Before the game, players come to the field's check-in desk. As a marshal you can do three things there: check a membership card, check in a player who has no app, and send a player with a printed ticket to the GM console. Players with the app check themselves in ([player manual](player.md#3-check-in-at-the-field)). The desk's console side is in the [game master manual](game-master.md#the-check-in-desk).
+
+### Check the membership card
+
+When the field checks APD membership, a player's card in the queue (**Replicas to chrono**) shows their APD, membership number and expiry with a badge: **Valid membership**, **Membership expired**, **APD not accepted here** or **Membership missing**. The app does not verify anything: compare the number and the date with the player's card. **The field must check the physical card against what the player typed in advance** (a legal duty for fields in Portugal, Art. 6(1)(c) GDPR; the field's legitimate interest elsewhere, Art. 6(1)(f)). So when the rule checks at check-in, **every player waits**, even with a valid badge and automatic confirmation, until you look at the card and tap **Card seen, matches**. That lets the player in and records **your id and the time**; the controller then **erases the membership number** and keeps only the APD, the expiry date, the verdict as it stood that day (*Membership valid on 2027-01-15*) and who checked it, for the normal check-in retention. If the card does not match, correct the APD, number or expiry on the player's row in the console first, or refuse to tap. **Let in without the card** (shown instead of **Let in** when the rule checks at check-in) still admits a player: you are never blocked. The controller logs it with the reason (*no card*, or the verdict) and never the number, keeps the number, and the card says **let in without the card**. The queue lists players who declared replicas, and also any player who is **waiting for confirmation** without replicas, so you can see their membership and let them in from your phone; once they are in and have no replica, they leave the queue. The GM console lists everyone.
 
 **Outside Portugal** the same screens say **association membership**: the field's country decides the words (the GM sets it), so the badge reads **Association not accepted here** and the player's card shows their association instead of an APD. What you check is the same: the number and the date against the player's card.
+
+### Check in a player by hand
+
+A player without the app: in **Replicas to chrono** ([section 3](#3-the-queue-replicas-to-chrono)), tap **Check in by hand**, type their name and tap **Check in**. When the field asks for a membership, the form also has the **APD** (or association), the **membership number** and the **expiry** (YYYY-MM-DD): type what the player's card says, and tick **Card seen, matches** while the card is in your hand (the number is then erased as above; unticked, it is a check-in without the card). The form also has a separate box, **Share my position with the game during this game**: tick it only if the player agrees, it is off otherwise and does not change the check-in. None of it is verified and you are never refused because of the verdict; an override is logged without the number. The controller gives them an id.
+
+### Printed tickets and registered players
+
+Players who registered on the field's site come with a **check-in ticket**: a QR code in the app, or on paper. With the app they pick their registration when they check in, and need nothing from you.
+
+- **A printed ticket is scanned in the GM console, not in the marshal app.** Send the player to the GM (or to whoever runs the console at the desk). In **Check-in**, under **Printed ticket**, the GM scans or pastes the code (`atalaia:ticket:…`) and taps **Check in**. The player is checked in at once, except when the field checks membership cards: then the check-in waits until you (or the GM) tap **Card seen, matches** ([Check the membership card](#check-the-membership-card)). Only the newest ticket of a registration works.
+- **A registered player without the ticket** shows as **expected** in the console's list. Once you have seen who they are, the GM taps **Arrived**.
+- **Do not use Check in by hand for a registered player.** It makes a new check-in beside their registration, and the registration stays **expected**.
+- The desk's console runs with the GM code, or a day code with **Full GM**. A **Read and manage marshals** day code can neither confirm check-ins nor take tickets.
+- If a ticket is refused, the console says why: a newer ticket was made for the registration (ask the player for the newest one), or the registration is for another game.
 
 ## 3. The queue: replicas to chrono
 
@@ -59,7 +77,7 @@ When the field checks APD membership, a player's card in the queue shows their A
 4. To find a replica by its label, tap the **scan** icon and point the camera at its QR label.
 5. Tap a replica to chrono it ([section 4](#4-chrono-a-replica)).
 6. If you chrono several replicas offline, tap **Send** *n* **series not sent yet** when you are back on the field's Wi-Fi. A series the controller does not accept stays on your phone.
-7. A player without the app: tap **Check in by hand**, type their name and tap **Check in**. When the field asks for a membership, the form also has the **APD** (or association), the **membership number** and the **expiry** (YYYY-MM-DD): type what the player's card says, and tick **Card seen, matches** while the card is in your hand (the number is then erased as above; unticked, it is a check-in without the card). The form also has a separate box, **Share my position with the game during this game**: tick it only if the player agrees, it is off otherwise and does not change the check-in. None of it is verified and you are never refused because of the verdict; an override is logged without the number. The controller gives them an id.
+7. A player without the app: see [Check in a player by hand](#check-in-a-player-by-hand).
 
 The organisers can also see this list in their console. The list needs the organisers' confirmation that you are a marshal.
 
@@ -154,6 +172,7 @@ Plan to be back on the field's Wi-Fi every couple of hours.
 | **This check-in is no longer valid: check in again.** | Check in again at the field. |
 | **Ask the GM to add you as a marshal** | The organisers must add you in **Check-in › Marshals**. Then tap **Ask again**. |
 | **The GM took you off the marshal list** | The organisers removed you. The unsent series stay on the phone. Ask them to add you again. |
+| A player shows a printed ticket | The marshal app cannot read it. Send the player to the GM console: **Check-in › Printed ticket** ([the check-in desk](#printed-tickets-and-registered-players)). |
 | **Record the shot** is grey | You need a replica, a limit for its class and a velocity. Pick a replica first. |
 | **Not sent … It stays on this phone to send later.** | The controller could not be reached. Join the field's Wi-Fi and tap **Send** *n* **series not sent yet** in the queue. |
 | **n series were not accepted because the controller does not have you on its marshal list** | Ask the organisers to add you again. The series wait on your phone. |
