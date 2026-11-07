@@ -14,6 +14,21 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.11.0](https://github.com/vakaobr/atalaia-project/compare/v0.10.0...v0.11.0) (2026-11-07)
+
+### Features
+
+* **controller:** the registering phone proves itself at check-in (TKB-1 to TKB-8) ([#135](https://github.com/vakaobr/atalaia-project/issues/135)) ([8dfd964](https://github.com/vakaobr/atalaia-project/commit/8dfd964679d0df8254187063ff001c7141bed065))
+* **firmware:** prepare the hardened image's burn procedure, digest revocation and emulator test (nothing burned) ([#140](https://github.com/vakaobr/atalaia-project/issues/140)) ([7fe03d4](https://github.com/vakaobr/atalaia-project/commit/7fe03d478a6f34d014cc82c182ead8a5bac5e031))
+
+
+### Documentation
+
+* **release:** record the release environment's reviewer and the v* tag ruleset ([#139](https://github.com/vakaobr/atalaia-project/issues/139)) ([8c7b5b9](https://github.com/vakaobr/atalaia-project/commit/8c7b5b95223712fe7bd4e1c36de9d99e6e0dd08c))
+* v0.10.0 is released: README, manuals, STATUS and the project page ([#137](https://github.com/vakaobr/atalaia-project/issues/137)) ([3619b6e](https://github.com/vakaobr/atalaia-project/commit/3619b6e2a9bcbb6137260c72c2eac0402d8bcb03))
+
+### Details
+
 - **The hardened Field Box image, prepared and still burned nowhere (HPR-1 to HPR-12).** The maintainer decided on
   2026-11-07 that no board, bench or field, gets the hardened image or any eFuse burn for now
   (firmware/esp32/docs/RELEASE_HARDENING.md, section 5 question 1); the work that needs no hardware went ahead.
