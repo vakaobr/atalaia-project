@@ -9,7 +9,7 @@ For the people who run a field: setting it up once, running a game day from the 
 
 > **Not field-ready yet.** Atalaia is pre-alpha. The controller has played whole games with real boards on a bench, but no controller, box, phone or server has been used on a real field. Every step below matches what the software shows today. Steps that depend on hardware say **Not yet tested on a field**. Words in *italics* are in the [glossary](https://atalaia-project.link/en/glossary/).
 
-> **Versions.** The newest release is **v0.8.0** (4 November 2026). A feature marked **From v0.9.0 (not released yet)** is on the project's `main` branch only: you get it from the next release, or by building from `main` now.
+> **Versions.** The newest release is **v0.9.0** (6 November 2026). A feature marked **From v0.9.0** needs that release or a later one on the controller, the modem or the box, as the text says.
 
 ## Contents
 
@@ -467,12 +467,12 @@ A box that was switched off when its game ended never heard the end. Switched on
 
 Try these in order:
 
-1. **Wait about a minute.** From v0.9.0 the controller hears the box, sends that game's end again by itself (at most once a minute per game) and the box shows **READY**. The game shows in the **Boxes** tab under **Stuck in an ended game**, with the box numbers heard, how long ago, the signal and how many times it was resent.
-2. **Tap Release** on that game's row to send the end now. The toast says whether it went: the radio must be connected, and a game live on another channel must end first.
+1. **Wait about a minute.** From v0.9.0 the controller hears the box, sends that game's end again by itself and the box shows **READY**. It does this between games and while a game is being set up, for one ended game a minute at most (from v0.10.0). **Once a game has started (or is paused) it waits until that game ends**, so that the live game keeps the radio's air time: during a game, use step 2. The game shows in the **Boxes** tab under **Stuck in an ended game**, with the box numbers heard (the 32 heard last, and how many more), how long ago, the signal and how many times it was resent.
+2. **Tap Release** on that game's row to send the end now, also during a game. The toast says whether it went: the radio must be connected, and a game live on another channel must end first.
 3. **The controller no longer knows the game** (it was reinstalled or lost its data): use [Release every box not in this game](#the-controller-was-reinstalled-or-lost-its-data).
 4. **Take the box out at the box**: see [Take a box out of its game](#take-a-box-out-of-its-game).
 
-**What each step needs.** All of this is **From v0.9.0 (not released yet)**:
+**What each step needs.** All of this is **From v0.9.0**:
 
 | Step | Controller | USB radio modem | Box |
 | --- | --- | --- | --- |
@@ -484,7 +484,7 @@ With an older modem the list says **The radio modem cannot report boxes still in
 
 ### Take a box out of its game
 
-At the box, with its admin PIN. This also pulls a box out of a game that is still running: the console then sees that box as ended, and the game goes on for the others. **From v0.9.0 (not released yet)** in the box's firmware.
+At the box, with its admin PIN. This also pulls a box out of a game that is still running: the console then sees that box as ended, and the game goes on for the others. **From v0.9.0** in the box's firmware.
 
 1. Hold `*` for 3 seconds.
 2. Type the admin PIN and press `#`.
@@ -509,7 +509,7 @@ A box on older firmware has no such menu. Steps 1 and 2 of [A box is stuck in an
 
 1. **Restore a backup if you have one** ([controller setup guide](controller-setup.md)). With the same join key the boxes go on working.
 2. **Without a backup**, give the new controller the same field join key if you still have it. Otherwise adopt every box again.
-3. **Boxes still in the old game.** The controller no longer knows that game, so it cannot end it. Open **Settings**, **Boxes left in a lost game**, tap **Release every box not in this game** (or **Release every box in a game** when no game is live) and confirm with **Release**. Every box of this field on this channel that is in another game leaves it and shows **READY**. **From v0.9.0 (not released yet)**, controller and boxes.
+3. **Boxes still in the old game.** The controller no longer knows that game, so it cannot end it. Open **Settings**, **Boxes left in a lost game**, tap **Release every box not in this game** (or **Release every box in a game** when no game is live) and confirm with **Release**. Every box of this field on this channel that is in another game leaves it and shows **READY**. **From v0.9.0**, controller and boxes.
 
 Careful: a game another controller of this field runs at the same time on the same channel loses its boxes too. A box that joined its game after the release is not affected. The release is refused from a standby, with a wrong controller clock, and more than once in 30 seconds. Not yet tried on hardware.
 
@@ -523,7 +523,7 @@ When the clock is behind, every screen shows a yellow banner: **The controller's
 2. In the banner, or in **Settings › Controller clock**, tap **Set the controller's clock from this device**. Only the GM code can.
 3. It says **The controller's clock is now …**.
 
-The clock only moves forward: never before the newest data the controller holds, and never more than 14 days at a time when it already looks right. The setting lasts until the controller restarts, so a Pi 4 needs it after every power cut. Players who checked in while the clock was far behind may have to check in again (the app asks). **Release every box not in this game** is refused while the clock is wrong. To fix the clock for good, see the [controller setup guide](controller-setup.md). A phone controller has the same banner and button **from v0.9.0 (not released yet)**.
+The clock only moves forward: never before the newest data the controller holds, and never more than 14 days at a time when it already looks right. The setting lasts until the controller restarts, so a Pi 4 needs it after every power cut. Players who checked in while the clock was far behind may have to check in again (the app asks). **Release every box not in this game** is refused while the clock is wrong. To fix the clock for good, see the [controller setup guide](controller-setup.md). A phone controller has the same banner and button **from v0.9.0**.
 
 ### Promote the standby
 
@@ -590,7 +590,7 @@ Each box needs the field's Wi-Fi name and password in its setup, and enough batt
 
 ### Update the modem
 
-The USB radio modem has **no update over the air**: it is reflashed over USB. Do it for each release that changes it, and when the console says **The radio modem cannot report boxes still in an ended game: update its firmware**. The stuck-box reports need a modem from v0.9.0 (not released yet).
+The USB radio modem has **no update over the air**: it is reflashed over USB. Do it for each release that changes it, and when the console says **The radio modem cannot report boxes still in an ended game: update its firmware**. The stuck-box reports need a modem from v0.9.0.
 
 1. Stop the controller (on a Pi: `sudo systemctl stop atalaia-controller`; on a phone: **Stop the controller**).
 2. Flash the modem image of the same release as the boxes: [set up the radio modem](modem.md).
