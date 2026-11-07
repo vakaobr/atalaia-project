@@ -467,8 +467,8 @@ A box that was switched off when its game ended never heard the end. Switched on
 
 Try these in order:
 
-1. **Wait about a minute.** From v0.9.0 the controller hears the box, sends that game's end again by itself (at most once a minute per game) and the box shows **READY**. The game shows in the **Boxes** tab under **Stuck in an ended game**, with the box numbers heard, how long ago, the signal and how many times it was resent.
-2. **Tap Release** on that game's row to send the end now. The toast says whether it went: the radio must be connected, and a game live on another channel must end first.
+1. **Wait about a minute.** From v0.9.0 the controller hears the box, sends that game's end again by itself and the box shows **READY**. It does this between games and while a game is being set up, for one ended game a minute at most (from v0.10.0). **Once a game has started (or is paused) it waits until that game ends**, so that the live game keeps the radio's air time: during a game, use step 2. The game shows in the **Boxes** tab under **Stuck in an ended game**, with the box numbers heard (the 32 heard last, and how many more), how long ago, the signal and how many times it was resent.
+2. **Tap Release** on that game's row to send the end now, also during a game. The toast says whether it went: the radio must be connected, and a game live on another channel must end first.
 3. **The controller no longer knows the game** (it was reinstalled or lost its data): use [Release every box not in this game](#the-controller-was-reinstalled-or-lost-its-data).
 4. **Take the box out at the box**: see [Take a box out of its game](#take-a-box-out-of-its-game).
 

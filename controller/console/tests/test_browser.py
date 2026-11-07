@@ -467,6 +467,17 @@ class ConsoleBrowserTests(unittest.TestCase):
         fkey = ff.field_key(JOIN_KEY)
         sent = [ff.decode(fkey, f) for f in self.field.host.transmitted_all(0.5) if ff.is_frame(f)]
         self.assertIn({"kind": "game_over", "game_id": game["id"], "key_tag": ff.key_tag(key)}, sent)
+        # A capped list of node ids (SRB-4): the count says how many more were heard.
+        listed = reinvite.stuck_view
+
+        def capped():
+            v = listed()
+            return {**v, "stuck": [{**s, "nodes_count": len(s["nodes"]) + 5} for s in v["stuck"]]}
+        reinvite.stuck_view = capped
+        page.reload()
+        page.get_by_test_id("tab-nodes").click()
+        expect(page.get_by_test_id(f"stuck-nodes-{game['id']}")).to_have_text(f"{BOX} mais 5")
+        reinvite.stuck_view = listed
         # A modem whose firmware cannot report them: the hint, in English.
         modem = self.field.bundle.modem
         modem.ident = {**modem.ident, "games": False}

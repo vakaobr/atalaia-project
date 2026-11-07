@@ -294,8 +294,9 @@ class Reinvite:
                     **self.stuck_view()}
 
     def stuck_view(self) -> dict[str, Any]:
-        """``stuck``: per ended game a box was heard still in, {game, name, last_heard_s, nodes, rssi,
-        game_over_resent}; ``stuck_reports``: the modem's reports of other games' packets;
+        """``stuck``: per ended game a box was heard still in, {game, name, last_heard_s, nodes (the 32
+        heard last), nodes_count, rssi, game_over_resent}; ``stuck_reports``: the modem's reports of other games'
+        packets;
         ``stuck_watch``: whether the modem can report them (its IDENT says "games"); ``radio_kind``: what the
         radio is, so the console's hint fits it (STUCK-64 as changed by the maintainer): "modem" (a Pi's radio is
         always a USB radio modem) or "none"; a phone controller also says "pod" (an I/O pod)."""

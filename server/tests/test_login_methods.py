@@ -18,6 +18,7 @@ from typing import Any, Optional
 from unittest import mock
 from urllib.parse import parse_qs, urlsplit
 
+import cbor2
 import httpx2
 
 from atalaia_server import personal_data, quotas
@@ -25,7 +26,7 @@ from atalaia_server.config import OidcClient, Settings
 from atalaia_server.oidc import pkce_challenge
 
 from .base import METRICS_TOKEN, PASSWORD, SECRET_KEY, AppTestCase
-from .login_fakes import FakeIdp, SoftAuthenticator, apple_key_pem
+from .login_fakes import FakeIdp, SoftAuthenticator, apple_key_pem, b64u
 
 ORIGIN = "https://server.test"
 CLIENT_IDS = {"google": "google-id", "microsoft": "ms-id", "apple": "apple.services.id"}
@@ -111,12 +112,13 @@ class LoginTestCase(AppTestCase):
     # Passkeys -------------------------------------------------------------------------------------
 
     async def add_passkey(self, headers: dict[str, str], authenticator: Optional[SoftAuthenticator] = None,
-                          password: str = PASSWORD, name: Optional[str] = None) -> tuple[SoftAuthenticator, httpx2.Response]:
+                          password: str = PASSWORD, name: Optional[str] = None,
+                          **create: Any) -> tuple[SoftAuthenticator, httpx2.Response]:
         authenticator = authenticator or SoftAuthenticator()
         r = await self.client.post("/api/v1/me/passkeys/options", json={"password": password}, headers=headers)
         self.assertEqual(r.status_code, 200, r.text)
         options = r.json()
-        credential = authenticator.create(options["options"], ORIGIN)
+        credential = authenticator.create(options["options"], ORIGIN, **create)
         r = await self.client.post("/api/v1/me/passkeys", headers=headers, json={
             "challenge_token": options["challenge_token"], "credential": credential, **({"name": name} if name else {})})
         return authenticator, r
@@ -911,6 +913,38 @@ class PasskeyTests(LoginTestCase):
         self.assertEqual(options["authenticatorSelection"]["userVerification"], "required")
         self.assertEqual(options["authenticatorSelection"]["residentKey"], "required")
         self.assertEqual(options["attestation"], "none")
+
+    async def test_packed_self_attestation_is_accepted(self) -> None:
+        authenticator, r = await self.add_passkey(self.headers, fmt="packed")
+        self.assertEqual(r.status_code, 201, r.text)
+        self.assertEqual((await self.passkey_login(authenticator)).status_code, 200)
+
+    async def test_attestation_formats_not_asked_for_are_refused_unparsed(self) -> None:
+        # With attestation "none" only "none" and "packed" can come back; the others' statements (certificates
+        # the library would decode) are refused before the library sees them.
+        statement = {"alg": -7, "sig": b"\x00" * 64, "x5c": [b"\x30" * 4096]}
+        with mock.patch("atalaia_server.passkeys.verify_registration_response",
+                        side_effect=AssertionError("parsed")) as verify:
+            for fmt in ("android-key", "tpm", "apple", "fido-u2f", "android-safetynet", "NONE", ""):
+                _, r = await self.add_passkey(self.headers, fmt=fmt, att_stmt=statement)
+                self.assertEqual((r.status_code, r.json()["detail"]), (400, "passkey_invalid"), fmt)
+            verify.assert_not_called()
+        self.assertEqual((await self.fetch("SELECT count(*) FROM passkeys"))[0][0], 0)
+
+    async def test_a_malformed_attestation_object_is_refused(self) -> None:
+        async def send(attestation_object: str) -> httpx2.Response:
+            parts = (await self.client.post("/api/v1/me/passkeys/options", json={"password": PASSWORD},
+                                            headers=self.headers)).json()  # a challenge is accepted once
+            good = SoftAuthenticator().create(parts["options"], ORIGIN)
+            bad = {**good, "response": {**good["response"], "attestationObject": attestation_object}}
+            return await self.client.post("/api/v1/me/passkeys", headers=self.headers,
+                                          json={"challenge_token": parts["challenge_token"], "credential": bad})
+        for att in ("!!", b64u(b"\xff\x00"), b64u(cbor2.dumps({"fmt": 7, "attStmt": {}})), b64u(cbor2.dumps([1])),
+                    # The credential, attestation object included, is capped before anything is decoded.
+                    "A" * 20000):
+            r = await send(att)
+            self.assertEqual((r.status_code, r.json()["detail"]), (400, "passkey_invalid"), att[:20])
+        self.assertEqual((await self.fetch("SELECT count(*) FROM passkeys"))[0][0], 0)
 
     async def test_registration_refusals(self) -> None:
         # No user verification at the authenticator.

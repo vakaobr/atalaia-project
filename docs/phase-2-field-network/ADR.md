@@ -1252,6 +1252,10 @@ nodes join, so the first Pi to join becomes the primary controller.
    counted at the interval the node hears the controller beacon at, not
    the one its own failover mode gives: 30 s (90 seconds of silence)
    until it has heard three beacons in a row 10 s apart.
+   *Note (2026-11-06, decisions FLC-1 to FLC-6):* only the TIMEs of the
+   controller the node follows (by the packet's authenticated `source`)
+   count as its heartbeat and its cadence; a same-term TIME or CLAIM from
+   another source does not keep it alive (RFC 0001 section 7).
 
 2. **Candidacy**: each controller-capable node calculates its priority
    and sends a CLAIM message with a new term number = `last_seen_term +
