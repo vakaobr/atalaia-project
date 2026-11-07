@@ -29,6 +29,11 @@ refuses it over its sync (``claims``; decision S16-4).
 as the ``atalaia:ticket:`` text of a printable QR code, ``checkin_ticket.py``); only its SHA-256 is kept
 and sent in the roster. A new one replaces it (``POST .../ticket``).
 
+**The registering phone** (decisions TKB-1 to TKB-8). The player's app gives each registration it keeps a ticket for
+an Ed25519 public key of its own (``PUT /me/registrations/{id}/binding``; ``bind``). It goes in the roster as
+``binding_key`` to a controller that asks (``?binding=1``), which then tells staff whether a self check-in proved it.
+Cancelling clears it with the ticket; a registration made from the web page or by staff has none (unbound).
+
 **Game day.** The controller pulls the schedule and, for each scheduled game it made a game from, the
 roster (``roster``) until that game starts; after the game it pushes each registration's outcome and its
 declarations' final states (``apply_checkins``). The controller stays the authority: the site server
@@ -50,6 +55,7 @@ from pathlib import Path
 from typing import Any, Iterable, Optional
 
 import yaml
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from atalaia_controller import REPO_ROOT, apd as apd_core, checkin_ticket, sync_format
 from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
@@ -425,6 +431,7 @@ async def register(db: AsyncSession, field: Field, game: ScheduledGame, user_id:
     reg.display_name, reg.team_preference, reg.federation_number = name, team, number
     reg.apd_id, reg.membership_expires = apd_id, expires
     reg.status, reg.ticket_hash, reg.updated_at = "registered", digest, now
+    reg.binding_key = None  # the app binds its phone after this answer (TKB-1)
     await db.flush()
     await _put_replicas(db, reg, decls)
     return reg, secret
@@ -501,6 +508,7 @@ def cancel(game: ScheduledGame, reg: GameRegistration, now: datetime, staff: boo
     elif not is_open(game, now):
         raise RegistrationError("registration_closed", 409)
     reg.status, reg.cancelled_at, reg.updated_at, reg.ticket_hash = "cancelled", now, now, None
+    reg.binding_key = None
 
 
 def _staff_window(game: ScheduledGame, now: datetime) -> None:
@@ -631,6 +639,20 @@ def renew_ticket(game: ScheduledGame, reg: GameRegistration, now: datetime) -> b
     return secret
 
 
+def bind(game: ScheduledGame, reg: GameRegistration, key: Any, now: datetime) -> None:
+    """The registering phone's Ed25519 public key (decisions TKB-1, TKB-2): standard base64 of 32 bytes. Only while
+    the registration has a ticket and the game has not started (the roster stops at the start); a new key replaces
+    the old one, so the phone that set it last is the one a check-in can prove."""
+    if reg.status != "registered" or reg.ticket_hash is None or game.status != "published" or game.starts_at <= now:
+        raise RegistrationError("not_registered", 409)
+    try:
+        raw = sync_format.public_key_bytes(key, "binding_key")
+        Ed25519PublicKey.from_public_bytes(raw)
+    except (sync_format.SyncFormatError, ValueError):
+        raise RegistrationError("binding_key_invalid") from None
+    reg.binding_key, reg.updated_at = key, now
+
+
 # --- views -----------------------------------------------------------------------------------
 
 def _iso(value: Optional[datetime]) -> Optional[str]:
@@ -665,7 +687,8 @@ def registration_json(reg: GameRegistration, replicas: list[RegistrationReplica]
         if reg.membership_expires else None, "apd_status": membership_status(*(verdict_for or (game, field)), reg),
         "status": reg.status, "source": reg.source,
         "external_ref": reg.external_ref,
-        "has_ticket": reg.ticket_hash is not None, "replicas": [replica_json(r) for r in replicas],
+        "has_ticket": reg.ticket_hash is not None, "has_binding": reg.binding_key is not None,
+        "replicas": [replica_json(r) for r in replicas],
         "created_at": _iso(reg.created_at), "updated_at": _iso(reg.updated_at),
         "cancelled_at": _iso(reg.cancelled_at), "outcome_at": _iso(reg.outcome_at),
         "paid": reg.paid_at is not None, "paid_at": _iso(reg.paid_at),
@@ -721,9 +744,12 @@ async def schedule(db: AsyncSession, field_id: uuid.UUID, now: datetime, days: i
     return answer
 
 
-async def roster(db: AsyncSession, field_id: uuid.UUID, game_id: uuid.UUID) -> Optional[dict[str, Any]]:
+async def roster(db: AsyncSession, field_id: uuid.UUID, game_id: uuid.UUID,
+                 binding: bool = False) -> Optional[dict[str, Any]]:
     """GET /api/v1/sync/roster: a scheduled game's live registrations, with only what ADR-P3-13's check-in
-    holds (the federation number only when the game asks for one), or None for no such game here."""
+    holds (the federation number only when the game asks for one), or None for no such game here. ``binding``
+    (a controller that asked with ``?binding=1``, TKB-2) adds each registering phone's public key: an older
+    controller checks the answer strictly and would refuse the key, so it is never sent unasked."""
     game = await db.scalar(select(ScheduledGame).where(ScheduledGame.id == game_id, ScheduledGame.field_id == field_id,
                                                        ScheduledGame.status != "draft"))
     if game is None:
@@ -749,6 +775,8 @@ async def roster(db: AsyncSession, field_id: uuid.UUID, game_id: uuid.UUID) -> O
                 entry["membership_expires"] = r.membership_expires.isoformat()
         if r.ticket_hash:
             entry["ticket_sha256"] = r.ticket_hash
+            if binding and r.binding_key:
+                entry["binding_key"] = r.binding_key
         for d in reps[r.id]:
             decl: dict[str, Any] = {"declaration_id": str(d.declaration_id), "type": d.replica_type,
                                     "class": d.replica_class}

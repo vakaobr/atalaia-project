@@ -344,6 +344,8 @@ const _listSecrets = {
   'field_identities': ('field_id', 'secret'),
   'site_accounts': ('site', 'refresh'),
   'scoreboard_links': ('ca', 'token'),
+  // The registering phone's private key for each kept ticket (TKB-1).
+  'site_tickets': ('registration_id', 'binding_seed'),
 };
 
 bool _sealedKey(String k) =>

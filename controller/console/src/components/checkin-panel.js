@@ -378,6 +378,7 @@ export class CheckinPanel extends Component {
             return html`<div class="notice" role="alert" data-testid="ticket-decision-app">
                 <strong>${t('checkin.ticket_app_title')}</strong>
                 <p>${t('checkin.ticket_app_body', { app_name: d.name || unknown, time: at, roster_name: d.roster_name || unknown })}</p>
+                ${d.app_binding && html`<p data-testid=${`ticket-app-${d.app_binding}`}>${t(`checkin.app_binding.${d.app_binding}_long`)}</p>`}
                 <button type="button" class="primary" data-testid="ticket-confirm-app" onClick=${() => again({ app_checkin: 'confirm' })}>${t('checkin.ticket_app_confirm')}</button>
                 ${' '}<button type="button" data-testid="ticket-discard-app" onClick=${() => again({ app_checkin: 'discard' })}>${t('checkin.ticket_app_discard')}</button>
                 ${' '}<button type="button" data-testid="ticket-decision-cancel" onClick=${() => this.setState({ ticketDecision: null })}>${t('common.cancel')}</button>
@@ -503,6 +504,8 @@ export class CheckinPanel extends Component {
                 ${r.manual && html` <span class="badge">${t('checkin.by_hand')}</span>`}
                 ${r.position_share && html` <span class="badge" data-testid="checkin-position-shared">${t('checkin.position_shared')}</span>`}
                 ${r.registered && html` <span class="badge" data-testid="checkin-registered-badge">${t('checkin.registered_badge')}</span>`}
+                ${r.app_binding && html` <span class=${`badge ${r.app_binding === 'bound' ? 'status-checked_in' : 'status-pending'}`} data-testid="checkin-app-binding"
+                    title=${t(`checkin.app_binding.${r.app_binding}_long`)}>${t(`checkin.app_binding.${r.app_binding}`)}</span>`}
                 <div class="small muted">${r.player_id}${r.team_preference ? ` · ${t('checkin.prefers', { team: r.team_preference })}` : ''}</div></td>
             <td role="cell" data-label=${t('checkin.status')}><span class=${`badge status-${r.status}`}>${t(`checkin.statuses.${r.status}`)}</span>
                 ${r.status === 'pending' && s.apd.checkin && html` <span class="small muted" data-testid="checkin-waits-card">${t('checkin.waits_card')}</span>`}

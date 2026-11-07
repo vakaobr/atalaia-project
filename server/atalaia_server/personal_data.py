@@ -490,7 +490,7 @@ async def erase(db: AsyncSession, user_id: uuid.UUID, reason: str = "user_reques
                      .values(make_model=None).execution_options(synchronize_session=False))
     await db.execute(update(GameRegistration).where(GameRegistration.user_id == user_id).values(
         user_id=None, display_name=None, team_preference=None, federation_number=None, apd_id=None,
-        membership_expires=None, ticket_hash=None, updated_at=now).execution_options(synchronize_session=False))
+        membership_expires=None, ticket_hash=None, binding_key=None, updated_at=now).execution_options(synchronize_session=False))
     await db.execute(delete(PlayerIdClaim).where(PlayerIdClaim.user_id == user_id))
     # What a staff account marked on registrations (paid, no-show: FU7) stays, without who marked it.
     await db.execute(update(GameRegistration).where(GameRegistration.paid_by == user_id).values(paid_by=None)

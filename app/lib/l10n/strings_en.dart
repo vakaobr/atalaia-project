@@ -561,6 +561,12 @@ const Map<String, String> enStrings = {
       'for a staff confirmation. The ticket is for "{roster_name}" on the '
       "game's list. Confirm only if the person in front of you is the one who "
       'checked in with that phone.',
+  'ticket.app_bound':
+      'The app proved it is the phone that registered for this game.',
+  'ticket.app_unbound':
+      'The app did not prove it is the phone that registered: it may be a '
+      'copy of the ticket (or an older app, or a registration made on the '
+      'web).',
   'ticket.app_checkin_confirm': 'It is them: confirm the app check-in',
   'ticket.app_checkin_discard':
       'Not them: discard the app check-in and check in the ticket holder',

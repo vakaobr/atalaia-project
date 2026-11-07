@@ -269,7 +269,7 @@ class ScopeTests(TokenCase):
     PUBLIC = {
         ("GET", "/healthz"), ("GET", "/"), ("GET", "/console"), ("GET", "/scoreboard"),
         ("GET", "/api/v1/controller/https"), ("GET", "/api/v1/controller/ca"), ("GET", "/api/v1/checkin"),
-        ("GET", "/api/v1/games/{game_id}/teams"), ("POST", "/api/v1/checkin"),
+        ("GET", "/api/v1/games/{game_id}/teams"), ("POST", "/api/v1/checkin"), ("GET", "/api/v1/checkin/challenge"),
         ("GET", "/api/v1/field/branding"), ("GET", "/api/v1/field/branding/{slot}"), ("GET", "/api/v1/crests/{crest_id}"),
         ("GET", "/api/v1/firmware/{release_id}/image"), ("GET", "/api/v1/firmware/{release_id}/release"),
         ("POST", "/api/v1/firmware/report"),

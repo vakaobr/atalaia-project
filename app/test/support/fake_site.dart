@@ -24,6 +24,9 @@ class FakeSite {
   final code = '123456';
   var offline = false;
 
+  /// Whether `PUT /me/registrations/{id}/binding` exists (TKB-1).
+  var bindingSupported = true;
+
   /// Access tokens live this many seconds.
   var accessTtl = 900;
 
@@ -1121,6 +1124,17 @@ class FakeSite {
       };
       regs[id] = r;
       return SiteResponse(201, _withTicket(r));
+    }
+    final bind = RegExp(r'^/me/registrations/([0-9a-f-]+)/binding$')
+        .firstMatch(path);
+    if (bind != null && method == 'PUT') {
+      // The registering phone's key (TKB-1); an older site server has no
+      // such call ([bindingSupported] false: 404).
+      final r = regs[bind.group(1)];
+      if (!bindingSupported) return err(404, 'Not Found');
+      if (r == null) return err(404, 'registration_not_found');
+      r['binding_key'] = b['binding_key'];
+      return SiteResponse(200, _regJson(r));
     }
     final mine = RegExp(r'^/me/registrations/([0-9a-f-]+)(/ticket)?$')
         .firstMatch(path);

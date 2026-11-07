@@ -26,7 +26,10 @@ from typing import Any, Optional
 
 from p3support import GM, T0, Marshal, P3Case, bearer, declaration, new_identity
 
-from atalaia_controller import REPO_ROOT, checkin_ticket, sync_format
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from atalaia_controller import REPO_ROOT, checkin_binding, checkin_ticket, sync_format
 from atalaia_controller.store import SCHEMA_VERSION, Store
 from atalaia_controller.sync_client import SyncClient, SyncError
 
@@ -54,6 +57,7 @@ class FakeSite:
         self.gets: list[str] = []
         self.games: dict[tuple[int, int], dict[str, Any]] = {}
         self.unsupported = False
+        self.binding_asked = False  # the last roster pull asked for the binding keys (TKB-2)
         self.no_guests = False  # an older site server: a check-ins body with guests is refused (PWI-*)
         self.shared: list[dict[str, Any]] = []  # other fields' records by player (S14-5)
         self.no_shared_endpoint = False  # an older site server: the roster, but no shared chrono
@@ -69,7 +73,9 @@ class FakeSite:
                 answer["copies_revoked"] = copy.deepcopy(self.revoked)
             kind = "schedule"
         elif path.startswith("/api/v1/sync/roster"):
-            sid = path.rsplit("=", 1)[1]
+            query = dict(q.split("=", 1) for q in path.split("?", 1)[1].split("&"))
+            sid = query["scheduled_game_id"]
+            self.binding_asked = query.get("binding") == "1"
             if sid not in self.rosters:
                 raise SyncError("scheduled_game_not_found", 404)
             answer = {"sync_version": 1, "scheduled_game_id": sid, "status": "published", "federation": "optional",
@@ -369,7 +375,7 @@ class ArrivalTests(GameDayCase):
         self.assertEqual((row["status"], row["already"], row["confirmed"], row["discarded"]),
                          ("pending", False, False, False))
         self.assertEqual(row["decision"], {"kind": "app_checkin", "name": "Falcão no telemóvel", "at": app_at,
-                                           "roster_name": "Falcão"})
+                                           "roster_name": "Falcão", "app_binding": "unbound"})
         self.assertEqual((row["ticket_scanned_by"], row["checked_in_at"]), (None, None))
         self.assertNotIn("Falcão", "\n".join(logs.output))
         self.assertIn("staff to decide (app_checkin)", "\n".join(logs.output))
@@ -589,6 +595,169 @@ class ArrivalTests(GameDayCase):
         self.assertEqual(len(self.site.bodies("checkins")), 1)
 
 
+class BindingTests(GameDayCase):
+    """TKB-1 to TKB-8: the roster's binding key (asked for with ``binding=1``), the registering phone's proof at
+    check-in, and what staff see: bound or unbound. Never a refusal for a missing or wrong proof."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.phone = Ed25519PrivateKey.generate()
+        key = base64.b64encode(self.phone.public_key().public_bytes(serialization.Encoding.Raw,
+                                                                    serialization.PublicFormat.Raw)).decode()
+        self.reg, self.ticket_text, self.raw = registration(binding_key=key)
+        self.ident = (self.reg["player_id"], new_identity()[1])
+        self.site.rosters[SCHEDULED] = [self.reg]
+        self.gid = self.from_schedule()["id"]
+        self.cycle()
+
+    def challenge(self) -> str:
+        r = self.client.get("/api/v1/checkin/challenge")
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual((r.json()["expires_in"], r.headers["cache-control"]), (300, "no-store"))
+        return r.json()["challenge"]
+
+    def proof(self, ident: tuple[str, str], key: Optional[Ed25519PrivateKey] = None,
+              challenge: Optional[str] = None, game_id: Optional[int] = None) -> dict[str, str]:
+        challenge = challenge or self.challenge()
+        msg = checkin_binding.message(challenge, game_id or self.gid, self.reg["registration_id"], ident[0],
+                                      base64.urlsafe_b64decode(ident[1] + "="))
+        sig = (key or self.phone).sign(msg)
+        return {"challenge": challenge, "signature": base64.urlsafe_b64encode(sig).decode().rstrip("=")}
+
+    def staff_confirm(self) -> str:
+        _, token = self.make_marshal(self.gid)
+        r = self.client.put("/api/v1/checkin/settings", json={"confirm": "staff"}, headers=GM)
+        self.assertEqual(r.status_code, 200, r.text)
+        return token
+
+    def printed(self) -> str:
+        return checkin_ticket.make({"registration_id": self.reg["registration_id"], "player_id": self.reg["player_id"],
+                                    "secret": self.raw})
+
+    def test_the_roster_carries_the_key_when_asked(self) -> None:
+        self.assertTrue(self.site.binding_asked)
+        row = self.bundle.store.checkin(self.gid, self.reg["player_id"])
+        self.assertEqual(row["binding_key"], self.reg["binding_key"])
+        self.assertIsNone(self.rows(self.gid)[self.reg["player_id"]]["app_binding"])  # expected: no app check-in yet
+
+    def test_the_registering_phone_is_bound(self) -> None:
+        token = self.staff_confirm()
+        with self.assertLogs("atalaia", level="INFO") as logs:
+            out = self.app_checkin(self.gid, self.ident, self.reg, self.ticket_text, binding=self.proof(self.ident))
+        self.assertEqual((out["status"], out["app_binding"]), ("pending", "bound"))
+        self.assertNotIn("did not verify", "\n".join(logs.output))
+        self.assertEqual(self.rows(self.gid)[self.reg["player_id"]]["app_binding"], "bound")
+        # The marshal still decides (TKS-1 stays): the decision says the registering phone proved it.
+        r = self.client.post(f"/api/v1/games/{self.gid}/checkins/ticket", json={"ticket": self.printed()},
+                             headers=bearer(token))
+        self.assertEqual(r.json()["decision"]["app_binding"], "bound", r.text)
+        r = self.client.post(f"/api/v1/games/{self.gid}/checkins/ticket",
+                             json={"ticket": self.printed(), "app_checkin": "confirm"}, headers=bearer(token))
+        self.assertEqual((r.json()["status"], r.json()["app_binding"]), ("checked_in", "bound"))
+
+    def test_a_copy_of_the_ticket_is_unbound(self) -> None:
+        """Another phone with a copy of the ticket: no proof, or a proof with its own key. It checks in as before
+        (no flag day), shown as unbound; staff discard it and the registering phone then checks in bound."""
+        token = self.staff_confirm()
+        thief = (self.reg["player_id"], new_identity()[1])
+        out = self.app_checkin(self.gid, thief, self.reg, self.ticket_text,
+                               binding=self.proof(thief, key=Ed25519PrivateKey.generate()))
+        self.assertEqual(out["app_binding"], "unbound")
+        r = self.client.post(f"/api/v1/games/{self.gid}/checkins/ticket", json={"ticket": self.printed()},
+                             headers=bearer(token))
+        self.assertEqual(r.json()["decision"]["app_binding"], "unbound")
+        r = self.client.post(f"/api/v1/games/{self.gid}/checkins/ticket",
+                             json={"ticket": self.printed(), "app_checkin": "discard"}, headers=bearer(token))
+        self.assertEqual((r.json()["discarded"], r.json()["app_binding"]), (True, None))
+        back = self.app_checkin(self.gid, self.ident, self.reg, self.ticket_text, expect=200,
+                                binding=self.proof(self.ident))
+        self.assertEqual(back["app_binding"], "bound")
+
+    def test_a_proof_for_another_check_in_does_not_bind(self) -> None:
+        other = (self.reg["player_id"], new_identity()[1])
+        proof = self.proof(other)  # signed for another phone's secret
+        out = self.app_checkin(self.gid, self.ident, self.reg, self.ticket_text, binding=proof)
+        self.assertEqual(out["app_binding"], "unbound")
+        # The phone that holds the identity proves the key later: bound from then on.
+        again = self.app_checkin(self.gid, self.ident, self.reg, self.ticket_text, expect=200,
+                                 binding=self.proof(self.ident))
+        self.assertEqual(again["app_binding"], "bound")
+
+    def test_an_older_app_is_unbound(self) -> None:
+        out = self.app_checkin(self.gid, self.ident, self.reg, self.ticket_text)
+        self.assertEqual(out["app_binding"], "unbound")
+
+    def test_challenges(self) -> None:
+        """A challenge from another controller (or restart), a broken one, a proof without a registration, or a
+        proof of the wrong shape."""
+        forged = checkin_binding.Challenges(key=os.urandom(32)).issue()
+        r = self.client.post("/api/v1/checkin", json={
+            "game_id": self.gid, "player_id": self.ident[0], "player_secret": self.ident[1], "display_name": "F",
+            "notice_version": 2, "registration_id": self.reg["registration_id"], "ticket": self.ticket_text,
+            "binding": self.proof(self.ident, challenge=forged)})
+        self.assertEqual(r.status_code, 409, r.text)
+        self.assertTrue(r.json()["detail"].startswith("binding_challenge_expired"))
+        self.check_in(self.gid, binding=self.proof(self.ident), expect=400)  # a walk-in has nothing to prove
+        for bad in ({"challenge": self.challenge()}, {"challenge": "x" * 43, "signature": "A" * 86},
+                    {**self.proof(self.ident), "extra": 1}, "proof"):
+            self.app_checkin(self.gid, self.ident, self.reg, self.ticket_text, binding=bad,
+                             expect=409 if isinstance(bad, dict) and len(bad) == 2 else 400)
+        self.assertIsNone(self.bundle.store.checkin(self.gid, self.reg["player_id"])["app_checkin_at"])
+
+    def test_a_challenge_expires(self) -> None:
+        clock = [1000.0]
+        ch = checkin_binding.Challenges(clock=lambda: clock[0], key=b"k" * 32)
+        text = ch.issue()
+        self.assertTrue(ch.valid(text))
+        clock[0] += 300
+        self.assertTrue(ch.valid(text))
+        clock[0] += 1
+        self.assertFalse(ch.valid(text))
+        self.assertFalse(ch.valid(text[:-1] + ("A" if text[-1] != "A" else "B")))
+
+    def test_without_a_key_in_the_roster(self) -> None:
+        """A registration made on the web page or by staff (no key): a proof is ignored, the check-in unbound."""
+        self.reg.pop("binding_key")
+        self.cycle()
+        self.assertIsNone(self.bundle.store.checkin(self.gid, self.reg["player_id"])["binding_key"])
+        out = self.app_checkin(self.gid, self.ident, self.reg, self.ticket_text, binding=self.proof(self.ident))
+        self.assertEqual(out["app_binding"], "unbound")
+
+
+class BindingVectorTests(unittest.TestCase):
+    """protocol/vectors/checkin.json ``binding``: the challenge, the message and the signature both controllers
+    check (the Dart side: app/test/protocol/checkin_binding_test.dart)."""
+
+    V = json.loads((REPO_ROOT / "protocol" / "vectors" / "checkin.json").read_text(encoding="utf-8"))["binding"]
+
+    def args(self, case: dict[str, Any]) -> tuple[Any, ...]:
+        v = {**self.V, **case}
+        secret = base64.urlsafe_b64decode(v["player_secret"] + "=")
+        msg = checkin_binding.message(v["challenge"], v["game_id"], v["registration_id"], v["player_id"], secret)
+        return v["public_key"], msg, base64.urlsafe_b64decode(v["signature"] + "==")
+
+    def test_valid(self) -> None:
+        v = self.V
+        key, msg, sig = self.args({})
+        self.assertEqual(msg.decode(), v["message"])
+        self.assertTrue(checkin_binding.verify(key, msg, sig))
+        private = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(v["seed"]))
+        raw = private.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        self.assertEqual(base64.b64encode(raw).decode(), v["public_key"])
+
+    def test_invalid(self) -> None:
+        for case in self.V["invalid"]:
+            with self.subTest(case["name"]):
+                self.assertFalse(checkin_binding.verify(*self.args(case)))
+
+    def test_the_challenge(self) -> None:
+        v = self.V
+        key = bytes.fromhex(v["challenge_key"])
+        for at, ok in ((v["clock"], True), (v["clock"] + v["ttl"], True), (v["clock"] + v["ttl"] + 1, False)):
+            self.assertEqual(checkin_binding.Challenges(clock=lambda at=at: at, key=key).valid(v["challenge"]), ok)
+        self.assertFalse(checkin_binding.Challenges(clock=lambda: v["clock"], key=bytes(32)).valid(v["challenge"]))
+
+
 class ClaimTests(GameDayCase):
     def test_the_controller_answers_claims(self) -> None:
         game = self.new_game()
@@ -779,6 +948,7 @@ class StoreUpgradeTests(unittest.TestCase):
             row = store.checkin(1, "p-abcdefgh2345")
             self.assertEqual((row["registration_id"], row["from_roster"], store.get_setting("schema_version")),
                              (None, False, str(SCHEMA_VERSION)))
+            self.assertEqual((row["binding_key"], row["app_bound"]), (None, None))  # schema 23 (TKB-4): unbound
             store.close()
 
 

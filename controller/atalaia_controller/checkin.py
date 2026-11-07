@@ -62,6 +62,7 @@ from . import REPO_ROOT, chrono, player_token
 from . import apd as apdfmt
 from . import checkin_poster as posterfmt
 from .addresses import FieldAddresses, saved_poster_urls, warn_dropped
+from . import checkin_binding as bindingfmt
 from . import checkin_ticket as ticketfmt
 from . import import_format as importfmt
 from . import sync_format as syncfmt
@@ -85,7 +86,9 @@ NAME_MAX = 32
 # What a check-in forgets of the card check (leaving, removal, retention): protocol/apd.md "The card check".
 ERASED_CARD = {"apd_verdict": None, "apd_verdict_on": None, "card_checked_by": None, "card_checked_at": None}
 # Who took the printed ticket (TKT-3), the roster's name and when the app checked in (TKS-1).
-ERASED_SCAN = {"ticket_scanned_by": None, "ticket_scanned_at": None, "roster_name": None, "app_checkin_at": None}
+# Whether that app proved the registering phone's key (TKB-4) goes with it.
+ERASED_SCAN = {"ticket_scanned_by": None, "ticket_scanned_at": None, "roster_name": None, "app_checkin_at": None,
+               "app_bound": None}
 TICKET_CHOICES = ("confirm", "discard")  # what staff decided about a pending app check-in (TKS-2, TKS-3)
 TICKET_NOT_NEWEST = "ticket_not_newest: this ticket is not this registration's (was a newer one made?)"
 FEDERATION_MAX = 32
@@ -404,6 +407,8 @@ class Checkin:
         self.info_rate = RateLimit(max(60, self.cfg.rate_per_minute * 6))
         # Printed tickets scanned, per staff id (a marshal's player id, or "gm"): a desk's pace, never a flood (TKT-2).
         self.ticket_rate = RateLimit(max(60, self.cfg.rate_per_minute * 6))
+        # The challenges a registering phone signs at check-in (TKB-3): stateless, keyed in memory.
+        self.challenges = bindingfmt.Challenges()
         self._last_purge = 0.0
         controller.checkin = self
 
@@ -931,7 +936,7 @@ class Checkin:
             raise TooMany("too many check-ins from this address; wait a minute")
         allowed = {"game_id", "player_id", "player_secret", "display_name", "federation_number",
                    "team_preference", "notice_version", "replicas", "registration_id", "ticket", "apd_id",
-                   "membership_number", "membership_expires", "share_position"}
+                   "membership_number", "membership_expires", "share_position", "binding"}
         unknown = set(body) - allowed
         if unknown:
             raise ControllerError(f"unknown fields {sorted(unknown)}")
@@ -952,6 +957,7 @@ class Checkin:
             raise ControllerError("player_id: p- and 12 of a-z 2-7")
         secret = secret_bytes(body.get("player_secret"))
         reg_id, ticket_hex = self._registration_proof(body)
+        proof = self._binding_proof(body, reg_id)
         st = self.settings()
         name = _text("display_name", body.get("display_name"), NAME_MAX)
         decl_m = declared_membership(body)
@@ -976,6 +982,7 @@ class Checkin:
                 if known["secret_sha256"] is None or not hmac.compare_digest(known["secret_sha256"], digest):
                     raise Conflict("this player id is someone else's at this field")
                 self.store.touch_field_player(pid, now)
+            bound = self._bound(proof, expected, game_id, reg_id, pid, secret)
             if row is not None and row["status"] == "removed":
                 raise Forbidden("staff removed this check-in; ask at the desk")
             # A registered player's roster entry fills in what the app did not send.
@@ -1006,7 +1013,7 @@ class Checkin:
                 fields = {"status": status, "display_name": name, "federation_number": fed,
                           "apd_id": apd_id, "membership_expires": exp, "team_preference": pref, "notice_version": notice,
                           "checked_in_at": now if status == "checked_in" else None, "app_checkin_at": now,
-                          **self._share_fields(share, notice, now)}
+                          "app_bound": bound, **self._share_fields(share, notice, now)}
                 if row is None:
                     if reg_id is not None:  # no roster here: kept, so the site server can match it later
                         fields.update(registration_id=reg_id, ticket_sha256=ticket_hex)
@@ -1023,9 +1030,11 @@ class Checkin:
                 if status == "left":
                     status = "checked_in" if st["confirm"] == "auto" and auto_ok else "pending"
                     emit = status == "checked_in"
-                    fields.update(status=status, app_checkin_at=now)
+                    fields.update(status=status, app_checkin_at=now, app_bound=bound)
                 elif known is None:
-                    fields["app_checkin_at"] = now
+                    fields.update(app_checkin_at=now, app_bound=bound)
+                elif bound:  # the phone that holds the field identity proves the registering key now
+                    fields["app_bound"] = True
                 # Once a marshal checked the card, the number is gone and the stored verdict stands: the player's
                 # app cannot put the number back or reset the check.
                 if row.get("card_checked_at") is None and (fed, apd_id, exp) != (
@@ -1053,7 +1062,44 @@ class Checkin:
     def _token_answer(self, game: dict[str, Any], row: dict[str, Any], token: str, exp: int) -> dict[str, Any]:
         return {"game_id": game["id"], "player_id": row["player_id"], "token": token, "exp": exp,
                 "status": row["status"], "team": self._team_name(game, row["team"]), "team_id": row["team"],
-                "squad": row["squad"], "role": row["role"], "position_share": self.share_in_force(row)}
+                "squad": row["squad"], "role": row["role"], "position_share": self.share_in_force(row),
+                "app_binding": bindingfmt.state(row)}
+
+    def challenge(self) -> dict[str, Any]:
+        """GET /api/v1/checkin/challenge: what a registering phone signs with its check-in (TKB-3)."""
+        return {"challenge": self.challenges.issue(), "expires_in": self.challenges.ttl}
+
+    def _binding_proof(self, body: dict[str, Any], reg_id: Optional[str]) -> Optional[tuple[str, bytes]]:
+        """The check-in's ``binding`` (TKB-3): None without one; 400 for a bad shape or without a registration,
+        409 ``binding_challenge_expired`` for a challenge this controller did not give or that is too old (the app
+        fetches a new one and sends the check-in again)."""
+        value = body.get("binding")
+        if value is None:
+            return None
+        if reg_id is None:
+            raise ControllerError("binding goes with registration_id and ticket")
+        try:
+            challenge, signature = bindingfmt.parse_proof(value)
+        except bindingfmt.BindingError as exc:
+            raise ControllerError(str(exc)) from None
+        if not self.challenges.valid(challenge):
+            raise Conflict(bindingfmt.CHALLENGE_EXPIRED)
+        return challenge, signature
+
+    @staticmethod
+    def _bound(proof: Optional[tuple[str, bytes]], expected: Optional[dict[str, Any]], game_id: int,
+               reg_id: Optional[str], pid: str, secret: bytes) -> bool:
+        """Whether the check-in proved the key the roster gave its registration (TKB-4). Without a proof, a
+        roster key or a roster entry it is unbound; a proof that does not verify is unbound too (logged), never a
+        refusal: the ticket alone still checks in, as before, and staff see the difference."""
+        if proof is None or expected is None or reg_id is None or not expected.get("binding_key"):
+            return False
+        challenge, signature = proof
+        ok = bindingfmt.verify(expected["binding_key"], bindingfmt.message(challenge, game_id, reg_id, pid, secret),
+                               signature)
+        if not ok:
+            log.info("check-in: game %d, %s: the registering phone's proof did not verify", game_id, pid)
+        return ok
 
     def _registration_proof(self, body: dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
         """``registration_id`` and ``ticket`` (both or neither): the id and the SHA-256 (hex) of the ticket."""
@@ -1143,6 +1189,7 @@ class Checkin:
                         "card_checked_at": row.get("card_checked_at"),
                         "ticket_scanned_by": row.get("ticket_scanned_by"),
                         "ticket_scanned_at": row.get("ticket_scanned_at"),
+                        "app_binding": bindingfmt.state(row),
                         "country": st["country"]})  # the words of the verdict: protocol/apd.md
         if declarations:
             out["declarations"] = self._decl_views(game["id"], row["player_id"])
@@ -1541,7 +1588,7 @@ class Checkin:
                 and row.get("ticket_scanned_at") is None
             if unmatched_app and choice is None:
                 decision = {"kind": "app_checkin", "name": row["display_name"], "at": row["app_checkin_at"],
-                            "roster_name": row.get("roster_name")}
+                            "roster_name": row.get("roster_name"), "app_binding": bindingfmt.state(row)}
             elif unmatched_app and choice == "discard":
                 # The app check-in is undone (TKS-3, TKS-4): what the app sent goes, its phone's tokens and field
                 # identity with it; the ticket holder then arrives as an expected player does.
@@ -1549,7 +1596,7 @@ class Checkin:
                     game_id, pid, display_name=row.get("roster_name"), team_preference=None, notice_version=None,
                     federation_number=None, apd_id=None, membership_expires=None, apd_override=False,
                     federation_seen=False, **ERASED_CARD, position_share=False, position_share_at=now,
-                    app_checkin_at=None, token_gen=int(row.get("token_gen") or 0) + 1, updated_at=now)
+                    app_checkin_at=None, app_bound=None, token_gen=int(row.get("token_gen") or 0) + 1, updated_at=now)
                 self.store.delete_player_position(game_id, pid)
                 self.store.delete_field_player(pid)
                 changed = discarded = True
@@ -1859,7 +1906,8 @@ class Checkin:
                 decls = self._roster_declarations(game_id, pid, reg["replicas"], st, out)
                 fields = {"display_name": name, "roster_name": name, "federation_number": fed, "apd_id": apd_id,
                           "membership_expires": exp, "team_preference": pref, "registration_id": rid,
-                          "ticket_sha256": reg.get("ticket_sha256"), "from_roster": 1}
+                          "ticket_sha256": reg.get("ticket_sha256"), "binding_key": reg.get("binding_key"),
+                          "from_roster": 1}
                 if row is None:
                     self.store.add_checkin(game_id, pid, {"status": "expected", **fields}, now)
                     self._replace_declarations(game, pid, decls, staff=True, now=now)
@@ -1871,7 +1919,8 @@ class Checkin:
                 else:
                     if row["registration_id"] is None:  # a walk-in who turns out to be registered
                         self.store.update_checkin(game_id, pid, registration_id=rid, from_roster=1, roster_name=name,
-                                                  ticket_sha256=reg.get("ticket_sha256"), updated_at=now)
+                                                  ticket_sha256=reg.get("ticket_sha256"),
+                                                  binding_key=reg.get("binding_key"), updated_at=now)
                     elif row.get("roster_name") != name and row.get("erased_at") is None:
                         self.store.update_checkin(game_id, pid, roster_name=name)  # what a ticket scan shows staff
                     out["kept"] += 1

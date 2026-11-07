@@ -88,7 +88,9 @@ final class TicketOutcome {
 /// What the controller asks the marshal to decide about a scanned ticket
 /// (TKS-1 to TKS-5): [kind] `app_checkin` (a pending check-in made in an app,
 /// with the app's [appName], when it checked in, [at], and the ticket's
-/// [rosterName]) or `membership` (the stored [verdict] does not pass).
+/// [rosterName]; [appBinding] says whether that app proved it is the phone
+/// that registered, TKB-5) or `membership` (the stored [verdict] does not
+/// pass).
 final class TicketDecision {
   const TicketDecision({
     required this.ticket,
@@ -98,6 +100,7 @@ final class TicketDecision {
     this.rosterName,
     this.verdict,
     this.appCheckin,
+    this.appBinding,
   });
 
   /// The ticket's text, sent again with the marshal's choice.
@@ -107,6 +110,11 @@ final class TicketDecision {
   final DateTime? at;
   final String? rosterName;
   final String? verdict;
+
+  /// `bound` (the registering phone's key signed the check-in) or `unbound`
+  /// (a copy of the ticket, an older app or a registration without a key);
+  /// null from an older controller.
+  final String? appBinding;
 
   /// The choice already made about the app check-in, kept when a
   /// membership decision follows it.
@@ -131,6 +139,7 @@ final class TicketDecision {
       rosterName: d['roster_name'] as String?,
       verdict: d['verdict'] as String?,
       appCheckin: appCheckin,
+      appBinding: d['app_binding'] as String?,
     );
   }
 }
@@ -309,6 +318,22 @@ class _TicketCheckinScreenState extends State<TicketCheckinScreen> {
             ),
             const SizedBox(height: 8),
             Text(text),
+            if (app && d.appBinding != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                key: Key('ticket-app-${d.appBinding}'),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    d.appBinding == 'bound'
+                        ? Icons.verified_user_outlined
+                        : Icons.warning_amber_outlined,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(s.t('ticket.app_${d.appBinding}'))),
+                ],
+              ),
+            ],
             const SizedBox(height: 12),
             if (app) ...[
               FilledButton(

@@ -882,6 +882,7 @@ Json checkRoster(Object? raw) {
         'ticket_sha256',
         'apd_id',
         'membership_expires',
+        'binding_key',
       ],
     );
     _uuid(r['registration_id'], '$path.registration_id');
@@ -931,6 +932,11 @@ Json checkRoster(Object? raw) {
       nullable: true,
       pattern: sha256HexRe,
     );
+    // The registering phone's Ed25519 key (TKB-2), only for a controller
+    // that asked (`binding=1`).
+    if (_default(r, 'binding_key', null) != null) {
+      publicKeyBytes(r['binding_key'], '$path.binding_key');
+    }
     final reps = _list(r['replicas'], '$path.replicas', maxDeclarations);
     for (var j = 0; j < reps.length; j++) {
       final d = checkDeclaration(reps[j], '$path.replicas[$j]');

@@ -18,6 +18,8 @@
     PATCH  /api/v1/me/registrations/{reg}               change them while the window is open
     DELETE /api/v1/me/registrations/{reg}               cancel while the window is open
     POST   /api/v1/me/registrations/{reg}/ticket        a new ticket (shown once), until the game starts
+    PUT    /api/v1/me/registrations/{reg}/binding       {binding_key}: the registering phone's Ed25519 public key
+                                                        (the player's app; TKB-1), until the game starts
     GET    /api/v1/fields-by-slug/{slug}                any account, for a field with its public page on: the field and its games that can be
                                                         registered for, for the app (plan phase 17, S17-9)
     GET    /api/v1/me/player-ids                        the account's player ids and its claims
@@ -88,6 +90,11 @@ class PaidIn(BaseModel):
 class NoShowIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     no_show: bool
+
+
+class BindingIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    binding_key: str = PydanticField(max_length=64)
 
 
 class ClaimIn(BaseModel):
@@ -445,6 +452,24 @@ async def new_ticket(reg_id: uuid.UUID, request: Request, principal: Principal =
            resource_id=reg.id, details={"field_id": str(field.id)})
     await db.commit()
     return await _answer(db, reg, 200, svc.ticket_answer(reg, secret))
+
+
+@router.put("/me/registrations/{reg_id}/binding")
+async def bind_mine(reg_id: uuid.UUID, body: BindingIn, request: Request,
+                    principal: Principal = Depends(current_principal),
+                    db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    """The app's key for this registration (TKB-1): a self check-in that signs the controller's challenge with it is
+    shown to staff as the registering phone's. Not counted with registrations and tickets (WREG-5): the app sends it
+    right after each of those."""
+    field, game, reg = await _mine(db, principal, reg_id)
+    try:
+        svc.bind(game, reg, body.binding_key, svc.now_utc())
+    except svc.RegistrationError as exc:
+        raise _error(exc) from None
+    record(db, "registration_binding", request, user_id=principal.user.id, resource="registration",
+           resource_id=reg.id, details={"field_id": str(field.id)})
+    await db.commit()
+    return await _answer(db, reg)
 
 
 @router.get("/me/player-ids")

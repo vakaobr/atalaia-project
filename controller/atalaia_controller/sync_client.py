@@ -784,7 +784,8 @@ class SyncClient:
         for link, game in self._linked():
             if game["state"] != "ready":
                 continue
-            path = f"/api/v1/sync/roster?scheduled_game_id={link['scheduled_game_id']}"
+            # ``binding=1`` (TKB-2): the registering phones' keys; an older site server ignores it.
+            path = f"/api/v1/sync/roster?scheduled_game_id={link['scheduled_game_id']}&binding=1"
             try:
                 roster = self._get(path, "roster")
             except SyncError as exc:

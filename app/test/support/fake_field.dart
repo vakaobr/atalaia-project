@@ -34,6 +34,13 @@ class FakeField {
   final String fieldId;
   final String fieldName;
 
+  /// Whether `GET /checkin/challenge` exists (TKB-3; an older controller:
+  /// 404), the challenges given, and how many check-ins with a proof are
+  /// answered 409 `binding_challenge_expired` first.
+  var challenges = true;
+  final givenChallenges = <String>[];
+  var expireChallenges = 0;
+
   /// The CA's DER bytes (the poster's fingerprint is their SHA-256) and PEM.
   final Uint8List der;
   final String? _customPem;
@@ -278,6 +285,11 @@ class FakeField {
       return FieldResponse(200, r);
     }
     switch ('$method $path') {
+      case 'GET /checkin/challenge':
+        if (!challenges) return err(404, 'Not Found');
+        final c = base64UrlNoPad(List.filled(32, givenChallenges.length + 1));
+        givenChallenges.add(c);
+        return FieldResponse(200, {'challenge': c, 'expires_in': 300});
       case 'GET /checkin':
         return FieldResponse(200, {
           'version': 1,
@@ -304,6 +316,10 @@ class FakeField {
         });
       case 'POST /checkin':
         final pid = b['player_id']! as String;
+        if (b['binding'] != null && expireChallenges > 0) {
+          expireChallenges--;
+          return err(409, 'binding_challenge_expired: too old');
+        }
         if (b['notice_version'] != notice) {
           return err(
             409,
@@ -345,6 +361,7 @@ class FakeField {
         // A site server registration's id and ticket (decision S16-8).
         row['registration_id'] = b['registration_id'];
         row['registration_ticket'] = b['ticket'];
+        row['binding'] = b['binding']; // the registering phone's proof (TKB-3)
         if (b['replicas'] is List) _declare(row, b['replicas']! as List);
         return FieldResponse(created ? 201 : 200, _ticket(pid));
       case 'POST /checkin/token':
@@ -499,6 +516,7 @@ class FakeField {
               'name': r['display_name'],
               'at': r['app_checkin_at'],
               'roster_name': r['roster_name'],
+              'app_binding': ?r['app_binding'],
             },
           });
         }

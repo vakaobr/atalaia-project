@@ -15,6 +15,8 @@ import 'package:atalaia_app/checkin/my_replicas.dart';
 import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/platform/links.dart';
 import 'package:atalaia_app/player/player_screens.dart';
+import 'package:atalaia_app/protocol/checkin_binding.dart';
+import 'package:atalaia_app/security/bytes.dart';
 import 'package:atalaia_app/site/site_api.dart';
 import 'package:atalaia_app/site/site_screens.dart';
 import 'package:atalaia_app/l10n/strings_en.dart';
@@ -158,6 +160,11 @@ void main() {
     expect(kept, hasLength(1));
     expect(find.byKey(const Key('ticket-qr')), findsOneWidget);
     expect(find.text(kept.single.ticketText), findsOneWidget);
+    // This phone's key for the registration: the site server has the public
+    // half, the phone keeps the private one with the ticket (TKB-1).
+    final key = await BindingKey.fromText(kept.single.bindingSeed);
+    expect(key, isNotNull);
+    expect(site.regs.values.single['binding_key'], key!.publicKeyText);
     final sent =
         site.bodies['POST /fields/${site.fieldId}/scheduled-games/$game1/registrations']!
             as Map;
@@ -182,6 +189,19 @@ void main() {
     await tapKey(tester, 'reg-new-ticket');
     final renewed = await h.services.tickets.all();
     expect(renewed.single.ticket, isNot(kept.single.ticket));
+    // A new ticket comes with a new key of this phone's.
+    expect(renewed.single.bindingSeed, isNot(kept.single.bindingSeed));
+    expect(
+      site.regs.values.single['binding_key'],
+      (await BindingKey.fromText(renewed.single.bindingSeed))!.publicKeyText,
+    );
+    // An older site server has no binding call: the ticket is kept unbound.
+    site.bindingSupported = false;
+    await back(tester);
+    await tapKey(tester, 'reg-new-ticket');
+    final older = await h.services.tickets.all();
+    expect(older.single.ticket, isNot(renewed.single.ticket));
+    expect(older.single.bindingSeed, isNull);
     await back(tester);
     await tapKey(tester, 'reg-cancel');
     expect(find.byType(AlertDialog), findsOneWidget);
@@ -414,10 +434,65 @@ void main() {
     final row = field.rows['p-sitemade2345']!;
     expect(row['registration_id'], ticket.registrationId);
     expect(row['registration_ticket'], ticket.ticket);
+    expect(row['binding'], isNull); // a ticket without a key: no proof
     // The phone now has that id at this field.
     expect(
       (await FieldIdentities(h.store).existing('campo-norte'))!.playerId,
       'p-sitemade2345',
+    );
+  });
+
+  testWidgets('a ticket with this phone\'s key proves it at check-in, with a '
+      'new challenge when the first was too old (TKB-3)', (tester) async {
+    final field = FakeField()..expireChallenges = 1;
+    final h = harness(
+      qr: FakeQr(field.posterText()),
+      fieldHttp: field.http,
+      caFetch: field.fetchCa,
+    );
+    final key = await BindingKey.fromSeed(List.filled(32, 0x41));
+    final ticket = KeptTicket(
+      site: 'https://campo.example.pt',
+      registrationId: '0192f3a0-0000-7000-8000-0000000a0001',
+      playerId: 'p-sitemade2345',
+      ticket: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ',
+      ticketText: 'atalaia:ticket:x',
+      gameTitle: 'Domingo de manhã',
+      fieldName: 'Campo Norte',
+      bindingSeed: key.seedText,
+    );
+    await h.services.tickets.keep(ticket);
+    expect((await h.services.tickets.all()).single.bindingSeed, key.seedText);
+    await tester.pumpWidget(h.app(home: const PlayerStartScreen()));
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'player-checkin');
+    await tapKey(tester, 'checkin-scan');
+    await tapKey(tester, 'checkin-notice-ok');
+    await tester.enterText(find.byKey(const Key('checkin-name')), 'Falcão');
+    await tapKey(tester, 'checkin-registration');
+    await tester.tap(find.text('Domingo de manhã · Campo Norte').last);
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'checkin-submit');
+    expect(find.text('Check-in feito.'), findsOneWidget);
+    final row = field.rows['p-sitemade2345']!;
+    final proof = (row['binding']! as Map).cast<String, Object?>();
+    expect(field.givenChallenges, hasLength(2));
+    expect(proof['challenge'], field.givenChallenges.last);
+    final id = (await FieldIdentities(h.store).existing('campo-norte'))!;
+    final (challenge, signature) = parseBindingProof(proof);
+    expect(
+      await verifyBinding(
+        key.publicKeyText,
+        bindingMessage(
+          challenge: challenge,
+          gameId: 42,
+          registrationId: ticket.registrationId,
+          playerId: 'p-sitemade2345',
+          playerSecret: base64UrlNoPadDecode(id.secret)!,
+        ),
+        signature,
+      ),
+      isTrue,
     );
   });
 

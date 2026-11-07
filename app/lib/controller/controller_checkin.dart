@@ -47,6 +47,7 @@ import '../chrono/limit_template.dart';
 import '../chrono/reading.dart';
 import '../chrono/record_signer.dart';
 import '../protocol/apd.dart';
+import '../protocol/checkin_binding.dart';
 import '../protocol/checkin_poster.dart';
 import '../protocol/checkin_ticket.dart';
 import '../security/bytes.dart';
@@ -482,6 +483,10 @@ class ControllerCheckin {
   /// Printed tickets scanned, per staff id (a marshal's player id, or "gm"):
   /// a desk's pace, never a flood (TKT-2).
   final RateLimit ticketRate;
+
+  /// The challenges a registering phone signs at check-in (TKB-3):
+  /// stateless, keyed in memory.
+  Challenges challenges = Challenges();
   final Random _random;
   double _lastPurge = 0;
 
@@ -671,6 +676,8 @@ class ControllerCheckin {
       'roster_name': null,
       'app_checkin_at': null,
       'token_gen': 0,
+      'binding_key': null,
+      'app_bound': null,
       'position_share': false,
       'position_share_at': null,
       'position_share_notice': null,
@@ -1233,6 +1240,7 @@ class ControllerCheckin {
     'ticket_scanned_at': null,
     'roster_name': null,
     'app_checkin_at': null,
+    'app_bound': null,
   };
 
   /// What staff decided about a pending app check-in (TKS-2, TKS-3).
@@ -1780,8 +1788,9 @@ class ControllerCheckin {
   /// whether a check-in was made (201) or taken up again (200).
   (Map<String, Object?>, bool) checkIn(
     Map<String, Object?> body,
-    String client,
-  ) {
+    String client, {
+    ({String? key, bool verified})? proof,
+  }) {
     if (!rate.allow(client)) {
       throw ControllerError(
         'too many check-ins from this address; wait a minute',
@@ -1803,6 +1812,7 @@ class ControllerCheckin {
       'registration_id',
       'ticket',
       'share_position',
+      'binding',
     };
     final unknown = body.keys.where((k) => !allowed.contains(k)).toList()
       ..sort();
@@ -1825,6 +1835,12 @@ class ControllerCheckin {
     }
     final secret = _secretBytes(body['player_secret']);
     final (regId, ticketHex) = _registrationProof(body);
+    if (body['binding'] != null && proof == null) {
+      // Only [checkInWithProof] verifies a proof (Ed25519 is asynchronous).
+      throw ControllerError(
+        'binding: send the check-in through checkInWithProof',
+      );
+    }
     final st = settings();
     final name = _text('display_name', body['display_name'], _nameMax);
     final declared = _declared(body);
@@ -1852,6 +1868,14 @@ class ControllerCheckin {
       }
       known['last_seen_at'] = now;
     }
+    // Bound only when the proof was made for this roster entry's key (the
+    // roster may have changed while it was verified).
+    final bound =
+        proof != null &&
+        proof.verified &&
+        expected != null &&
+        expected['binding_key'] != null &&
+        expected['binding_key'] == proof.key;
     if (row != null && row['status'] == 'removed') {
       throw _forbidden('staff removed this check-in; ask at the desk');
     }
@@ -1911,6 +1935,7 @@ class ControllerCheckin {
         'notice_version': notice,
         'checked_in_at': status == 'checked_in' ? now : null,
         'app_checkin_at': now,
+        'app_bound': bound,
         ..._shareFields(share, notice, now),
       };
       if (row == null) {
@@ -1950,6 +1975,11 @@ class ControllerCheckin {
         'notice_version': notice,
         'updated_at': now,
         if (rejoin || known == null) 'app_checkin_at': now,
+        if (rejoin || known == null)
+          'app_bound': bound
+        else if (bound)
+          // The phone that holds the field identity proves the key now.
+          'app_bound': true,
       };
       // Once a marshal checked the card the number is gone and the stored
       // verdict stands: the app cannot put the number back.
@@ -2010,7 +2040,75 @@ class ControllerCheckin {
     'squad': row['squad'],
     'role': row['role'],
     'position_share': shareInForce(row),
+    'app_binding': bindingState(row),
   };
+
+  /// GET /api/v1/checkin/challenge: what a registering phone signs with its
+  /// check-in (TKB-3).
+  Map<String, Object?> challenge() => {
+    'challenge': challenges.issue(),
+    'expires_in': challenges.ttl,
+  };
+
+  /// POST /api/v1/checkin with the registering phone's `binding` (TKB-3,
+  /// TKB-4): the proof's shape and challenge are checked (400; 409
+  /// `binding_challenge_expired`), its signature verified against the
+  /// roster's key for the registration, then [checkIn] runs at once. A proof
+  /// that does not verify, or with no roster key, leaves the check-in
+  /// unbound: never a refusal (checkin.py `_bound`).
+  Future<(Map<String, Object?>, bool)> checkInWithProof(
+    Map<String, Object?> body,
+    String client,
+  ) async {
+    final value = body['binding'];
+    if (value == null) return checkIn(body, client);
+    final (regId, _) = _registrationProof(body);
+    if (regId == null) {
+      throw ControllerError('binding goes with registration_id and ticket');
+    }
+    final String challenge;
+    final Uint8List signature;
+    try {
+      (challenge, signature) = parseBindingProof(value);
+    } on FormatException catch (e) {
+      throw ControllerError(e.message);
+    }
+    if (!challenges.valid(challenge)) {
+      throw ControllerError.conflict(challengeExpired);
+    }
+    final gameId = body['game_id'];
+    final pid = body['player_id'];
+    final secret = body['player_secret'];
+    String? key;
+    var verified = false;
+    if (gameId is int && pid is String && secret is String) {
+      final match = _byRegistration(gameId, regId);
+      key = match != null && match['from_roster'] == true
+          ? match['binding_key'] as String?
+          : null;
+      final raw = base64UrlNoPadDecode(secret);
+      if (key != null && raw != null && raw.length == 32) {
+        verified = await verifyBinding(
+          key,
+          bindingMessage(
+            challenge: challenge,
+            gameId: gameId,
+            registrationId: regId,
+            playerId: pid,
+            playerSecret: raw,
+          ),
+          signature,
+        );
+        if (!verified) {
+          audit(
+            "check-in: game $gameId, $pid: the registering phone's proof "
+            'did not verify',
+          );
+        }
+      }
+    }
+    return checkIn(body, client, proof: (key: key, verified: verified));
+  }
 
   /// `registration_id` and `ticket` (both or neither): the id and the
   /// ticket's SHA-256 (hex).
@@ -2157,6 +2255,7 @@ class ControllerCheckin {
         'card_checked_at': row['card_checked_at'],
         'ticket_scanned_by': row['ticket_scanned_by'],
         'ticket_scanned_at': row['ticket_scanned_at'],
+        'app_binding': bindingState(row),
         'country': country(),
       });
     }
@@ -2991,6 +3090,7 @@ class ControllerCheckin {
         'name': row['display_name'],
         'at': row['app_checkin_at'],
         'roster_name': row['roster_name'],
+        'app_binding': bindingState(row),
       };
     } else if (unmatchedApp && choice == 'discard') {
       // The app check-in is undone (TKS-3, TKS-4): what the app sent goes,
@@ -3009,6 +3109,7 @@ class ControllerCheckin {
         'position_share': false,
         'position_share_at': now,
         'app_checkin_at': null,
+        'app_bound': null,
         'token_gen': ((row['token_gen'] as int?) ?? 0) + 1,
         'updated_at': now,
       });
@@ -4496,6 +4597,7 @@ class ControllerCheckin {
         'team_preference': pref,
         'registration_id': rid,
         'ticket_sha256': reg['ticket_sha256'],
+        'binding_key': reg['binding_key'],
         'from_roster': true,
       };
       if (row == null) {
@@ -4514,6 +4616,7 @@ class ControllerCheckin {
             'from_roster': true,
             'roster_name': name,
             'ticket_sha256': reg['ticket_sha256'],
+            'binding_key': reg['binding_key'],
             'updated_at': now,
           });
         } else if (row['roster_name'] != name && row['erased_at'] == null) {
@@ -4627,6 +4730,7 @@ class ControllerCheckin {
             ..['ticket_scanned_at'] = null
             ..['roster_name'] = null
             ..['app_checkin_at'] = null
+            ..['app_bound'] = null
             ..['team_preference'] = null
             ..['erased_at'] = now;
           erased++;

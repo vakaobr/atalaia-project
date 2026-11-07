@@ -575,6 +575,12 @@ const Map<String, String> ptStrings = {
       'confirmação da organização. O bilhete é de "{roster_name}", na lista do '
       'jogo. Confirma só se a pessoa à tua frente for quem fez o check-in '
       'nesse telemóvel.',
+  'ticket.app_bound':
+      'A app provou que é o telemóvel com que foi feita a inscrição neste '
+      'jogo.',
+  'ticket.app_unbound':
+      'A app não provou que é o telemóvel da inscrição: pode ser uma cópia do '
+      'bilhete (ou uma app mais antiga, ou uma inscrição feita na web).',
   'ticket.app_checkin_confirm': 'É a mesma pessoa: confirmar o check-in da app',
   'ticket.app_checkin_discard':
       'Não é: anular o check-in da app e fazer o check-in a quem tem o bilhete',

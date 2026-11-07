@@ -1004,6 +1004,12 @@
     "squad_n": "Squad {n}",
     "no_squad": "kein Squad",
     "registered_counts": "Angemeldet: {expected} erwartet, {arrived} angekommen · ohne Anmeldung: {walkins}",
+    "app_binding": {
+      "bound": "Handy der Anmeldung",
+      "unbound": "Handy nicht nachgewiesen",
+      "bound_long": "Die App hat nachgewiesen, dass es das Handy ist, mit dem die Anmeldung für dieses Spiel gemacht wurde.",
+      "unbound_long": "Die App hat nicht nachgewiesen, dass es das Handy der Anmeldung ist: es kann eine Kopie des Tickets sein (oder eine ältere App oder eine Anmeldung im Web)."
+    },
     "registered_badge": "angemeldet",
     "arrived": "Angekommen",
     "ticket_title": "Gedrucktes Ticket",

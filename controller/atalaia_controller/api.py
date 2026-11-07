@@ -108,6 +108,7 @@ which browsers cannot give headers, takes it in the ``Sec-WebSocket-Protocol`` h
     POST /api/v1/adopt/pair                GM: pair {"pair_id", "code"} (CPace with the box's code)
     GET  /api/v1/checkin                   field check-in: field, notice, settings, open games (no token)
     POST /api/v1/checkin                   check in with a field identity: a player token
+    GET  /api/v1/checkin/challenge         what a registering phone signs with its check-in (no token; TKB-3)
     POST /api/v1/checkin/token             a new player token (player token)
     GET|DELETE /api/v1/checkin/me          the player's own check-in / leave the game
     PUT  /api/v1/checkin/me/replicas       the player's declaration (replicas for this game)
@@ -1421,6 +1422,13 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         if not svc.info_rate.allow(client_of(request)):
             raise HTTPException(429, "too many requests from this address; wait a minute")
         return JSONResponse(svc.info(), headers=NO_STORE)
+
+    @app.get("/api/v1/checkin/challenge")
+    def checkin_challenge(request: Request) -> JSONResponse:
+        svc = need_checkin()
+        if not svc.info_rate.allow(client_of(request)):
+            raise HTTPException(429, "too many requests from this address; wait a minute")
+        return JSONResponse(svc.challenge(), headers=NO_STORE)
 
     @app.post("/api/v1/checkin")
     def checkin_post(request: Request, body: Any = Body(None)) -> JSONResponse:

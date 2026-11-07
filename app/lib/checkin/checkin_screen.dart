@@ -24,7 +24,9 @@ import '../marshal/chrono_queue.dart';
 import '../marshal/marshal_access.dart';
 import '../player/field_feed.dart';
 import '../player/player_screens.dart';
+import '../protocol/checkin_binding.dart';
 import '../protocol/checkin_poster.dart';
+import '../security/bytes.dart' show base64UrlNoPadDecode;
 import '../site/site_api.dart';
 import '../ui/code_kind.dart';
 import '../ui/widgets.dart';
@@ -284,25 +286,59 @@ class _CheckinScreenState extends State<CheckinScreen> {
         .firstOrNull;
     if (old != null) pending.declarations.addAll(old.declarations);
     final decls = store.declarationsFor(pending, _picked.toList());
-    try {
-      final ticket = await _client!.checkIn(
+    // The registering phone's proof (TKB-3): signed with the key this phone
+    // gave the registration, over the controller's challenge. None without a
+    // key or from an older controller: the check-in is then unbound.
+    Future<Map<String, String>?> proof() async {
+      final key = kept == null
+          ? null
+          : await BindingKey.fromText(kept.bindingSeed);
+      final secret = base64UrlNoPadDecode(id.secret);
+      if (kept == null || key == null || secret == null) return null;
+      final String? challenge;
+      try {
+        challenge = await _client!.challenge();
+      } on CheckinException {
+        return null;
+      }
+      if (challenge == null) return null;
+      return key.prove(
+        challenge: challenge,
         gameId: gameId,
+        registrationId: kept.registrationId,
         playerId: id.playerId,
-        secret: id.secret,
-        displayName: name,
-        noticeVersion: info.noticeVersion,
-        federationNumber:
-            (info.federation == 'off' && !rule.checkin) || fed.isEmpty
-            ? null
-            : fed,
-        apdId: withApd ? _apd.apd : null,
-        membershipExpires: withApd ? _apd.expiresOrNull : null,
-        teamPreference: _team,
-        sharePosition: _share,
-        replicas: decls.isEmpty ? null : decls,
-        registrationId: kept?.registrationId,
-        registrationTicket: kept?.ticket,
+        playerSecret: secret,
       );
+    }
+
+    try {
+      Future<CheckinTicket> send(Map<String, String>? binding) =>
+          _client!.checkIn(
+            binding: binding,
+            gameId: gameId,
+            playerId: id.playerId,
+            secret: id.secret,
+            displayName: name,
+            noticeVersion: info.noticeVersion,
+            federationNumber:
+                (info.federation == 'off' && !rule.checkin) || fed.isEmpty
+                ? null
+                : fed,
+            apdId: withApd ? _apd.apd : null,
+            membershipExpires: withApd ? _apd.expiresOrNull : null,
+            teamPreference: _team,
+            sharePosition: _share,
+            replicas: decls.isEmpty ? null : decls,
+            registrationId: kept?.registrationId,
+            registrationTicket: kept?.ticket,
+          );
+      CheckinTicket ticket;
+      try {
+        ticket = await send(await proof());
+      } on CheckinException catch (e) {
+        if (!e.challengeExpired) rethrow;
+        ticket = await send(await proof()); // a new challenge, once
+      }
       pending.update(ticket);
       await store.saveCheckin(pending);
       await app.update((x) {

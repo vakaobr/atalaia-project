@@ -1345,6 +1345,18 @@
       ]
     },
     {
+      "name": "check-in: the registering phone's challenge and proof (TKB-3, TKB-4): the challenge needs no token; a proof without a registration or of the wrong shape is 400, a challenge this controller did not give is 409, and without a roster key a proof is ignored and the check-in unbound (the roster's key and a valid signature are pinned by each controller's own tests and protocol/vectors/checkin.json)",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Binding", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"], "assignments": {"4": "zone"}}}, "status": 201, "save": {"gid": "id"}},
+        {"request": {"method": "GET", "path": "/api/v1/checkin/challenge", "token": "none"}, "status": 200, "json": {"challenge": "$any", "expires_in": 300}, "save": {"ch": "challenge"}},
+        {"request": {"method": "POST", "path": "/api/v1/checkin", "token": "none", "body": {"game_id": "${gid}", "player_id": "p-bbbbbbbbbbbb", "player_secret": "CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo", "display_name": "Bia", "notice_version": 2, "binding": {"challenge": "${ch}", "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}}}, "status": 400, "json": {"detail": "$any"}},
+        {"request": {"method": "POST", "path": "/api/v1/checkin", "token": "none", "body": {"game_id": "${gid}", "player_id": "p-bbbbbbbbbbbb", "player_secret": "CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo", "display_name": "Bia", "notice_version": 2, "registration_id": "0192f3a4-0000-7000-8000-00000000b001", "ticket": "CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk", "binding": {"challenge": "${ch}", "signature": "short"}}}, "status": 400},
+        {"request": {"method": "POST", "path": "/api/v1/checkin", "token": "none", "body": {"game_id": "${gid}", "player_id": "p-bbbbbbbbbbbb", "player_secret": "CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo", "display_name": "Bia", "notice_version": 2, "registration_id": "0192f3a4-0000-7000-8000-00000000b001", "ticket": "CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk", "binding": {"challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}}}, "status": 409, "json": {"detail": "$any"}},
+        {"request": {"method": "POST", "path": "/api/v1/checkin", "token": "none", "body": {"game_id": "${gid}", "player_id": "p-bbbbbbbbbbbb", "player_secret": "CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo", "display_name": "Bia", "notice_version": 2, "registration_id": "0192f3a4-0000-7000-8000-00000000b001", "ticket": "CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk", "binding": {"challenge": "${ch}", "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}}}, "status": 201, "json": {"player_id": "p-bbbbbbbbbbbb", "status": "checked_in", "app_binding": "unbound"}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/checkins", "token": "gm"}, "status": 200}
+      ]
+    },
+    {
       "name": "check-in: position sharing is its own unticked choice, taken at check-in, changeable and recorded (LEG-12 to LEG-16)",
       "steps": [
         {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sharing", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"], "assignments": {"4": "zone"}}}, "status": 201, "save": {"gid": "id"}},

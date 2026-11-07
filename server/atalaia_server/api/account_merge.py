@@ -187,7 +187,7 @@ async def merge_into(db: AsyncSession, a: User, b: User) -> dict[str, int]:
     await db.execute(update(GameRegistration).where(
         GameRegistration.user_id == b.id, GameRegistration.scheduled_game.in_(same_game)).values(
         user_id=None, display_name=None, team_preference=None, federation_number=None, apd_id=None,
-        membership_expires=None, ticket_hash=None, updated_at=now).execution_options(synchronize_session=False))
+        membership_expires=None, ticket_hash=None, binding_key=None, updated_at=now).execution_options(synchronize_session=False))
     # The chrono sharing link is one per account.
     if await db.get(HubShareLink, a.id) is not None:
         await hub_share.unlink(db, b.id)
