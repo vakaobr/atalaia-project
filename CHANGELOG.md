@@ -12,8 +12,9 @@ CONTRIBUTING.md, "Pull request titles and commit messages"); optional hand-writt
 `## [Unreleased]` and move into the next release's section as "Details". The sections up to 0.5.0
 were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.10.0](https://github.com/vakaobr/atalaia-project/compare/v0.9.0...v0.10.0) (2026-11-07)
+## [Unreleased]
 
+## [0.10.0](https://github.com/vakaobr/atalaia-project/compare/v0.9.0...v0.10.0) (2026-11-07)
 
 ### Features
 
@@ -35,9 +36,9 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 * v0.9.0 is released: README, manuals, STATUS and the project page ([#125](https://github.com/vakaobr/atalaia-project/issues/125)) ([8c4427f](https://github.com/vakaobr/atalaia-project/commit/8c4427fb89c8d31527890e33b9f04a64782e4548))
 
-## [Unreleased]
+### Details
 
-### Security
+#### Security
 
 - **The release APK is built without the signing key, and signed offline** (decisions APS-1 to APS-6; `.github/workflows/release.yml` job `apk`, `app/tool/check.sh` `apk-release` and `gradle-verification`, the new `app/tool/sign_apk.sh`, `app/android/app/build.gradle.kts`, `app/android/gradle/verification-metadata.xml`, `tools/docker_app.py`, `app/README.md`, `firmware/esp32/docs/RELEASE_SIGNING.md`): the Android keystore and its password used to sit in the environment and on a mount during `flutter build apk --release`, a build that downloads Gradle plugins, Maven artifacts and pub packages. The job now builds the APK **unsigned** in a step with no secret (`-Patalaia.release.unsigned=true`; `check.sh apk-release` refuses any `ATALAIA_RELEASE_*` variable and checks the APK is unsigned), then signs it in a separate step, in a container started with `--network none`, with `zipalign` if needed and `apksigner`; the keystore is decoded for that step only and shredded when it ends, with an `if: always()` step that shreds anything left. The checks are unchanged: exactly one signer, certificate SHA-256 `9C:35:…:A1:99`, the same assets and `.apk.sha256`. The Android build now also has **Gradle dependency verification**: the SHA-256 of every plugin and artifact the debug and release builds use, written in Docker with the pinned toolchain by `python tools/docker_app.py gradle-verification`; Gradle stops on anything else.
 
@@ -54,7 +55,7 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
   `attestation: none` brings back (`none`, or `packed` self-attestation); other formats are refused before their
   statement is parsed.
 
-### Details
+#### Details
 
 - **Boxes stuck in an ended game: one air budget for the automatic resends** (decisions SRB-1 to SRB-6, both
   controllers). The controller no longer resends an ended game's GAME_OVER by itself while a game is started
