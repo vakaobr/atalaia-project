@@ -126,6 +126,7 @@ python tools/docker_fw.py modem                   USB radio modem variant -> fir
 python tools/docker_fw.py pod                     I/O pod variant -> firmware/esp32/build-pod/
 python tools/docker_fw.py bench                   bare board on the desk -> firmware/esp32/build-bench/
 python tools/docker_fw.py release-hardened        hardened Field Box release, signed -> firmware/esp32/build-hardened/
+python tools/docker_fw.py qemu-hardened           the same, then burned in QEMU with throw-away keys, secure boot checked
 python tools/docker_fw.py test                    host tests and screen reference images
 python tools/docker_fw.py test --update-screens   accept changed screens as the new references
 ```
@@ -163,7 +164,11 @@ anti-rollback) is the Field Box firmware for a box whose eFuses are to be burned
 ([docs/RELEASE_HARDENING.md](docs/RELEASE_HARDENING.md)): its first boot burns them, for good.
 `release-hardened` signs its bootloader and app for secure boot with `--secure-boot-key PATH`
 (up to 3) or, left out, a throw-away test key (`*.test-signed.bin`), and checks the sizes.
-Never flash it to a board that is not meant to be burned.
+Never flash it to a board that is not meant to be burned. **No board gets it for now** (the maintainer's
+decision of 2026-11-07, RELEASE_HARDENING.md section 5): `tools/hardened_burn.py` holds the burn as a
+script that only prints its plan unless it is given the port and the board's MAC, `qemu-hardened`
+runs that burn in Espressif's emulator and checks secure boot there, and the image alone carries the secure boot
+digest revocation (`sb_revoke.c`, `@sbdigests`, `@sbrevoke`; compiled out of every other build).
 
 `build`, `wokwi`, `modem`, `pod`, `bench` and `release-hardened` use the `espressif/idf:v5.3.2` image, like CI's
 `esp32-build`, `esp32-modem-build`, `esp32-pod-build` and `esp32-hardened-build` jobs. `test` runs CI's `firmware-test` commands in the

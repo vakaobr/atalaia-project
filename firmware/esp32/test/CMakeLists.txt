@@ -182,6 +182,7 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/serial_console.c
     ${SHELL_DIR}/wifi_args.c
     ${SHELL_DIR}/fw_update.c
+    ${SHELL_DIR}/sb_revoke.c
     ${SHELL_DIR}/fw_layout.c
     ${SHELL_DIR}/mode_package.c
     ${SHELL_DIR}/mode_store.c
@@ -264,6 +265,7 @@ set(TEST_SOURCES
     test_pod_settings.c
     test_pod_pair.c
     test_fw_update.c
+    test_sb_revoke.c
     test_mode_package.c
     test_mode_fetch.c
     test_box_beacon.c

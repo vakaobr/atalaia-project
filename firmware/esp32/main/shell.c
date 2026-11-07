@@ -58,6 +58,9 @@
 #include "radio/radio_stats.h"
 #include "radio/radio_task.h"
 #include "reset_reason.h"
+#if CONFIG_ATALAIA_SB_REVOKE
+#include "sb_revoke_esp.h"
+#endif
 #if CONFIG_ATALAIA_LBT_BENCH
 #include "radio/lbt_bench.h"
 #endif
@@ -401,6 +404,9 @@ static void serial_input_init(void)
                   "\"@update <version> <release id> <admin PIN>\", \"@modes\", \"@forgetmodes\" "
                   "or \"@lobby\" on the console");
 #endif
+#if CONFIG_ATALAIA_SB_REVOKE
+    ESP_LOGI(TAG, "hardened build: \"@sbdigests\", \"@sbrevoke <digest> <signature> <admin PIN>\"");
+#endif
 }
 
 #if CONFIG_ATALAIA_SERIAL_ADOPT
@@ -548,6 +554,30 @@ static void serial_command(const char *cmd)
         }
         cmd = gated;
     }
+#if CONFIG_ATALAIA_SB_REVOKE
+    /* A hardened build only (sb_revoke.h): "@sbdigests" lists the secure boot digest slots;
+     * "@sbrevoke <digest hex> <signature base64> <admin PIN>" revokes one, when the instruction is
+     * signed with a revocation key (the root release key). Permanent, so the admin PIN always. */
+    if (strcmp(cmd, "sbdigests") == 0) {
+        sb_revoke_esp_log_state();
+        return;
+    }
+    if (strncmp(cmd, "sbrevoke ", 9) == 0) {
+        static char sb_line[SB_REVOKE_TEXT_MAX + 48], sb_reply[120];
+        snprintf(sb_line, sizeof(sb_line), "%s", cmd);
+        if (strlen(cmd) >= sizeof(sb_line) ||
+            !admin_pin_gate_serial(&admin_guard, false, sb_line, 2, sb_reply, sizeof(sb_reply))) {
+            ESP_LOGW(TAG, "sbrevoke: %s", strlen(cmd) >= sizeof(sb_line) ? "too long" : sb_reply);
+            return;
+        }
+        if (box_game_active(&box) || runner.running) {
+            ESP_LOGW(TAG, "sbrevoke: not in a game");
+            return;
+        }
+        sb_revoke_esp_command(sb_line + 9);
+        return;
+    }
+#endif
     bool adopt_cmd =
         SERIAL_ADOPT_ON && (strcmp(cmd, "adopt-info") == 0 || strncmp(cmd, "adopt ", 6) == 0);
     bool joinkey_cmd = SERIAL_JOIN_ON && strncmp(cmd, "joinkey ", 8) == 0;
@@ -1790,6 +1820,10 @@ void app_main(void)
 
     /* An image a firmware update just installed confirms itself here, or rolls back. */
     fw_update_esp_boot(hal.radio != NULL, storage_ok);
+#if CONFIG_ATALAIA_SB_REVOKE
+    /* A hardened image's built-in secure boot revocations (sb_revoke.h), once it is confirmed. */
+    sb_revoke_esp_boot();
+#endif
     preset_store_init(STORAGE_PATH);
     /* The field logo an older firmware fetched is never read now (LOGO-5): removed once. */
     if (storage_ok) {

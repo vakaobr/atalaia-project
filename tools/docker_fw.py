@@ -16,6 +16,12 @@
                                                firmware/esp32/docs/RELEASE_HARDENING.md), signed for
                                                secure boot -> firmware/esp32/build-hardened/. Never
                                                flash it to a board you are not ready to burn.
+    python tools/docker_fw.py qemu-hardened    release-hardened, then the emulator test
+                                               (tools/hardened_qemu.py): the image burned with
+                                               throw-away keys by tools/hardened_burn.py in
+                                               Espressif's QEMU (ESP32-S3, eFuses in a file) and its
+                                               secure boot checked there, never on a board
+                                               (RELEASE_HARDENING.md, section 8)
     python tools/docker_fw.py test             host tests and screen reference images (as CI)
     python tools/docker_fw.py test --update-screens
                                                accept new screen renders as the references
@@ -499,6 +505,17 @@ def release_hardened() -> int:
     return code
 
 
+def qemu_hardened() -> int:
+    """The hardened image built, then burned and booted in the emulator with throw-away keys
+    (tools/hardened_qemu.py; RELEASE_HARDENING.md, section 8). No board, no serial port."""
+    if SECURE_BOOT_KEYS:
+        return fail("qemu-hardened signs with throw-away keys of its own; --secure-boot-key is for release-hardened")
+    code = release_hardened()
+    if code != 0:
+        return code
+    return run_idf(f"set -e; . $IDF_PATH/export.sh > /dev/null; python3 ../../tools/hardened_qemu.py {HARDENED_BUILD}")
+
+
 def ensure_dev_image() -> bool:
     dockerfile = (REPO / "tools" / "dev" / "Dockerfile").read_bytes().replace(b"\r\n", b"\n")
     wanted = hashlib.sha256(dockerfile).hexdigest()[:16]
@@ -572,7 +589,7 @@ def main(argv: list[str]) -> int:
            "--buzzer=", "--simple-out="]
     radio = ["--region=", "--lbt=", "--antenna-dbi="]
     known = {"build": box, "wokwi": box, "modem": radio, "pod": radio + ["--buzzer=", "--simple-out=", "--module-outputs="],
-             "bench": box, "release-hardened": box + ["--secure-boot-key="],
+             "bench": box, "release-hardened": box + ["--secure-boot-key="], "qemu-hardened": box,
              "test": ["--update-screens"], "clean": [], "version": []}
     if command not in known:
         return fail(f"unknown command {command!r}; run with --help")
@@ -654,6 +671,8 @@ def main(argv: list[str]) -> int:
             return bench()
         if command == "release-hardened":
             return release_hardened()
+        if command == "qemu-hardened":
+            return qemu_hardened()
         return test("--update-screens" in options)
     except KeyboardInterrupt:
         return 130

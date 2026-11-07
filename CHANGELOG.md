@@ -14,6 +14,19 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+- **The hardened Field Box image, prepared and still burned nowhere (HPR-1 to HPR-12).** The maintainer decided on
+  2026-11-07 that no board, bench or field, gets the hardened image or any eFuse burn for now
+  (firmware/esp32/docs/RELEASE_HARDENING.md, section 5 question 1); the work that needs no hardware went ahead.
+  `tools/hardened_burn.py` writes the burn down as a script that only prints its plan (the whole `esptool`/`espefuse`
+  sequence: a host-made flash key, two secure boot digests with the spare slot kept, secure boot enabled from the host
+  before the first boot, security version 1) unless it is given both `--port` and
+  `--i-understand-this-is-permanent=<the board's MAC>`, checks the MAC and that the chip is blank, and records each box.
+  The hardened build alone carries the secure boot digest revocation a leaked CI key needs (`main/sb_revoke.c`,
+  `CONFIG_ATALAIA_SB_REVOKE`): an instruction signed with the root release key (`tools/firmware_release.py
+  revoke-sb-digest`), built into a release or typed on the USB console (`@sbrevoke`, `@sbdigests`), never the running
+  image's key nor the last one. `python3 tools/docker_fw.py qemu-hardened` runs the burn in Espressif's QEMU with throw-away keys and
+  checks secure boot there (the emulator cannot finish the first boot's flash encryption). The plain and bench images are unchanged.
+
 - **Check-in tickets: the registering phone (TKB-1 to TKB-8, follow-up to TKS-7).** When the app registers for a game
   (or gets a new ticket) it gives the registration an Ed25519 key of that phone (`PUT /api/v1/me/registrations/{id}/binding`,
   site server migration `0032_registration_binding`). The roster carries the public key to a controller that asks
