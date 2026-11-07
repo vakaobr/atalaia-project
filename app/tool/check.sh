@@ -17,10 +17,11 @@
 #                                     and that it carries no Google Play services;
 #                                     then a release build with no keystore, which must
 #                                     stop and say so (APP-2)
-#   sh app/tool/check.sh apk-release  the release APK, signed with the release key
-#                                     (ATALAIA_RELEASE_*), the same checks, and apksigner's
-#                                     certificate SHA-256 must be ATALAIA_APK_CERT_SHA256
-#                                     (release.yml; decisions APK-1 to APK-8)
+#   sh app/tool/check.sh apk-release  the release APK, unsigned (no key in this networked
+#                                     build), and the same checks; app/tool/sign_apk.sh signs
+#                                     it offline (release.yml; decisions APK-1 to APK-8, APS-*)
+#   sh app/tool/check.sh gradle-verification  write android/gradle/verification-metadata.xml
+#                                     again (Gradle's dependency checksums), then build with it
 #   sh app/tool/check.sh format       format lib/, test/, integration_test/ and tool/ in place
 #   sh app/tool/check.sh lock         resolve pubspec.yaml again and write pubspec.lock
 #   sh app/tool/check.sh gen          write lib/modes/builtin_modes.g.dart from modes/
@@ -37,9 +38,9 @@
 # and the Field Box's (slice S4 of PE24).
 #
 # The repository is at $ATALAIA_SRC (default /src), mounted read-only except
-# for format, lock, gen and goldens: the work happens on a copy of app/,
+# for format, lock, gen, goldens and gradle-verification: the work happens on a copy of app/,
 # core/, modes/, protocol/ and the GM console (controller/console/src,
-# controller/templates), so nothing is written into the checkout. Those four
+# controller/templates), so nothing is written into the checkout. Those five
 # copy their results back and need it writable. The console and the check-in
 # notices go into the app's assets with tool/sync_console.dart first (slice
 # S6 of PE24: the phone controller serves them; decision PE24-61).
@@ -246,19 +247,20 @@ case "$MODE" in
         fi
         ;;
     apk-release)
-        # The release APK the release workflow attaches (decisions APK-1 to APK-8): signed with the
-        # release key named by ATALAIA_RELEASE_STORE_FILE, _STORE_PASSWORD, _KEY_ALIAS and
-        # _KEY_PASSWORD (build.gradle.kts), the same checks as the debug APK, then apksigner must
-        # say it verifies and that its one signer's certificate has the SHA-256 in
-        # ATALAIA_APK_CERT_SHA256 (64 hex digits, colons and case ignored). ATALAIA_APK_VERSION is
-        # the release's version (X.Y.Z or X.Y.Z-pre): the versionName, and X*1000000+Y*1000+Z the
-        # versionCode, so every release installs over the one before. The APK is copied to
-        # $ATALAIA_APK_OUT/atalaia-app-<version>.apk.
+        # The release APK the release workflow attaches (decisions APK-1 to APK-8, APS-1 to APS-6),
+        # built UNSIGNED: this build fetches Gradle and pub dependencies over the network, so the
+        # release key never comes into it. app/tool/sign_apk.sh signs the APK afterwards in a
+        # container with no network, and checks the certificate. The same checks as the debug APK.
+        # ATALAIA_APK_VERSION is the release's version (X.Y.Z or X.Y.Z-pre): the versionName, and
+        # X*1000000+Y*1000+Z the versionCode, so every release installs over the one before. The
+        # APK is copied to $ATALAIA_APK_OUT/atalaia-app-<version>-unsigned.apk.
         version="${ATALAIA_APK_VERSION:?ATALAIA_APK_VERSION is not set}"
-        want=$(printf '%s' "${ATALAIA_APK_CERT_SHA256:?ATALAIA_APK_CERT_SHA256 is not set}" | tr -d ':' | tr 'A-F' 'a-f')
         out="${ATALAIA_APK_OUT:?ATALAIA_APK_OUT is not set}"
-        printf '%s' "$want" | grep -Eqx '[0-9a-f]{64}' \
-            || { echo "check.sh: ATALAIA_APK_CERT_SHA256 is not a SHA-256 fingerprint" >&2; exit 1; }
+        for var in ATALAIA_RELEASE_STORE_FILE ATALAIA_RELEASE_STORE_PASSWORD ATALAIA_RELEASE_KEY_ALIAS \
+                ATALAIA_RELEASE_KEY_PASSWORD; do
+            eval "val=\${$var:-}"
+            [ -z "$val" ] || { echo "check.sh: apk-release builds unsigned; $var must not reach this build" >&2; exit 1; }
+        done
         core=${version%%-*}
         printf '%s' "$core" | grep -Eqx '[0-9]+\.[0-9]+\.[0-9]+' \
             || { echo "check.sh: ATALAIA_APK_VERSION $version is not X.Y.Z[-pre]" >&2; exit 1; }
@@ -270,25 +272,108 @@ EOV
         code=$((major * 1000000 + minor * 1000 + patch))
         android_tools
         flutter pub get --enforce-lockfile
-        flutter build apk --release --build-name "$version" --build-number "$code"
+        flutter build apk --release --build-name "$version" --build-number "$code" \
+            --android-project-arg atalaia.release.unsigned=true
         apk=build/app/outputs/flutter-apk/app-release.apk
         check_apk "$apk" "Lorg/atalaia/app/QrScanActivity;"
-        # The newest build-tools' apksigner (the image's SDK has them).
+        # Unsigned: no signature block for apksigner to verify.
         apksigner=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -n 1)
         [ -x "$apksigner" ] || { echo "check.sh: no apksigner in $ANDROID_HOME/build-tools" >&2; exit 1; }
-        "$apksigner" verify --verbose --print-certs "$apk" > /tmp/apksigner.txt 2>&1 \
-            || { cat /tmp/apksigner.txt; echo "check.sh: apksigner does not verify $apk" >&2; exit 1; }
-        grep -E '^Verified using|^Number of signers|certificate (DN|SHA-256)' /tmp/apksigner.txt
-        grep -qx 'Number of signers: 1' /tmp/apksigner.txt \
-            || { echo "check.sh: $apk must have exactly one signer" >&2; exit 1; }
-        got=$(sed -n 's/^Signer #1 certificate SHA-256 digest: *//p' /tmp/apksigner.txt | tr 'A-F' 'a-f')
-        if [ "$got" != "$want" ]; then
-            echo "check.sh: $apk is signed by certificate $got, not the release key $want" >&2
+        if "$apksigner" verify "$apk" > /dev/null 2>&1; then
+            echo "check.sh: $apk is signed; apk-release must build it unsigned" >&2
             exit 1
         fi
-        echo "ok   $apk is signed by the certificate $got"
-        cp "$apk" "$out/atalaia-app-$version.apk"
-        echo "ok   copied to atalaia-app-$version.apk (versionName $version, versionCode $code)"
+        echo "ok   $apk is unsigned"
+        cp "$apk" "$out/atalaia-app-$version-unsigned.apk"
+        echo "ok   copied to atalaia-app-$version-unsigned.apk (versionName $version, versionCode $code)"
+        ;;
+    gradle-verification)
+        # Writes android/gradle/verification-metadata.xml again (the SHA-256 of every Gradle
+        # plugin and Maven artifact the Android build may use; Gradle refuses any other). Run it
+        # after changing a Gradle plugin, an Android dependency, a pub package with Android code,
+        # or the Flutter SDK: python tools/docker_app.py gradle-verification. It runs the debug
+        # and the unsigned release build exactly as `apk` and `apk-release` do, through a
+        # stand-in for android/gradlew that adds --write-verification-metadata sha256 to the
+        # command Flutter runs, starting from an empty file so nothing stale stays; then both
+        # builds again with the real gradlew, which must pass against the new file. The
+        # checkout must be writable.
+        android_tools
+        flutter pub get --enforce-lockfile
+        meta=android/gradle/verification-metadata.xml
+        rm -f "$meta"
+        # Flutter writes gradlew, gradle-wrapper.jar and local.properties on the first build
+        # (only when they are missing, so the stand-in stays in place for the next two).
+        flutter build apk --debug
+        mv android/gradlew android/gradlew.real
+        printf '#!/bin/sh\nexec "$(dirname "$0")/gradlew.real" --write-verification-metadata sha256 "$@"\n' \
+            > android/gradlew
+        chmod +x android/gradlew
+        # From clean build folders, so every task runs and resolves what it uses. That includes
+        # the Flutter SDK's own Gradle plugin (packages/flutter_tools/gradle, the included build
+        # `:gradle`): the first build compiled it into the SDK, and an up-to-date
+        # :gradle:compileKotlin never resolves its kotlinBuildToolsApiClasspath. And from an
+        # empty Gradle home: with a warm cache Gradle records some POMs, BOMs and parent POMs
+        # (or the .pom where a fresh download reads the .module) differently from what a fresh
+        # CI machine downloads, and CI fails on the ones missing.
+        sdk_gradle="$(dirname "$(dirname "$(command -v flutter)")")/packages/flutter_tools/gradle"
+        rm -rf build android/.gradle android/app/.cxx android/.kotlin \
+            "$sdk_gradle/build" "$sdk_gradle/.gradle" "$sdk_gradle/.kotlin"
+        saved_gradle_home="${GRADLE_USER_HOME:-}"
+        GRADLE_USER_HOME=$(mktemp -d /tmp/gradle-home.XXXXXX)
+        export GRADLE_USER_HOME
+        flutter build apk --debug
+        flutter build apk --release --android-project-arg atalaia.release.unsigned=true
+        # The Gradle and Kotlin daemons may still write into it as they stop; a leftover temp
+        # folder is harmless.
+        (cd android && ./gradlew.real --stop) > /dev/null 2>&1 || true
+        rm -rf "$GRADLE_USER_HOME" 2> /dev/null || true
+        if [ -n "$saved_gradle_home" ]; then export GRADLE_USER_HOME="$saved_gradle_home"; else unset GRADLE_USER_HOME; fi
+        mv android/gradlew.real android/gradlew
+        [ -s "$meta" ] || { echo "check.sh: Gradle wrote no $meta" >&2; exit 1; }
+        # Keep the file's own header (the licence and what it is for).
+        {
+            sed -n '1{/^<?xml/p}' "$meta"
+            cat <<'EOH'
+<!--
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+
+Gradle's dependency verification for the Android build: the SHA-256 of every plugin and
+artifact it may download. Written by `python tools/docker_app.py gradle-verification`
+(app/tool/check.sh); do not edit by hand.
+-->
+EOH
+            sed '1{/^<?xml/d}' "$meta"
+        } > /tmp/verification-metadata.xml
+        mv /tmp/verification-metadata.xml "$meta"
+        # aapt2 comes as one jar per system: this build fetched Linux's; add the macOS and
+        # Windows jars of the same version from Google's Maven repository (the Mac's native app
+        # job and a native Windows build use them).
+        python3 - "$meta" <<'EOP'
+import hashlib, re, sys, urllib.request
+path = sys.argv[1]
+text = open(path, encoding="utf-8").read()
+url = "https://dl.google.com/dl/android/maven2/com/android/tools/build/aapt2/{v}/{f}"
+for m in list(re.finditer(r'( *)<artifact name="aapt2-([^"]+)-linux\.jar">.*?</artifact>\n', text, re.S)):
+    indent, version = m.group(1), m.group(2)
+    blocks = ""
+    for system in ("osx", "windows"):
+        name = f"aapt2-{version}-{system}.jar"
+        if f'artifact name="{name}"' in text:
+            continue
+        with urllib.request.urlopen(url.format(v=version, f=name), timeout=120) as r:
+            digest = hashlib.sha256(r.read()).hexdigest()
+        blocks += (f'{indent}<artifact name="{name}">\n{indent}   <sha256 value="{digest}" '
+                   f'origin="Generated by app/tool/check.sh"/>\n{indent}</artifact>\n')
+        print(f"ok   {name} {digest}")
+    text = text.replace(m.group(0), m.group(0) + blocks, 1)
+open(path, "w", encoding="utf-8").write(text)
+EOP
+        rm -rf build android/.gradle android/app/.cxx
+        flutter build apk --debug
+        flutter build apk --release --android-project-arg atalaia.release.unsigned=true
+        cp "$meta" "$SRC/app/$meta"
+        echo "ok   wrote app/$meta ($(grep -c '<component ' "$meta") components)"
         ;;
     format)
         flutter pub get --enforce-lockfile
@@ -312,7 +397,7 @@ EOV
         cp pubspec.lock "$SRC/app/pubspec.lock"
         ;;
     *)
-        echo "check.sh: unknown mode '$MODE' (check, test, ndk, apk, format, lock, gen or goldens)" >&2
+        echo "check.sh: unknown mode '$MODE' (check, test, ndk, apk, apk-release, gradle-verification, format, lock, gen or goldens)" >&2
         exit 2
         ;;
 esac
