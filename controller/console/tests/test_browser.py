@@ -4789,8 +4789,12 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v26').then((c) => c.keys())"
-                               ".then((k) => k.map((r) => new URL(r.url).pathname))")
+        # The cache's name is read from sw.js, so bumping its version (each console change) needs
+        # no edit here.
+        sw = (Path(__file__).resolve().parents[1] / "src" / "sw.js").read_text(encoding="utf-8")
+        cache_name = re.search(r"const CACHE = '([^']+)';", sw).group(1)
+        cached = page.evaluate("(name) => caches.open(name).then((c) => c.keys())"
+                               ".then((k) => k.map((r) => new URL(r.url).pathname))", cache_name)
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js", "/console/labels.js", "/console/qr-svg.js"):
             self.assertIn(path, cached)
