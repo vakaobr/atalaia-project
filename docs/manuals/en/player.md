@@ -20,7 +20,7 @@ For people who play on an Atalaia field. You install the app, check in at the fi
 
 ## 1. Install the app
 
-The app is **not in Google Play or the App Store yet**. From v0.9.0 on, every [GitHub release](https://github.com/vakaobr/atalaia-project/releases) has the Android app attached: `atalaia-app-<version>.apk`, with `atalaia-app-<version>.apk.sha256` (its SHA-256 checksum) next to it. The first is [v0.9.0](https://github.com/vakaobr/atalaia-project/releases/tag/v0.9.0) (6 November 2026): `atalaia-app-0.9.0.apk`. The organisers may also give you the file, or you can build it yourself with the [app guide](../../../app/README.md#install-it-on-an-android-phone-from-windows) (a build of your own is debug-signed: see the warning below).
+The app is **not in Google Play or the App Store yet**. From v0.9.0 on, every [GitHub release](https://github.com/vakaobr/atalaia-project/releases) has the Android app attached: `atalaia-app-<version>.apk`, with `atalaia-app-<version>.apk.sha256` (its SHA-256 checksum) next to it. The first is [v0.9.0](https://github.com/vakaobr/atalaia-project/releases/tag/v0.9.0) (6 November 2026): `atalaia-app-0.9.0.apk`. The newest is [v0.10.0](https://github.com/vakaobr/atalaia-project/releases/tag/v0.10.0) (7 November 2026): `atalaia-app-0.10.0.apk`, which installs over v0.9.0 and keeps your data. The organisers may also give you the file, or you can build it yourself with the [app guide](../../../app/README.md#install-it-on-an-android-phone-from-windows) (a build of your own is debug-signed: see the warning below).
 
 ### Android
 

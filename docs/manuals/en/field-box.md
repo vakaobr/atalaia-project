@@ -11,7 +11,7 @@ For the person who looks after the boxes on a field: switching them on, getting 
 
 > **Not field-ready yet.** Atalaia is pre-alpha. Real Heltec V4.3 boards have played whole games on a bench with the field controller. No built box has been used on a field. Every step below matches what the firmware shows today. Steps that depend on hardware say **Not yet tested on a field**. Words in *italics* are in the [glossary](https://atalaia-project.link/en/glossary/).
 
-> **Which firmware.** The newest release is **v0.9.0** (2026-11-06). A few things below need **v0.9.0** or later, and say so where they appear: taking a box out of its game at the box, the controller freeing such a box by itself, Wi-Fi names with spaces on the USB console, and the setup page's Wi-Fi rules.
+> **Which firmware.** The newest release is **v0.10.0** (2026-11-07). A few things below need **v0.9.0** or later, and say so where they appear: taking a box out of its game at the box, the controller freeing such a box by itself, Wi-Fi names with spaces on the USB console, and the setup page's Wi-Fi rules. **For v0.10.0, update the boxes and the controller together**, and reflash the controller's USB radio modem over USB: a v0.9.0 box and a v0.10.0 controller, or the reverse, do not accept each other's **Release every box not in this game** ([12.2](#122-update)).
 
 ## Contents
 
@@ -366,6 +366,8 @@ The organisers update a box's firmware over the field's Wi-Fi, between games. No
 5. The box downloads the image, checks the signature again with the keys built into its own firmware, installs it and restarts. If the new version fails its self-test, the box goes back to the old one by itself.
 
 Do not switch the box off during an update. A box that is not in the game, or a game that has started, gets no update.
+
+**v0.10.0: update the controllers and the boxes together.** From v0.10.0, **Release every box not in this game** names its channel: a v0.9.0 box refuses a v0.10.0 controller's, and a v0.10.0 box refuses a v0.9.0 controller's. Update the controller (Raspberry Pi or phone) and every Field Box to v0.10.0 on the same day, and reflash the USB radio modem with the v0.10.0 image over USB (it has no update over the air). Until both are updated, a stuck box still leaves its game with **Leave the game** at the box, `@leave` on its USB console, or the controller's automatic resend.
 
 ### 12.3 The release keys after v0.8.0
 

@@ -20,7 +20,7 @@ Para quem joga num campo com a Atalaia. Instalas a app, fazes o check-in no camp
 
 ## 1. Instala a app
 
-A app **ainda não está no Google Play nem na App Store**. A partir da v0.9.0, cada [versão no GitHub](https://github.com/vakaobr/atalaia-project/releases) traz a app Android: `atalaia-app-<versão>.apk`, com o `atalaia-app-<versão>.apk.sha256` (a soma SHA-256) ao lado. A primeira é a [v0.9.0](https://github.com/vakaobr/atalaia-project/releases/tag/v0.9.0) (6 de novembro de 2026): `atalaia-app-0.9.0.apk`. A organização também te pode dar o ficheiro, ou podes fazê-lo tu com o [guia da app](../../../app/README.md#install-it-on-an-android-phone-from-windows) (em inglês; uma compilação tua é assinada com a chave de depuração: vê o aviso abaixo).
+A app **ainda não está no Google Play nem na App Store**. A partir da v0.9.0, cada [versão no GitHub](https://github.com/vakaobr/atalaia-project/releases) traz a app Android: `atalaia-app-<versão>.apk`, com o `atalaia-app-<versão>.apk.sha256` (a soma SHA-256) ao lado. A primeira é a [v0.9.0](https://github.com/vakaobr/atalaia-project/releases/tag/v0.9.0) (6 de novembro de 2026): `atalaia-app-0.9.0.apk`. A mais recente é a [v0.10.0](https://github.com/vakaobr/atalaia-project/releases/tag/v0.10.0) (7 de novembro de 2026): `atalaia-app-0.10.0.apk`, que se instala por cima da v0.9.0 e mantém os teus dados. A organização também te pode dar o ficheiro, ou podes fazê-lo tu com o [guia da app](../../../app/README.md#install-it-on-an-android-phone-from-windows) (em inglês; uma compilação tua é assinada com a chave de depuração: vê o aviso abaixo).
 
 ### Android
 

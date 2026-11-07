@@ -1166,3 +1166,7 @@ What S16-9 left for later, now that social login and passkeys exist (LG-*): `/f/
 ## Every documented setting reaches a Compose deployment (SRVENV, 2026-11-06, in software)
 
 `server/docker-compose.yml` named only some of the server's settings, so others set in `.env` (or the preview's `preview.env`) never reached the container: among them `ATALAIA_APP_ANDROID_PACKAGE` and `_SHA256`, which left the preview's `/.well-known/assetlinks.json` a 404, and `ATALAIA_PASSWORD_LOGIN`. The file now passes every setting of server/README.md's table except four left out on purpose (test-only switches, the relay's fixed container port, and `backup.sh`'s own setting), the hosted file passes the missing `ATALAIA_QUOTA_STORED_MB`, and `ComposeTests` (`server/tests/test_config.py`) fails when a new setting is not passed (decisions SRVENV-1 to SRVENV-4). The preview takes it at its next update.
+
+## 2026-11-07: v0.10.0 released, with the server's dependency updates
+
+[v0.10.0](https://github.com/vakaobr/atalaia-project/releases/tag/v0.10.0) (2026-11-07; CHANGELOG.md 0.10.0) carries the site server's dependency updates (pyasn1 0.6.5 and opentelemetry-api 1.45.1 in its lock) and accepts a passkey registration only with the attestation formats the server asks for (`none`, or `packed` self-attestation). Update the site server to v0.10.0. Not yet on a real field's server.

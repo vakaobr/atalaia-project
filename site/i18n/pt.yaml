@@ -88,7 +88,7 @@ hero:
     Pré-alfa · software das fases 1 e 2 pronto; placas a sério já jogam jogos inteiros com o
     controlador de campo na bancada, com teclado; fase 3 pronta em software, a app iOS verificada
     num iPhone; o servidor do site da fase 4 a correr num servidor de testes; fase 5 feita em
-    software · versão mais recente v0.9.0 · ainda não pronta para o campo
+    software · versão mais recente v0.10.0 · ainda não pronta para o campo
   title: A plataforma aberta de <span class="nowrap">combate simulado</span>
   lead: >-
     A Atalaia é uma plataforma aberta para os dispositivos eletrónicos de jogo (os props) de
@@ -737,8 +737,12 @@ try:
     text: >-
       A <a href="https://github.com/vakaobr/atalaia-project/releases/tag/v0.9.0">v0.9.0</a> (6 de
       novembro de 2026) é a primeira versão no GitHub que traz a app: o atalaia-app-0.9.0.apk,
-      assinado com a chave do projeto, para cada versão se instalar por cima da anterior. A
-      impressão digital SHA-256 do certificado é <code
+      assinado com a chave do projeto, para cada versão se instalar por cima da anterior. A mais
+      recente, a <a
+      href="https://github.com/vakaobr/atalaia-project/releases/tag/v0.10.0">v0.10.0</a> (7 de
+      novembro de 2026), instala-se por cima dela e mantém os dados da app; a partir da v0.10.0 o
+      APK é compilado sem a chave de assinatura e assinado num passo à parte, sem rede. A impressão
+      digital SHA-256 do certificado é <code
       class="fingerprint">9C:35:0D:17:37:D6:C5:35:CD:3E:D1:04:28:8E:65:AD:7D:B4:FA:CE:8E:4E:6F:27:75:3B:7B:7C:38:40:A1:99</code>;
       o Android recusa uma atualização assinada com outra chave. Uma app instalada de uma compilação
       de testes antiga tem de ser desinstalada uma vez antes (os manuais dizem o que se perde). Ou
@@ -763,9 +767,13 @@ roadmap:
     do hardware: as fases 1 a 3 estão prontas em software (placas a sério já jogam jogos inteiros na
     bancada e a app para iOS já passou a sua lista de verificação num iPhone); as fases 4 e 5 estão
     feitas em software. As provas esperam por caixas montadas, testes no campo, um servidor a sério
-    e a chave do registo do projeto. A versão mais recente é a v0.9.0 (6 de novembro de 2026): o
-    controlador liberta as caixas que ficaram num jogo terminado (por agora, um teste na bancada),
-    as regras do Wi-Fi da caixa e a primeira app Android assinada com a chave do projeto.
+    e a chave do registo do projeto. A versão mais recente é a v0.10.0 (7 de novembro de 2026):
+    correções de uma revisão que reforçam a recuperação das caixas presas, a substituição do
+    controlador e o check-in com bilhete, um APK assinado sem rede e uma imagem endurecida da Field
+    Box que já se compila (ainda não gravada em nenhuma placa). As caixas e os controladores
+    atualizam-se para ela ao mesmo tempo. A v0.9.0 (6 de novembro de 2026) trouxe a recuperação das
+    caixas presas (por agora, um teste na bancada), as regras do Wi-Fi da caixa e a primeira app
+    Android assinada com a chave do projeto.
   more: O roadmap completo, com o que cada fase inclui e a sua prova →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
   # hardware), in progress, designed (research, architecture and plan written; no code):
@@ -796,7 +804,9 @@ roadmap:
       Firmware da Field Box e manual de montagem; na bancada, uma placa a sério joga jogos inteiros,
       já com ecrã, teclado e botões montados com fios soltos (fotografia e vídeo na página de
       montagem). Sair de um jogo terminado na própria caixa chegou com a v0.9.0, ainda não
-      experimentado numa caixa a sério. Falta ainda uma caixa montada.
+      experimentado numa caixa a sério. A partir da v0.10.0, o menu de administração da caixa só
+      abre durante um jogo quando o jogo está em pausa ou à espera, e a imagem de lançamento
+      endurecida já se compila (ainda não gravada em nenhuma placa). Falta ainda uma caixa montada.
     done:
       - Firmware ESP32 da Field Box, com predefinições na própria caixa, a correr num emulador.
       - O pequeno ecrã da caixa mostra a barra de progresso, os pontos e o tempo de posse, em quatro línguas.
@@ -819,13 +829,15 @@ roadmap:
       - "Um texto de ecrã que não cabe é recusado quando se verifica o modo, e um texto que falha ao desenhar mostra \"?\" em vez de ficar em branco (um texto longo em quatro línguas ficava vazio, sem aviso, numa caixa). Testes no computador."
       - "Uma contagem de um usa o singular (\"1 ponto\", não \"1 pontos\") nos ecrãs da caixa, na app, na consola do GM e nas páginas da equipa. Testes em software."
       - "Uma caixa que ficou num jogo terminado enquanto estava desligada sai dele na própria caixa: mantém * premido 3 segundos, escreve o PIN de administração e escolhe Sair do jogo (ou @leave na consola USB). Mantém o campo, o Wi-Fi e os modos. Na v0.9.0 (6 de novembro de 2026); ainda não experimentado numa caixa a sério."
+      - "O menu de administração da caixa só abre durante um jogo de campo quando o jogo não recebe teclas de quem joga: antes do início, em pausa, ou 5 minutos depois de o controlador do jogo se calar (uma caixa presa num jogo terminado). Para tirar uma caixa de um jogo a decorrer, põe primeiro o jogo em pausa. Na v0.10.0 (7 de novembro de 2026); só testes no computador."
+      - "A imagem de lançamento endurecida (arranque seguro v2, cifra da memória flash, cifra da NVS, anti-reversão) já se compila, e a CI assina-a com uma chave descartável. Nada foi gravado de forma permanente numa placa, e as imagens publicadas não mudam. Na v0.10.0 (7 de novembro de 2026)."
     next:
       - Uma caixa montada que aguente um jogo de clube de 2 horas sem reiniciar.
       - "Ver a barra do tempo num painel a sério."
       - "Experimentar o reenvio da configuração e o Mudar de campo numa placa a sério."
       - "Ouvir a baliza de uma Field Box com um telemóvel a sério, e arrancar o Wi-Fi à entrada num jogo com o novo orçamento de memória."
       - "Gravar a nova tabela de partições numa placa a sério (uma gravação por USB, sem apagar, para uma caixa com a antiga)."
-      - "Uma imagem de lançamento endurecida (cifra da memória flash, arranque seguro): está só escrita como plano, nada foi construído nem experimentado numa placa."
+      - "Gravar a imagem de lançamento endurecida numa placa: compila-se a partir da v0.10.0, ainda não gravada em nenhuma placa."
       - "Experimentar o tratamento de falhas do I2C numa placa com o teclado mal ligado, e o ecrã de arranque e os novos ecrãs em mais do que a primeira placa de bancada."
       - "Experimentar o Sair do jogo numa caixa a sério."
     gate: >-
@@ -837,8 +849,10 @@ roadmap:
       Skirmesh-RF sobre LoRa, controlador de campo, API, consola da organização e um pacote de
       modos, testados em software; na bancada, placas a sério jogam jogos inteiros com o controlador
       pelo rádio, e o que a bancada achou está corrigido em software. Libertar as caixas que ficaram
-      num jogo terminado chegou com a v0.9.0 e passou o primeiro teste na bancada. À espera de 5
-      caixas montadas num campo.
+      num jogo terminado chegou com a v0.9.0 e passou o primeiro teste na bancada. A v0.10.0
+      reforça-a: uma caixa ignora uma libertação geral noutro canal ou enquanto ainda ouve o seu
+      jogo, e os reenvios automáticos cumprem um só orçamento de tempo no ar. À espera de 5 caixas
+      montadas num campo.
     done:
       - O protocolo de rádio cifrado Skirmesh-RF e o modem de rádio USB.
       - O controlador de campo com a sua API.
@@ -885,6 +899,7 @@ roadmap:
       - "Atualizações pelo ar para as compilações da bancada: uma chave de versões da bancada, aceite na bancada ao lado das chaves do projeto, assina as compilações diárias; a 2 de novembro de 2026 uma caixa passou de uma compilação para a seguinte a partir da consola em cerca de 22 segundos, confirmada depois do autoteste."
       - "O controlador liberta uma caixa que ficou num jogo terminado enquanto estava desligada: o modem USB avisa, o controlador volta a enviar o fim desse jogo, e a consola da organização mostra essas caixas em Presas num jogo terminado, com um botão Libertar. Um controlador que perdeu o jogo (reinstalado, ou com os dados perdidos) pode libertar todas as caixas que não estão no jogo em curso. Na v0.9.0 (6 de novembro de 2026). Passou um teste na bancada a 6 de novembro de 2026: uma caixa Heltec V4.3 desligada a meio do jogo, o jogo terminou, voltou a ser ligada e o controlador libertou-a em segundos. O modem precisa do firmware da v0.9.0, gravado por USB."
       - "A configuração do Wi-Fi da caixa: o @wifi aceita um nome e uma palavra-passe com espaços, entre aspas, e a página de configuração recusa o que a caixa não pode usar: um nome com mais de 32 bytes, ou uma palavra-passe que não seja vazia, de 8 a 63 caracteres ou de 64 algarismos hexadecimais. Na v0.9.0 (6 de novembro de 2026)."
+      - "As correções da revisão na v0.10.0 (7 de novembro de 2026): Libertar todas as caixas que não estão neste jogo indica o canal, e uma caixa que ainda ouve o controlador do seu jogo ignora-a, por isso uma libertação ouvida de novo não liberta uma caixa num jogo a decorrer; os reenvios automáticos do controlador às caixas presas esperam enquanto há um jogo começado e ficam por uma rajada por minuto; um controlador de reserva só conta os sinais do líder reconhecido para a substituição. Os controladores e as caixas atualizam-se ao mesmo tempo, e o modem grava-se de novo por USB. Em software e testes no computador, ainda não na bancada."
     next:
       - As placas de rádio e 5 caixas montadas para o teste no campo.
       - Um teste no campo com 20 caixas, com e sem escuta antes de falar.
@@ -894,6 +909,7 @@ roadmap:
       - "Apagar o registo de épocas de uma caixa em duas placas de bancada para ver que volta a ser encontrada, duas vezes seguidas e com um antigo líder a voltar a entrar (o guia está escrito)."
       - "Acertar o relógio e usar tokens de acesso num Raspberry Pi real, num campo sem internet."
       - "Experimentar a recuperação das caixas presas e as regras do Wi-Fi em mais placas (a recuperação passou um teste na bancada a 6 de novembro de 2026)."
+      - "Experimentar as regras da libertação e dos reenvios da v0.10.0 nas placas de bancada."
     gate: >-
       Prova: 5 caixas num espaço de <a href="{{ page.to.glossary }}#glossario-cqb">CQB</a> e num campo
       exterior, sem uma única captura perdida. <strong>Em aberto.</strong>
@@ -961,6 +977,7 @@ roadmap:
         - "A partilha da posição é uma escolha própria, não marcada de origem, no check-in (na app e no check-in manual da consola), com quem a vê; recusar não impede o check-in nem o jogo, e cada jogador/a pode ligá-la ou desligá-la quando quiser. Sem ela, o controlador recusa as posições. Só em software."
         - "A revisão de segurança da app: a CA do campo fixada é exatamente um certificado, nada de HTTP simples em todo o Android (só o loopback, o anfitrião do emulador, 192.168.4.1 e atalaia.local), uma APK de lançamento que nunca é assinada com a chave de depuração por engano e um bilhete de início de sessão social ligado à instância da app. Não experimentado num telemóvel real; a chave de assinatura de lançamento ainda tem de ser criada pelo responsável do projeto."
         - "A lista de eventos e o histórico de jogos de quem joga deixam de fora os eventos de rotina que não têm texto para jogadores (uma caixa a confirmar a configuração, nós a ligar ou desligar, leituras de etiquetas, acertos em alvos), em vez de mostrar nomes de tipo em bruto."
+        - "A leitura de um bilhete impresso por um marshal ou pela organização já não confirma sozinha um check-in feito na app de quem joga: aparecem os dois nomes, e o marshal confirma-o ou descarta-o. Na v0.10.0 (7 de novembro de 2026); não experimentado num telemóvel a sério."
     g_props:
       title: Dispositivos Android e módulo de E/S
       items:
@@ -1256,8 +1273,9 @@ roadmap:
     short: >-
       Editor visual de modos, pacotes de modos assinados, o registo de modos como modelo, alemão e
       chinês tradicional, guias de montagem, os módulos de alvo e de saídas da porta de expansão.
-      Todos os passos de software estão feitos. A versão mais recente, a v0.9.0, vem assinada com a
-      chave de versões do projeto e traz a app Android, assinada com a chave Android do projeto.
+      Todos os passos de software estão feitos. A versão mais recente, a v0.10.0, vem assinada com a
+      chave de versões do projeto e traz a app Android, compilada sem a chave e assinada com a chave
+      Android do projeto num passo à parte, sem rede.
     done:
       - "<strong>O editor visual de modos</strong>: uma página do simulador onde se monta um modo
         com blocos (o que acontece quando uma equipa mantém o botão premido, temporizadores,
