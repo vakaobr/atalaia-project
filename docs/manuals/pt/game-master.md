@@ -498,8 +498,8 @@ Uma caixa que estava desligada quando o jogo terminou nunca ouviu o fim. Ligada 
 
 Tenta por esta ordem:
 
-1. **Espera cerca de um minuto.** A partir da v0.9.0 o controlador ouve a caixa, volta a enviar sozinho o fim desse jogo (no máximo uma vez por minuto por jogo) e a caixa mostra **PRONTA**. O jogo aparece no separador **Caixas** em **Presas num jogo terminado**, com os números das caixas ouvidas, há quanto tempo, o sinal e quantas vezes foi reenviado.
-2. **Toca em Libertar** na linha desse jogo para enviar o fim já. O aviso diz se seguiu: o rádio tem de estar ligado, e um jogo a decorrer noutro canal tem de terminar primeiro.
+1. **Espera cerca de um minuto.** A partir da v0.9.0 o controlador ouve a caixa, volta a enviar sozinho o fim desse jogo e a caixa mostra **PRONTA**. Fá-lo entre jogos e enquanto um jogo está a ser preparado, para um jogo terminado por minuto no máximo (a partir da v0.10.0). **Depois de um jogo começar (ou enquanto está em pausa), espera que esse jogo termine**, para que o jogo em curso fique com o tempo de emissão do rádio: durante um jogo, usa o passo 2. O jogo aparece no separador **Caixas** em **Presas num jogo terminado**, com os números das caixas ouvidas (as 32 ouvidas por último, e quantas mais), há quanto tempo, o sinal e quantas vezes foi reenviado.
+2. **Toca em Libertar** na linha desse jogo para enviar o fim já, também durante um jogo. O aviso diz se seguiu: o rádio tem de estar ligado, e um jogo a decorrer noutro canal tem de terminar primeiro.
 3. **O controlador já não conhece o jogo** (foi reinstalado ou perdeu os dados): usa [Libertar todas as caixas que não estão neste jogo](#the-controller-was-reinstalled-or-lost-its-data).
 4. **Tira a caixa do jogo na própria caixa**: vê [Tirar uma caixa do jogo](#take-a-box-out-of-its-game).
 

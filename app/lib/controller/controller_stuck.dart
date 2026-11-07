@@ -18,7 +18,14 @@
 /// after a restart without the key), it says that game's GAME_OVER again,
 /// through the same path and channel rules as at the end, at most once a
 /// minute per game. GAME_OVER can only end a game that is over, so a report
-/// forged from a header in the clear can cost some air, never a game. An I/O
+/// forged from a header in the clear can cost some air, never a game; that
+/// air is bounded (decisions SRB-1 to SRB-6): no automatic burst while a game
+/// is started (running or paused), so its TIME and CMD keep the radio's duty
+/// budget (the GM's Release still works); otherwise one automatic burst for
+/// all games together in [stuckAutoResendMs], one at a time, the game served
+/// longest ago first, and one that takes the radio off the field's channel in
+/// [stuckAutoRetuneMs]. Each game keeps the [stuckSourcesKept] node ids heard
+/// most recently, with a count. An I/O
 /// pod passes no OTHER_GAME on: with it (or an older modem) `stuck_watch` is
 /// false, and the console's hint fits the radio (`radio_kind`, STUCK-64):
 /// update an older modem's firmware, or use a USB radio modem for a pod.
@@ -67,21 +74,48 @@ const stuckForgetMs = 2 * 3600000;
 /// The ended games whose key tag the controller keeps.
 const keyTagsKept = 50;
 
+/// One automatic burst for all games together in this time at most (SRB-2).
+const stuckAutoResendMs = 60000;
+
+/// One automatic burst off the field's channel in this time at most (SRB-3).
+const stuckAutoRetuneMs = 300000;
+
+/// The node ids a game keeps (the most recently heard), with a count (SRB-4).
+const stuckSourcesKept = 32;
+
+/// A started game: no automatic burst (SRB-1).
+const stuckLiveStates = {'running', 'paused'};
+
 /// A game a box was heard still in.
 class StuckGame {
   StuckGame(this.gameId, this.heardMs);
   final int gameId;
   int heardMs;
+
+  /// The node ids heard, the most recently heard last (a LinkedHashSet).
   final sources = <int>{};
+  int sourcesDropped = 0;
   int? rssi;
   int resent = 0;
   int? resentMs;
+
+  /// A node id heard: kept among the [stuckSourcesKept] most recent (SRB-4).
+  void hear(int source) {
+    sources
+      ..remove(source)
+      ..add(source);
+    while (sources.length > stuckSourcesKept) {
+      sources.remove(sources.first);
+      sourcesDropped++;
+    }
+  }
 
   Map<String, Object?> public(int nowMs, String? name) => {
     'game': gameId,
     'name': name,
     'last_heard_s': max(0, (nowMs - heardMs) ~/ 1000),
     'nodes': sources.toList()..sort(),
+    'nodes_count': sources.length + sourcesDropped,
     'rssi': rssi,
     'game_over_resent': resent,
   };
@@ -120,6 +154,14 @@ class ControllerStuck {
   /// When the last field-wide RELEASE started.
   int? fieldReleasedMs;
 
+  var autoResendMs = stuckAutoResendMs;
+  var autoRetuneMs = stuckAutoRetuneMs;
+
+  /// When the last burst (automatic or released) went, and the last
+  /// automatic one off the field's channel.
+  int? autoMs;
+  int? retuneMs;
+
   ControllerStore get _store => engine.store;
 
   bool get _standby => engine.liveGame?['joined'] == true;
@@ -152,29 +194,71 @@ class ControllerStuck {
     stuck
       ..heardMs = now
       ..rssi = other.rssi
-      ..sources.add(other.source);
+      ..hear(other.source);
     // The consoles' list carries the stuck games: told of a new one, and of
     // each resend (decision STUCK-63).
-    if (_resend(stuck, game, tag, now) || fresh) boxes.refreshBoxes();
+    if (_resendNext(now) || fresh) boxes.refreshBoxes();
   }
 
-  /// The game's GAME_OVER again, unless it is still being said or went
-  /// within [resendMs]; true when it went.
-  bool _resend(
-    StuckGame stuck,
-    Map<String, Object?> game,
-    String tag,
-    int now,
-  ) {
-    if (boxes.inviter.gameOverPending(stuck.gameId)) return false;
-    final last = stuck.resentMs;
-    if (last != null && now - last < resendMs) return false;
-    if (!boxes.gameOver(stuck.gameId, hexDecode(tag), _channelOf(game))) {
+  /// One automatic GAME_OVER burst, if the air budget allows (decisions
+  /// SRB-1 to SRB-3): none while a game is started on this controller, none
+  /// while any GAME_OVER is still being said, one for all games together in
+  /// [autoResendMs], and one that takes the radio off the field's channel in
+  /// [autoRetuneMs]. Of the games heard within [stuckShownMs] that may go
+  /// (each at most once in [resendMs]), the one served longest ago goes, so
+  /// forged reports for many games cannot keep a real one waiting for ever.
+  /// True when a burst went.
+  bool _resendNext(int now) {
+    final live = engine.liveGame;
+    // Its TIME and CMD keep the duty budget; the GM can still Release.
+    if (live != null && stuckLiveStates.contains(live['state'])) return false;
+    // One burst at a time (the end's own three included).
+    if (boxes.inviter.gamesOverPending) return false;
+    final lastAuto = autoMs;
+    if (lastAuto != null && now - lastAuto < autoResendMs) return false;
+    final field = engine.fieldChannel;
+    final liveHz = live == null
+        ? null
+        : ((live['channel_hz'] as int?) ?? field);
+    final lastRetune = retuneMs;
+    final retuneOk = lastRetune == null || now - lastRetune >= autoRetuneMs;
+    StuckGame? best;
+    (int, int)? bestOrder;
+    int? bestChannel;
+    String? bestTag;
+    for (final s in games.values) {
+      if (now - s.heardMs > stuckShownMs) continue;
+      final last = s.resentMs;
+      if (last != null && now - last < resendMs) continue;
+      final game = _store.game(s.gameId);
+      final tag = _store.getSetting('key_tag:${s.gameId}');
+      if (game == null || game['state'] != 'ended' || tag == null) continue;
+      final channel = _channelOf(game);
+      if (liveHz != null) {
+        // A game made on another channel: the burst would be dropped.
+        if (liveHz != channel) continue;
+      } else if (channel != field && !retuneOk) {
+        continue;
+      }
+      final order = (last ?? -1, -s.heardMs);
+      if (bestOrder == null ||
+          order.$1 < bestOrder.$1 ||
+          (order.$1 == bestOrder.$1 && order.$2 < bestOrder.$2)) {
+        best = s;
+        bestOrder = order;
+        bestChannel = channel;
+        bestTag = tag;
+      }
+    }
+    if (best == null) return false;
+    if (!boxes.gameOver(best.gameId, hexDecode(bestTag!), bestChannel)) {
       return false;
     }
-    stuck
+    best
       ..resent += 1
       ..resentMs = now;
+    autoMs = now;
+    if (liveHz == null && bestChannel != field) retuneMs = now;
     return true;
   }
 
@@ -238,6 +322,7 @@ class ControllerStuck {
     } else {
       _released[gameId] = now;
     }
+    autoMs = now; // the automatic minute starts again (SRB-2)
     boxes.refreshBoxes();
     return {'game': gameId, 'game_over_frame': 'sent'};
   }
