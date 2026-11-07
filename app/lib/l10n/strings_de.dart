@@ -582,6 +582,29 @@ const Map<String, String> deStrings = {
   'ticket.session': 'Dein Check-in ist abgelaufen: Check erneut ein.',
   'ticket.refused': 'Der Feldcontroller hat das Ticket abgelehnt: {error}',
   'ticket.recent': 'Gerade angenommen',
+  'ticket.app_checkin_title': 'Ein App-Check-in wartet auf dieses Ticket',
+  'ticket.app_checkin_body':
+      'Jemand hat sich um {time} in der App als "{app_name}" eingecheckt und '
+      'wartet auf eine Bestätigung der Orga. Das Ticket gehört zu '
+      '"{roster_name}" auf der Liste des Spiels. Bestätige nur, wenn die '
+      'Person vor dir die ist, die sich mit diesem Handy eingecheckt hat.',
+  'ticket.app_checkin_confirm': 'Das ist die Person: App-Check-in bestätigen',
+  'ticket.app_checkin_discard':
+      'Nicht die Person: App-Check-in verwerfen und die Person mit dem Ticket '
+      'einchecken',
+  'ticket.membership_title': 'Die Mitgliedschaft reicht nicht',
+  'ticket.membership_body':
+      '{verdict}. Checke trotzdem nur ein, wenn das Feld es erlaubt: Die '
+      'Ausnahme wird festgehalten.',
+  'ticket.membership_override': 'Trotzdem einchecken (Ausnahme)',
+  'ticket.decision_cancelled': 'Nichts geändert.',
+  'ticket.unknown_name': '(kein Name)',
+  'ticket.discarded':
+      'Der App-Check-in wurde verworfen: {name}, die Person mit dem Ticket, '
+      'ist eingecheckt. Ihre eigene App kann mit dem Ticket einchecken.',
+  'ticket.discarded_pending':
+      'Der App-Check-in wurde verworfen: {name}, die Person mit dem Ticket, '
+      'wartet auf die Ausweisprüfung: Siehe Repliken zum Chronen.',
 
   // Tags
   'tags.title': 'Tags der Spielenden',

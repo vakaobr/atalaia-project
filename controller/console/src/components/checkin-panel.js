@@ -345,16 +345,51 @@ export class CheckinPanel extends Component {
 
     async ticketCheckin(e) {
         e.preventDefault();
+        await this.sendTicket(this.state.ticket.trim(), {});
+    }
+
+    /** Sends a ticket with the choices made so far (TKS-1 to TKS-5): the answer is an outcome, or a decision the GM
+     * makes before anything changes (a pending app check-in to confirm or discard, a membership that does not pass). */
+    async sendTicket(ticket, choices) {
         const g = this.game();
-        const row = await this.props.app.call('POST', `/games/${g.id}/checkins/ticket`, { ticket: this.state.ticket.trim() });
-        if (row) {
-            this.setState({ ticket: '' });
-            this.onStream({ type: 'checkin', game: g.id, checkin: row });
-            // TKT-5: what the scan did: in, waiting for the card check (the APD rule), or nothing (already there).
-            const key = row.confirmed ? 'checkin.ticket_confirmed' : row.already ? 'checkin.ticket_already'
-                : row.status === 'pending' ? 'checkin.ticket_pending' : 'checkin.ticket_done';
-            this.props.app.showToast(t(key, { name: row.display_name || row.player_id }));
+        this.setState({ ticketDecision: null });
+        const row = await this.props.app.call('POST', `/games/${g.id}/checkins/ticket`, { ticket, ...choices });
+        if (!row) return;
+        this.setState({ ticket: '' });
+        if (row.decision) {
+            this.setState({ ticketDecision: { ...row.decision, ticket, app_checkin: choices.app_checkin } });
+            return;
         }
+        this.onStream({ type: 'checkin', game: g.id, checkin: row });
+        // TKT-5: what the scan did: in, waiting for the card check (the APD rule), or nothing (already there).
+        const key = row.discarded ? (row.status === 'pending' ? 'checkin.ticket_discarded_pending' : 'checkin.ticket_discarded')
+            : row.confirmed ? 'checkin.ticket_confirmed' : row.already ? 'checkin.ticket_already'
+                : row.status === 'pending' ? 'checkin.ticket_pending' : 'checkin.ticket_done';
+        this.props.app.showToast(t(key, { name: row.display_name || row.player_id }));
+    }
+
+    renderTicketDecision(s) {
+        const d = this.state.ticketDecision;
+        if (!d) return null;
+        const again = (more) => this.sendTicket(d.ticket, { ...(d.app_checkin ? { app_checkin: d.app_checkin } : {}), ...more });
+        const unknown = t('checkin.ticket_unknown_name');
+        if (d.kind === 'app_checkin') {
+            const at = typeof d.at === 'number' ? new Date(d.at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '?';
+            return html`<div class="notice" role="alert" data-testid="ticket-decision-app">
+                <strong>${t('checkin.ticket_app_title')}</strong>
+                <p>${t('checkin.ticket_app_body', { app_name: d.name || unknown, time: at, roster_name: d.roster_name || unknown })}</p>
+                <button type="button" class="primary" data-testid="ticket-confirm-app" onClick=${() => again({ app_checkin: 'confirm' })}>${t('checkin.ticket_app_confirm')}</button>
+                ${' '}<button type="button" data-testid="ticket-discard-app" onClick=${() => again({ app_checkin: 'discard' })}>${t('checkin.ticket_app_discard')}</button>
+                ${' '}<button type="button" data-testid="ticket-decision-cancel" onClick=${() => this.setState({ ticketDecision: null })}>${t('common.cancel')}</button>
+            </div>`;
+        }
+        const verdict = usesApd(s) ? t(`checkin.apd_status.${d.verdict}`) : t(`checkin.apd_status_m.${d.verdict}`);
+        return html`<div class="notice" role="alert" data-testid="ticket-decision-membership">
+            <strong>${t('checkin.ticket_membership_title')}</strong>
+            <p>${t('checkin.ticket_membership_body', { verdict })}</p>
+            <button type="button" class="primary" data-testid="ticket-override" onClick=${() => again({ override: true })}>${t('checkin.ticket_override')}</button>
+            ${' '}<button type="button" data-testid="ticket-decision-cancel" onClick=${() => this.setState({ ticketDecision: null })}>${t('common.cancel')}</button>
+        </div>`;
     }
 
     async fromSchedule(id) {
@@ -383,7 +418,7 @@ export class CheckinPanel extends Component {
         </section>`;
     }
 
-    renderTicket(g) {
+    renderTicket(g, s) {
         return html`<form class="form inline" data-testid="ticket-form" onSubmit=${(e) => this.ticketCheckin(e)}>
             <h3>${t('checkin.ticket_title')}</h3>
             <p class="muted small">${t('checkin.ticket_hint')}</p>
@@ -391,6 +426,7 @@ export class CheckinPanel extends Component {
                 <input id="ct-ticket" data-testid="ticket-input" required maxlength="256" value=${this.state.ticket}
                     onInput=${(e) => this.setState({ ticket: e.target.value })} /></div>
             <button type="submit" class="primary" data-testid="ticket-submit">${t('checkin.ticket_submit')}</button>
+            ${this.renderTicketDecision(s)}
         </form>`;
     }
 
@@ -452,7 +488,7 @@ export class CheckinPanel extends Component {
                 <tbody role="rowgroup">${rows.map((r) => this.renderRow(g, s, r))}</tbody>
             </table></div>`}
             ${this.renderManual(g, s)}
-            ${this.renderTicket(g)}
+            ${this.renderTicket(g, s)}
             <${RegistrationImport} app=${this.props.app} game=${g} onDone=${() => this.load()} />
         </section>`;
     }

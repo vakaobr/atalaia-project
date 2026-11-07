@@ -84,7 +84,9 @@ STATES = ("pending", "passed", "refused", "withdrawn")
 NAME_MAX = 32
 # What a check-in forgets of the card check (leaving, removal, retention): protocol/apd.md "The card check".
 ERASED_CARD = {"apd_verdict": None, "apd_verdict_on": None, "card_checked_by": None, "card_checked_at": None}
-ERASED_SCAN = {"ticket_scanned_by": None, "ticket_scanned_at": None}  # who took the printed ticket (TKT-3)
+# Who took the printed ticket (TKT-3), the roster's name and when the app checked in (TKS-1).
+ERASED_SCAN = {"ticket_scanned_by": None, "ticket_scanned_at": None, "roster_name": None, "app_checkin_at": None}
+TICKET_CHOICES = ("confirm", "discard")  # what staff decided about a pending app check-in (TKS-2, TKS-3)
 TICKET_NOT_NEWEST = "ticket_not_newest: this ticket is not this registration's (was a newer one made?)"
 FEDERATION_MAX = 32
 SERIES_MAX = 50
@@ -852,9 +854,20 @@ class Checkin:
             exp = min(exp, game["started_at"] + game["duration_ms"] / 1000 + TOKEN_GRACE_S)
         return int(max(exp, now + TOKEN_MIN_S))
 
+    @staticmethod
+    def _gen_key(key: bytes, row: dict[str, Any]) -> bytes:
+        """The key a check-in's player tokens are signed with: the game's token key, or for a row whose app
+        check-in staff discarded (``token_gen`` above 0, TKS-4) a key derived from it, so the tokens issued
+        before stop working. Only the controller checks player tokens, so the token format is unchanged."""
+        gen = int(row.get("token_gen") or 0)
+        if gen == 0:
+            return key
+        return hmac.new(key, f"atalaia token generation {gen} {row['player_id']}".encode(), hashlib.sha256).digest()
+
     def issue_token(self, game: dict[str, Any], row: dict[str, Any]) -> tuple[str, int]:
         key = self.store.token_key(game["id"], create=True)
         assert key is not None
+        key = self._gen_key(key, row)
         exp = self.token_exp(game, self._wall())
         claims = {"exp": exp, "game_id": game["id"], "player_id": row["player_id"], "role": row["role"],
                   "squad": int(row["squad"]), "team": int(row["team"])}
@@ -867,7 +880,8 @@ class Checkin:
             if len(parts) != 3:
                 raise ValueError
             raw = base64.urlsafe_b64decode(parts[1] + "=" * (-len(parts[1]) % 4))
-            game_id = json.loads(raw.decode("utf-8")).get("game_id")
+            payload = json.loads(raw.decode("utf-8"))
+            game_id, claimed = payload.get("game_id"), payload.get("player_id")
             if isinstance(game_id, bool) or not isinstance(game_id, int):
                 raise ValueError
         except (ValueError, binascii.Error, UnicodeDecodeError, AttributeError):
@@ -876,6 +890,10 @@ class Checkin:
         game = self.store.game(game_id)
         if key is None or game is None:
             raise Unauthorized("not a valid token")
+        # The claimed row picks the key (its token generation); the MAC then proves the claim.
+        claimed_row = self.store.checkin(game_id, claimed) if isinstance(claimed, str) else None
+        if claimed_row is not None:
+            key = self._gen_key(key, claimed_row)
         try:
             claims = player_token.verify(token, key, game_id=game_id, team_count=len(game["teams"]),
                                          now=int(self._wall()))
@@ -987,7 +1005,7 @@ class Checkin:
                 status = "checked_in" if st["confirm"] == "auto" and auto_ok else "pending"
                 fields = {"status": status, "display_name": name, "federation_number": fed,
                           "apd_id": apd_id, "membership_expires": exp, "team_preference": pref, "notice_version": notice,
-                          "checked_in_at": now if status == "checked_in" else None,
+                          "checked_in_at": now if status == "checked_in" else None, "app_checkin_at": now,
                           **self._share_fields(share, notice, now)}
                 if row is None:
                     if reg_id is not None:  # no roster here: kept, so the site server can match it later
@@ -998,11 +1016,16 @@ class Checkin:
                 emit = status == "checked_in"
             else:
                 status = row["status"]
+                if known is None:  # the first phone to check in on a row a ticket scan made: its secret binds
+                    self.store.add_field_player(pid, digest, now)
+                fields = {"status": status, "display_name": name, "team_preference": pref,
+                          "notice_version": notice, "updated_at": now}
                 if status == "left":
                     status = "checked_in" if st["confirm"] == "auto" and auto_ok else "pending"
                     emit = status == "checked_in"
-                fields = {"status": status, "display_name": name, "team_preference": pref,
-                          "notice_version": notice, "updated_at": now}
+                    fields.update(status=status, app_checkin_at=now)
+                elif known is None:
+                    fields["app_checkin_at"] = now
                 # Once a marshal checked the card, the number is gone and the stored verdict stands: the player's
                 # app cannot put the number back or reset the check.
                 if row.get("card_checked_at") is None and (fed, apd_id, exp) != (
@@ -1464,26 +1487,42 @@ class Checkin:
         token for this game, TKT-1) scan a registered player's printed ``atalaia:ticket:`` code. The registration
         must be in this game's roster and the ticket its own (403 ``ticket_not_newest`` otherwise); an expected
         player arrives at once, or waits for "card seen, matches" under the APD rule (the ticket is not the
-        card). A player who checked in with the app and waits as ``pending`` is confirmed by the scan, which is
-        the staff confirmation (TKT-7), unless the APD rule's card check is still to do: then they stay pending
-        for it. The answer is the row with ``already``: true when the scan changed nothing (the player had
-        arrived and was confirmed, or a second scan), and ``confirmed``: true when it confirmed a pending
-        check-in. Who scanned and when are kept with the arrival and logged (TKT-3); at most ``ticket_rate``
-        scans a minute per staff id (TKT-2)."""
+        card).
+
+        A ticket scan never confirms on its own what it cannot see (TKS-1 to TKS-3): when the row is a pending
+        check-in made in the player's app that no ticket matched yet, the answer is a ``decision`` of kind
+        ``app_checkin`` (the app's name, when it checked in, the roster's name) and nothing changes until staff
+        send the same ticket with ``"app_checkin": "confirm"`` (the scan confirms it, as TKT-7 had it) or
+        ``"discard"`` (the app check-in is undone, its phone's tokens and field identity dropped, and the ticket
+        holder arrives as an expected player would). A confirmation over a stored membership verdict other than
+        valid is a ``decision`` of kind ``membership`` with the verdict until staff add ``"override": true``
+        (TKS-5), as a confirmation in the list is the marshal's explicit call.
+
+        The answer is the row with ``already``: true when the scan changed nothing and needs nothing,
+        ``confirmed``: true when it confirmed a pending check-in, ``discarded``: true when it replaced an app
+        check-in, and ``decision`` when staff must choose (then nothing changed). Who scanned and when are kept
+        with the arrival and logged (TKT-3); at most ``ticket_rate`` scans a minute per staff id (TKT-2)."""
         game = self._staff(viewer, game_id)
         staff = self._staff_id(viewer)
         if not self.ticket_rate.allow(staff):
             raise TooMany("too many tickets scanned; wait a minute")
         if game["state"] == "ended":
             raise Conflict("the game has ended")
-        if set(body) - {"ticket"}:
-            raise ControllerError(f"unknown fields {sorted(set(body) - {'ticket'})}")
+        if set(body) - {"ticket", "app_checkin", "override"}:
+            raise ControllerError(f"unknown fields {sorted(set(body) - {'ticket', 'app_checkin', 'override'})}")
+        choice = body.get("app_checkin")
+        if choice is not None and choice not in TICKET_CHOICES:
+            raise ControllerError('app_checkin: "confirm" or "discard"')
+        override = body.get("override", False)
+        if not isinstance(override, bool):
+            raise ControllerError("override: true or false")
         try:
             ticket = ticketfmt.parse(body.get("ticket"))
         except ticketfmt.TicketError as exc:
             raise ControllerError(f"ticket: {exc}") from None
         digest = ticketfmt.secret_sha256(ticket["secret"])
         now = self._wall()
+        decision: Optional[dict[str, Any]] = None
         with self._lock:
             row = self.store.checkin_by_registration(game_id, ticket["registration_id"])
             if row is None or not row["from_roster"]:
@@ -1493,46 +1532,77 @@ class Checkin:
                 raise Forbidden(TICKET_NOT_NEWEST)
             if row["status"] == "removed":
                 raise Forbidden("staff removed this check-in")
-            arriving = row["status"] == "expected"
-            emit = changed = confirmed = False
+            pid = row["player_id"]
+            emit = changed = confirmed = discarded = False
             st = self.settings()
             card_rule = bool(st["apd"]["checkin"])
             scan = {"ticket_scanned_by": staff, "ticket_scanned_at": now, "updated_at": now}
-            if arriving:
+            unmatched_app = row["status"] == "pending" and row.get("app_checkin_at") is not None \
+                and row.get("ticket_scanned_at") is None
+            if unmatched_app and choice is None:
+                decision = {"kind": "app_checkin", "name": row["display_name"], "at": row["app_checkin_at"],
+                            "roster_name": row.get("roster_name")}
+            elif unmatched_app and choice == "discard":
+                # The app check-in is undone (TKS-3, TKS-4): what the app sent goes, its phone's tokens and field
+                # identity with it; the ticket holder then arrives as an expected player does.
+                self.store.update_checkin(
+                    game_id, pid, display_name=row.get("roster_name"), team_preference=None, notice_version=None,
+                    federation_number=None, apd_id=None, membership_expires=None, apd_override=False,
+                    federation_seen=False, **ERASED_CARD, position_share=False, position_share_at=now,
+                    app_checkin_at=None, token_gen=int(row.get("token_gen") or 0) + 1, updated_at=now)
+                self.store.delete_player_position(game_id, pid)
+                self.store.delete_field_player(pid)
+                changed = discarded = True
+                if card_rule:  # the ticket is not the card: pending until "card seen, matches"
+                    self.store.update_checkin(game_id, pid, status="pending", **scan)
+                else:
+                    emit = True
+                    self.store.update_checkin(game_id, pid, status="checked_in", checked_in_at=now, **scan)
+            elif row["status"] == "expected":
                 if self.store.count_checkins(game_id) >= st["max_players"]:
                     raise Forbidden(f"game {game_id} is full ({st['max_players']} players)")
                 changed = True
                 if card_rule:  # the ticket is not the card: pending until "card seen, matches"
-                    self.store.update_checkin(game_id, row["player_id"], status="pending", **scan)
+                    self.store.update_checkin(game_id, pid, status="pending", **scan)
                 else:
                     emit = True
-                    self.store.update_checkin(game_id, row["player_id"], status="checked_in", checked_in_at=now,
-                                              **scan)
+                    self.store.update_checkin(game_id, pid, status="checked_in", checked_in_at=now, **scan)
             elif row["status"] == "pending":
-                # A pending self check-in: the scan is the staff confirmation (TKT-7). The card check, when the
-                # rule asks for it and nobody ticked it yet, still waits; the scan is recorded once.
+                # A pending check-in staff matched with the ticket: the scan is the staff confirmation (TKT-7). The
+                # card check, when the rule asks for it and nobody ticked it yet, still waits; the scan is recorded
+                # once. A stored verdict other than valid needs the marshal's explicit override (TKS-5).
                 fields = {} if row.get("ticket_scanned_at") is not None else dict(scan)
                 card_done = row.get("card_checked_at") is not None
-                if not card_rule or card_done:
+                verdict = row.get("apd_verdict") if card_rule else None  # as a PATCH confirmation judges it
+                if (not card_rule or card_done) and verdict not in (None, "valid") and not override:
+                    decision = {"kind": "membership", "verdict": verdict}
+                    fields = {}
+                elif not card_rule or card_done:
                     fields.update(status="checked_in", checked_in_at=now, updated_at=now)
-                    verdict = row.get("apd_verdict") if card_rule else None  # as a PATCH confirmation judges it
-                    if verdict not in (None, "valid"):  # a confirmation over a failing verdict is staff's call
+                    if verdict not in (None, "valid"):  # the marshal's explicit override
                         fields["apd_override"] = True
                         log.info("apd override: game %d, %s confirmed by staff, reason %s, verdict %s", game_id,
-                                 row["player_id"], verdict, verdict)
+                                 pid, verdict, verdict)
                     emit = confirmed = True
                 if fields:
                     changed = True
-                    self.store.update_checkin(game_id, row["player_id"], **fields)
-            row = self.store.checkin(game_id, row["player_id"])
+                    self.store.update_checkin(game_id, pid, **fields)
+            row = self.store.checkin(game_id, pid)
             assert row is not None
         if changed:
-            log.info("ticket check-in: game %d, %s by %s, %s%s", game_id, row["player_id"], staff, row["status"],
-                     " (confirmed)" if confirmed else "")
+            log.info("ticket check-in: game %d, %s by %s, %s%s", game_id, pid, staff, row["status"],
+                     " (confirmed)" if confirmed else " (app check-in discarded)" if discarded else "")
+        elif decision is not None:
+            log.info("ticket check-in: game %d, %s by %s, staff to decide (%s)", game_id, pid, staff,
+                     decision["kind"])
         if emit:
             self._emit_checkin_event(game, row)
-        self._notify(game_id, row["player_id"])
-        return {**self.row_view(game, row), "already": not changed, "confirmed": confirmed}
+        self._notify(game_id, pid)
+        out = {**self.row_view(game, row), "already": not changed and decision is None, "confirmed": confirmed,
+               "discarded": discarded}
+        if decision is not None:
+            out["decision"] = decision
+        return out
 
     def apply_shared_chrono(self, game_id: int, roster_players: list[str], answer: dict[str, Any]) -> dict[str, Any]:
         """Other fields' records of the game's roster players, from ``GET /api/v1/sync/chrono`` (S14-5,
@@ -1787,8 +1857,9 @@ class Checkin:
                 exp = reg.get("membership_expires") if asked else None
                 pref = reg.get("team_preference") if reg.get("team_preference") in game["teams"] else None
                 decls = self._roster_declarations(game_id, pid, reg["replicas"], st, out)
-                fields = {"display_name": name, "federation_number": fed, "apd_id": apd_id,
-                          "membership_expires": exp, "team_preference": pref, "registration_id": rid, "ticket_sha256": reg.get("ticket_sha256"), "from_roster": 1}
+                fields = {"display_name": name, "roster_name": name, "federation_number": fed, "apd_id": apd_id,
+                          "membership_expires": exp, "team_preference": pref, "registration_id": rid,
+                          "ticket_sha256": reg.get("ticket_sha256"), "from_roster": 1}
                 if row is None:
                     self.store.add_checkin(game_id, pid, {"status": "expected", **fields}, now)
                     self._replace_declarations(game, pid, decls, staff=True, now=now)
@@ -1799,8 +1870,10 @@ class Checkin:
                     out["updated"] += 1
                 else:
                     if row["registration_id"] is None:  # a walk-in who turns out to be registered
-                        self.store.update_checkin(game_id, pid, registration_id=rid, from_roster=1,
+                        self.store.update_checkin(game_id, pid, registration_id=rid, from_roster=1, roster_name=name,
                                                   ticket_sha256=reg.get("ticket_sha256"), updated_at=now)
+                    elif row.get("roster_name") != name and row.get("erased_at") is None:
+                        self.store.update_checkin(game_id, pid, roster_name=name)  # what a ticket scan shows staff
                     out["kept"] += 1
             for row in self.store.checkins(game_id):
                 if row["status"] == "expected" and row["from_roster"] and row["registration_id"] not in listed:

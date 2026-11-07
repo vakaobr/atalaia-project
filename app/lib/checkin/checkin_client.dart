@@ -564,17 +564,26 @@ class CheckinClient {
   /// A registered player's printed ticket (`atalaia:ticket:…`), scanned or
   /// typed by a marshal (decision TKT-1): the answer is the player's row
   /// (`status` checked_in, or pending under the APD rule's card check) with
-  /// `already` true when the player had arrived before. Staff only; 403
-  /// `ticket_not_newest` for a ticket a newer one replaced.
+  /// `already` true when the player had arrived before, or a `decision` the
+  /// marshal makes (TKS-1 to TKS-5): then the same ticket goes again with
+  /// [appCheckin] (`confirm` or `discard` a pending app check-in) or
+  /// [override] (confirm over a membership that does not pass). Staff only;
+  /// 403 `ticket_not_newest` for a ticket a newer one replaced.
   Future<Map<String, Object?>> ticketCheckin(
     String token,
     int gameId,
-    String ticket,
-  ) => _call(
+    String ticket, {
+    String? appCheckin,
+    bool override = false,
+  }) => _call(
     'POST',
     '/games/$gameId/checkins/ticket',
     token: token,
-    body: {'ticket': ticket},
+    body: {
+      'ticket': ticket,
+      'app_checkin': ?appCheckin,
+      if (override) 'override': true,
+    },
   );
 
   /// The marshal's phone registers the key that signs its readings, for the

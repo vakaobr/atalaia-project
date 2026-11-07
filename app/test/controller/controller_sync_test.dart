@@ -1416,9 +1416,10 @@ void main() {
       expect(call('POST', path, 'g', {'ticket': gaio}).status, 200);
     });
 
-    test('a ticket scan confirms a pending self check-in under "staff '
-        'confirms"; the card check still waits; a confirmed player is '
-        'already (TKT-7)', () async {
+    test('a ticket scan asks before confirming a pending app check-in, then '
+        'confirms it or discards it for the ticket holder; the card check '
+        'still waits; a failing verdict needs the override; a confirmed '
+        'player is already (TKT-7, TKS-1 to TKS-5)', () async {
       site.gets['/api/v1/sync/schedule'] = scheduled();
       site.gets['/api/v1/sync/claims'] = {
         'sync_version': 1,
@@ -1439,6 +1440,13 @@ void main() {
         'player_id': 'p-cccccccccccc',
         'display_name': 'Gaio',
         'ticket_sha256': sha256.convert(List.filled(32, 7)).toString(),
+        'replicas': <Object?>[],
+      });
+      (r['registrations']! as List).add({
+        'registration_id': '7a000000-0000-4000-8000-000000000004',
+        'player_id': 'p-dddddddddddd',
+        'display_name': 'Pardal',
+        'ticket_sha256': sha256.convert(List.filled(32, 6)).toString(),
         'replicas': <Object?>[],
       });
       site.gets['/api/v1/sync/roster'] = r;
@@ -1507,13 +1515,41 @@ void main() {
       );
       const falcaoReg = '7a000000-0000-4000-8000-000000000001';
       const gaioReg = '7a000000-0000-4000-8000-000000000003';
+      final appAt = wall;
       var a = selfCheckin(falcaoReg, 'p-aaaaaaaaaaaa', 9, 4);
       expect((a.status, (a.body! as Map)['status']), (201, 'pending'));
-      // The scan is the staff confirmation, recorded as the scan.
+      final appToken = (a.body! as Map)['token']! as String;
+      // The scan alone does not confirm an app check-in: staff decide.
       final path = '/api/v1/games/$gid/checkins/ticket';
       final falcao = ticket(falcaoReg, 'p-aaaaaaaaaaaa', 9);
+      wall += 60;
       a = call('POST', path, m, {'ticket': falcao});
       var row = a.body! as Map;
+      expect(
+        (row['status'], row['already'], row['confirmed'], row['discarded']),
+        ('pending', false, false, false),
+      );
+      expect(row['decision'], {
+        'kind': 'app_checkin',
+        'name': 'X',
+        'at': appAt,
+        'roster_name': 'Falcão',
+      });
+      expect(row['ticket_scanned_by'], isNull);
+      expect(logged.single, contains('staff to decide (app_checkin)'));
+      logged.clear();
+      expect(
+        call('POST', path, m, {'ticket': falcao, 'app_checkin': 'x'}).status,
+        400,
+      );
+      expect(
+        call('POST', path, m, {'ticket': falcao, 'override': 'yes'}).status,
+        400,
+      );
+      // Confirmed: the scan is the staff confirmation, recorded as the scan.
+      a = call('POST', path, m, {'ticket': falcao, 'app_checkin': 'confirm'});
+      row = a.body! as Map;
+      expect(row.containsKey('decision'), isFalse);
       expect(
         (row['status'], row['already'], row['confirmed'], row['checked_in_at']),
         ('checked_in', false, true, wall),
@@ -1528,6 +1564,34 @@ void main() {
         (row['already'], row['confirmed'], logged.length),
         (true, false, 1),
       );
+      // The confirmed app keeps working.
+      expect(call('GET', '/api/v1/checkin/me', appToken).status, 200);
+      // Discarded: what the app sent goes, its token and identity with it.
+      const pardalReg = '7a000000-0000-4000-8000-000000000004';
+      a = selfCheckin(pardalReg, 'p-dddddddddddd', 6, 8);
+      expect((a.status, (a.body! as Map)['status']), (201, 'pending'));
+      final otherToken = (a.body! as Map)['token']! as String;
+      final pardal = ticket(pardalReg, 'p-dddddddddddd', 6);
+      expect(
+        (call('POST', path, m, {'ticket': pardal}).body! as Map)['decision'],
+        isNotNull,
+      );
+      row =
+          call('POST', path, m, {
+                'ticket': pardal,
+                'app_checkin': 'discard',
+              }).body!
+              as Map;
+      expect(
+        (row['status'], row['discarded'], row['display_name']),
+        ('checked_in', true, 'Pardal'),
+      );
+      expect(logged.last, contains('(app check-in discarded)'));
+      expect(call('GET', '/api/v1/checkin/me', otherToken).status, 401);
+      // The ticket holder's own phone checks in with the ticket and binds.
+      a = selfCheckin(pardalReg, 'p-dddddddddddd', 6, 11);
+      expect((a.status, (a.body! as Map)['status']), (200, 'checked_in'));
+      expect(selfCheckin(pardalReg, 'p-dddddddddddd', 6, 8).status, 409);
       // With the APD rule's card check the player stays pending for it.
       expect(
         call('PUT', '/api/v1/checkin/settings', 'g', {
@@ -1542,6 +1606,13 @@ void main() {
       expect((a.status, (a.body! as Map)['status']), (201, 'pending'));
       final gaio = ticket(gaioReg, 'p-cccccccccccc', 7);
       row = call('POST', path, m, {'ticket': gaio}).body! as Map;
+      expect((row['decision']! as Map)['kind'], 'app_checkin');
+      row =
+          call('POST', path, m, {
+                'ticket': gaio,
+                'app_checkin': 'confirm',
+              }).body!
+              as Map;
       expect(
         (row['status'], row['already'], row['confirmed'], row['checked_in_at']),
         ('pending', false, false, null),
@@ -1561,6 +1632,26 @@ void main() {
       expect((card.body! as Map)['status'], 'checked_in');
       row = call('POST', path, m, {'ticket': gaio}).body! as Map;
       expect((row['already'], row['confirmed']), (true, false));
+      // A stored verdict other than valid: the scan answers it, changes
+      // nothing, and only the marshal's override confirms (TKS-5).
+      checkin.debugUpdateCheckin(gid, 'p-cccccccccccc', {
+        'status': 'pending',
+        'checked_in_at': null,
+        'apd_verdict': 'expired',
+      });
+      row = call('POST', path, m, {'ticket': gaio}).body! as Map;
+      expect(
+        (row['status'], row['already'], row['confirmed']),
+        ('pending', false, false),
+      );
+      expect(row['decision'], {'kind': 'membership', 'verdict': 'expired'});
+      row =
+          call('POST', path, m, {'ticket': gaio, 'override': true}).body!
+              as Map;
+      expect(
+        (row['status'], row['confirmed'], row['apd_override']),
+        ('checked_in', true, true),
+      );
     });
 
     test('the schedule, a game made from it, its roster until the start, '

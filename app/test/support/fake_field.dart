@@ -117,6 +117,7 @@ class FakeField {
   final registrations = <String, ({String player, String sha})>{};
   var cardRule = false;
   final ticketRequests = <String>[];
+  final ticketBodies = <Map<String, Object?>>[];
 
   /// A registration on the roster as an expected row; the printed ticket's
   /// text, with a secret of 32 bytes of [seed].
@@ -454,6 +455,7 @@ class FakeField {
         }
         final text = b['ticket'];
         ticketRequests.add('$text');
+        ticketBodies.add(Map.of(b));
         final tkt.CheckinTicket t;
         try {
           t = tkt.parseTicket(text is String ? text : '');
@@ -478,6 +480,41 @@ class FakeField {
         final r = rows[reg.player]!;
         var changed = false;
         var confirmed = false;
+        final choice = b['app_checkin'];
+        final override = b['override'] == true;
+        // A pending app check-in no ticket matched yet: staff decide
+        // (TKS-1 to TKS-3), as both controllers.
+        final unmatched =
+            r['status'] == 'pending' &&
+            r['app_checkin_at'] != null &&
+            r['ticket_scanned_by'] == null;
+        if (unmatched && choice == null) {
+          return FieldResponse(200, {
+            ...r,
+            'already': false,
+            'confirmed': false,
+            'discarded': false,
+            'decision': {
+              'kind': 'app_checkin',
+              'name': r['display_name'],
+              'at': r['app_checkin_at'],
+              'roster_name': r['roster_name'],
+            },
+          });
+        }
+        if (unmatched && choice == 'discard') {
+          r
+            ..['display_name'] = r['roster_name']
+            ..['app_checkin_at'] = null
+            ..['status'] = cardRule ? 'pending' : 'checked_in'
+            ..['ticket_scanned_by'] = who;
+          return FieldResponse(200, {
+            ...r,
+            'already': false,
+            'confirmed': false,
+            'discarded': true,
+          });
+        }
         if (r['status'] == 'expected') {
           changed = true;
           r
@@ -490,8 +527,26 @@ class FakeField {
             r['ticket_scanned_by'] = who;
             changed = true;
           }
-          if (!cardRule || r['card_checked_by'] != null) {
+          final verdict = r['apd_verdict'];
+          final confirming = !cardRule || r['card_checked_by'] != null;
+          if (confirming &&
+              verdict != null &&
+              verdict != 'valid' &&
+              !override) {
+            // A failing verdict: the marshal's override only (TKS-5).
+            return FieldResponse(200, {
+              ...r,
+              'already': false,
+              'confirmed': false,
+              'discarded': false,
+              'decision': {'kind': 'membership', 'verdict': verdict},
+            });
+          }
+          if (confirming) {
             r['status'] = 'checked_in';
+            if (verdict != null && verdict != 'valid') {
+              r['apd_override'] = true;
+            }
             changed = confirmed = true;
           }
         }
@@ -499,6 +554,7 @@ class FakeField {
           ...r,
           'already': !changed,
           'confirmed': confirmed,
+          'discarded': false,
         });
       case 'GET /games/42/chrono-list':
         if (who == null || _role(token!, who) != 'marshal') {

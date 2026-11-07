@@ -289,7 +289,7 @@ No ecrã de entrada, **Ler o aviso de privacidade** mostra o aviso do campo na l
 4. Escolhe o jogo, preenche o formulário e toca em **Fazer a inscrição**.
 5. A app guarda o teu **bilhete de check-in**. No campo, escolhe a tua inscrição em **Inscrição online**, em **Check-in no campo**, ou mostra o código QR do bilhete a um marshal com a app ou na receção.
 
-Não partilhes o bilhete. Quem o tiver pode fazer o check-in no teu lugar. Podes alterar ou cancelar uma inscrição enquanto estiver aberta: **Alterar a inscrição** ou **Cancelar a inscrição**. O campo apaga os dados da inscrição 30 dias depois do jogo.
+Não partilhes o bilhete, nem sequer uma fotografia dele. Tal como uma etiqueta NFC, funciona para quem tiver uma cópia: pode fazer o check-in no teu lugar. Se alguém fizer o check-in com o teu bilhete antes de chegares, o marshal vê esse check-in na app quando lê o teu bilhete e pode anulá-lo e fazer o teu check-in; a tua app pode depois fazer o check-in com o bilhete. Se achares que saiu uma cópia, toca em **Pedir um bilhete novo** na página da inscrição: o antigo deixa de valer. Podes alterar ou cancelar uma inscrição enquanto estiver aberta: **Alterar a inscrição** ou **Cancelar a inscrição**. O campo apaga os dados da inscrição 30 dias depois do jogo.
 
 ### Inscrever-te no browser, sem a app
 
