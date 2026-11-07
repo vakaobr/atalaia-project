@@ -54,7 +54,7 @@ Esta é a maneira suportada, do [guia do controlador](../../../controller/README
    sudo git clone https://github.com/vakaobr/atalaia-project /opt/atalaia
    ```
 
-   Isto traz o código mais recente (o ramo `main`). Para instalar antes uma versão publicada, corre `sudo git -C /opt/atalaia checkout v0.8.0` (a mais recente a 2026-11-06; a [página das versões](https://github.com/vakaobr/atalaia-project/releases) lista-as).
+   Isto traz o código mais recente (o ramo `main`). Para instalar antes uma versão publicada, corre `sudo git -C /opt/atalaia checkout v0.9.0` (a mais recente a 2026-11-06; a [página das versões](https://github.com/vakaobr/atalaia-project/releases) lista-as).
 2. Compila a pequena biblioteca de programas de que o controlador precisa para os scripts dos jogos:
 
    ```
@@ -145,7 +145,7 @@ Para manter a hora entre arranques, acerta também o relógio do sistema, como `
 
 Se a consola recusar («... is earlier than ...»), ou a hora do telemóvel também está errada, ou o controlador já viu uma hora posterior porque o seu relógio esteve *adiantado* durante algum tempo. O controlador nunca recua sozinho: corrige-o como `root` com `sudo timedatectl set-time` e reinicia o serviço; os registos feitos enquanto estava adiantado mantêm as suas datas.
 
-**A partir da v0.9.0 (ainda não publicada; até lá, compila a partir do `main`)**, o controlador usa também a hora acertada nos sinais TIME que envia às caixas e em **Libertar todas as caixas que não estão neste jogo**, para que a caixa compare a hora de entrada no jogo e a libertação no mesmo relógio. Esse botão é recusado enquanto o relógio estiver errado: acerta primeiro o relógio.
+**A partir da v0.9.0**, o controlador usa também a hora acertada nos sinais TIME que envia às caixas e em **Libertar todas as caixas que não estão neste jogo**, para que a caixa compare a hora de entrada no jogo e a libertação no mesmo relógio. Esse botão é recusado enquanto o relógio estiver errado: acerta primeiro o relógio.
 
 Um telemóvel controlador tem a mesma guarda do relógio a partir da v0.9.0: vê o [Guia do telemóvel controlador](phone-controller.md#the-controller-clock).
 
@@ -186,7 +186,7 @@ Enquanto está de reserva, ouve o jogo pelo seu próprio rádio, regista os even
 
 - arrancar, pausar ou retomar o jogo (*Este controlador não está a mandar no jogo. Para o controlar daqui, promove-o no separador Controlador.*), convidar caixas, mudar pontuações ou ligar saídas;
 - gerar dados de entrada (*Um controlador de reserva não gera dados de entrada; usa o controlador ativo.*);
-- libertar caixas presas num jogo terminado: nunca reenvia o GAME_OVER sozinho e recusa **Libertar** e **Libertar todas as caixas que não estão neste jogo** (a partir da v0.9.0, ainda não publicada). Isso é com o controlador ativo.
+- libertar caixas presas num jogo terminado: nunca reenvia o GAME_OVER sozinho e recusa **Libertar** e **Libertar todas as caixas que não estão neste jogo** (a partir da v0.9.0). Isso é com o controlador ativo.
 
 O botão **Terminar** dele diz **Deixar o jogo**: deixa de acompanhar, e o jogo continua. Também sai sozinho quando o jogo termina.
 
@@ -298,10 +298,10 @@ Atualiza entre jogos, nunca com um jogo a decorrer. Uma versão nova pode mudar 
 
    ```
    sudo git -C /opt/atalaia fetch --tags
-   sudo git -C /opt/atalaia checkout v0.8.0
+   sudo git -C /opt/atalaia checkout v0.9.0
    ```
 
-   Põe a versão que queres no lugar de `v0.8.0`. Para seguir antes o código mais recente, `sudo git -C /opt/atalaia checkout main` e depois `sudo git -C /opt/atalaia pull`.
+   Põe a versão que queres no lugar de `v0.9.0`. Para seguir antes o código mais recente, `sudo git -C /opt/atalaia checkout main` e depois `sudo git -C /opt/atalaia pull`.
 3. Instala pacotes novos, se os houver: corre outra vez a linha `sudo apt install ...` da [secção 4](#4-instalar-o-controlador) (não faz nada aos pacotes que já tens).
 4. Compila outra vez a biblioteca de programas:
 
@@ -343,7 +343,7 @@ Uma lista vazia (`release_keys = []`) recusa todas as versões. Atualizar as pr�
 
 O modem não tem atualização pelo ar: escreve a imagem nova por USB. Quando e como fazê-lo está em [Montar o modem de rádio, Atualizar o modem](modem.md#update-the-modem). Em resumo: pára o controlador, escreve a imagem nova do modem e volta a arrancar o controlador.
 
-Atualiza também o modem quando o registo disser `the radio modem's firmware cannot report boxes still in an ended game`, ou o separador **Caixas** da consola disser que o modem de rádio não consegue dizer que caixas ficaram num jogo terminado. Isso precisa de uma imagem do modem da v0.9.0 (ainda não publicada; até lá, compila-a a partir do `main`).
+Atualiza também o modem quando o registo disser `the radio modem's firmware cannot report boxes still in an ended game`, ou o separador **Caixas** da consola disser que o modem de rádio não consegue dizer que caixas ficaram num jogo terminado. Isso precisa de uma imagem do modem da v0.9.0.
 
 ## 12. Resolução de problemas
 

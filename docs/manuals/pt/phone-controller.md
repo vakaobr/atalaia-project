@@ -61,7 +61,7 @@ Para um árbitro ou uma organização convidada, cria um código do dia com praz
 
 ## 4. O relógio do controlador
 
-**A partir da v0.9.0 (ainda não publicada; até lá, compila a partir do `main`)** o telemóvel controlador tem a guarda do relógio do Raspberry Pi. A hora de um telemóvel costuma estar certa, dada pela rede móvel, mas pode estar errada num telemóvel que foi reposto, acertado à mão ou que esteve muito tempo sem rede.
+**A partir da v0.9.0** o telemóvel controlador tem a guarda do relógio do Raspberry Pi. A hora de um telemóvel costuma estar certa, dada pela rede móvel, mas pode estar errada num telemóvel que foi reposto, acertado à mão ou que esteve muito tempo sem rede.
 
 1. O controlador compara o relógio com o dia em que esta versão do programa foi publicada, com a hora mais recente que já viu e com os dados mais recentes que guarda.
 2. Se o relógio estiver antes, a consola mostra em todos os ecrãs a faixa amarela **O relógio do controlador está errado.**, e nada é apagado enquanto não estiver certo.
@@ -100,7 +100,7 @@ Os dois levam o rádio do jogo. Diferem no resto:
 | Convites, fim de jogo, emparelhamento por código | Sim | Só com um firmware do módulo que passe estas tramas; com um módulo antigo a consola diz que o rádio não as leva |
 | Atualizações de firmware das caixas | Sim | Sim |
 | Procura de canal | Sim | Sim |
-| Caixas presas num jogo terminado avisadas e libertadas sozinhas | Sim, com uma imagem do modem da v0.9.0 (ainda não publicada) | **Não**: um módulo de E/S não as consegue avisar |
+| Caixas presas num jogo terminado avisadas e libertadas sozinhas | Sim, com uma imagem do modem da v0.9.0 | **Não**: um módulo de E/S não as consegue avisar |
 | Botões, luzes, sirene para o telemóvel | Não | Sim |
 
 Para usar um modem de rádio USB, segue [Montar o modem de rádio, Com um telemóvel controlador](modem.md#with-a-phone-controller). Ligar um módulo de E/S (a chave de acesso por Bluetooth, voltar a ligar) está no [Guia do telemóvel como dispositivo de jogo](phone-prop.md).

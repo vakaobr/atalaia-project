@@ -46,11 +46,20 @@ export class StuckBoxes extends Component {
         app.loadBoxes(false);
     }
 
+    // The node ids heard: a capped list (the most recent 32) and how many in all (SRB-4); an older
+    // controller sends only the list.
+    nodes(entry) {
+        const nodes = entry.nodes || [];
+        const more = (entry.nodes_count ?? nodes.length) - nodes.length;
+        const list = nodes.join(', ') || '–';
+        return more > 0 ? `${list} ${t('stuck.nodes_more', { n: more })}` : list;
+    }
+
     renderRow(entry) {
         const id = entry.game;
         return html`<tr data-testid=${`stuck-row-${id}`}>
             <td><strong>${entry.name || '–'}</strong> <span class="muted small">#${id}</span></td>
-            <td class="small">${(entry.nodes || []).join(', ') || '–'}</td>
+            <td class="small" data-testid=${`stuck-nodes-${id}`}>${this.nodes(entry)}</td>
             <td class="muted small">${t('invites.seen', { s: entry.last_heard_s })}</td>
             <td class="muted small">${entry.rssi != null ? `${entry.rssi} dBm` : '–'}</td>
             <td class="small" data-testid=${`stuck-resent-${id}`}>${entry.game_over_resent}</td>

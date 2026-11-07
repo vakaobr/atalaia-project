@@ -10,7 +10,12 @@ this controller ran and ended, whose key's tag it still keeps (``key_tag:<game>`
 KEY_TAGS_KEPT games, so also after a restart without the key), it says that game's GAME_OVER
 again, through the same path and channel rules as at the end, at most once a minute per game.
 GAME_OVER can only end a game that is over, so a report forged from a header in the clear can
-cost some air, never a game.
+cost some air, never a game; that air is bounded (decisions SRB-1 to SRB-6): no automatic burst
+while a game is started (running or paused) on this controller, so its TIME and CMD keep the
+modem's duty budget (the GM's Release still works); otherwise one automatic burst for all games
+together in AUTO_RESEND_MS, one at a time, the game served longest ago first, and one that takes
+the modem off the field's channel in AUTO_RETUNE_MS. Each game keeps the SOURCES_KEPT node ids
+heard most recently, with a count.
 
 A standby controller never sends it (its games run on the primary). What it has heard is kept for
 the console (``stuck`` in GET /api/v1/boxes): per game, when a box in it was last heard, from
@@ -40,20 +45,34 @@ RELEASE_FIELD_MS = 30_000    # the field-wide RELEASE (Amendment 28): one burst 
 SHOWN_MS = 120_000           # the console lists a game heard within this time (STUCK-71)
 FORGET_MS = 2 * 3_600_000    # a game not heard of for this long is forgotten (its resend count and rate limit)
 KEY_TAGS_KEPT = 50           # the ended games whose key tag the controller keeps
+AUTO_RESEND_MS = 60_000      # one automatic burst for all games together in this time at most (SRB-2)
+AUTO_RETUNE_MS = 300_000     # one automatic burst off the field's channel in this time at most (SRB-3)
+SOURCES_KEPT = 32            # the node ids a game keeps (the most recently heard), with a count (SRB-4)
+LIVE_STATES = ("running", "paused")  # a started game: no automatic burst (SRB-1)
 
 
 @dataclass
 class StuckGame:
     game_id: int
     heard_ms: int
-    sources: set[int] = field(default_factory=set)
+    sources: dict[int, None] = field(default_factory=dict)  # the most recently heard last
+    sources_dropped: int = 0
     rssi: Optional[int] = None
     resent: int = 0
     resent_ms: Optional[int] = None
 
+    def hear(self, source: int) -> None:
+        """A node id heard: kept among the SOURCES_KEPT most recent (SRB-4)."""
+        self.sources.pop(source, None)
+        self.sources[source] = None
+        while len(self.sources) > SOURCES_KEPT:
+            del self.sources[next(iter(self.sources))]
+            self.sources_dropped += 1
+
     def public(self, now_ms: int, name: Optional[str] = None) -> dict[str, Any]:
         return {"game": self.game_id, "name": name, "last_heard_s": max(0, (now_ms - self.heard_ms) // 1000),
-                "nodes": sorted(self.sources), "rssi": self.rssi, "game_over_resent": self.resent}
+                "nodes": sorted(self.sources), "nodes_count": len(self.sources) + self.sources_dropped,
+                "rssi": self.rssi, "game_over_resent": self.resent}
 
 
 class StuckGames:
@@ -67,6 +86,10 @@ class StuckGames:
         self.released: dict[int, int] = {}  # game id -> when the GM last released a game not in the list
         self.release_field_ms = RELEASE_FIELD_MS
         self.field_released_ms: Optional[int] = None  # when the last field-wide RELEASE started
+        self.auto_resend_ms = AUTO_RESEND_MS
+        self.auto_retune_ms = AUTO_RETUNE_MS
+        self.auto_ms: Optional[int] = None    # when the last burst (automatic or released) went
+        self.retune_ms: Optional[int] = None  # when the last automatic burst off the field's channel went
 
     def on_report(self, other: "OtherGame") -> None:
         """OTHER_GAME from the modem (its own thread)."""
@@ -84,27 +107,66 @@ class StuckGames:
                 self.unknown += 1
                 return
             stuck = self.games.get(other.game_id)
+            fresh = stuck is None
             if stuck is None:
                 stuck = self.games[other.game_id] = StuckGame(other.game_id, now)
             stuck.heard_ms = now
-            stuck.sources.add(other.source)
+            stuck.hear(other.source)
             stuck.rssi = other.rssi
-            self._resend(stuck, game, tag, now)
+            # The consoles' list carries the stuck games: told of a new one, and of each resend (STUCK-63).
+            if (self._resend_next(now) or fresh) and self.ctl.reinvite is not None:
+                self.ctl.reinvite.refresh_boxes()
 
-    def _resend(self, stuck: StuckGame, game: dict[str, Any], tag: str, now: int) -> None:
+    def _resend_next(self, now: int) -> bool:
+        """One automatic GAME_OVER burst, if the air budget allows (decisions SRB-1 to SRB-3): none while
+        a game is started on this controller, none while any GAME_OVER is still being said, one for all
+        games together in ``auto_resend_ms``, and one that takes the modem off the field's channel in
+        ``auto_retune_ms``. Of the games heard within SHOWN_MS that may go (each at most once in
+        ``resend_ms``), the one served longest ago goes, so forged reports for many games cannot keep
+        a real one waiting for ever. True when a burst went."""
         reinvite = self.ctl.reinvite
         if reinvite is None:
-            return
-        if any(g.game_id == stuck.game_id for g in reinvite.inviter.games_over):
-            return  # its GAME_OVERs are still being said
-        if stuck.resent_ms is not None and now - stuck.resent_ms < self.resend_ms:
-            return
-        channel = game.get("channel_hz") or self.ctl.cfg.channel_hz
-        if reinvite.game_over(stuck.game_id, bytes.fromhex(tag), channel,
-                              why="a box is still in it; GAME_OVER sent again"):
-            stuck.resent += 1
-            stuck.resent_ms = now
-            reinvite.refresh_boxes()  # the consoles' list carries the stuck games
+            return False
+        live = self.ctl.game
+        if live is not None and live.get("state") in LIVE_STATES:
+            return False  # its TIME and CMD keep the duty budget; the GM can still Release
+        if reinvite.inviter.games_over:
+            return False  # one burst at a time (the end's own three included)
+        if self.auto_ms is not None and now - self.auto_ms < self.auto_resend_ms:
+            return False
+        fc, transport, field_hz = self.ctl.fc, self.ctl.transport, self.ctl.field_channel
+        retune_ok = self.retune_ms is None or now - self.retune_ms >= self.auto_retune_ms
+        best: Optional[tuple[tuple[int, int], StuckGame, int, str]] = None
+        for stuck in self.games.values():
+            if now - stuck.heard_ms > SHOWN_MS:
+                continue
+            if stuck.resent_ms is not None and now - stuck.resent_ms < self.resend_ms:
+                continue
+            game = self.ctl.store.game(stuck.game_id)
+            tag = self.ctl.store.get_setting(f"key_tag:{stuck.game_id}")
+            if game is None or game.get("state") != "ended" or tag is None:
+                continue
+            channel = game.get("channel_hz") or self.ctl.cfg.channel_hz
+            if fc is not None:
+                if transport is None or transport.channel_hz != channel:
+                    continue  # a game made on another channel: the burst would be dropped
+            elif channel != field_hz and not retune_ok:
+                continue
+            order = (stuck.resent_ms if stuck.resent_ms is not None else -1, -stuck.heard_ms)
+            if best is None or order < best[0]:
+                best = (order, stuck, channel, tag)
+        if best is None:
+            return False
+        _, stuck, channel, tag = best
+        if not reinvite.game_over(stuck.game_id, bytes.fromhex(tag), channel,
+                                  why="a box is still in it; GAME_OVER sent again"):
+            return False
+        stuck.resent += 1
+        stuck.resent_ms = now
+        self.auto_ms = now
+        if fc is None and channel != field_hz:
+            self.retune_ms = now
+        return True
 
     def release(self, game_id: int) -> dict[str, Any]:
         """The GM's Release (POST /api/v1/boxes/stuck/{game}/release, decisions STUCK-40 to STUCK-47):
@@ -153,6 +215,7 @@ class StuckGames:
                 stuck.resent_ms = now
             else:
                 self.released[game_id] = now
+            self.auto_ms = now  # the automatic minute starts again (SRB-2)
             reinvite.refresh_boxes()
             return {"game": game_id, "game_over_frame": "sent"}
 

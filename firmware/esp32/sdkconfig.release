@@ -1,0 +1,74 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The hardened Field Box release (firmware/esp32/docs/RELEASE_HARDENING.md, section 2; review findings
+# FLD-2 and FLD-3), applied on top of sdkconfig.defaults:
+#   python tools/docker_fw.py release-hardened [--secure-boot-key PATH]
+# builds it into build-hardened/ and signs the bootloader and the app for secure boot v2.
+#
+# A box running this image BURNS eFuses at its first boot (secure boot, flash encryption, JTAG off,
+# secure download mode, the security version): none of it can be undone, and only the maintainer
+# decides when a board gets it (RELEASE_HARDENING.md, section 4, steps 3 to 5). The bench, Wokwi,
+# modem and I/O pod builds never take this file.
+#
+# Every name below was checked against the ESP-IDF in the pinned image (v5.3.2:
+# components/bootloader/Kconfig.projbuild, components/nvs_flash/Kconfig,
+# components/nvs_sec_provider/Kconfig); `docker_fw.py release-hardened` and CI's
+# esp32-hardened-build job fail when an option here does not end up in the build's sdkconfig
+# (tools/secure_boot_sign.py check-config), so a renamed option cannot be dropped in silence.
+
+# --- Secure boot v2 (RSA-3072, RSA-PSS: the only scheme the ESP32-S3 has) ---
+# The ROM checks the bootloader's signature, the bootloader the app's. The build does NOT sign:
+# the images are signed afterwards with espsecure.py sign_data --version 2 (tools/secure_boot_sign.py),
+# so no private key is ever in the build tree or the build's configuration.
+CONFIG_SECURE_BOOT=y
+CONFIG_SECURE_BOOT_V2_ENABLED=y
+CONFIG_SECURE_SIGNED_APPS_RSA_SCHEME=y
+# CONFIG_SECURE_BOOT_BUILD_SIGNED_BINARIES is not set
+# Two digests are burned (the root key, offline, and the CI key) and the third slot is kept for a
+# replacement (maintainer's decision, plan section 5 question 4). ESP-IDF revokes unused slots by
+# default and files keeping one under "potentially insecure options": this is the only one set
+# (JTAG, eFuse read protection and the app-partition padding keep their secure defaults). A slot
+# survives only when secure boot is enabled from the host with espefuse before the first boot: the
+# bootloader revokes unused slots whenever it enables secure boot itself (RELEASE_HARDENING.md,
+# section 4).
+CONFIG_SECURE_BOOT_INSECURE=y
+CONFIG_SECURE_BOOT_ALLOW_UNUSED_DIGEST_SLOTS=y
+
+# --- The bootloader's size: no bootloader log ---
+# The bootloader sits at 0x0 below the partition table at 0x8000: 32 KB, signature sector included.
+# With secure boot v2 and flash encryption it builds to 0xb000 (45056 bytes) at the default log level
+# (Info) and 0x9000 at Warning or Error: it does not fit. Without its log it is 0x6000 (24576), 0x7000
+# (28672) signed with one to three keys, 4 KB to spare, so the partition table does not move (a
+# moved table is a new layout and a first USB flash of every box: RELEASE_HARDENING.md, section 3).
+# The ROM's own boot messages and the app's log stay; the plain build's bootloader (Info) is 21728 bytes.
+CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y
+
+# --- Flash encryption, release mode (XTS-AES-128, one eFuse key block) ---
+# The key is made on the maintainer's computer, kept offline and burned with espefuse before the
+# first boot (decision, plan section 5 question 2), so that a box can still be re-flashed over USB
+# with an image encrypted for it (espsecure.py encrypt_flash_data). With a key already burned, the
+# key size below is ignored and the burned key is used.
+CONFIG_SECURE_FLASH_ENC_ENABLED=y
+CONFIG_SECURE_FLASH_ENCRYPTION_AES128=y
+CONFIG_SECURE_FLASH_ENCRYPTION_MODE_RELEASE=y
+# The ROM downloader stays, in its secure mode: flashing (of signed, encrypted images) works, reading
+# the flash, the memory or the eFuses does not. Disabling it altogether would leave no way to
+# recover a box. JTAG (pad and USB) is disabled by the bootloader with secure boot and flash
+# encryption on (SECURE_BOOT_ALLOW_JTAG stays unset); the USB serial port stays, for @adopt.
+CONFIG_SECURE_ENABLE_SECURE_ROM_DL_MODE=y
+
+# --- NVS encryption, flash-encryption scheme (plan section 5 question 3) ---
+# The NVS keys are made on the chip at first start and kept in the nvs_keys partition, which
+# ESP-IDF 5.3.2 always treats as encrypted once flash encryption is on (esp_partition's
+# partition.c): partitions.csv needs no "encrypted" flag, and the table does not change.
+CONFIG_NVS_ENCRYPTION=y
+CONFIG_NVS_SEC_KEY_PROTECT_USING_FLASH_ENC=y
+
+# --- Anti-rollback: security version 1 from the first hardened release (question 5) ---
+# 16 eFuse bits for the chip's whole life: raise the version only for a security fix that old
+# firmware must not come back from, never with every release. The app-level version floor
+# (fw_update.c) and CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE (sdkconfig.defaults) stay.
+CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=y
+CONFIG_BOOTLOADER_APP_SECURE_VERSION=1
+CONFIG_BOOTLOADER_APP_SEC_VER_SIZE_EFUSE_FIELD=16

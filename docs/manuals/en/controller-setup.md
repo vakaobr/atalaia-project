@@ -54,7 +54,7 @@ This is the supported way from the [controller guide](../../../controller/README
    sudo git clone https://github.com/vakaobr/atalaia-project /opt/atalaia
    ```
 
-   This takes the newest code (the `main` branch). To install a published release instead, run `sudo git -C /opt/atalaia checkout v0.8.0` (the newest release on 2026-11-06; the [Releases page](https://github.com/vakaobr/atalaia-project/releases) lists them).
+   This takes the newest code (the `main` branch). To install a published release instead, run `sudo git -C /opt/atalaia checkout v0.9.0` (the newest release on 2026-11-06; the [Releases page](https://github.com/vakaobr/atalaia-project/releases) lists them).
 2. Build the small program library the controller needs for game scripts:
 
    ```
@@ -145,7 +145,7 @@ To keep the time across restarts, set the system clock too, as `root` on the Pi:
 
 If the console refuses ("... is earlier than ..."), either the phone's time is wrong too, or the controller has already seen a later time because its clock was *ahead* for a while. The controller never goes back by itself: fix it as `root` with `sudo timedatectl set-time` and restart the service; the records made while it was ahead keep their dates.
 
-**From v0.9.0 (not released yet; build from `main` until then)**, the controller also uses the corrected time in the TIME beacons it sends the boxes and in **Release every box not in this game**, so a box compares its game's join time and a release on one clock. That button is refused while the clock is wrong: set the clock first.
+**From v0.9.0**, the controller also uses the corrected time in the TIME beacons it sends the boxes and in **Release every box not in this game**, so a box compares its game's join time and a release on one clock. That button is refused while the clock is wrong: set the clock first.
 
 A phone controller has the same clock guard from v0.9.0: see the [Phone controller guide](phone-controller.md#the-controller-clock).
 
@@ -186,7 +186,7 @@ While it stands by, it hears the game over its own radio, logs its events and fo
 
 - start, pause or resume the game (*This controller is not in charge of the game. To run it from here, promote it in the Controller tab.*), invite boxes, change scores or switch outputs;
 - make join data (*A standby controller does not make join data; use the controller in charge.*);
-- free boxes stuck in an ended game: it never resends GAME_OVER by itself, and refuses **Release** and **Release every box not in this game** (from v0.9.0, not released yet). The controller in charge does that.
+- free boxes stuck in an ended game: it never resends GAME_OVER by itself, and refuses **Release** and **Release every box not in this game** (from v0.9.0). The controller in charge does that.
 
 Its **End** button reads **Leave the game**: it stops following, and the game goes on. It also leaves on its own when the game ends.
 
@@ -296,10 +296,10 @@ Update between games, never while a game is running. A new version can change th
 
    ```
    sudo git -C /opt/atalaia fetch --tags
-   sudo git -C /opt/atalaia checkout v0.8.0
+   sudo git -C /opt/atalaia checkout v0.9.0
    ```
 
-   Put the release you want in place of `v0.8.0`. To follow the newest code instead, `sudo git -C /opt/atalaia checkout main` and then `sudo git -C /opt/atalaia pull`.
+   Put the release you want in place of `v0.9.0`. To follow the newest code instead, `sudo git -C /opt/atalaia checkout main` and then `sudo git -C /opt/atalaia pull`.
 3. Install any new packages: run the `sudo apt install ...` line of [section 4](#4-install-the-controller) again (it does nothing for packages you already have).
 4. Rebuild the program library:
 
@@ -341,7 +341,7 @@ An empty list (`release_keys = []`) refuses every release. Updating the boxes th
 
 The modem has no over-the-air update: write the new image over USB. When to do it, and how, is in [Set up the radio modem, Update the modem](modem.md#update-the-modem). In short: stop the controller, write the new modem image, start the controller again.
 
-Update the modem too when the log says `the radio modem's firmware cannot report boxes still in an ended game`, or the console's **Boxes** tab says the radio modem cannot report them. That needs a modem image from v0.9.0 (not released yet; build it from `main` until then).
+Update the modem too when the log says `the radio modem's firmware cannot report boxes still in an ended game`, or the console's **Boxes** tab says the radio modem cannot report them. That needs a modem image from v0.9.0.
 
 ## 12. Troubleshooting
 

@@ -47,7 +47,7 @@ New firmware for the boxes: [Update the boxes](field-box.md#update-the-boxes).
 
 ## If something goes wrong
 
-- **A box is refused "in another game", or the console lists it under Stuck in an ended game:** tap **Release**; or take it out at the box ([take a box out of its game](field-box.md#take-a-box-out-of-its-game), from v0.9.0, not released yet). More: [recover from problems](game-master.md#recover-from-problems).
+- **A box is refused "in another game", or the console lists it under Stuck in an ended game:** tap **Release**; or take it out at the box ([take a box out of its game](field-box.md#take-a-box-out-of-its-game), from v0.9.0). More: [recover from problems](game-master.md#recover-from-problems).
 - **The console says Radio down:** check the USB modem's cable, then see [recover from problems](game-master.md#recover-from-problems) and [update the modem](modem.md#update-the-modem).
 - **A yellow banner says The controller's clock is wrong:** tap **Set the controller's clock from this device** if your phone's time is right ([the controller clock](controller-setup.md#the-controller-clock)).
 - **A box shows as not heard:** move it closer, or put a box in between; after a channel change, use **Look for boxes** ([change the channel](game-master.md#change-the-channel)).

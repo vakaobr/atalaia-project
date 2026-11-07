@@ -241,7 +241,7 @@ sudo journalctl -u atalaia-controller -n 50 | grep -i modem
 
 You should see `atalaia.modem INFO modem link up` and, just before it, `atalaia.modem INFO modem: {...}`: the modem's identity, with its `fw_version` and its `region`. A failure shows as `cannot open the modem at /dev/ttyACM0: ...`, `modem missed ping 1 of 3` or `modem link lost; reconnecting`.
 
-**Can it report stuck boxes?** From v0.9.0 (not released yet; build it from `main` until then, section 3.2), the modem's identity also says `"games": true`. Such a modem tells the controller when it hears a box still in a game that is over (a box that was switched off when its game ended), and the controller frees it by sending that game's end again. This works with a Raspberry Pi controller and with a phone controller (section 11). A modem image of v0.8.0 or older cannot do it: a Raspberry Pi controller from v0.9.0 then logs `the radio modem's firmware cannot report boxes still in an ended game` once, the console's **Boxes** tab says the radio modem cannot report them, and a phone controller says it on its screen under **Radio**. Update the modem to get the automatic recovery (section 10); until then, take such a box out at the box ([Field Box manual](field-box.md#take-a-box-out-of-its-game)).
+**Can it report stuck boxes?** From v0.9.0, the modem's identity also says `"games": true`. Such a modem tells the controller when it hears a box still in a game that is over (a box that was switched off when its game ended), and the controller frees it by sending that game's end again. This works with a Raspberry Pi controller and with a phone controller (section 11). A modem image of v0.8.0 or older cannot do it: a Raspberry Pi controller from v0.9.0 then logs `the radio modem's firmware cannot report boxes still in an ended game` once, the console's **Boxes** tab says the radio modem cannot report them, and a phone controller says it on its screen under **Radio**. Update the modem to get the automatic recovery (section 10); until then, take such a box out at the box ([Field Box manual](field-box.md#take-a-box-out-of-its-game)).
 
 **In the GM console** (see the [Game master manual](game-master.md)): the pill at the top right says **Radio: up**. `connecting` and `down` are not yet working, and **no modem** means the setting is empty. If the modem drops, an alert says **Radio down: the USB modem does not answer.**, and **Radio back.** when it returns. The **Controller** tab lists **Radio**, **Modem** (the modem's firmware and version) and **Modem reconnects**: a count that keeps rising means a bad cable, port or power.
 
@@ -271,7 +271,7 @@ The modem has **no over-the-air update**: a new image is always written over USB
 ### When to update it
 
 - A new release's notes say the modem changed. Look at the [Releases page](https://github.com/vakaobr/atalaia-project/releases) and the CHANGELOG.
-- The controller's log says `the radio modem's firmware cannot report boxes still in an ended game`, or the console's **Boxes** tab, or a phone controller's screen under **Radio**, says the radio modem cannot report them. That needs a modem image from **v0.9.0** (not released yet; build it from `main` until then, section 3.2).
+- The controller's log says `the radio modem's firmware cannot report boxes still in an ended game`, or the console's **Boxes** tab, or a phone controller's screen under **Radio**, says the radio modem cannot report them. That needs a modem image from **v0.9.0**.
 - It was flashed with v0.4.0 or earlier (the old partition table, section 4.3).
 
 To see which version a modem runs: the console's **Controller** tab, **Modem**, or the `fw_version` in the controller's log (section 8).
@@ -304,7 +304,7 @@ A phone controller can also use an **I/O pod** as its radio. The modem is the be
 | Link to the phone | USB only | USB or Bluetooth |
 | Games, firmware updates, channel scan | Yes | Yes |
 | Invites, game over, pairing by code | Yes | Only with pod firmware that relays these frames |
-| Boxes still in an ended game reported and freed by themselves | Yes, from v0.9.0 (not released yet) | No, never |
+| Boxes still in an ended game reported and freed by themselves | Yes, from v0.9.0 | No, never |
 
 ### Plug it into the phone
 
