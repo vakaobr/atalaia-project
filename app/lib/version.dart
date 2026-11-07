@@ -7,4 +7,4 @@
 /// prop reports `app-<version>` as its firmware version.
 library;
 
-const appVersion = '0.11.0'; // x-release-please-version
+const appVersion = '0.11.1'; // x-release-please-version
