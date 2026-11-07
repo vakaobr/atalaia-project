@@ -2882,8 +2882,57 @@ static void test_release_bound(void)
     state_persist_clear();
 }
 
+/* The keypad's admin menu over a field game (decisions AMG-1 to AMG-3): only while the mode takes
+ * no keys from players (joined and waiting, paused) or the game's controller has been silent for
+ * BOX_ADMIN_MENU_SILENT_MS (a game that ended while the box was off), never while a game runs with
+ * its controller in reach. */
+static void test_admin_menu_gate(void)
+{
+    uint32_t now;
+    joined_box(&now);
+    CHECK(box_game_admin_menu_ok(&game)); /* waiting for the start: no mode yet */
+    cmd(FIELD_CMD_START);
+    run_ms(&now, 100);
+    CHECK(game.phase == BOX_PLAYING && !game.paused && !box_game_admin_menu_ok(&game));
+    cmd(FIELD_CMD_PAUSE);
+    CHECK(game.paused && box_game_admin_menu_ok(&game));
+    cmd(FIELD_CMD_RESUME);
+    CHECK(!game.paused && !box_game_admin_menu_ok(&game));
+    /* Beacons every 30 s keep it shut, however long the game runs. */
+    for (int i = 0; i < 20; i++) {
+        run_ms(&now, 30000);
+        time_state(FIELD_GAME_RUNNING, 30000u * (uint32_t)(i + 1));
+        CHECK(!box_game_admin_menu_ok(&game));
+    }
+    /* The controller silent (out of reach, gone): shut until the limit, open after it. */
+    run_ms(&now, BOX_ADMIN_MENU_SILENT_MS - 1000);
+    CHECK(!box_game_admin_menu_ok(&game));
+    run_ms(&now, 1000);
+    CHECK(box_game_admin_menu_ok(&game));
+    /* Its next TIME shuts it again. */
+    time_state(FIELD_GAME_RUNNING, 1000000);
+    CHECK(!box_game_admin_menu_ok(&game));
+
+    /* Switched off and on in the game, its controller gone (the stuck box of STUCK-20): back in
+     * the game, the menu shut at first, open after BOX_ADMIN_MENU_SILENT_MS without a TIME. */
+    node_runner_stop(&runner);
+    fixture(true);
+    CHECK(box_game_load_join_key(&game));
+    CHECK(box_game_resume(&game, 5));
+    now = 5;
+    run_ms(&now, 1000);
+    CHECK(game.phase == BOX_PLAYING && !box_game_admin_menu_ok(&game));
+    run_ms(&now, BOX_ADMIN_MENU_SILENT_MS);
+    CHECK(game.phase == BOX_PLAYING && box_game_admin_menu_ok(&game));
+    CHECK(box_game_leave(&game, "admin menu") && game.phase == BOX_ENDED);
+    CHECK(!box_game_admin_menu_ok(&game)); /* over: nothing to open it for */
+    node_runner_stop(&runner);
+    state_persist_clear();
+}
+
 void run_box_game_tests(void)
 {
+    test_admin_menu_gate();
     test_outputs_in_a_field_game();
     test_outputs_disabled_in_a_field_game();
     test_lobby_nonces();

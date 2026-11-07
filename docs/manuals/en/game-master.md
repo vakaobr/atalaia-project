@@ -484,7 +484,7 @@ With an older modem the list says **The radio modem cannot report boxes still in
 
 ### Take a box out of its game
 
-At the box, with its admin PIN. This also pulls a box out of a game that is still running: the console then sees that box as ended, and the game goes on for the others. **From v0.9.0** in the box's firmware.
+At the box, with its admin PIN. This also pulls a box out of a game that is still running: **pause the game first**, because the menu does not open while the game runs with the controller in reach (so players cannot open it mid-game). The console then sees that box as ended, and the game goes on for the others. A stuck box hears nothing from its controller, so its menu opens 5 minutes after it is switched on. **From v0.9.0** in the box's firmware; pausing first is needed from v0.10.0.
 
 1. Hold `*` for 3 seconds.
 2. Type the admin PIN and press `#`.
