@@ -12,14 +12,13 @@ CONTRIBUTING.md, "Pull request titles and commit messages"); optional hand-writt
 `## [Unreleased]` and move into the next release's section as "Details". The sections up to 0.5.0
 were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.11.1](https://github.com/vakaobr/atalaia-project/compare/v0.11.0...v0.11.1) (2026-11-07)
+## [Unreleased]
 
+## [0.11.1](https://github.com/vakaobr/atalaia-project/compare/v0.11.0...v0.11.1) (2026-11-07)
 
 ### Documentation
 
 * v0.11.0 is released: README, manuals, STATUS and the project page ([#142](https://github.com/vakaobr/atalaia-project/issues/142)) ([f327b81](https://github.com/vakaobr/atalaia-project/commit/f327b81910a810387d62e83b94c4f0ab2f525298))
-
-## [Unreleased]
 
 ## [0.11.0](https://github.com/vakaobr/atalaia-project/compare/v0.10.0...v0.11.0) (2026-11-07)
 
