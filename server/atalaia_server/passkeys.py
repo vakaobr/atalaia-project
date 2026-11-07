@@ -15,7 +15,10 @@ origin and RP ID checks, the signature counter); this module fixes the choices t
   gave (ATALAIA_APP_ANDROID_SHA256, the same ones that go in assetlinks.json) are accepted as origins besides
   the site's own. The RP ID stays the site's host name, so the same passkey works in the browser and in the app.
 - **No attestation**: the server does not ask which authenticator model it is, so it keeps nothing that
-  identifies the device (``attestation: none``).
+  identifies the device (``attestation: none``). A registration is accepted only with the attestation formats
+  that request can bring back: ``none``, or ``packed`` (the authenticator's self-attestation, which some send
+  anyway). Any other format (android-key, tpm, apple, fido-u2f...) is refused before its statement is parsed,
+  and the whole credential is capped at ``MAX_CREDENTIAL_JSON`` bytes before anything is decoded.
 - The **challenge** is made here and carried in a signed token (``tokens.make_webauthn_challenge``), not kept in
   the database; it expires after 5 minutes and is accepted once.
 - The signature counter is checked by the library when either side is non-zero (a clone shows as a counter that
@@ -32,7 +35,7 @@ from urllib.parse import urlsplit
 
 from webauthn import (generate_authentication_options, generate_registration_options, options_to_json,
                       verify_authentication_response, verify_registration_response)
-from webauthn.helpers import base64url_to_bytes
+from webauthn.helpers import base64url_to_bytes, parse_cbor
 from webauthn.helpers.structs import (AttestationConveyancePreference, AuthenticatorSelectionCriteria,
                                       PublicKeyCredentialDescriptor, ResidentKeyRequirement,
                                       UserVerificationRequirement)
@@ -40,6 +43,8 @@ from webauthn.helpers.structs import (AttestationConveyancePreference, Authentic
 RP_NAME = "Atalaia"
 MAX_PER_ACCOUNT = 20
 MAX_CREDENTIAL_JSON = 16384
+# The attestation formats an ``attestation: none`` registration can come back with (see the module notes).
+ATTESTATION_FORMATS = frozenset({"none", "packed"})
 
 
 class PasskeyError(Exception):
@@ -77,6 +82,7 @@ def verify_registration(credential: dict[str, Any], challenge: bytes, origin: st
                         app_origins: Sequence[str] = ()) -> Any:
     """The library's ``VerifiedRegistration`` (credential id, public key, sign count...) or ``PasskeyError``."""
     _check_size(credential)
+    _check_attestation_format(credential)
     try:
         return verify_registration_response(credential=credential, expected_challenge=challenge,
                                             expected_rp_id=rp_id_of(origin),
@@ -126,6 +132,18 @@ def verify_authentication(credential: dict[str, Any], challenge: bytes, origin: 
             require_user_verification=True)
     except Exception as e:  # noqa: BLE001
         raise PasskeyError(type(e).__name__) from None
+
+
+def _check_attestation_format(credential: dict[str, Any]) -> None:
+    """Refuses an attestation format outside ``ATTESTATION_FORMATS``: only the outer CBOR map is read here, so the
+    library never parses a statement (its certificates) of a format the server did not ask for."""
+    try:
+        attestation = parse_cbor(base64url_to_bytes(credential["response"]["attestationObject"]))
+        fmt = attestation["fmt"]
+    except Exception:  # noqa: BLE001  (a missing field, bad base64 or bad CBOR: all mean "refused")
+        raise PasskeyError("bad attestation") from None
+    if not isinstance(fmt, str) or fmt not in ATTESTATION_FORMATS:
+        raise PasskeyError("attestation format")
 
 
 def _check_size(credential: dict[str, Any]) -> None:

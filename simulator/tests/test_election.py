@@ -224,14 +224,18 @@ class MixedModeTests(unittest.TestCase):
         self.assertIsNone(e.tick(89_999))
         self.assertIsNotNone(e.tick(90_000))  # three missed 10 s beacons
 
-    def test_two_lost_beacons_forget_the_auto_cadence(self):
-        e = Election(5, priority=1000, mode="auto")
+    def test_two_lost_beacons_keep_the_auto_cadence_two_steady_30_s_gaps_do_not(self):
+        # The shortest steady cadence heard from the leader counts (decision FLC-2): one 30 s gap is two
+        # lost beacons; two in a row are a leader beaconing every 30 s.
+        e = Election(5, priority=1000, mode="manual")
         e.follow(0)
         self.run_beacons(e, [0, 10_000, 20_000, 30_000, 40_000])
         self.assertEqual(e.leader_beacon_ms, 10_000)
         e.on_time(1, source=0, now_ms=70_000, game_state=RUNNING)
-        self.assertIsNone(e.leader_beacon_ms)
-        self.assertEqual(e.takeover_after_ms, 90_000)
+        self.assertEqual(e.leader_beacon_ms, 10_000)
+        e.on_time(1, source=0, now_ms=100_000, game_state=RUNNING)
+        self.assertEqual(e.leader_beacon_ms, 30_000)
+        self.assertEqual(e.leader_failover_mode, "manual")
 
     def test_a_new_leader_or_term_is_measured_afresh(self):
         e = Election(5, priority=1000, mode="auto")
@@ -241,6 +245,126 @@ class MixedModeTests(unittest.TestCase):
         e.on_time(2, source=7, now_ms=45_000, game_state=RUNNING)
         self.assertIsNone(e.leader_beacon_ms)
         self.assertEqual(e.takeover_after_ms, 90_000)
+
+
+class LeaderBoundCadenceTests(unittest.TestCase):
+    """TIMEs from another source at the leader's term are not the leader's liveness (decisions FLC-1 to
+    FLC-6): a keyed node injecting them hid a leader's 10 s cadence (takeover 30 s -> 90 s) and, after the
+    leader died, kept a standby from ever taking over."""
+
+    LEADER, OTHER = 10, 11
+
+    def fast_leader(self, hostile_offset=None, beacons=8):
+        """A standby on auto behind a leader on auto (10 s); with ``hostile_offset``, another source sends
+        a TIME at the same term that long after each of the leader's."""
+        e = Election(50, priority=100, mode="auto")
+        e.follow(0)
+        t = 0
+        e.on_time(1, source=self.LEADER, now_ms=t, game_state=RUNNING)
+        for _ in range(beacons):
+            t += 10_000
+            self.assertTrue(e.on_time(1, source=self.LEADER, now_ms=t, game_state=RUNNING))
+            if hostile_offset is not None:
+                self.assertFalse(e.on_time(1, source=self.OTHER, now_ms=t + hostile_offset, game_state=RUNNING))
+        return e, t
+
+    def test_same_term_times_from_another_source_do_not_hide_the_fast_cadence(self):
+        for offset in (0, 1, 3_000, 5_000, 8_000, 9_900):
+            with self.subTest(offset=offset):
+                e, _ = self.fast_leader(hostile_offset=offset)
+                self.assertEqual(e.leader, self.LEADER)
+                self.assertEqual(e.leader_beacon_ms, 10_000)
+                self.assertEqual(e.liveness_interval, 10_000)
+                self.assertEqual(e.takeover_after_ms, 30_000)
+
+    def test_they_do_not_keep_a_dead_leader_alive(self):
+        e, t = self.fast_leader(beacons=4)  # the leader's last TIME at 40 s, then it dies
+        self.assertEqual(e.takeover_after_ms, 30_000)
+        dead_at = t
+        claimed = None
+        for now in range(t + 100, t + 330_001, 100):
+            if (now - dead_at) % 5_000 == 0 and now - dead_at <= 12_000:
+                e.on_time(1, source=self.OTHER, now_ms=now, game_state=RUNNING)  # inside the leader's beat
+            if e.tick(now) is not None:
+                claimed = now
+                break
+        self.assertEqual(claimed, dead_at + 30_000)
+
+    def test_continuous_times_from_a_higher_id_after_the_leader_died_do_not_block_the_takeover(self):
+        # The review's repro: the leader dies; another source keeps sending TIMEs at its term every 30 s.
+        e, t = self.fast_leader(beacons=4)
+        dead_at, claimed = t, None
+        for now in range(t + 100, t + 330_001, 100):
+            if (now - dead_at) % 30_000 == 0:
+                self.assertFalse(e.on_time(1, source=self.OTHER, now_ms=now, game_state=RUNNING))
+            if e.tick(now) is not None:
+                claimed = now
+                break
+        self.assertEqual(claimed, dead_at + 30_000)
+        self.assertEqual(e.role, CANDIDATE)
+
+    def test_the_survivor_of_a_split_election_is_followed_once_the_other_leader_stops(self):
+        # Two leaders at one term: the one with the higher id (here the recognised one) yields to the
+        # other and falls silent; the standby takes the other once a beacon is missed, before claiming.
+        e, t = self.fast_leader(beacons=4)
+        self.assertFalse(e.on_time(1, source=4, now_ms=t + 5_000))
+        self.assertFalse(e.on_time(1, source=12, now_ms=t + 12_600))  # a higher id: never at this term
+        self.assertTrue(e.on_time(1, source=4, now_ms=t + 12_600))  # past 10 s + 25 %
+        self.assertEqual(e.leader, 4)
+        self.assertIsNone(e.leader_beacon_ms)  # measured afresh: 30 s until heard
+        for now in range(t + 12_600, t + 200_000, 100):
+            if (now - t - 12_600) % 10_000 == 0:
+                e.on_time(1, source=4, now_ms=now)
+            self.assertIsNone(e.tick(now), f"a claim at {now}")
+
+    def test_a_manual_leader_is_still_not_taken_over(self):
+        # FAIL-1 holds with another source's TIMEs around: they cannot make the standby count 10 s.
+        e = Election(50, priority=100, mode="auto")
+        e.follow(0)
+        for t in range(0, 600_001, 100):
+            if t % 30_000 == 0:
+                e.on_time(1, source=self.LEADER, now_ms=t, game_state=RUNNING)
+            if t % 10_000 == 5_000:
+                e.on_time(1, source=self.OTHER, now_ms=t, game_state=RUNNING)
+            self.assertIsNone(e.tick(t), f"a claim at {t}")
+        self.assertEqual(e.leader, self.LEADER)
+        self.assertEqual(e.leader_beacon_ms, 30_000)
+
+    def test_an_extra_time_from_the_leader_does_not_reset_its_cadence(self):
+        # A TIME of the leader's own source between its beacons (no change of state) is skipped: the
+        # 10 s already measured stays, and the next gap is measured from the last regular beacon.
+        e, t = self.fast_leader(beacons=4)
+        self.assertEqual(e.leader_beacon_ms, 10_000)
+        for k in range(5):
+            e.on_time(1, source=self.LEADER, now_ms=t + 4_000, game_state=RUNNING)
+            t += 10_000
+            e.on_time(1, source=self.LEADER, now_ms=t, game_state=RUNNING)
+            self.assertEqual(e.leader_beacon_ms, 10_000, k)
+
+    def test_a_long_silence_keeps_the_measured_cadence(self):
+        e = Election(50, priority=100, mode="manual")
+        e.follow(0)
+        for t in range(0, 40_001, 10_000):
+            e.on_time(1, source=self.LEADER, now_ms=t, game_state=RUNNING)
+        self.assertEqual(e.leader_beacon_ms, 10_000)
+        e.on_time(1, source=self.LEADER, now_ms=140_000, game_state=RUNNING)
+        self.assertEqual(e.leader_beacon_ms, 10_000)
+
+    def test_a_same_term_claim_is_not_the_leaders_liveness(self):
+        e, t = self.fast_leader(beacons=4)
+        for k in range(1, 6):
+            e.on_claim(1, priority=60_000, node_id=self.OTHER, now_ms=t + k * 5_000)
+            if k * 5_000 < 30_000:
+                self.assertIsNone(e.tick(t + k * 5_000))
+        self.assertIsNotNone(e.tick(t + 30_000))
+
+    def test_a_claim_at_a_higher_term_still_opens_the_election(self):
+        e, t = self.fast_leader(beacons=4)
+        e.on_claim(2, priority=60_000, node_id=self.OTHER, now_ms=t + 20_000)
+        self.assertEqual(e.term, 2)
+        self.assertIsNone(e.tick(t + 49_999))  # the winner has a full timeout to beacon
+        self.assertTrue(e.on_time(2, source=self.OTHER, now_ms=t + 25_000))
+        self.assertEqual(e.leader, self.OTHER)
 
 
 class ManualElectionTests(unittest.TestCase):

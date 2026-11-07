@@ -54,7 +54,7 @@ This is the supported way from the [controller guide](../../../controller/README
    sudo git clone https://github.com/vakaobr/atalaia-project /opt/atalaia
    ```
 
-   This takes the newest code (the `main` branch). To install a published release instead, run `sudo git -C /opt/atalaia checkout v0.8.0` (the newest release on 2026-11-06; the [Releases page](https://github.com/vakaobr/atalaia-project/releases) lists them).
+   This takes the newest code (the `main` branch). To install a published release instead, run `sudo git -C /opt/atalaia checkout v0.9.0` (the newest release on 2026-11-06; the [Releases page](https://github.com/vakaobr/atalaia-project/releases) lists them).
 2. Build the small program library the controller needs for game scripts:
 
    ```
@@ -145,7 +145,7 @@ To keep the time across restarts, set the system clock too, as `root` on the Pi:
 
 If the console refuses ("... is earlier than ..."), either the phone's time is wrong too, or the controller has already seen a later time because its clock was *ahead* for a while. The controller never goes back by itself: fix it as `root` with `sudo timedatectl set-time` and restart the service; the records made while it was ahead keep their dates.
 
-**From v0.9.0 (not released yet; build from `main` until then)**, the controller also uses the corrected time in the TIME beacons it sends the boxes and in **Release every box not in this game**, so a box compares its game's join time and a release on one clock. That button is refused while the clock is wrong: set the clock first.
+**From v0.9.0**, the controller also uses the corrected time in the TIME beacons it sends the boxes and in **Release every box not in this game**, so a box compares its game's join time and a release on one clock. That button is refused while the clock is wrong: set the clock first.
 
 A phone controller has the same clock guard from v0.9.0: see the [Phone controller guide](phone-controller.md#the-controller-clock).
 
@@ -186,7 +186,7 @@ While it stands by, it hears the game over its own radio, logs its events and fo
 
 - start, pause or resume the game (*This controller is not in charge of the game. To run it from here, promote it in the Controller tab.*), invite boxes, change scores or switch outputs;
 - make join data (*A standby controller does not make join data; use the controller in charge.*);
-- free boxes stuck in an ended game: it never resends GAME_OVER by itself, and refuses **Release** and **Release every box not in this game** (from v0.9.0, not released yet). The controller in charge does that.
+- free boxes stuck in an ended game: it never resends GAME_OVER by itself, and refuses **Release** and **Release every box not in this game** (from v0.9.0). The controller in charge does that.
 
 Its **End** button reads **Leave the game**: it stops following, and the game goes on. It also leaves on its own when the game ends.
 
@@ -215,7 +215,7 @@ In `[controller]` of `/etc/atalaia/controller.toml`:
 - `failover_mode = "manual"` (the default): nothing happens by itself. When the main controller stops answering, open the standby's console, **Controller** tab, and tap **Promote to controller**. It asks *This controller will take charge of the game. Continue?*
 - `failover_mode = "auto"`: the main controller sends its time beacon every 10 seconds instead of 30. A standby that misses three in a row (about **30 seconds** of silence) stands for the role and, a few seconds later, takes over. The project's example settings say to use `auto` only after field testing, which has not happened yet.
 
-A standby set to `auto` counts the beacons it actually hears from the main controller, not the ones its own setting gives. It waits for **about 90 seconds** of silence (three missed 30-second beacons) until it has heard three beacons in a row 10 seconds apart, about 40 seconds after it joins or hears a new controller. It also waits 90 seconds after two beacons in a row go missing, and the whole time behind a main controller set to `manual`. So a different setting no longer makes a standby take over a main controller that still works. The beacons a start, a pause or a resume sends again in the next 10 seconds do not count. The standby's **Controller** tab shows **Takes over after** with the silence it waits for.
+A standby set to `auto` counts the beacons it actually hears from the main controller, not the ones its own setting gives. It waits for **about 90 seconds** of silence (three missed 30-second beacons) until it has heard three beacons in a row 10 seconds apart, about 40 seconds after it joins or hears a new controller. Once it has heard the 10 seconds it keeps them, also after a missed beacon, until it hears the main controller beacon every 30 seconds twice in a row; behind a main controller set to `manual` it waits 90 seconds the whole time. So a different setting no longer makes a standby take over a main controller that still works. The beacons a start, a pause or a resume sends again in the next 10 seconds do not count. Only the beacons of the main controller the standby follows count: a beacon of the same game from another device neither keeps that controller alive nor changes the silence the standby waits for. The standby's **Controller** tab shows **Takes over after** with the silence it waits for.
 
 If the old controller comes back, it hears the newer one and steps down.
 
@@ -296,10 +296,10 @@ Update between games, never while a game is running. A new version can change th
 
    ```
    sudo git -C /opt/atalaia fetch --tags
-   sudo git -C /opt/atalaia checkout v0.8.0
+   sudo git -C /opt/atalaia checkout v0.9.0
    ```
 
-   Put the release you want in place of `v0.8.0`. To follow the newest code instead, `sudo git -C /opt/atalaia checkout main` and then `sudo git -C /opt/atalaia pull`.
+   Put the release you want in place of `v0.9.0`. To follow the newest code instead, `sudo git -C /opt/atalaia checkout main` and then `sudo git -C /opt/atalaia pull`.
 3. Install any new packages: run the `sudo apt install ...` line of [section 4](#4-install-the-controller) again (it does nothing for packages you already have).
 4. Rebuild the program library:
 
@@ -341,7 +341,7 @@ An empty list (`release_keys = []`) refuses every release. Updating the boxes th
 
 The modem has no over-the-air update: write the new image over USB. When to do it, and how, is in [Set up the radio modem, Update the modem](modem.md#update-the-modem). In short: stop the controller, write the new modem image, start the controller again.
 
-Update the modem too when the log says `the radio modem's firmware cannot report boxes still in an ended game`, or the console's **Boxes** tab says the radio modem cannot report them. That needs a modem image from v0.9.0 (not released yet; build it from `main` until then).
+Update the modem too when the log says `the radio modem's firmware cannot report boxes still in an ended game`, or the console's **Boxes** tab says the radio modem cannot report them. That needs a modem image from v0.9.0.
 
 ## 12. Troubleshooting
 
@@ -358,7 +358,7 @@ Update the modem too when the log says `the radio modem's firmware cannot report
 | A box does not hear the controller | Same region and channel? Antennas fitted? See the [Game master manual](game-master.md#recover-from-problems) |
 | A box is stuck in a game that is over, and the console says the radio modem cannot report it | The modem's image is older than v0.9.0: update it (section 11). Until then, take the box out at the box ([Field Box manual](field-box.md#take-a-box-out-of-its-game)) |
 | **Promote to controller** is missing, or the standby never takes over | The standby has not joined this game (section 9, steps 4 and 5), or `failover_mode` is `manual`: promote it by hand |
-| A standby on `auto` took about 90 s, not 30 s, to take over | It had not yet heard three beacons in a row 10 s apart (it had just joined or heard a new controller, or two beacons in a row were missed), or the main controller is on `manual`: section 9, [`failover_mode`](#failover-mode) |
+| A standby on `auto` took about 90 s, not 30 s, to take over | It had not yet heard three beacons in a row 10 s apart (it had just joined or heard a new controller), or the main controller is on `manual`: section 9, [`failover_mode`](#failover-mode) |
 | I forgot the codes | Run the `tokens` and `join-key` commands again (section 5) |
 
 Found a step that does not match? Open an issue or tell us in [Discussions](https://github.com/vakaobr/atalaia-project/discussions).

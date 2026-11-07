@@ -20,6 +20,25 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
   tokens stop working). A scan no longer sets `apd_override` over a failing membership verdict: the marshal
   decides with an explicit override. Both controllers, Pi schema 22, console service worker v26, four languages.
 
+- **Failover: only the leader's own beacons keep it alive** (decisions FLC-1 to FLC-6; `simulator/atalaia_sim/election.py`, `simulator/tests/test_election.py`; `app/lib/controller/controller_failover.dart`, `app/test/controller/controller_failover_test.dart`; `controller/README.md`, `docs/manuals/{en,pt}/controller-setup.md`, notes in RFC 0001 section 7, ADR-P2-8 and `docs/design-spec.md`): a standby measured the leader's TIME cadence across every TIME at the current term, so same-term TIMEs from another node holding the game key reset the measurement (the leader's 10 s cadence read as 30 s, the takeover delay 30 s as 90 s) and, after the leader stopped, could keep a standby from taking over. A follower now recognises the leader by the packet's authenticated `source` and counts only its TIMEs as liveness and cadence; a same-term TIME from another source is ignored, except a lower id once the recognised leader has missed a beacon (two leaders elected at one term), and a same-term CLAIM no longer refreshes the leader's liveness. The cadence is kept per leader and term and is the shortest steady one heard: an extra TIME is skipped without moving the measuring point, a long silence keeps a 10 s cadence already measured, and only two steady 30 s gaps in a row turn it back to 30 s, so a standby on auto still never takes over a working manual main controller (FAIL-1 to FAIL-6). Nothing changes on the wire. A node holding the game key can still forge the leader's own source or outbid it with a higher term; the RFC note says so. In software and host tests only.
+
+* **server:** pyasn1 0.6.5 and opentelemetry-api 1.45.1 in the site server's lock (the controller already had
+  opentelemetry-api 1.45.1 and no pyasn1). A passkey registration is accepted only with the attestation formats
+  `attestation: none` brings back (`none`, or `packed` self-attestation); other formats are refused before their
+  statement is parsed.
+
+### Details
+
+- **Boxes stuck in an ended game: one air budget for the automatic resends** (decisions SRB-1 to SRB-6, both
+  controllers). The controller no longer resends an ended game's GAME_OVER by itself while a game is started
+  (running or paused), so the live game keeps the radio's duty budget; the GM's **Release** still works. Between
+  games and while a game is being set up, the automatic resends go one at a time, one burst a minute for all
+  games together, the longest-waiting game first, and one that retunes the modem off the field's channel at
+  most every five minutes. Each stuck game keeps the 32 node ids heard last, with a count (`nodes_count`); the
+  console shows "+N more".
+
+- **The hardened Field Box image builds (plan step 2; nothing burned).** `firmware/esp32/sdkconfig.release` turns on secure boot v2 (RSA-3072), flash encryption in release mode, NVS encryption by the flash-encryption scheme and anti-rollback at security version 1, as the maintainer chose (firmware/esp32/docs/RELEASE_HARDENING.md, section 5). `python3 tools/docker_fw.py release-hardened [--secure-boot-key PATH]` builds it into `build-hardened/`, checks that every option made it into the build, the internal RAM and the sizes, and signs the bootloader and the app with `espsecure.py sign_data --version 2` (`tools/secure_boot_sign.py`; a throw-away test key when no key is given). The bootloader fits below the partition table only with its log off: 28,672 of 32,768 bytes signed, so the partition table does not change. The signed app is 53.22 % of its slot. CI's new `esp32-hardened-build` job builds it with a throw-away key. Released images do not change: the release workflow is untouched, the signing step is written down in RELEASE_SIGNING.md, and no box has been flashed with the hardened image.
+
 ## [0.9.0](https://github.com/vakaobr/atalaia-project/compare/v0.8.0...v0.9.0) (2026-11-06)
 
 ### Features

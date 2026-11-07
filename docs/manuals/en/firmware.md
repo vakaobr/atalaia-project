@@ -45,9 +45,9 @@ Two ways. Download a release if you only want to put the project's firmware on a
 
 ### 2.1 Download a release (the easy way)
 
-The project publishes firmware on GitHub: [the Releases page](https://github.com/vakaobr/atalaia-project/releases). Take the newest one: **v0.8.0**, 2026-11-04 (before it v0.7.0, 2026-11-03, and v0.6.1, 2026-11-02; the first was v0.4.0; v0.6.0 has no files, its build failed). Each is marked **pre-release**: pre-alpha and **not field-tested**. Read its notes first.
+The project publishes firmware on GitHub: [the Releases page](https://github.com/vakaobr/atalaia-project/releases). Take the newest one: **v0.9.0**, 2026-11-06 (before it v0.8.0, 2026-11-04, v0.7.0, 2026-11-03, and v0.6.1, 2026-11-02; the first was v0.4.0; v0.6.0 has no files, its build failed). Each is marked **pre-release**: pre-alpha and **not field-tested**. Read its notes first.
 
-**v0.8.0 changed the release keys.** It is signed with the project's new CI key, which boxes on v0.6.1 or older do not trust. Flash such a box over USB, or take it through v0.7.0 first: [section 7.1](#71-with-the-projects-releases). A few things in this guide come with v0.9.0, which is not released yet; they say so, and need a build from `main` until then.
+**v0.8.0 changed the release keys.** It is signed with the project's new CI key, which boxes on v0.6.1 or older do not trust. Flash such a box over USB, or take it through v0.7.0 first: [section 7.1](#71-with-the-projects-releases). A few things in this guide need v0.9.0 or later; they say so. The USB radio modem has no update over the air: for the controller to free boxes left in an ended game, flash the v0.9.0 modem image over USB ([modem guide](modem.md)).
 
 Pick the files for your board:
 
@@ -93,7 +93,7 @@ python tools/docker_fw.py build
 
 On macOS and Linux, use `python3` if `python` is not found. The first build downloads the build tools and takes several minutes (about ten the first time). It ends with a line that names the file `firmware/esp32/build/atalaia_esp32.bin`. The other files you need are in the same folder. You do not need to read them.
 
-A build from a checkout prints a version such as `0.8.0+12.g1a2b3c4` (or `0.9.0-dev.12+g1a2b3c4` between releases): the release's number, the number of changes since, and the code's identifier. It is also on the board's small screen at boot. Keep a note of it with the box. To get exactly a release's firmware, check out its tag (`git checkout v0.8.0`) and build there: a clean checkout of a tag says plain `0.8.0`.
+A build from a checkout prints a version such as `0.9.0+12.g1a2b3c4` (or `0.10.0-dev.12+g1a2b3c4` between releases): the release's number, the number of changes since, and the code's identifier. It is also on the board's small screen at boot. Keep a note of it with the box. To get exactly a release's firmware, check out its tag (`git checkout v0.9.0`) and build there: a clean checkout of a tag says plain `0.9.0`.
 
 **Keys.** A build you make trusts the project's two release keys and two mode keys by default, the same as the released files, so a controller you run accepts the project's signed releases. Your own builds are not signed by the project: sign them with your own key and give the boxes its public half (`--release-keys=`, [section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)).
 
@@ -243,7 +243,7 @@ A new Field Box or Satellite does this on its first start. The 2.4 GHz antenna m
    - **Admin PIN**: 4 to 8 digits. Write it down. 1234, 0000, a sequence such as 9876 and a repeated pair such as 1212 are refused.
    - **Display Brightness** and **Audio Volume**.
    - **Field join key** (optional): the 64 digits from the organisers. You can add it later by adoption.
-   - **Field Wi-Fi name** and **password** (optional, but needed for updates and fetched game modes: [section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)). The field Wi-Fi must be 2.4 GHz. The name is 1 to 32 bytes: an accented letter takes 2 and a Chinese character 3, so a name with them can be refused under 32 characters. The password is none (an open network), 8 to 63 characters, or exactly 64 hex digits. From v0.9.0 (not released yet) the page refuses anything else and says why, as the USB console does; v0.8.0 and older cut a longer name or password without saying so.
+   - **Field Wi-Fi name** and **password** (optional, but needed for updates and fetched game modes: [section 7](#7-updates-over-the-air-and-what-else-uses-the-field-wi-fi)). The field Wi-Fi must be 2.4 GHz. The name is 1 to 32 bytes: an accented letter takes 2 and a Chinese character 3, so a name with them can be refused under 32 characters. The password is none (an open network), 8 to 63 characters, or exactly 64 hex digits. From v0.9.0 the page refuses anything else and says why, as the USB console does; v0.8.0 and older cut a longer name or password without saying so.
 5. Tap **Save & Reboot**. The box restarts.
 
 Then a box with no field shows **PAIR THIS BOX** and a 6-digit code ([section 6](#6-adoption)). A box that is already adopted shows **READY**.
@@ -255,7 +255,7 @@ Then a box with no field shows **PAIR THIS BOX** and a 6-digit code ([section 6]
 
 The box keeps its adoption and its field key. It replaces what the page asks for. The bench build has no setup page.
 
-**Take a box out of its game.** A box that was switched off when its game ended comes back in that game: its log refuses every join (`join: a game is being played`) and USB adoption (`busy`). Do not erase it. From v0.9.0 (not released yet; build from `main` until then), type `@leave` and the admin PIN on the USB console, then Enter. The box answers `leave: game N is over on this box; it is free for the next game`, and keeps its adoption, its join key, its Wi-Fi, its admin PIN and its modes. A wrong PIN counts toward the waits below. The bench build takes `@leave` alone. The other ways out (the box's admin menu, and the controller freeing it by itself with a v0.9.0 modem) are in the [Field Box manual](field-box.md#take-a-box-out-of-its-game).
+**Take a box out of its game.** A box that was switched off when its game ended comes back in that game: its log refuses every join (`join: a game is being played`) and USB adoption (`busy`). Do not erase it. From v0.9.0, type `@leave` and the admin PIN on the USB console, then Enter. The box answers `leave: game N is over on this box; it is free for the next game`, and keeps its adoption, its join key, its Wi-Fi, its admin PIN and its modes. A wrong PIN counts toward the waits below. The bench build takes `@leave` alone. The other ways out (the box's admin menu, and the controller freeing it by itself with a v0.9.0 modem) are in the [Field Box manual](field-box.md#take-a-box-out-of-its-game).
 
 **Forgotten PIN.** After five wrong PINs the box makes you wait 1, 2, 4... up to 60 minutes. The wait survives a restart. If you really lost the PIN, erase the settings ([section 8](#8-a-box-that-does-not-boot)).
 
@@ -275,7 +275,7 @@ A box of another field asks for its **admin PIN**. **Change field** moves a box 
 
 Two things use the field's Wi-Fi, and only between games: **firmware updates** and **game modes the box does not have** (fetched from the controller as signed packages). For both the box needs the **field Wi-Fi name and password** from the setup page, and the controller must be running with HTTPS on.
 
-You can also set the Wi-Fi on the USB console: `@wifi <name> <password>`, or `@wifi <name>` for an open network. From v0.9.0 (not released yet), a name or password with spaces goes in double quotes: `@wifi "My Field" "pass word"` (inside the quotes, `\"` is a quote and `\\` a backslash). The rules are the setup page's ([section 5](#5-first-boot-and-setup)). The box answers `field Wi-Fi: stored (network "My Field")`, or `field Wi-Fi: refused:` and why (a quote left open, for example), and then stores nothing. On v0.8.0, `@wifi` takes no spaces in the name.
+You can also set the Wi-Fi on the USB console: `@wifi <name> <password>`, or `@wifi <name>` for an open network. From v0.9.0, a name or password with spaces goes in double quotes: `@wifi "My Field" "pass word"` (inside the quotes, `\"` is a quote and `\\` a backslash). The rules are the setup page's ([section 5](#5-first-boot-and-setup)). The box answers `field Wi-Fi: stored (network "My Field")`, or `field Wi-Fi: refused:` and why (a quote left open, for example), and then stores nothing. On v0.8.0, `@wifi` takes no spaces in the name.
 
 **The rules for firmware updates.** The box installs an update only if all of these are true:
 

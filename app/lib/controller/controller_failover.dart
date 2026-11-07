@@ -33,6 +33,23 @@
 ///   19). Nothing changes on the wire; [Election.leaderFailoverMode] tells
 ///   the engine when the leader's mode differs from this node's, so it can
 ///   warn.
+/// - The leader's liveness and cadence come from the leader alone
+///   (decisions FLC-1 to FLC-6). A follower recognises the node whose TIME
+///   (header `source`, authenticated by the MIC) it first takes at a term; a
+///   TIME at that term from any other source neither refreshes the leader's
+///   liveness nor touches its measured cadence, and is ignored, unless its
+///   source has a lower node id and the recognised leader has missed a
+///   beacon (silence past its interval plus 25 %): the survivor of a split
+///   election, where the leader with the higher id yields. Within one leader
+///   and term the cadence is the shortest steady one heard: a gap shorter
+///   than 7.5 s (an extra TIME) is skipped without moving the measuring
+///   point, a long silence starts the count again without forgetting the
+///   10 s already measured, and only two steady 30 s gaps in a row turn it
+///   back to 30 s. A same-term CLAIM does not refresh the recognised
+///   leader's liveness either. What this cannot stop: a node with the game
+///   key that forges the leader's own `source`, outbids it with a higher
+///   term, or beacons at the term under a lower id once the real leader is
+///   gone; the key is shared by every node of the game (RFC 0001 section 3).
 ///
 /// A pure state machine with no radio and no clock: the FieldController
 /// (field_controller.dart) feeds it the TIME and CLAIM it hears and sends
@@ -149,6 +166,7 @@ class Election {
   /// The highest term seen (ours when leading).
   int term = 0;
   int? leader;
+  int? _leaderTerm; // the term the recognised leader was taken at
   int? lastHeartbeatMs;
   int? candidateSinceMs;
 
@@ -175,7 +193,9 @@ class Election {
     _slowGaps = 0;
   }
 
-  /// One more TIME of the leader: measures the gap since its last one.
+  /// One more TIME of the recognised leader: measures the gap since its last
+  /// regular one. The cadence is kept per leader and term (decision FLC-1)
+  /// and is the shortest steady one heard (FLC-2).
   void _observe(int source, int t, int nowMs, int? gameState) {
     if (_cadenceOf != (source, t)) {
       _resetCadence();
@@ -189,28 +209,32 @@ class Election {
       _lastState = gameState;
     }
     final prev = _lastTimeMs;
-    _lastTimeMs = nowMs;
-    if (prev == null) return;
     final changed = _stateChangedMs;
-    if (changed != null && nowMs - changed < stateRepeatWindowMs) {
-      return; // a state change's repeats: no evidence either way
+    if (prev == null ||
+        (changed != null && nowMs - changed < stateRepeatWindowMs)) {
+      // The first TIME, or a state change's repeats: no evidence either way.
+      _lastTimeMs = nowMs;
+      return;
     }
     final gap = nowMs - prev;
+    if (gap < beaconIntervalFailoverMs * (1 - cadenceTolerance)) {
+      // An extra TIME: no evidence, and the next gap is measured from the
+      // last regular one.
+      return;
+    }
+    _lastTimeMs = nowMs;
     if (_fits(gap, beaconIntervalFailoverMs)) {
       _fastGaps++;
       _slowGaps = 0;
     } else if (_fits(gap, beaconIntervalManualMs)) {
-      _slowGaps++;
+      _slowGaps++; // one lost pair of 10 s beacons is not yet a manual leader
       _fastGaps = 0;
-      if (leaderBeaconMs == beaconIntervalFailoverMs) {
-        leaderBeaconMs = null; // two lost beacons, or a leader not on auto
-      }
     } else if (gap > beaconIntervalFailoverMs && gap < beaconIntervalManualMs) {
       return; // a lost 10 s beacon, a late one: neither interval's evidence
     } else {
+      // A long silence: count again, keep what was measured.
       _fastGaps = 0;
       _slowGaps = 0;
-      leaderBeaconMs = null;
       return;
     }
     if (_fastGaps >= steadyFastGaps) {
@@ -254,6 +278,7 @@ class Election {
   void lead(int t, int nowMs) {
     term = max(term, t);
     leader = nodeId;
+    _leaderTerm = term;
     candidateSinceMs = null;
     _resetCadence();
     _setRole(electionLeader, nowMs);
@@ -276,6 +301,7 @@ class Election {
     term += 1;
     candidateSinceMs = nowMs;
     leader = null;
+    _leaderTerm = null;
     _resetCadence();
     _setRole(electionCandidate, nowMs);
     return Claim(term, priority, nodeId);
@@ -291,13 +317,34 @@ class Election {
       // deterministic winner (the lower node id) and let the other yield.
       if (source > nodeId) return false;
     }
+    if (role == electionFollower &&
+        _fromAnotherThanTheLeader(t, source, nowMs)) {
+      return false;
+    }
     term = t;
     leader = source;
+    _leaderTerm = t;
     lastHeartbeatMs = nowMs;
     candidateSinceMs = null;
     _setRole(electionFollower, nowMs);
     _observe(source, t, nowMs, gameState);
     return true;
+  }
+
+  /// True for a TIME at the recognised leader's term from another source
+  /// (decision FLC-3): it is not the leader's liveness and is ignored. The
+  /// one exception is the survivor of a split election: two leaders at one
+  /// term resolve to the lower node id (the other yields, [onTime]), so a
+  /// source with a lower id is taken once the recognised leader has missed a
+  /// beacon (silence past its interval plus the tolerance).
+  bool _fromAnotherThanTheLeader(int t, int source, int nowMs) {
+    final current = leader;
+    if (current == null || source == current || _leaderTerm != t) {
+      return false;
+    }
+    final last = lastHeartbeatMs;
+    if (source > current || last == null) return source > current;
+    return nowMs - last <= livenessInterval * (1 + cadenceTolerance);
   }
 
   /// A CLAIM from another candidate.
@@ -315,7 +362,10 @@ class Election {
       if (t > term) _yield(t, nowMs);
       return;
     }
-    // A follower: an election is under way; wait for its winner's TIME.
+    // A follower: an election is under way; wait for its winner's TIME. A
+    // CLAIM at the term of the leader it follows is no election after that
+    // leader, and not its liveness (decision FLC-4).
+    if (leader != null && _leaderTerm == t) return;
     term = max(term, t);
     lastHeartbeatMs = nowMs;
   }
@@ -323,6 +373,7 @@ class Election {
   void _yield(int t, int nowMs) {
     term = t;
     leader = null;
+    _leaderTerm = null;
     candidateSinceMs = null;
     lastHeartbeatMs = nowMs; // a full timeout for the winner to beacon
     _setRole(electionFollower, nowMs);

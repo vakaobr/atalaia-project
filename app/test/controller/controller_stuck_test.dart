@@ -276,6 +276,128 @@ void main() {
     expect(engine.store.getSetting('key_tag:$live'), isNotNull);
   });
 
+  group('the air budget (SRB-1 to SRB-6)', () {
+    List<int> endedGames(int n) => [for (var i = 0; i < n; i++) endedGame()];
+
+    List<int?> sentGames() => [for (final f in frames()) f['game_id'] as int?];
+
+    test('no automatic resend while a game is started; Release still '
+        'works', () {
+      final gid = endedGame();
+      final live = game();
+      engine.startGame(live, force: true);
+      messages.clear();
+      for (final source in [4, 5, 6]) {
+        radio.otherGame(gid, source);
+        expect(drain(70000), 0);
+      }
+      var entry = (boxes.boxes()['stuck']! as List).single as Map;
+      expect(
+        [entry['game'], entry['nodes'], entry['game_over_resent']],
+        [
+          gid,
+          [4, 5, 6],
+          0,
+        ],
+      );
+      // The console heard of it at once.
+      expect(messages.map((m) => m['type']), contains('boxes'));
+      engine.pauseGame(live);
+      radio.otherGame(gid, 4);
+      expect(drain(10000), 0); // paused is still started
+      expect(stuck.release(gid)['game_over_frame'], 'sent');
+      expect(sentGames(), [gid]);
+      engine.endGame(live);
+      drain(70000);
+      radio.otherGame(gid, 4); // between games again: automatic
+      expect(drain(10000), gameOverRepeats);
+      entry = (boxes.boxes()['stuck']! as List).single as Map;
+      expect(entry['game_over_resent'], 2);
+    });
+
+    test('a game made but not started still frees its boxes', () {
+      final gid = endedGame();
+      game();
+      radio.otherGame(gid, 4);
+      expect(drain(10000), gameOverRepeats);
+    });
+
+    test('one automatic burst a minute for all games, the longest waiting '
+        'first', () {
+      final [a, b, c] = endedGames(3);
+      radio.otherGame(a, 1);
+      expect(sentGames(), [a]);
+      drain(10000);
+      for (var i = 0; i < 5; i++) {
+        for (final g in [a, b, c]) {
+          radio.otherGame(g, 1);
+        }
+        expect(drain(10000), 0);
+      }
+      radio.otherGame(a, 1); // a minute on: b or c, not a again
+      final first = sentGames().single;
+      expect([b, c], contains(first));
+      drain(60000);
+      radio.otherGame(a, 1);
+      expect(sentGames(), [first == b ? c : b]);
+      final counts = {
+        for (final s in boxes.boxes()['stuck']! as List)
+          (s as Map)['game']: s['game_over_resent'],
+      };
+      expect(counts, {a: 1, b: 1, c: 1});
+    });
+
+    test('a Release restarts the automatic minute', () {
+      final [a, b] = endedGames(2);
+      expect(stuck.release(a)['game_over_frame'], 'sent');
+      drain(10000);
+      radio.otherGame(b, 1);
+      expect(drain(10000), 0);
+      drain(40000);
+      radio.otherGame(b, 1);
+      expect(drain(10000), gameOverRepeats);
+    });
+
+    test('automatic bursts off the field\'s channel are rarer', () {
+      final [a, b] = endedGames(2); // on 869.525 MHz
+      engine.store.setSetting('radio.channel_hz', '$otherHz'); // moved on
+      radio.log.clear();
+      List<Object?> channels() => [
+        for (final e in radio.log)
+          if (e['kind'] == 'channel') e['channel_hz'],
+      ];
+      radio.otherGame(a, 1);
+      expect(drain(10000), gameOverRepeats);
+      expect(channels(), [gameHz, otherHz]); // there and back
+      for (var i = 0; i < stuckAutoRetuneMs ~/ 10000 - 2; i++) {
+        radio.otherGame(b, 1);
+        expect(drain(10000), 0, reason: 'report $i');
+      }
+      expect(channels(), [gameHz, otherHz]);
+      drain(20000);
+      radio.otherGame(b, 1);
+      expect(drain(10000), gameOverRepeats);
+      expect(channels(), [gameHz, otherHz, gameHz, otherHz]);
+    });
+
+    test('the node ids kept are bounded, with a count', () {
+      final gid = endedGame();
+      for (var s = 1; s <= stuckSourcesKept + 8; s++) {
+        radio.otherGame(gid, s);
+      }
+      radio.otherGame(gid, 1); // heard again: kept again
+      final entry = (boxes.boxes()['stuck']! as List).single as Map;
+      expect(entry['nodes'], [
+        1,
+        for (var s = 10; s <= stuckSourcesKept + 8; s++) s,
+      ]);
+      // An id dropped and heard again counts again: 40 heard, 41 counted.
+      expect(entry['nodes_count'], stuckSourcesKept + 9);
+      final view = (boxes.stuckView()['stuck']! as List).single as Map;
+      expect((view['nodes']! as List).length, stuckSourcesKept);
+    });
+  });
+
   group('a standby', () {
     late ControllerEngine leader;
     late int gid;

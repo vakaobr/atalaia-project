@@ -20,7 +20,7 @@ Para quem joga num campo com a Atalaia. Instalas a app, fazes o check-in no camp
 
 ## 1. Instala a app
 
-A app **ainda não está no Google Play nem na App Store**. A partir da v0.9.0, cada [versão no GitHub](https://github.com/vakaobr/atalaia-project/releases) traz a app Android: `atalaia-app-<versão>.apk`, com o `atalaia-app-<versão>.apk.sha256` (a soma SHA-256) ao lado. A organização também te pode dar o ficheiro, ou podes fazê-lo tu com o [guia da app](../../../app/README.md#install-it-on-an-android-phone-from-windows) (em inglês; uma compilação tua é assinada com a chave de depuração: vê o aviso abaixo).
+A app **ainda não está no Google Play nem na App Store**. A partir da v0.9.0, cada [versão no GitHub](https://github.com/vakaobr/atalaia-project/releases) traz a app Android: `atalaia-app-<versão>.apk`, com o `atalaia-app-<versão>.apk.sha256` (a soma SHA-256) ao lado. A primeira é a [v0.9.0](https://github.com/vakaobr/atalaia-project/releases/tag/v0.9.0) (6 de novembro de 2026): `atalaia-app-0.9.0.apk`. A organização também te pode dar o ficheiro, ou podes fazê-lo tu com o [guia da app](../../../app/README.md#install-it-on-an-android-phone-from-windows) (em inglês; uma compilação tua é assinada com a chave de depuração: vê o aviso abaixo).
 
 ### Android
 
@@ -30,7 +30,7 @@ A app **ainda não está no Google Play nem na App Store**. A partir da v0.9.0, 
 4. Toca em **Instalar** e abre a **Atalaia**.
 5. Aceita as autorizações que a app pedir quando as usares: câmara, localização e notificações.
 
-**Atualizações.** A partir da v0.9.0, os APK das versões são todos assinados com a única chave Android do projeto: descarrega o APK da versão nova e instala-o por cima do antigo. O Android mantém as tuas definições, os teus bilhetes e os campos em que confias. A impressão digital SHA-256 do certificado está nas [chaves do projeto](../../community/keys.md#the-android-app) (em inglês); o Android recusa um APK que diga ser a Atalaia mas esteja assinado com outra chave.
+**Atualizações.** A partir da v0.9.0, os APK das versões são todos assinados com a única chave Android do projeto: descarrega o APK da versão nova e instala-o por cima do antigo. O Android mantém as tuas definições, os teus bilhetes e os campos em que confias. A impressão digital SHA-256 do certificado é `9C:35:0D:17:37:D6:C5:35:CD:3E:D1:04:28:8E:65:AD:7D:B4:FA:CE:8E:4E:6F:27:75:3B:7B:7C:38:40:A1:99` (também nas [chaves do projeto](../../community/keys.md#the-android-app), em inglês); o Android recusa um APK que diga ser a Atalaia mas esteja assinado com outra chave.
 
 **Só uma vez: uma app instalada de um ficheiro antigo.** Antes da v0.9.0, a app era distribuída como `atalaia-debug.apk`, assinada com a chave do computador que a compilou. O Android não instala o APK da versão por cima dela (*App não instalada*, ou *em conflito com um pacote existente*). Desinstala a Atalaia uma vez e instala depois o APK da versão; a partir daí, as atualizações instalam-se por cima. Desinstalar apaga o que a app guarda: a língua e as definições, o bilhete de check-in e os campos em que confiavas. Depois de instalares de novo, escolhe a língua, lê o cartaz do campo, confia no campo e faz o check-in outra vez (ou pede um bilhete novo ao marshal). **Se este telemóvel for o telemóvel controlador de um campo ou um dispositivo de jogo, lê primeiro o aviso no [Manual do telemóvel controlador](phone-controller.md#10-updates) ou no [Guia do telemóvel como dispositivo de jogo](phone-prop.md#2-set-up-the-phone)**: esses perdem mais.
 

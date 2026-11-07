@@ -279,13 +279,16 @@ void main() {
       expect(e.tick(89999), null);
       expect(e.tick(90000), isNotNull);
     });
-    test('two lost beacons forget the auto cadence', () {
-      final e = Election(5, 1000, mode: 'auto')..follow(0);
+    test('two lost beacons keep the auto cadence, two steady 30 s gaps do not '
+        '(FLC-2)', () {
+      final e = Election(5, 1000)..follow(0);
       runBeacons(e, [0, 10000, 20000, 30000, 40000]);
       expect(e.leaderBeaconMs, 10000);
       e.onTime(1, 0, 70000, gameState: running);
-      expect(e.leaderBeaconMs, null);
-      expect(e.takeoverAfterMs, 90000);
+      expect(e.leaderBeaconMs, 10000);
+      e.onTime(1, 0, 100000, gameState: running);
+      expect(e.leaderBeaconMs, 30000);
+      expect(e.leaderFailoverMode, 'manual');
     });
     test('a new leader or term is measured afresh', () {
       final e = Election(5, 1000, mode: 'auto')..follow(0);
@@ -293,6 +296,132 @@ void main() {
       e.onTime(2, 7, 45000, gameState: running);
       expect(e.leaderBeaconMs, null);
       expect(e.takeoverAfterMs, 90000);
+    });
+  });
+
+  group('the leader alone is its liveness (decisions FLC-1 to FLC-6)', () {
+    const running = 1, leaderId = 10, other = 11;
+
+    /// A standby on auto behind a leader on auto (10 s); with
+    /// [hostileOffset], another source sends a TIME at the same term that long
+    /// after each of the leader's. Returns the election and the last TIME.
+    (Election, int) fastLeader({int? hostileOffset, int beacons = 8}) {
+      final e = Election(50, 100, mode: 'auto')..follow(0);
+      var t = 0;
+      e.onTime(1, leaderId, t, gameState: running);
+      for (var i = 0; i < beacons; i++) {
+        t += 10000;
+        expect(e.onTime(1, leaderId, t, gameState: running), isTrue);
+        if (hostileOffset != null) {
+          expect(
+            e.onTime(1, other, t + hostileOffset, gameState: running),
+            isFalse,
+          );
+        }
+      }
+      return (e, t);
+    }
+
+    test(
+      'same-term TIMEs from another source do not hide the fast cadence',
+      () {
+        for (final offset in [0, 1, 3000, 5000, 8000, 9900]) {
+          final (e, _) = fastLeader(hostileOffset: offset);
+          expect(e.leader, leaderId, reason: 'offset $offset');
+          expect(e.leaderBeaconMs, 10000, reason: 'offset $offset');
+          expect(e.livenessInterval, 10000, reason: 'offset $offset');
+          expect(e.takeoverAfterMs, 30000, reason: 'offset $offset');
+        }
+      },
+    );
+    test('they do not keep a dead leader alive', () {
+      final (e, t) = fastLeader(beacons: 4);
+      expect(e.takeoverAfterMs, 30000);
+      int? claimed;
+      for (var now = t + 100; now <= t + 330000; now += 100) {
+        if ((now - t) % 5000 == 0 && now - t <= 12000) {
+          e.onTime(1, other, now, gameState: running);
+        }
+        if (e.tick(now) != null) {
+          claimed = now;
+          break;
+        }
+      }
+      expect(claimed, t + 30000);
+    });
+    test('continuous TIMEs from a higher id after the leader died do not '
+        'block the takeover', () {
+      final (e, t) = fastLeader(beacons: 4);
+      int? claimed;
+      for (var now = t + 100; now <= t + 330000; now += 100) {
+        if ((now - t) % 30000 == 0) {
+          expect(e.onTime(1, other, now, gameState: running), isFalse);
+        }
+        if (e.tick(now) != null) {
+          claimed = now;
+          break;
+        }
+      }
+      expect(claimed, t + 30000);
+      expect(e.role, electionCandidate);
+    });
+    test('the survivor of a split election is followed once the other leader '
+        'stops', () {
+      final (e, t) = fastLeader(beacons: 4);
+      expect(e.onTime(1, 4, t + 5000), isFalse);
+      expect(e.onTime(1, 12, t + 12600), isFalse); // a higher id: never
+      expect(e.onTime(1, 4, t + 12600), isTrue); // past 10 s + 25 %
+      expect(e.leader, 4);
+      expect(e.leaderBeaconMs, null);
+      for (var now = t + 12600; now < t + 200000; now += 100) {
+        if ((now - t - 12600) % 10000 == 0) e.onTime(1, 4, now);
+        expect(e.tick(now), null, reason: 'a claim at $now');
+      }
+    });
+    test('a manual leader is still not taken over', () {
+      final e = Election(50, 100, mode: 'auto')..follow(0);
+      for (var t = 0; t <= 600000; t += 100) {
+        if (t % 30000 == 0) e.onTime(1, leaderId, t, gameState: running);
+        if (t % 10000 == 5000) e.onTime(1, other, t, gameState: running);
+        expect(e.tick(t), null, reason: 'a claim at $t');
+      }
+      expect(e.leader, leaderId);
+      expect(e.leaderBeaconMs, 30000);
+    });
+    test('an extra TIME from the leader does not reset its cadence', () {
+      var (e, t) = fastLeader(beacons: 4);
+      expect(e.leaderBeaconMs, 10000);
+      for (var k = 0; k < 5; k++) {
+        e.onTime(1, leaderId, t + 4000, gameState: running);
+        t += 10000;
+        e.onTime(1, leaderId, t, gameState: running);
+        expect(e.leaderBeaconMs, 10000, reason: 'round $k');
+      }
+    });
+    test('a long silence keeps the measured cadence', () {
+      final e = Election(50, 100)..follow(0);
+      for (var t = 0; t <= 40000; t += 10000) {
+        e.onTime(1, leaderId, t, gameState: running);
+      }
+      expect(e.leaderBeaconMs, 10000);
+      e.onTime(1, leaderId, 140000, gameState: running);
+      expect(e.leaderBeaconMs, 10000);
+    });
+    test('a same-term CLAIM is not the leader\'s liveness', () {
+      final (e, t) = fastLeader(beacons: 4);
+      for (var k = 1; k <= 5; k++) {
+        e.onClaim(1, 60000, other, t + k * 5000);
+        if (k * 5000 < 30000) expect(e.tick(t + k * 5000), null);
+      }
+      expect(e.tick(t + 30000), isNotNull);
+    });
+    test('a CLAIM at a higher term still opens the election', () {
+      final (e, t) = fastLeader(beacons: 4);
+      e.onClaim(2, 60000, other, t + 20000);
+      expect(e.term, 2);
+      expect(e.tick(t + 49999), null);
+      expect(e.onTime(2, other, t + 25000), isTrue);
+      expect(e.leader, other);
     });
   });
 

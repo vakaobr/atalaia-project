@@ -623,6 +623,113 @@ class StuckGameTests(GameOverTests):
         self.assertEqual([self.store.get_setting(f"key_tag:{g}") is not None for g in ids], [False, True, True])
         self.assertIsNotNone(self.store.get_setting(f"key_tag:{live}"))  # a live game's always stays
 
+    # --- the air budget (decisions SRB-1 to SRB-6) ----------------------------------------------
+
+    def ended_games(self, n: int) -> list[int]:
+        ids = []
+        for _ in range(n):
+            g = self.game()
+            self.ctrl.end_game(g)
+            self.drain(10)  # its own three GAME_OVERs
+            ids.append(g)
+        return ids
+
+    def test_no_automatic_resend_while_a_game_is_started(self):
+        """SRB-1: a started game's TIME and CMD keep the modem's duty budget; the game is still listed
+        and the GM's Release still sends it."""
+        gid, key = self.ended_game_with_a_stuck_box()
+        live = self.game()
+        self.ctrl.start_game(live, force=True)
+        self.messages.clear()
+        for source in (4, 5, 6):
+            self.modem.other_game(gid, source)
+            self.assertEqual(self.drain(70), 0)
+        [stuck] = self.client.get("/api/v1/boxes", headers=GM).json()["stuck"]
+        self.assertEqual((stuck["game"], stuck["nodes"], stuck["game_over_resent"]), (gid, [4, 5, 6], 0))
+        self.assertIn("boxes", {m["type"] for m in self.messages})  # the console heard of it at once
+        self.ctrl.pause_game(live)
+        self.modem.other_game(gid, 4)
+        self.assertEqual(self.drain(10), 0)  # paused is still started
+        self.assertEqual(self.release(gid).json()["game_over_frame"], "sent")
+        self.assertEqual(self.frames(), [{"kind": "game_over", "game_id": gid, "key_tag": ff.key_tag(key)}])
+        self.ctrl.end_game(live)
+        self.drain(70)
+        self.modem.other_game(gid, 4)  # between games again: automatic
+        self.assertEqual(self.drain(10), lobby.GAME_OVER_REPEATS)
+
+    def test_a_game_made_but_not_started_still_frees_its_boxes(self):
+        """SRB-1: a box stuck in an older game refuses the invites, so a game being set up still frees it."""
+        gid, _ = self.ended_game_with_a_stuck_box()
+        self.game()
+        self.modem.other_game(gid, 4)
+        self.assertEqual(self.drain(10), lobby.GAME_OVER_REPEATS)
+
+    def test_one_automatic_burst_a_minute_for_all_games_the_longest_waiting_first(self):
+        """SRB-2: reports for many ended games give one burst a minute in all, and a game waiting is
+        served before one already told again."""
+        a, b, c = self.ended_games(3)
+        self.modem.other_game(a, 1)
+        self.assertEqual([f["game_id"] for f in self.frames()], [a])
+        self.drain(10)
+        for _ in range(5):  # all three heard every 10 s: nothing more within the minute
+            for g in (a, b, c):
+                self.modem.other_game(g, 1)
+            self.assertEqual(self.drain(10), 0)
+        self.drain(0.5)
+        self.modem.other_game(a, 1)  # a minute on, a is reported first, but b and c wait
+        sent = [f["game_id"] for f in self.frames()]
+        self.assertEqual(len(sent), 1)
+        self.assertIn(sent[0], (b, c))
+        self.drain(60)
+        self.modem.other_game(a, 1)
+        self.assertEqual([f["game_id"] for f in self.frames()], [({b, c} - set(sent)).pop()])
+        listed = self.client.get("/api/v1/boxes", headers=GM).json()["stuck"]
+        counts = {s["game"]: s["game_over_resent"] for s in listed}
+        self.assertEqual(counts, {a: 1, b: 1, c: 1})
+
+    def test_a_release_restarts_the_automatic_minute(self):
+        a, b = self.ended_games(2)
+        self.assertEqual(self.release(a).json()["game_over_frame"], "sent")
+        self.drain(10)
+        self.modem.other_game(b, 1)
+        self.assertEqual(self.drain(10), 0)
+        self.drain(41.5)
+        self.modem.other_game(b, 1)
+        self.assertEqual(self.drain(10), lobby.GAME_OVER_REPEATS)
+
+    def test_automatic_bursts_off_the_fields_channel_are_rarer(self):
+        """SRB-3: between games, a burst for a game on another channel retunes the modem at most once
+        in AUTO_RETUNE_MS."""
+        from atalaia_controller.stuck_games import AUTO_RETUNE_MS
+        a, b = self.ended_games(2)  # on 869.525 MHz
+        self.store.set_setting("radio.channel_hz", "868100000")  # the field moved on
+        self.modem.channels.clear()
+        self.modem.other_game(a, 1)
+        self.assertEqual(self.drain(10), lobby.GAME_OVER_REPEATS)
+        self.assertEqual(self.modem.channels, [869_525_000, 868_100_000])  # there and back
+        for report in range(AUTO_RETUNE_MS // 10_000 - 2):  # b heard every 10 s for nearly five minutes
+            self.modem.other_game(b, 1)
+            self.assertEqual(self.drain(10), 0, report)
+        self.assertEqual(self.modem.channels, [869_525_000, 868_100_000])
+        self.drain(21)
+        self.modem.other_game(b, 1)
+        self.assertEqual(self.drain(10), lobby.GAME_OVER_REPEATS)
+        self.assertEqual(len(self.modem.channels), 4)
+
+    def test_the_node_ids_kept_are_bounded_with_a_count(self):
+        """SRB-4: a game keeps the SOURCES_KEPT node ids heard most recently and counts the rest."""
+        from atalaia_controller.stuck_games import SOURCES_KEPT
+        gid, _ = self.ended_game_with_a_stuck_box()
+        for source in range(1, SOURCES_KEPT + 9):
+            self.modem.other_game(gid, source)
+        self.modem.other_game(gid, 1)  # heard again: kept again
+        [stuck] = self.client.get("/api/v1/boxes", headers=GM).json()["stuck"]
+        self.assertEqual(len(stuck["nodes"]), SOURCES_KEPT)
+        self.assertEqual(stuck["nodes"], sorted([1, *range(10, SOURCES_KEPT + 9)]))
+        self.assertEqual(stuck["nodes_count"], SOURCES_KEPT + 9)
+        # An id dropped from the list and heard again counts again: 40 ids heard, 41 counted.
+        self.assertEqual(len(self.ctrl.reinvite.stuck_view()["stuck"][0]["nodes"]), SOURCES_KEPT)  # the stream's too
+
     def test_a_standby_never_sends_it(self):
         from atalaia_sim import join
         gid, _ = self.ended_game_with_a_stuck_box()
