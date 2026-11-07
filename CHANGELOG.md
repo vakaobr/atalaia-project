@@ -14,6 +14,11 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+* **server:** pyasn1 0.6.5 and opentelemetry-api 1.45.1 in the site server's lock (the controller already had
+  opentelemetry-api 1.45.1 and no pyasn1). A passkey registration is accepted only with the attestation formats
+  `attestation: none` brings back (`none`, or `packed` self-attestation); other formats are refused before their
+  statement is parsed.
+
 ### Details
 
 - **Boxes stuck in an ended game: one air budget for the automatic resends** (decisions SRB-1 to SRB-6, both
