@@ -510,13 +510,20 @@ void main() {
     test('names the live game and the wall clock, three times', () {
       final live = game();
       final out = stuck.releaseField();
+      final channel = engine.fieldChannel; // the game is not started
       expect(out, {
         'live_game': live,
         'time': (wallStart).floor(),
+        'channel_hz': channel,
         'release_frame': 'sent',
       });
       expect(frames(), [
-        {'kind': 'release', 'live_game': live, 'time': wallStart.floor()},
+        {
+          'kind': 'release',
+          'live_game': live,
+          'time': wallStart.floor(),
+          'channel_hz': channel,
+        },
       ]);
       expect(drain(10000), releaseRepeats); // the first one included
     });
@@ -548,8 +555,9 @@ void main() {
       expect(
         () => stuck.releaseField(),
         throwsA(
-          isA<ControllerError>()
+          isA<ClockError>()
               .having((e) => e.status, 's', 409)
+              .having((e) => e.code, 'c', 'not_set')
               .having((e) => e.message, 'm', contains('clock')),
         ),
       );
@@ -560,8 +568,30 @@ void main() {
       wall = wallStart - 7200;
       expect(
         () => stuck.releaseField(),
-        throwsA(isA<ControllerError>().having((e) => e.status, 's', 409)),
+        throwsA(isA<ClockError>().having((e) => e.status, 's', 409)),
       );
+    });
+
+    test('needs a clock it can vouch for (RLB-4)', () {
+      Matcher refused(String code, [int status = 409]) => throwsA(
+        isA<ClockError>()
+            .having((e) => e.status, 's', status)
+            .having((e) => e.code, 'c', code),
+      );
+      // A GM's typo moved the clock two weeks forward: never undone.
+      engine.clock.set(wallStart + 14 * 86400);
+      expect(() => stuck.releaseField(), refused('unconfirmed'));
+      expect(() => stuck.releaseField(wallStart), refused('ahead_of_device'));
+      expect(() => stuck.releaseField('now'), refused('invalid', 400));
+      expect(radio.fields, isEmpty);
+      // A device that agrees confirms it.
+      final out = stuck.releaseField(engine.clock.now());
+      expect(out['release_frame'], 'sent');
+    });
+
+    test('a small correction needs no device', () {
+      engine.clock.set(wallStart + clockReleaseSlackS);
+      expect(stuck.releaseField()['release_frame'], 'sent');
     });
   });
 
@@ -581,7 +611,8 @@ void main() {
     expect(times.first, closeTo(wallStart + 3600, 5));
     engine.endGame(gid);
     drain(15000);
-    final out = stuck.releaseField();
+    // The GM's device agrees with the corrected clock (RLB-4).
+    final out = stuck.releaseField(engine.clock.now());
     expect(out['time']! as int, closeTo(wallStart + 3600 + now / 1000, 2));
     expect(out['time']! as int, greaterThan(times.last));
   });
@@ -593,11 +624,16 @@ void main() {
       api = ControllerApi(engine, gmToken: 'gm-secret', readToken: 'rd-secret');
     });
 
-    (int, Object?) post(String path, {String token = 'gm-secret'}) {
+    (int, Object?) post(
+      String path, {
+      String token = 'gm-secret',
+      String body = '',
+    }) {
       final r = api.handle(
         'POST',
         Uri.parse(path),
         authorization: 'Bearer $token',
+        body: body,
       );
       return (r.status, r.body);
     }
@@ -616,6 +652,13 @@ void main() {
       expect(all.$1, 200);
       expect((all.$2! as Map)['release_frame'], 'sent');
       expect(post('/api/v1/boxes/release').$1, 429);
+      // The console's device_time: a device far behind the controller.
+      final behind = post(
+        '/api/v1/boxes/release',
+        body: '{"device_time": ${wallStart - 3600}}',
+      );
+      expect(behind.$1, 409);
+      expect((behind.$2! as Map)['code'], 'ahead_of_device');
       final listed = api.handle(
         'GET',
         Uri.parse('/api/v1/boxes'),

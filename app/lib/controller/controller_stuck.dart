@@ -331,12 +331,14 @@ class ControllerStuck {
   /// Amendment 28, decisions STUCK-50 to STUCK-59), for a controller that
   /// lost the game a box is stuck in (a new install: no key tag, so no
   /// GAME_OVER can name it): every box in a game other than the live one (or
-  /// any game, with none live) that it joined before now leaves it.
+  /// any game, with none live) that it joined before now leaves it, on the
+  /// radio's channel, which the frame names (the addendum of 2026-11-06).
   /// `release_frame`: "sent" or "no_radio". Refused: a standby (409), a wall
-  /// clock that is not plausible (409: the boxes compare its time with their
-  /// join's), and while one is being said or within [releaseFieldMs] of the
-  /// last (429).
-  Map<String, Object?> releaseField() {
+  /// clock that is not plausible or is ahead of what the controller can
+  /// vouch for (409, [ClockGuard.releaseCheck]: the GM's device's
+  /// [deviceTime], else the uncorrected system clock; decision RLB-4), and
+  /// while one is being said or within [releaseFieldMs] of the last (429).
+  Map<String, Object?> releaseField([Object? deviceTime]) {
     final live = engine.liveGame;
     if (_standby) {
       throw ControllerError.conflict(
@@ -345,13 +347,8 @@ class ControllerStuck {
       );
     }
     // The engine's clock guard (controller_clock.dart, the Pi's
-    // wallclock.py; decision STUCK-62 as changed by the maintainer).
-    if (!engine.clock.plausible()) {
-      throw ControllerError.conflict(
-        "the controller's clock is not set: set it first, so that the boxes "
-        'can tell this RELEASE from an older one',
-      );
-    }
+    // wallclock.py; decision STUCK-62 as changed by the maintainer, RLB-4).
+    engine.clock.releaseCheck(deviceTime);
     final liveId = (live?['id'] as int?) ?? 0;
     final now = engine.nowMs();
     if (boxes.inviter.releasing) throw _tooSoon('a RELEASE is being sent now');
@@ -361,11 +358,11 @@ class ControllerStuck {
       throw _tooSoon('a RELEASE was sent a moment ago; try again in $wait s');
     }
     final timeS = min(0xffffffff, engine.wallSeconds().floor());
-    if (!boxes.release(liveId, timeS)) {
-      return {'live_game': liveId, 'time': timeS, 'release_frame': 'no_radio'};
-    }
+    final (sent, channel) = boxes.release(liveId, timeS);
+    final out = {'live_game': liveId, 'time': timeS, 'channel_hz': channel};
+    if (!sent) return {...out, 'release_frame': 'no_radio'};
     fieldReleasedMs = now;
-    return {'live_game': liveId, 'time': timeS, 'release_frame': 'sent'};
+    return {...out, 'release_frame': 'sent'};
   }
 
   /// The games a box was heard still in within [stuckShownMs], the most

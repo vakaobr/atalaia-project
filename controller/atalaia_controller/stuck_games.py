@@ -219,14 +219,15 @@ class StuckGames:
             reinvite.refresh_boxes()
             return {"game": game_id, "game_over_frame": "sent"}
 
-    def release_field(self) -> dict[str, Any]:
+    def release_field(self, device_time: Any = None) -> dict[str, Any]:
         """The field-wide RELEASE (POST /api/v1/boxes/release, RFC 0001 Amendment 28, decisions STUCK-50
-        to STUCK-59), for a controller that lost the game a box is stuck in (a new database: no key
-        tag, so no GAME_OVER can name it): every box in a game other than the live one (or any game,
-        with none live) that it joined before now leaves it. ``release_frame``: "sent", "no_radio" or
-        "no_join_key". Refused: a standby (409), a wall clock that is not plausible (409: the boxes
-        compare its time with their join's), and while one is being said or within RELEASE_FIELD_MS
-        of the last (429)."""
+        to STUCK-59, its addendum of 2026-11-06 and decisions RLB-*), for a controller that lost the game
+        a box is stuck in (a new database: no key tag, so no GAME_OVER can name it): every box on the
+        modem's channel in a game other than the live one (or any game, with none live) that it joined
+        before now leaves it. ``release_frame``: "sent", "no_radio" or "no_join_key". Refused: a standby
+        (409), a wall clock that is not plausible or is ahead of what the controller can vouch for (409,
+        ``ClockGuard.release_check``: the GM's device's ``device_time``, else the uncorrected system
+        clock), and while one is being said or within RELEASE_FIELD_MS of the last (429)."""
         from . import wallclock
         from .engine import Conflict, TooSoon
         with self.ctl._lock:
@@ -234,9 +235,7 @@ class StuckGames:
             if live is not None and live.get("joined"):
                 raise Conflict("this controller follows a game as a standby: a RELEASE would take the "
                                "primary's boxes out of its game")
-            if not self.ctl.clock_guard.plausible():
-                raise Conflict("the controller's clock is not set: set it first, so that the boxes can "
-                               "tell this RELEASE from an older one")
+            self.ctl.clock_guard.release_check(device_time)
             live_id = live["id"] if live is not None else 0
             reinvite = self.ctl.reinvite
             if reinvite is None:
@@ -249,10 +248,12 @@ class StuckGames:
                 wait = (self.release_field_ms - (now - last) + 999) // 1000
                 raise TooSoon(f"a RELEASE was sent a moment ago; try again in {wait} s")
             time_s = min(0xFFFFFFFF, int(wallclock.now()))
-            if not reinvite.release(live_id, time_s):
-                return {"live_game": live_id, "time": time_s, "release_frame": "no_radio"}
+            sent, channel = reinvite.release(live_id, time_s)
+            out = {"live_game": live_id, "time": time_s, "channel_hz": channel}
+            if not sent:
+                return {**out, "release_frame": "no_radio"}
             self.field_released_ms = now
-            return {"live_game": live_id, "time": time_s, "release_frame": "sent"}
+            return {**out, "release_frame": "sent"}
 
     def public(self) -> list[dict[str, Any]]:
         """The games a box was heard still in within SHOWN_MS, the most recent first, with their names

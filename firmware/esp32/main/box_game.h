@@ -432,6 +432,21 @@ uint32_t box_game_join_time(const box_game_t *g);
  * leaves on its own once its last events are acknowledged, or after BOX_END_LINGER_MS). */
 bool box_game_can_leave(const box_game_t *g);
 
+/* How long the box must have heard no TIME of its game before the admin menu opens over a
+ * running game (decision AMG-2): ten missed controller beacons (30 s each), well past a
+ * failover's claim (about 90 s). */
+#define BOX_ADMIN_MENU_SILENT_MS (5u * 60u * 1000u)
+
+/*
+ * True while the keypad's admin menu may open over the box's game (decisions AMG-1 to AMG-3):
+ * the box can leave it (box_game_can_leave) and its mode is not taking keys from players: joined
+ * and waiting for the start, fetching its modes, paused, or BOX_ADMIN_MENU_SILENT_MS without a
+ * TIME of its game (a game that ended while the box was off: its controller says nothing more of
+ * it). While a game runs with its controller in reach the menu stays shut; "@leave <admin PIN>"
+ * on the USB console still works then.
+ */
+bool box_game_admin_menu_ok(const box_game_t *g);
+
 /*
  * The box leaves its game by hand: the admin menu's "Leave the game", "@leave <admin PIN>" on the
  * USB console (how: "admin menu", "console"; the caller has checked the PIN). It does exactly

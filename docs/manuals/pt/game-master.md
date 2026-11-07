@@ -65,7 +65,7 @@ Os dois servem a mesma consola. Onde diferem:
 | --- | --- | --- |
 | Rádio para as caixas | Modem de rádio USB | Modem de rádio USB (por USB) ou um módulo de E/S (por USB ou Bluetooth). Sem nenhum, só jogam dispositivos de jogo por Wi-Fi |
 | Liberta sozinho uma caixa presa num jogo terminado, mostra-a em **Presas num jogo terminado** | Sim, com um modem a partir da v0.9.0 | Só com um modem de rádio USB a partir da v0.9.0. Um módulo de E/S não consegue dizer que caixas ficaram presas |
-| **Libertar todas as caixas que não estão neste jogo** | A partir da v0.9.0 | A partir da v0.9.0 |
+| **Libertar todas as caixas que não estão neste jogo** | A partir da v0.9.0 (a forma ligada ao canal a partir da v0.10.0) | A partir da v0.9.0 (a forma ligada ao canal a partir da v0.10.0) |
 | Procurar um canal calmo (medição de ruído) | Com o modem | Com o modem ou o módulo de E/S |
 | Códigos de um dia (**Definições › Códigos de acesso temporários**) | Sim | Não |
 | Imprimir o cartaz, as etiquetas e o mapa com a quadrícula; **Exportar CSV** | No navegador de um computador | No navegador de um computador na rede do campo (não na consola da própria app) |
@@ -508,7 +508,7 @@ Tenta por esta ordem:
 | Passo | Controlador | Modem de rádio USB | Caixa |
 | --- | --- | --- | --- |
 | 1 e 2: reenvio automático, **Presas num jogo terminado**, **Libertar** | v0.9.0 | v0.9.0. O modem não se atualiza pelo ar: [grava-o de novo por USB](#update-the-modem) | Qualquer versão |
-| 3: **Libertar todas as caixas que não estão neste jogo** | v0.9.0 | Qualquer | v0.9.0, e tem de ter entrado no jogo já com esse firmware |
+| 3: **Libertar todas as caixas que não estão neste jogo** | v0.9.0; a partir da v0.10.0, uma forma nova que indica o canal | Qualquer | A mesma forma que o controlador: uma caixa v0.9.0 e um controlador v0.10.0, ou o contrário, não se entendem (atualiza os dois). Tem de ter entrado no jogo já com esse firmware |
 | 4: **Sair do jogo** na caixa, ou `@leave` | Não é preciso | Não é preciso | v0.9.0 |
 
 Com um modem mais antigo a lista diz **O modem de rádio não consegue dizer que caixas ficaram num jogo terminado: atualiza o seu firmware**. Num telemóvel controlador com um módulo de E/S como rádio diz **Um módulo de E/S não consegue dizer que caixas ficaram num jogo terminado**: liga antes um modem de rádio USB. Ainda não experimentado em hardware.
@@ -516,7 +516,7 @@ Com um modem mais antigo a lista diz **O modem de rádio não consegue dizer que
 <a id="take-a-box-out-of-its-game"></a>
 ### Tirar uma caixa do jogo
 
-Na própria caixa, com o PIN de administração dela. Também serve para tirar uma caixa de um jogo ainda a decorrer: a consola passa a ver essa caixa como terminada, e o jogo continua para as outras. **A partir da v0.9.0** no firmware da caixa.
+Na própria caixa, com o PIN de administração dela. Também serve para tirar uma caixa de um jogo ainda a decorrer: **põe primeiro o jogo em pausa**, porque o menu não abre com o jogo a decorrer e o controlador ao alcance (assim quem joga não o abre a meio do jogo). A consola passa a ver essa caixa como terminada, e o jogo continua para as outras. Uma caixa presa não ouve nada do controlador, por isso o menu dela abre 5 minutos depois de ser ligada. **A partir da v0.9.0** no firmware da caixa; pôr primeiro em pausa é preciso a partir da v0.10.0.
 
 1. Mantém `*` premido 3 segundos.
 2. Escreve o PIN de administração e carrega em `#`.
@@ -544,9 +544,9 @@ Uma caixa com firmware mais antigo não tem este menu. Os passos 1 e 2 de [Uma c
 
 1. **Repõe uma cópia de segurança, se tiveres** ([guia de montagem do controlador](controller-setup.md)). Com a mesma chave de entrada as caixas continuam a funcionar.
 2. **Sem cópia de segurança**, dá ao controlador novo a mesma chave de entrada do campo, se ainda a tiveres. Caso contrário, adota de novo todas as caixas.
-3. **Caixas ainda no jogo antigo.** O controlador já não conhece esse jogo, por isso não o consegue terminar. Abre **Definições**, **Caixas que ficaram num jogo perdido**, toca em **Libertar todas as caixas que não estão neste jogo** (ou **Libertar todas as caixas que estão num jogo** quando não há jogo a decorrer) e confirma com **Libertar**. Todas as caixas deste campo, neste canal, que estejam noutro jogo saem dele e mostram **PRONTA**. **A partir da v0.9.0**, no controlador e nas caixas.
+3. **Caixas ainda no jogo antigo.** O controlador já não conhece esse jogo, por isso não o consegue terminar. Abre **Definições**, **Caixas que ficaram num jogo perdido**, toca em **Libertar todas as caixas que não estão neste jogo** (ou **Libertar todas as caixas que estão num jogo** quando não há jogo a decorrer) e confirma com **Libertar**. Todas as caixas deste campo, neste canal, que estejam noutro jogo e não ouçam o controlador desse jogo há minuto e meio saem dele e mostram **PRONTA**. Uma caixa desligada e ligada entretanto é libertada logo. **A partir da v0.9.0**, no controlador e nas caixas; **a partir da v0.10.0 (ainda não publicada)** a libertação indica o canal, e o controlador e as caixas têm de estar os dois na v0.10.0.
 
-Atenção: um jogo que outro controlador deste campo faça ao mesmo tempo, no mesmo canal, também perde as suas caixas. Uma caixa que entrou no seu jogo depois da libertação não é afetada. A libertação é recusada num controlador de reserva, com o relógio do controlador errado, e mais de uma vez em 30 segundos. Ainda não experimentado em hardware.
+Uma caixa cujo controlador ainda fala com ela não é afetada, por isso um jogo que outro controlador deste campo faça no mesmo canal fica com as suas caixas. Uma caixa noutro canal, ou que entrou no seu jogo depois da libertação, também não é afetada. A libertação é recusada num controlador de reserva, com o relógio do controlador errado, com o relógio do controlador mais de 5 minutos adiantado em relação ao dispositivo que usas, e mais de uma vez em 30 segundos. Se disser que o relógio está adiantado, reinicia o controlador (o acerto desaparece) ou verifica o relógio deste dispositivo. Ainda não experimentado em hardware.
 
 <a id="the-controller-clock"></a>
 ### O relógio do controlador
@@ -559,7 +559,7 @@ Quando o relógio está atrasado, todos os ecrãs mostram uma faixa amarela: **O
 2. Na faixa, ou em **Definições › Relógio do controlador**, toca em **Acertar o relógio do controlador por este dispositivo**. Só o código da organização o pode fazer.
 3. Diz **O relógio do controlador é agora …**.
 
-O relógio só avança: nunca para antes dos dados mais recentes que o controlador guarda, e nunca mais de 14 dias de cada vez quando já parece certo. O acerto dura até o controlador reiniciar, por isso um Pi 4 precisa dele depois de cada corte de energia. Quem fez o check-in com o relógio muito atrasado pode ter de o fazer outra vez (a app pede). **Libertar todas as caixas que não estão neste jogo** é recusado enquanto o relógio estiver errado. Para corrigir o relógio de vez, vê o [guia de montagem do controlador](controller-setup.md). Um telemóvel controlador tem a mesma faixa e o mesmo botão **a partir da v0.9.0**.
+O relógio só avança: nunca para antes dos dados mais recentes que o controlador guarda, e nunca mais de 14 dias de cada vez quando já parece certo. O acerto dura até o controlador reiniciar, por isso um Pi 4 precisa dele depois de cada corte de energia. Quem fez o check-in com o relógio muito atrasado pode ter de o fazer outra vez (a app pede). **Libertar todas as caixas que não estão neste jogo** é recusado enquanto o relógio estiver errado, e enquanto estiver mais de 5 minutos adiantado em relação ao dispositivo a partir do qual o envias. Para corrigir o relógio de vez, vê o [guia de montagem do controlador](controller-setup.md). Um telemóvel controlador tem a mesma faixa e o mesmo botão **a partir da v0.9.0**.
 
 <a id="promote-the-standby"></a>
 ### Promover o de reserva

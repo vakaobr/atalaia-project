@@ -186,13 +186,14 @@ class ReinviteSimTests(unittest.TestCase):
         same RELEASE played back once the box is in a newer game is older than that join: nothing."""
         self.assertEqual(self.box.join(join_payload(1, self.key1, 4)), "accepted")
         self.box.start()
-        self.box.heard_time(1_793_000_000)
-        self.run_for(1_000)
-        self.inviter.release(1, 1_793_000_500, self.now)  # its own game is the live one: stays
+        self.box.heard_time(1_793_000_000, self.now)
+        self.run_for(ff.RELEASE_HEARD_S * 1000)  # its controller went quiet
+        ch = self.box.channel_hz
+        self.inviter.release(1, 1_793_000_095, self.now, ch)  # its own game is the live one: stays
         self.run_for(13_000)
         self.assertEqual(self.box.phase, "playing")
         start = len(self.sent)
-        rel = self.inviter.release(9, 1_793_000_600, self.now)
+        rel = self.inviter.release(9, 1_793_000_110, self.now, ch)
         self.run_for(500)
         self.assertEqual(self.box.phase, "ended")
         self.assertIn("game 1 released by a field controller (live game 9)", self.box.log)
@@ -204,10 +205,90 @@ class ReinviteSimTests(unittest.TestCase):
         # A newer game; the recording played back changes nothing.
         self.assertEqual(self.box.join(join_payload(2, self.key2, 4)), "accepted")
         self.box.start()
-        self.box.heard_time(1_793_001_000)
+        self.box.heard_time(1_793_001_000, self.now)
         self.box.on_frame(recorded, self.now)
         self.assertEqual(self.box.phase, "playing")
-        self.assertIn("release refused", self.box.log[-1])
+        self.assertIn("release refused (hearing)", self.box.log[-1])  # its game talks
+        self.run_for(ff.RELEASE_HEARD_S * 1000)
+        self.box.on_frame(recorded, self.now)
+        self.assertEqual(self.box.phase, "playing")
+        self.assertIn("release refused (old)", self.box.log[-1])  # quiet now, but older than the join
+
+    def test_a_box_that_hears_its_game_ignores_a_release(self):
+        """The addendum of 2026-11-06 (decision RLB-3): a box playing a game whose controller still sends
+        TIME is not one RELEASE is for, whatever its time: 100 s after the join, 14 days after, the last
+        second of the clock."""
+        self.assertEqual(self.box.join(join_payload(1, self.key1, 4)), "accepted")
+        self.box.start()
+        self.box.heard_time(1_793_000_100, self.now)
+        ch = self.box.channel_hz
+        for t in (1_793_000_200, 1_793_000_100 + 14 * 86400, 0xFFFFFFFF):
+            self.inviter.releases = []
+            self.inviter.release(0x0D00, t, self.now, ch)
+            self.run_for(500)
+            self.assertEqual(self.box.phase, "playing")
+            self.assertIn("release refused (hearing)", self.box.log[-1])
+            self.box.heard_time(1_793_000_100, self.now)
+
+    def test_a_release_recorded_on_another_channel_frees_no_box(self):
+        """The addendum of 2026-11-06: a RELEASE names the channel it is sent on. Played back on another
+        channel, where a game started before its time is live, it frees no box there."""
+        self.assertEqual(self.box.join(join_payload(1, self.key1, 4)), "accepted")
+        self.box.start()
+        self.box.heard_time(1_793_000_000, self.now)
+        self.run_for(ff.RELEASE_HEARD_S * 1000)
+        other = self.box.channel_hz + 400_000
+        start = len(self.sent)
+        self.inviter.release(9, 1_793_000_100, self.now, other)  # sealed for another channel
+        self.run_for(500)
+        recorded = self.sent[start]
+        self.assertEqual(self.box.phase, "playing")
+        self.assertIn("release refused (other_channel)", self.box.log[-1])
+        self.box.on_frame(recorded, self.now)
+        self.assertEqual(self.box.phase, "playing")
+
+    def test_a_release_stamped_ahead_of_the_game_s_clock_is_refused(self):
+        """The addendum of 2026-11-06: a RELEASE more than ff.RELEASE_AHEAD_S past the box's estimate of
+        its game's clock (the newest TIME plus the time since) is refused, so a clock that runs ahead
+        does not make a frame that stays valid; within the margin, and once the time has come, it is
+        taken."""
+        self.assertEqual(self.box.join(join_payload(1, self.key1, 4)), "accepted")
+        self.box.start()
+        self.box.heard_time(1_793_000_000, self.now)
+        ch = self.box.channel_hz
+        self.run_for(100_000)  # its controller went quiet; the game's clock is now about 1_793_000_100
+        ahead = 1_793_000_100 + ff.RELEASE_AHEAD_S + 14 * 86400
+        start = len(self.sent)
+        self.inviter.release(9, ahead, self.now, ch)
+        self.run_for(500)
+        recorded = self.sent[start]
+        self.assertEqual(self.box.phase, "playing")
+        self.assertIn("release refused (ahead)", self.box.log[-1])
+        self.run_for(13_000)
+        self.inviter.release(9, 1_793_000_100 + ff.RELEASE_AHEAD_S, self.now, ch)  # within the margin
+        self.run_for(500)
+        self.assertEqual(self.box.phase, "ended")
+        self.assertTrue(recorded)
+
+    def test_a_box_restarted_into_a_lost_game_is_freed_at_once(self):
+        """The bench recovery of 2026-11-06: a box switched off mid-game, the game ended (and its controller
+        lost it), the box switched on again: it hears no TIME of its game, so the GM's RELEASE frees it at
+        once. Had its game's controller been alive, the box would hear it again and ignore the RELEASE."""
+        self.assertEqual(self.box.join(join_payload(1, self.key1, 4)), "accepted")
+        self.box.start()
+        self.box.heard_time(1_793_000_000, self.now)
+        ch = self.box.channel_hz
+        self.box.rebooted(self.now)
+        self.box.heard_time(1_793_000_010, self.now)  # its game talks after all
+        self.inviter.release(9, 1_793_000_020, self.now, ch)
+        self.run_for(500)
+        self.assertEqual(self.box.phase, "playing")
+        self.assertIn("release refused (hearing)", self.box.log[-1])
+        self.run_for(13_000)
+        self.box.rebooted(self.now)  # switched off and on again; nobody runs its game now
+        self.inviter.release(9, 1_793_090_000, self.now, ch)
+        self.run_for(500)
+        self.assertEqual(self.box.phase, "ended")
 
     def test_the_same_game_again_is_refused(self):
         """A box that played a game to its end does not join it again, even with a valid token."""

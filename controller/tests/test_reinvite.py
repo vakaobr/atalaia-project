@@ -832,12 +832,14 @@ class ReleaseFieldTests(GameOverTests):
     ended_game_with_a_stuck_box = StuckGameTests.ended_game_with_a_stuck_box
     drain = StuckGameTests.drain
 
-    def release_all(self):
-        return self.client.post("/api/v1/boxes/release", headers=GM)
+    def release_all(self, body=None):
+        return self.client.post("/api/v1/boxes/release", headers=GM, json=body)
 
     def test_release_frees_a_box_of_a_game_this_controller_does_not_know(self):
         gid, _ = self.ended_game_with_a_stuck_box()
-        self.box.heard_time(int(wallclock.now()) - 60)  # the box took its game's first TIME a minute ago
+        # Its game's first and last TIME, 100 s ago: its controller is gone (RLB-3: a box that hears its
+        # game ignores a RELEASE).
+        self.box.heard_time(int(wallclock.now()) - 100, self.ctrl.now_ms() - 100_000)
         self.store.delete_setting(f"key_tag:{gid}")  # as good as a lost database: nothing names the game
         live = self.game()
         with self.assertLogs("atalaia.reinvite", "WARNING") as logs:
@@ -846,8 +848,11 @@ class ReleaseFieldTests(GameOverTests):
         out = r.json()
         self.assertEqual((out["live_game"], out["release_frame"]), (live, "sent"))
         self.assertLessEqual(abs(out["time"] - int(wallclock.now())), 1)
-        self.assertIn(f"RELEASE: every box in a game other than {live}", logs.output[0])
-        self.assertEqual(self.frames(), [{"kind": "release", "live_game": live, "time": out["time"]}])
+        channel = self.ctrl.transport.channel_hz if self.ctrl.fc is not None else self.ctrl.field_channel
+        self.assertEqual((out["channel_hz"], self.box.channel_hz), (channel, channel))
+        self.assertIn(f"RELEASE: every box on {channel} Hz in a game other than {live}", logs.output[0])
+        self.assertEqual(self.frames(), [{"kind": "release", "live_game": live, "time": out["time"],
+                                          "channel_hz": channel}])
         frame = self.modem.fields.pop(0)
         self.box.on_frame(frame, self.ctrl.now_ms())
         self.assertEqual(self.box.phase, "ended")
@@ -858,7 +863,7 @@ class ReleaseFieldTests(GameOverTests):
         live = self.game(assignments={"4": "zone"})
         self.box.join(bytes.fromhex(self.ctrl.issue_join({"role": "zone"}, node_id=4)["payload_hex"]))
         self.box.start()
-        self.box.heard_time(int(wallclock.now()))
+        self.box.heard_time(int(wallclock.now()), self.ctrl.now_ms())
         self.assertEqual(self.release_all().json()["release_frame"], "sent")
         frame = self.modem.fields.pop(0)
         self.box.on_frame(frame, self.ctrl.now_ms())
@@ -868,10 +873,44 @@ class ReleaseFieldTests(GameOverTests):
         self.assertEqual(other.join(bytes.fromhex(self.ctrl.issue_join({"role": "zone"}, node_id=5)["payload_hex"])),
                          "accepted")
         other.game["game_id"] = 999
-        other.heard_time(int(wallclock.now()) + 3600)
+        other.heard_time(int(wallclock.now()) + 3600, self.ctrl.now_ms() - 100_000)
         other.on_frame(frame, self.ctrl.now_ms())
         self.assertEqual(other.phase, "joined")
-        self.assertIn("release refused", other.log[-1])
+        self.assertIn("release refused (old)", other.log[-1])
+
+    def test_a_recording_played_on_another_channel_frees_no_box(self):
+        """The addendum of 2026-11-06 (decision RLB-1): the frame names the modem's channel; a box in a
+        game on another channel, joined before the RELEASE's time, refuses it."""
+        gid, _ = self.ended_game_with_a_stuck_box()
+        self.box.heard_time(int(wallclock.now()) - 100, self.ctrl.now_ms() - 100_000)
+        self.assertEqual(self.release_all().json()["release_frame"], "sent")
+        frame = self.modem.fields.pop(0)
+        self.box.channel_hz += 400_000  # the same box, but in a game on another channel
+        self.box.on_frame(frame, self.ctrl.now_ms())
+        self.assertEqual(self.box.phase, "playing")
+        self.assertIn("release refused (other_channel)", self.box.log[-1])
+
+    def test_release_needs_a_clock_it_can_vouch_for(self):
+        """Decision RLB-4: the RELEASE's time is at most RELEASE_SLACK_S past the GM's device clock
+        (device_time) or, without one, past the system clock without the GM's correction."""
+        import time as _time
+        wallclock._offset = 14 * 86400.0  # a GM's typo moved the clock two weeks forward
+        self.addCleanup(wallclock.reset)
+        r = self.release_all()
+        self.assertEqual((r.status_code, r.json()["code"]), (409, "unconfirmed"))
+        r = self.release_all({"device_time": _time.time()})
+        self.assertEqual((r.status_code, r.json()["code"]), (409, "ahead_of_device"))
+        self.assertEqual(self.modem.fields, [])
+        # A device that agrees confirms it (a Pi that came up at 1970, set by the GM: a big correction).
+        self.assertEqual(self.release_all({"device_time": wallclock.now()}).json()["release_frame"], "sent")
+        wallclock.reset()
+        self.assertEqual(self.release_all({"device_time": "now"}).status_code, 400)
+        self.assertEqual(self.release_all([1]).status_code, 400)
+
+    def test_a_small_correction_needs_no_device(self):
+        wallclock._offset = float(wallclock.RELEASE_SLACK_S)
+        self.addCleanup(wallclock.reset)
+        self.assertEqual(self.release_all().json()["release_frame"], "sent")
 
     def test_time_and_release_carry_the_same_corrected_clock(self):
         """A box's join time is the wall_s of its game's first TIME and RELEASE's time is compared with it
@@ -886,7 +925,7 @@ class ReleaseFieldTests(GameOverTests):
         self.assertTrue(times)
         self.assertLessEqual(abs(times[0] - int(_time.time() + 3600)), 2)
         self.ctrl.end_game(gid, "done")
-        out = self.release_all().json()
+        out = self.release_all({"device_time": _time.time() + 3600}).json()  # the GM's device agrees
         self.assertEqual(out["release_frame"], "sent")
         self.assertLessEqual(abs(out["time"] - int(wallclock.now())), 1)
         self.assertGreaterEqual(out["time"], times[-1])
@@ -911,7 +950,7 @@ class ReleaseFieldTests(GameOverTests):
     def test_release_needs_a_plausible_clock(self):
         with mock.patch.object(self.ctrl.clock_guard, "plausible", return_value=False):
             r = self.release_all()
-        self.assertEqual(r.status_code, 409)
+        self.assertEqual((r.status_code, r.json()["code"]), (409, "not_set"))
         self.assertIn("clock", r.text)
         self.assertEqual(self.modem.fields, [])
 

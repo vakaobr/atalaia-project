@@ -13,9 +13,11 @@
  *                                  (decision OT-13; for a controller that lost the game's key)
  *   MOVE      controller -> boxes  "the field is on channel C now (revision R)": a free box listens
  *                                  there (RFC 0001 Amendment 19)
- *   RELEASE   controller -> boxes  "game L is live (or none), it is now T": every box in a game
- *                                  other than L that it joined before T leaves it (RFC 0001
- *                                  Amendment 28; for a controller that lost the game)
+ *   RELEASE   controller -> boxes  "game L is live (or none), it is now T, on channel C": every box
+ *                                  on C in a game other than L that it joined before T leaves it,
+ *                                  unless T is too far past its game's clock (RFC 0001 Amendment 28
+ *                                  and its addendum of 2026-11-06; for a controller that lost the
+ * game)
  *
  * On air:
  *
@@ -108,8 +110,9 @@ enum {
     ATALAIA_FF_K_CHANNEL = 4, /* the field's channel, Hz */
     ATALAIA_FF_K_REV = 5,     /* rises with every change of channel */
     /* RELEASE */
-    ATALAIA_FF_K_LIVE_GAME = 4, /* the sender's live game, 0 = none */
-    ATALAIA_FF_K_TIME = 5,      /* the sender's wall clock, Unix seconds */
+    ATALAIA_FF_K_LIVE_GAME = 4,       /* the sender's live game, 0 = none */
+    ATALAIA_FF_K_TIME = 5,            /* the sender's wall clock, Unix seconds */
+    ATALAIA_FF_K_RELEASE_CHANNEL = 6, /* the channel it is sent on, Hz (addendum of 2026-11-06) */
 };
 
 typedef struct {
@@ -134,8 +137,9 @@ typedef struct {
     /* GAME_OVER */
     uint16_t game_id;                     /* 1-65534 */
     uint8_t key_tag[ATALAIA_FF_TAG_SIZE]; /* the game key's tag (its epoch store's) */
-    /* MOVE */
-    uint32_t channel_hz; /* 1-0xFFFFFFFF; the box checks it against its region */
+    /* MOVE and RELEASE */
+    uint32_t channel_hz; /* 1-0xFFFFFFFF; MOVE: the box checks it against its region; RELEASE:
+                          * the channel it is sent on, which must be the box's */
     uint32_t rev;        /* 1-0xFFFFFFFF; a box takes only one above the last it took */
     /* RELEASE */
     uint16_t live_game; /* 0-65534: 0 = no game live */
@@ -207,5 +211,57 @@ int atalaia_ff_reasm_add(atalaia_ff_reasm_t *r, const atalaia_ff_msg_t *m, uint8
 
 /* The number of parts a join payload of len bytes takes (0 if it is too long). */
 size_t atalaia_ff_parts_for(size_t len);
+
+/*
+ * Whether a box in a game takes a RELEASE (RFC 0001 Amendment 28 and its addendum of 2026-11-06).
+ * The box's phase (joined or playing) is checked by the caller; this is the rest, in order:
+ *
+ *   the live game   a RELEASE naming the box's own game changes nothing
+ *   the channel     it must be the channel the box is on (its game's): a recording played back on
+ *                   another channel frees no box there
+ *   its game talks  a box that heard a TIME of its game (game key, replay window, Amendment 23's
+ *                   ordering) less than ATALAIA_FF_RELEASE_HEARD_S ago is in a game whose
+ *                   controller is alive: a RELEASE is not for it. RELEASE is for a box whose
+ *                   controller has gone quiet (lost, reinstalled) or a box restarted into a game
+ *                   nobody runs any more, which hears no TIME at all and is freed at once.
+ *   the join        the box must know when it joined (the first TIME of its game, kept across a
+ *                   reboot) and the RELEASE's time must be after it (a recording played back once
+ *                   the box is in a newer game changes nothing)
+ *   not ahead       when the box has heard a TIME with a wall clock in this run, the time must be
+ *                   at most ATALAIA_FF_RELEASE_AHEAD_S past its estimate of its game's wall clock
+ *                   now: that TIME's wall_s plus the seconds since (its monotonic clock). A RELEASE
+ *                   stamped by a clock that runs ahead does not stay valid for as long as it runs
+ *                   ahead. A box restarted with no TIME since has no estimate: the controllers'
+ *                   bound on the time they stamp (RLB-4) is what holds there.
+ */
+#define ATALAIA_FF_RELEASE_AHEAD_S 300u
+#define ATALAIA_FF_RELEASE_HEARD_S 90u
+
+typedef enum {
+    ATALAIA_FF_RELEASE_TAKEN = 0,
+    ATALAIA_FF_RELEASE_LIVE = 1,          /* the box is in the live game it names */
+    ATALAIA_FF_RELEASE_OTHER_CHANNEL = 2, /* sent on another channel than the box's */
+    ATALAIA_FF_RELEASE_HEARING = 3,       /* the box's game's controller still sends TIME */
+    ATALAIA_FF_RELEASE_NO_JOIN_TIME = 4,  /* the box never heard a TIME of its game */
+    ATALAIA_FF_RELEASE_OLD = 5,           /* not after the box's join */
+    ATALAIA_FF_RELEASE_AHEAD = 6,         /* too far past the box's estimate of the wall clock */
+} atalaia_ff_release_verdict_t;
+
+typedef struct {
+    uint16_t game_id;       /* the box's game */
+    uint32_t channel_hz;    /* the channel the box is on (its game's) */
+    uint32_t join_wall_s;   /* the wall clock of the game's first TIME; 0: unknown */
+    bool heard_time;        /* a TIME of its game heard since the box started (this run) */
+    uint32_t since_heard_s; /* seconds since the last one (with heard_time) */
+    uint32_t
+        time_wall_s; /* the newest TIME's wall_s (not 0) heard since the box started; 0: none */
+    uint32_t since_time_s; /* seconds since that TIME (the box's monotonic clock) */
+} atalaia_ff_release_box_t;
+
+atalaia_ff_release_verdict_t atalaia_ff_release_verdict(const atalaia_ff_release_box_t *box,
+                                                        const atalaia_ff_msg_t *m);
+
+/* A short name for a verdict ("taken", "live", "other_channel", ...), as in the vectors. */
+const char *atalaia_ff_release_verdict_name(atalaia_ff_release_verdict_t v);
 
 #endif /* ATALAIA_FIELD_FRAME_H */

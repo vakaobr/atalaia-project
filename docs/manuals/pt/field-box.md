@@ -314,23 +314,23 @@ Uma caixa que estava desligada quando o jogo terminou nunca ouve o fim. Ao volta
 | Maneira | Quem faz | Precisa da v0.9.0 em |
 | --- | --- | --- |
 | **O controlador liberta-a sozinho.** Ouve a caixa, volta a dizer que o jogo dela terminou e, em cerca de um minuto, a caixa mostra o último ecrã do jogo e depois **PRONTA**. A organização também vê a caixa no separador **Caixas** da consola, em **Presas num jogo terminado**, e **Libertar** avisa-a logo | Ninguém, ou a organização | O **controlador** e o seu **modem de rádio USB** (o modem não tem atualização pelo ar: grava-se outra vez por USB, [guia do modem](modem.md#update-the-modem)). Qualquer firmware de caixa. A caixa tem de estar no canal do campo. Um módulo de E/S usado como rádio do controlador não o consegue fazer |
-| **Libertar todas as caixas que não estão neste jogo** (consola, **Definições**). Para um controlador que foi reinstalado ou perdeu os dados, e já não conhece o jogo antigo. Liberta todas as caixas do campo que estão noutro jogo, se a caixa entrou nesse jogo antes | A organização | O **controlador** e a **caixa** (uma caixa mais antiga ignora-o) |
+| **Libertar todas as caixas que não estão neste jogo** (consola, **Definições**). Para um controlador que foi reinstalado ou perdeu os dados, e já não conhece o jogo antigo. Liberta todas as caixas do campo, nesse canal, que estão noutro jogo, se a caixa entrou nesse jogo antes e não ouve o controlador desse jogo há minuto e meio | A organização | O **controlador** e a **caixa** na mesma versão (a partir da v0.10.0 a libertação indica o canal: uma caixa v0.9.0 ignora a de um controlador v0.10.0, e o contrário) |
 | **Sair do jogo, na caixa** (abaixo). Funciona sempre, também com um controlador ou um modem mais antigos | Tu, com o PIN de administração | A **caixa** |
 
 O lado da organização está no [manual da organização, Recuperar de problemas](game-master.md#recover-from-problems).
 
 **Sair do jogo na caixa** (o menu de administração da caixa; não o **Sair do jogo** da app de quem joga, que só apaga o nome da pessoa):
 
-1. Mantém `*` premido durante 3 segundos. O toque em si continua a ir para o jogo, como um `*`.
+1. Mantém `*` premido durante 3 segundos. O toque em si continua a ir para o jogo, como um `*`. O menu só abre quando o jogo não pode receber teclas de quem joga: a caixa está à espera do início, o jogo está em pausa, ou a caixa não ouve nada do controlador há 5 minutos (uma caixa presa: espera 5 minutos depois de a ligar). Com o jogo a decorrer e o controlador ao alcance, manter `*` premido não faz mais nada.
 2. **Marca o PIN de administração.** `#` confirma. `*` apaga; sem nada escrito, `*` volta ao jogo.
 3. **ADMINISTRAÇÃO** mostra uma entrada, **Sair do jogo**. Carrega em `#`.
 4. **SAIR DO JOGO?**: `#` sai, `*` volta.
 
 A caixa termina o jogo como se a organização o tivesse terminado: o último ecrã do jogo e, 30 segundos depois, **PRONTA**. Nunca mais entra nesse jogo. Mantém o campo, a chave de entrada, o Wi-Fi, o PIN de administração e os jogos. Pode ser convidada, ou receber um cartão de entrada, logo a seguir.
 
-- Também funciona num jogo que ainda decorre, para a organização poder tirar uma caixa: a consola passa a ver essa caixa como terminada e o jogo continua para as outras caixas.
-- O menu só aparece enquanto a caixa está num jogo do controlador ou de um cartão de entrada. Fecha sozinho ao fim de 30 segundos sem tecla, ou quando o jogo termina.
-- Cinco PIN errados obrigam a esperar, como em todo o lado.
+- Para tirar uma caixa de um jogo que ainda decorre (um botão avariado, uma caixa no sítio errado), **põe o jogo em pausa** na consola primeiro e depois mantém `*` premido. Ou usa `@leave <PIN de administração>` na consola USB, que funciona a qualquer momento. A consola da organização passa a ver essa caixa como terminada e o jogo continua para as outras caixas quando for retomado.
+- O menu só aparece enquanto a caixa está num jogo do controlador ou de um cartão de entrada. Fecha sozinho ao fim de 30 segundos sem tecla, quando o jogo termina ou quando o jogo volta a decorrer (retomado, ou o controlador ouvido de novo).
+- Cinco PIN errados neste menu obrigam a esperar antes da tentativa seguinte neste menu (1, 2, 4 ... minutos, como em todo o lado). Estas tentativas têm a sua própria contagem: nunca bloqueiam o seletor de jogos, a adoção nem o `@leave` da consola USB, por isso quem joga e marca PIN errados não consegue impedir o GM de usar a caixa.
 - Uma caixa sem teclado (um Satélite) faz o mesmo na consola USB: `@leave <PIN de administração>`. A caixa responde `leave: game N is over on this box; it is free for the next game` ([guia do firmware, secção 5](firmware.md#5-primeiro-arranque-e-configuração)).
 
 Testado só num computador; ainda não experimentado em hardware.
@@ -411,7 +411,7 @@ Mais: a [página do rádio](https://atalaia-project.link/radio/), o [guia do tes
 | Não acontece nada quando ligo | Verifica o interruptor principal, o fusível e a bateria. Carrega por USB-C com o interruptor **ligado**. Se cheirar mal ou estiver quente, desliga e tira as células. |
 | A caixa não está na lista de **Convidar caixas** da organização | Tem de mostrar **PRONTA** e estar adotada. Espera até um minuto, ou pede à organização que carregue em **Procurar caixas**. Confirma a região e aproxima-te do controlador. |
 | O convite diz **recusou: noutro jogo** | A caixa ainda está num jogo antigo. Se esse jogo ainda decorre, termina-o ou [tira a caixa do jogo](#take-a-box-out-of-its-game). Se já tinha terminado (a caixa estava desligada quando acabou), vê a mesma secção. Não a apagues. |
-| A caixa ignora **Libertar** ou **Libertar todas as caixas que não estão neste jogo** | O firmware dela ou o modem do controlador são anteriores à v0.9.0, ou a caixa está noutro canal. Tira-a na própria caixa: [Sair do jogo](#take-a-box-out-of-its-game). |
+| A caixa ignora **Libertar** ou **Libertar todas as caixas que não estão neste jogo** | O firmware dela ou o modem do controlador são anteriores à v0.9.0, a caixa e o controlador estão em versões diferentes (v0.9.0 e v0.10.0), a caixa está noutro canal, ou a caixa ainda ouve o controlador do seu jogo. Tira-a na própria caixa: [Sair do jogo](#take-a-box-out-of-its-game). |
 | O convite diz **recusou**, «chave de entrada de outro campo?» | A caixa pertence a outro campo. Adota-a outra vez ([secção 5](#5-adota-a-caixa-no-campo)). |
 | A consola diz **A caixa N não dá notícias há mais de 90 s** | Aproxima a caixa, junta uma caixa no meio como repetidor, ou verifica a antena. A caixa pode estar bem: continua a jogar e põe-se em dia. |
 | A consola diz **Duas caixas partilham o n.º N** | A mesma entrada foi usada em duas caixas. Tira uma do jogo e junta-a de novo com outra entrada. |

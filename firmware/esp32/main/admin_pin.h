@@ -87,6 +87,14 @@ void admin_pin_init(admin_pin_t *a, const admin_pin_ops_t *ops, const char *pin)
 
 bool admin_pin_is_set(const admin_pin_t *a);
 
+/*
+ * A second check with the same PIN and its own count of wrong PINs (decision AMG-3: the admin menu
+ * over a field game, so tries there never start the waits of the picker, adoption and the USB
+ * console). The PIN in force is taken from main now, so a PIN changed since counts; the count,
+ * its waits and the ops stay a's own.
+ */
+void admin_pin_follow(admin_pin_t *a, const admin_pin_t *main);
+
 /* The wait for a count of failures: 0 below ADMIN_PIN_FREE_TRIES, then 1, 2, 4 ... minutes up
  * to ADMIN_PIN_WAIT_CAP_MIN. */
 uint32_t admin_pin_wait_for(uint32_t failures);

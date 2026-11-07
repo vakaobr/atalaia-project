@@ -61,7 +61,7 @@ Both run the same console. Where they differ:
 | --- | --- | --- |
 | Radio to the boxes | USB radio modem | USB radio modem (over USB) or an I/O pod (over USB or Bluetooth). Without one, only phone props on Wi-Fi can play |
 | Frees a box stuck in an ended game by itself, lists it under **Stuck in an ended game** | Yes, with a modem from v0.9.0 | Only with a USB radio modem from v0.9.0. An I/O pod cannot report such boxes |
-| **Release every box not in this game** | From v0.9.0 | From v0.9.0 |
+| **Release every box not in this game** | From v0.9.0 (the channel-bound form from v0.10.0) | From v0.9.0 (the channel-bound form from v0.10.0) |
 | Find a quiet channel (noise scan) | With the modem | With the modem or the I/O pod |
 | Day codes (**Settings › Access tokens**) | Yes | No |
 | Print the poster, labels and grid map; **Export CSV** | From a computer's browser | From a computer's browser on the field's network (not the app's own console) |
@@ -477,14 +477,14 @@ Try these in order:
 | Step | Controller | USB radio modem | Box |
 | --- | --- | --- | --- |
 | 1 and 2: automatic resend, **Stuck in an ended game**, **Release** | v0.9.0 | v0.9.0. The modem has no update over the air: [reflash it over USB](#update-the-modem) | Any version |
-| 3: **Release every box not in this game** | v0.9.0 | Any | v0.9.0, and it must have joined its game on that firmware |
+| 3: **Release every box not in this game** | v0.9.0; from v0.10.0 a new form that names the channel | Any | The same form as the controller: a v0.9.0 box and a v0.10.0 controller, or the reverse, do not understand each other (update both). It must have joined its game on that firmware |
 | 4: **Leave the game** at the box, or `@leave` | Not needed | Not needed | v0.9.0 |
 
 With an older modem the list says **The radio modem cannot report boxes still in an ended game: update its firmware**. On a phone controller with an I/O pod as its radio it says **An I/O pod cannot report boxes still in an ended game**: plug in a USB radio modem instead. Not yet tried on hardware.
 
 ### Take a box out of its game
 
-At the box, with its admin PIN. This also pulls a box out of a game that is still running: the console then sees that box as ended, and the game goes on for the others. **From v0.9.0** in the box's firmware.
+At the box, with its admin PIN. This also pulls a box out of a game that is still running: **pause the game first**, because the menu does not open while the game runs with the controller in reach (so players cannot open it mid-game). The console then sees that box as ended, and the game goes on for the others. A stuck box hears nothing from its controller, so its menu opens 5 minutes after it is switched on. **From v0.9.0** in the box's firmware; pausing first is needed from v0.10.0.
 
 1. Hold `*` for 3 seconds.
 2. Type the admin PIN and press `#`.
@@ -509,9 +509,9 @@ A box on older firmware has no such menu. Steps 1 and 2 of [A box is stuck in an
 
 1. **Restore a backup if you have one** ([controller setup guide](controller-setup.md)). With the same join key the boxes go on working.
 2. **Without a backup**, give the new controller the same field join key if you still have it. Otherwise adopt every box again.
-3. **Boxes still in the old game.** The controller no longer knows that game, so it cannot end it. Open **Settings**, **Boxes left in a lost game**, tap **Release every box not in this game** (or **Release every box in a game** when no game is live) and confirm with **Release**. Every box of this field on this channel that is in another game leaves it and shows **READY**. **From v0.9.0**, controller and boxes.
+3. **Boxes still in the old game.** The controller no longer knows that game, so it cannot end it. Open **Settings**, **Boxes left in a lost game**, tap **Release every box not in this game** (or **Release every box in a game** when no game is live) and confirm with **Release**. Every box of this field on this channel that is in another game, and has not heard that game's controller for a minute and a half, leaves it and shows **READY**. A box switched off and on since is freed at once. **From v0.9.0**, controller and boxes; **from v0.10.0 (not released yet)** the release names its channel, and controller and boxes must both be on v0.10.0.
 
-Careful: a game another controller of this field runs at the same time on the same channel loses its boxes too. A box that joined its game after the release is not affected. The release is refused from a standby, with a wrong controller clock, and more than once in 30 seconds. Not yet tried on hardware.
+A box whose game's controller still talks to it is not affected, so a game another controller of this field runs on the same channel keeps its boxes. A box on another channel, or one that joined its game after the release, is not affected either. The release is refused from a standby, with a wrong controller clock, with a controller clock more than 5 minutes ahead of the device you use, and more than once in 30 seconds. If it says the clock is ahead, restart the controller (the correction goes) or check this device's clock. Not yet tried on hardware.
 
 ### The controller clock
 
@@ -523,7 +523,7 @@ When the clock is behind, every screen shows a yellow banner: **The controller's
 2. In the banner, or in **Settings › Controller clock**, tap **Set the controller's clock from this device**. Only the GM code can.
 3. It says **The controller's clock is now …**.
 
-The clock only moves forward: never before the newest data the controller holds, and never more than 14 days at a time when it already looks right. The setting lasts until the controller restarts, so a Pi 4 needs it after every power cut. Players who checked in while the clock was far behind may have to check in again (the app asks). **Release every box not in this game** is refused while the clock is wrong. To fix the clock for good, see the [controller setup guide](controller-setup.md). A phone controller has the same banner and button **from v0.9.0**.
+The clock only moves forward: never before the newest data the controller holds, and never more than 14 days at a time when it already looks right. The setting lasts until the controller restarts, so a Pi 4 needs it after every power cut. Players who checked in while the clock was far behind may have to check in again (the app asks). **Release every box not in this game** is refused while the clock is wrong, and while it is more than 5 minutes ahead of the device you send it from. To fix the clock for good, see the [controller setup guide](controller-setup.md). A phone controller has the same banner and button **from v0.9.0**.
 
 ### Promote the standby
 

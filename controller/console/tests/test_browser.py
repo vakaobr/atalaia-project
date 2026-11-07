@@ -520,6 +520,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         releases = [m for m in sent if m["kind"] == "release"]
         self.assertTrue(releases)
         self.assertEqual(releases[0]["live_game"], game["id"])
+        self.assertGreater(releases[0]["channel_hz"], 0)  # the channel it is sent on (RLB-1)
 
     def ready_game_with_the_dialog(self, lang: str = "en", **spec):
         """A Hold-All game (min_zones 2 by default) waiting for its zone box (node 7), and the

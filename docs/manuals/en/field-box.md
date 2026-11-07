@@ -314,23 +314,23 @@ A box that was switched off when its game ended never hears the end. Switched on
 | Way | Who does it | Needs v0.9.0 on |
 | --- | --- | --- |
 | **The controller frees it by itself.** It hears the box, says again that its game is over, and within about a minute the box shows the game's last screen, then **READY**. The organisers also see the box in the console's **Boxes** tab, under **Stuck in an ended game**, and **Release** tells it at once | Nobody, or the GM | The **controller** and its **USB radio modem** (the modem has no update over the air: it is reflashed over USB, [modem guide](modem.md#update-the-modem)). Any box firmware. The box must be on the field's channel. An I/O pod used as the controller's radio cannot do it |
-| **Release every box not in this game** (console, **Settings**). For a controller that was reinstalled or lost its data, and no longer knows the old game. It frees every box of the field that is in another game, if the box joined that game before | The GM | The **controller** and the **box** (an older box ignores it) |
+| **Release every box not in this game** (console, **Settings**). For a controller that was reinstalled or lost its data, and no longer knows the old game. It frees every box of the field on that channel that is in another game, if the box joined that game before and has not heard that game's controller for a minute and a half | The GM | The **controller** and the **box** on the same version (from v0.10.0 the release names its channel: a v0.9.0 box ignores a v0.10.0 controller's, and the reverse) |
 | **Leave the game, at the box** (below). Works always, also with an older controller or modem | You, with the admin PIN | The **box** |
 
 The GM's side of all this is in the [GM manual, Recover from problems](game-master.md#recover-from-problems).
 
 **Leave the game at the box** (the box's admin menu; not the player app's **Leave the game**, which only erases a player's name):
 
-1. Hold `*` for 3 seconds. The press itself still goes to the game, as one `*`.
+1. Hold `*` for 3 seconds. The press itself still goes to the game, as one `*`. The menu opens only when the game cannot take keys from players: the box is waiting for the start, the game is paused, or the box has heard nothing from its controller for 5 minutes (a stuck box: wait 5 minutes after switching it on). While a game runs with its controller in reach, holding `*` does nothing more.
 2. **Enter the admin PIN.** `#` confirms. `*` deletes; with nothing typed, `*` goes back to the game.
 3. **ADMIN** lists one entry, **Leave the game**. Press `#`.
 4. **LEAVE THE GAME?**: `#` leaves, `*` goes back.
 
 The box ends the game as if the organisers had ended it: the game's last screen, then **READY** after 30 seconds. It never joins that game again. It keeps its field, its join key, its Wi-Fi, its admin PIN and its games. It can be invited, or take a join card, at once.
 
-- It works in a game that is still running too, so the organisers can pull a box out: their console then sees that box as ended, and the game goes on for the other boxes.
-- The menu shows only while the box is in a game from the controller or a join card. It closes by itself after 30 seconds without a key, or when the game ends.
-- Five wrong PINs make you wait, as everywhere else.
+- To pull a box out of a game that is still running (a broken button, a box on the wrong spot), **pause the game** in the console first, then hold `*`. Or use `@leave <admin PIN>` on the USB console, which works at any time. The organisers' console then sees that box as ended, and the game goes on for the other boxes once resumed.
+- The menu shows only while the box is in a game from the controller or a join card. It closes by itself after 30 seconds without a key, when the game ends, or when the game runs again (resumed, or the controller heard again).
+- Five wrong PINs in this menu make you wait before the next try in this menu (1, 2, 4 ... minutes, as everywhere else). These tries have their own count: they never lock the game picker, adoption or `@leave` on the USB console, so a player who types wrong PINs cannot lock the GM out of the box.
 - A box with no keypad (a Satellite) does the same on the USB console: `@leave <admin PIN>`. The box answers `leave: game N is over on this box; it is free for the next game` ([firmware guide, section 5](firmware.md#5-first-boot-and-setup)).
 
 Tested on a computer only; not yet tried on hardware.
@@ -411,7 +411,7 @@ More: the [radio page](https://atalaia-project.link/en/radio/), the [radio field
 | Nothing happens when I switch on | Check the main switch, the fuse and the battery. Charge it through USB-C with the switch **on**. If it smells or is hot, switch off and take the cells out. |
 | The box is not in the organisers' **Invite boxes** list | It must show **READY** and be adopted. Wait up to a minute, or ask the organisers to press **Look for boxes**. Check the region and move closer to the controller. |
 | The invite says **refused: in another game** | The box is still in an old game. If that game is still running, end it or [take the box out of it](#take-a-box-out-of-its-game). If it was already over (the box was off when it ended), see the same section. Do not erase it. |
-| The box ignores **Release** or **Release every box not in this game** | Its firmware or the controller's modem is older than v0.9.0, or the box is on another channel. Take it out at the box: [Leave the game](#take-a-box-out-of-its-game). |
+| The box ignores **Release** or **Release every box not in this game** | Its firmware or the controller's modem is older than v0.9.0, the box and the controller are on different versions (v0.9.0 and v0.10.0), the box is on another channel, or the box still hears its game's controller. Take it out at the box: [Leave the game](#take-a-box-out-of-its-game). |
 | The invite says **refused**, "another field's join key?" | The box belongs to another field. Adopt it again ([section 5](#5-adopt-the-box-into-the-field)). |
 | The console says **Box N has not been heard for more than 90 s** | Move the box closer, add a box in between as a relay, or check the antenna. The box may be fine: it keeps playing and catches up. |
 | The console says **Two boxes share node N** | One join was used on two boxes. Take one out of the game and join it again with a new join. |
