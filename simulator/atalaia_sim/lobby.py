@@ -25,9 +25,12 @@ earlier channel for the boxes that were away, which a GM's DISCOVER starts.
 
 RELEASE (RFC 0001 Amendment 28) is for a controller that lost the game entirely (a new
 database): no key tag names the game a box is stuck in. It says "game L is live (0: none), it is now
-T", RELEASE_REPEATS times; a box in a game other than L that it joined before T (the wall clock of the
-first TIME it took in that game, which the box keeps) ends it as on GAME_OVER. A RELEASE recorded and
-played back after the box joined a newer game is older than that join, so it changes nothing.
+T, on channel C", RELEASE_REPEATS times; a box on C in a game other than L that it joined before T (the
+wall clock of the first TIME it took in that game, which the box keeps) ends it as on GAME_OVER, unless T
+is more than ff.RELEASE_AHEAD_S past its game's clock (the newest TIME plus the time since; addendum of
+2026-11-06) A RELEASE recorded and played back after the box joined a newer game is older than that
+join, and one played back on another channel names the wrong one, so neither changes anything; a box
+that heard a TIME of its game less than ff.RELEASE_HEARD_S ago is in a live game and ignores it.
 
 The same timings as the firmware: an idle box announces 2-20 s after its
 game ends (spread, so a field's boxes do not all talk at once), then at an
@@ -167,6 +170,12 @@ class IdleBox:
         # The wall clock of the first TIME of the current game (kept in NVS on the box with the game
         # key's tag), None until one: a RELEASE must be newer (Amendment 28).
         self.joined_wall_s: Optional[int] = None
+        # This run's TIMEs of the game (the addendum of 2026-11-06): when the last one came (None:
+        # none), and the newest wall clock with when it came. A box that hears its game ignores a
+        # RELEASE; one may not be far ahead of the game's clock.
+        self.heard_ms: Optional[int] = None
+        self.time_wall_s: Optional[int] = None
+        self.time_ms = 0
 
     def _fresh(self) -> bytes:
         return bytes(self.rng.getrandbits(8) for _ in range(ff.TOKEN_SIZE))
@@ -202,6 +211,7 @@ class IdleBox:
         self.game = j
         self.phase = "joined"
         self.joined_wall_s = None  # known at the game's first TIME
+        self.heard_ms, self.time_wall_s = None, None
         # Key 16: a box that lacks parts fetches them now, and says HELLO only once it has them.
         self.fetching = missing_parts(j, self.installed)
         self.channel_hz = j["channel_hz"]
@@ -225,21 +235,41 @@ class IdleBox:
         self.end(now_ms)
         return True
 
-    def heard_time(self, wall_s: int) -> None:
-        """A TIME of the box's game: the first one's wall clock is the join's time (Amendment 28)."""
-        if self.phase in ("joined", "playing") and self.joined_wall_s is None and wall_s:
+    def heard_time(self, wall_s: int, now_ms: int) -> None:
+        """A TIME of the box's game: the first one's wall clock is the join's time (Amendment 28); a box
+        that heard one lately ignores a RELEASE, and the newest one's wall clock, with when it came,
+        bounds a RELEASE's time (the addendum of 2026-11-06)."""
+        if self.phase not in ("joined", "playing"):
+            return
+        self.heard_ms = now_ms
+        if not wall_s:
+            return
+        if self.joined_wall_s is None:
             self.joined_wall_s = wall_s
+        self.time_wall_s, self.time_ms = wall_s, now_ms
+
+    def rebooted(self, now_ms: int) -> None:
+        """The box restarted into its game (main/box_game.c resumes it): the join's time is kept (in
+        NVS), the newest TIME is not."""
+        self.heard_ms, self.time_wall_s = None, None
 
     def on_release(self, msg: dict[str, Any], now_ms: int) -> bool:
-        """RELEASE (Amendment 28): a box in a game other than the live one leaves it, as on GAME_OVER,
-        if it joined that game before the RELEASE's time; with no TIME of its game heard, it does not."""
+        """RELEASE (Amendment 28 and its addendum of 2026-11-06): a box in a game other than the live
+        one, on the RELEASE's channel, that has not heard its game lately, leaves it, as on GAME_OVER, if
+        it joined that game before the RELEASE's time and that time is not far ahead of its game's clock
+        (ff.release_verdict)."""
         if self.phase not in ("joined", "playing") or self.game is None:
             return False
-        if msg["live_game"] and msg["live_game"] == self.game["game_id"]:
+        box = {"game_id": self.game["game_id"], "channel_hz": self.channel_hz,
+               "join_wall_s": self.joined_wall_s or 0, "heard_time": self.heard_ms is not None,
+               "since_heard_s": max(0, now_ms - (self.heard_ms or 0)) // 1000,
+               "time_wall_s": self.time_wall_s or 0, "since_time_s": max(0, now_ms - self.time_ms) // 1000}
+        verdict = ff.release_verdict(box, msg)
+        if verdict == "live":
             return False
-        if self.joined_wall_s is None or msg["time"] <= self.joined_wall_s:
-            self.log.append(f"release refused: game {self.game['game_id']} joined at {self.joined_wall_s}, "
-                            f"the release is of {msg['time']}")
+        if verdict != "taken":
+            self.log.append(f"release refused ({verdict}): game {self.game['game_id']} joined at "
+                            f"{self.joined_wall_s}, the release is of {msg['time']} on {msg['channel_hz']} Hz")
             return False
         self.log.append(f"game {self.game['game_id']} released by a field controller (live game {msg['live_game']})")
         self.end(now_ms)
@@ -458,11 +488,15 @@ class GameOver:
 
 @dataclass
 class ReleaseOrder:
-    """A RELEASE on its way (Amendment 28): the live game (0: none), the time it says, on the channel
-    the modem is on (None: the field's, or the live game's)."""
+    """A RELEASE on its way (Amendment 28): the live game (0: none), the time it says and the channel
+    it names (the addendum of 2026-11-06: the one the modem is on when the GM asks), sent on the
+    channel the modem is on (channel_hz None: the field's, or the live game's). If the modem has
+    moved since, the boxes there refuse it (another channel): never a frame that frees boxes
+    elsewhere."""
 
     live_game: int
     time_s: int
+    on_hz: int
     channel_hz: Optional[int] = None
     left: int = RELEASE_REPEATS
     next_ms: int = 0
@@ -616,11 +650,12 @@ class Inviter:
         self.games_over.append(go)
         return go
 
-    def release(self, live_game: int, time_s: int, now_ms: int) -> ReleaseOrder:
-        """Says RELEASE_REPEATS times, GAME_OVER_GAP_MS apart, that ``live_game`` (0: none) is live and it
-        is ``time_s``: every box in another game it joined before then leaves it (Amendment 28)."""
-        ff.validate({"kind": "release", "live_game": live_game, "time": time_s})
-        order = ReleaseOrder(live_game, time_s, next_ms=now_ms)
+    def release(self, live_game: int, time_s: int, now_ms: int, on_hz: int) -> ReleaseOrder:
+        """Says RELEASE_REPEATS times, GAME_OVER_GAP_MS apart, that ``live_game`` (0: none) is live, it is
+        ``time_s`` and the frame is for channel ``on_hz`` (the one the modem is on): every box on that
+        channel in another game it joined before then leaves it (Amendment 28, addendum of 2026-11-06)."""
+        ff.validate({"kind": "release", "live_game": live_game, "time": time_s, "channel_hz": on_hz})
+        order = ReleaseOrder(live_game, time_s, on_hz, next_ms=now_ms)
         self.releases = [order]  # a newer one replaces one still being said
         return order
 
@@ -731,7 +766,8 @@ class Inviter:
             msg = {"kind": "move", "channel_hz": order.to_hz, "rev": order.rev}
             gap = order.gap_ms
         elif isinstance(order, ReleaseOrder):
-            msg = {"kind": "release", "live_game": order.live_game, "time": order.time_s}
+            msg = {"kind": "release", "live_game": order.live_game, "time": order.time_s,
+                   "channel_hz": order.on_hz}
             gap = GAME_OVER_GAP_MS
         else:
             msg = {"kind": "game_over", "game_id": order.game_id, "key_tag": order.key_tag}

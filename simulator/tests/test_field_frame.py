@@ -95,6 +95,30 @@ class BodyTests(unittest.TestCase):
             self.assertEqual(ff.key_tag(bytes.fromhex(v["game_key"])).hex(), v["tag"])
 
 
+class ReleaseRuleTests(unittest.TestCase):
+    """What a box in a game does with a RELEASE (RFC 0001 Amendment 28, addendum of 2026-11-06), on the
+    vectors core/tests/test_field_frame.c checks too."""
+
+    def test_release_rules(self):
+        rules = VECTORS["release_rules"]
+        self.assertEqual((rules["ahead_s"], rules["heard_s"]), (ff.RELEASE_AHEAD_S, ff.RELEASE_HEARD_S))
+        self.assertGreaterEqual(len(rules["cases"]), 24)
+        self.assertEqual({v["verdict"] for v in rules["cases"]}, set(ff.RELEASE_VERDICTS))
+        for v in rules["cases"]:
+            with self.subTest(v["name"]):
+                self.assertEqual(ff.release_verdict(v["box"], {"kind": "release", **v["release"]}), v["verdict"])
+
+    def test_a_release_needs_its_channel(self):
+        good = fields(next(v for v in VECTORS["valid"] if v["name"] == "release"))
+        for change in ({"channel_hz": 0}, {"channel_hz": 1 << 32}, {"time": 0}, {"live_game": 65535}):
+            with self.subTest(change):
+                with self.assertRaises(ff.FieldFrameError):
+                    ff.body_encode({**good, **change})
+        old = {k: v for k, v in good.items() if k != "channel_hz"}
+        with self.assertRaises(ff.FieldFrameError):
+            ff.body_encode(old)
+
+
 @unittest.skipUnless(_has_crypto(), "cryptography library not available")
 class FrameTests(unittest.TestCase):
     key = bytes.fromhex(VECTORS["field_key"])

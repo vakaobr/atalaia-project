@@ -1416,7 +1416,14 @@ controller's game.
   kept in NVS (`join_time`, with the game key's tag) so a reboot into the game
   keeps it; a box that took no TIME, the live game's boxes and a RELEASE not
   newer than the join (one played back) change nothing (`releases` and
-  `joined at` in `@lobby`; decisions STUCK-50 to STUCK-59). The box's idle channel (its
+  `joined at` in `@lobby`; decisions STUCK-50 to STUCK-59). Since the
+  addendum of 2026-11-06 (decisions RLB-1 to RLB-8) the RELEASE also names its
+  channel, which must be the box's game's; a box that took a TIME of its game
+  in the last 90 s ignores it; and its time may be at most 300 s past the
+  box's game clock (the newest TIME's `wall_s` plus the time since). A box
+  restarted into a game nobody runs is freed at once. The rules are
+  `atalaia_ff_release_verdict` in the core; refusals log
+  `release refused (<reason>)`. The box's idle channel (its
   last game's, or the field's) now also survives a reboot, where it used to
   fall back to the region's default. 30 s
   after a game ends the final screen gives way to "Ready / next game". `@lobby`

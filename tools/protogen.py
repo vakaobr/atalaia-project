@@ -2554,7 +2554,24 @@ def gen_field_frame_vectors(fv: dict[str, Any]) -> str:
           f"#define FF_NONCE_SOURCE_AFTER {src['stored_after']}u",
           "static const uint8_t ff_nonce_source[4][13] = {"]
     L += [f"    {braces(n)}," for n in src["nonces"]]
-    L += ["};", "", "#endif /* ATALAIA_FIELD_FRAME_VECTORS_H */", ""]
+    L += ["};", ""]
+
+    rr = fv["release_rules"]
+    verdicts = ("taken", "live", "other_channel", "hearing", "no_join_time", "old", "ahead")
+    L += [f"#define FF_RELEASE_AHEAD_S {rr['ahead_s']}u", f"#define FF_RELEASE_HEARD_S {rr['heard_s']}u", "",
+          "typedef struct {", "    const char *name;", "    atalaia_ff_release_box_t box;",
+          "    atalaia_ff_msg_t release;", "    atalaia_ff_release_verdict_t verdict;",
+          "} ff_release_rule_t;", "", "static const ff_release_rule_t ff_release_rules[] = {"]
+    for v in rr["cases"]:
+        b, r = v["box"], v["release"]
+        require(v["verdict"] in verdicts, f"field_frame.json release_rules {v['name']}: verdict")
+        L.append(f"    {{{c_string(v['name'])}, {{{b['game_id']}, {b['channel_hz']}u, {b['join_wall_s']}u, "
+                 f"{'true' if b['heard_time'] else 'false'}, {b['since_heard_s']}u, "
+                 f"{b['time_wall_s']}u, {b['since_time_s']}u}}, "
+                 f"{{.kind = ATALAIA_FF_RELEASE, .live_game = {r['live_game']}, .time_s = {r['time']}u, "
+                 f".channel_hz = {r['channel_hz']}u}}, {verdicts.index(v['verdict'])}}},")
+    L += ["};", "#define FF_RELEASE_RULE_COUNT (sizeof(ff_release_rules) / sizeof(ff_release_rules[0]))", "",
+          "#endif /* ATALAIA_FIELD_FRAME_VECTORS_H */", ""]
     return "\n".join(L)
 
 

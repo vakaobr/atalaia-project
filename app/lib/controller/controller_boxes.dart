@@ -174,12 +174,16 @@ class _GameOver {
   int sent = 0;
 }
 
-/// A RELEASE on its way (lobby.py `ReleaseOrder`): the live game (0: none)
-/// and the time it says, on the channel the radio is on.
+/// A RELEASE on its way (lobby.py `ReleaseOrder`): the live game (0: none),
+/// the time it says and the channel it names ([onHz], the one the radio is
+/// on when the GM asks; RFC 0001 Amendment 28's addendum of 2026-11-06),
+/// sent on the channel the radio is on. If the radio has moved since, the
+/// boxes there refuse it: never a frame that frees boxes elsewhere.
 class _Release {
-  _Release(this.liveGame, this.timeS, this.nextMs);
+  _Release(this.liveGame, this.timeS, this.onHz, this.nextMs);
   final int liveGame;
   final int timeS;
+  final int onHz;
   int left = releaseRepeats;
   int nextMs;
   int sent = 0;
@@ -456,18 +460,20 @@ class FieldInviter {
   }
 
   /// Says [releaseRepeats] times, [gameOverGapMs] apart, that [liveGame]
-  /// (0: none) is live and it is [timeS] (Unix seconds): every box in another
-  /// game it joined before then leaves it (RFC 0001 Amendment 28). A newer
-  /// one replaces one still being said.
-  void release(int liveGame, int timeS, int nowMs) {
+  /// (0: none) is live, it is [timeS] (Unix seconds) and the frame is for
+  /// channel [onHz]: every box on that channel in another game it joined
+  /// before then leaves it (RFC 0001 Amendment 28 and its addendum of
+  /// 2026-11-06). A newer one replaces one still being said.
+  void release(int liveGame, int timeS, int nowMs, int onHz) {
     validateFieldMessage({
       'kind': 'release',
       'live_game': liveGame,
       'time': timeS,
+      'channel_hz': onHz,
     });
     _releases
       ..clear()
-      ..add(_Release(liveGame, timeS, nowMs));
+      ..add(_Release(liveGame, timeS, onHz, nowMs));
   }
 
   /// Says [repeats] times, [gapMs] apart, on [channelHz] (where the boxes
@@ -662,7 +668,12 @@ class FieldInviter {
         msg = {'kind': 'game_over', 'game_id': go.gameId, 'key_tag': go.keyTag};
         gap = gameOverGapMs;
       case final _Release r:
-        msg = {'kind': 'release', 'live_game': r.liveGame, 'time': r.timeS};
+        msg = {
+          'kind': 'release',
+          'live_game': r.liveGame,
+          'time': r.timeS,
+          'channel_hz': r.onHz,
+        };
         gap = gameOverGapMs;
       default:
         return false;
@@ -878,16 +889,22 @@ class ControllerBoxes {
 
   /// RELEASE (RFC 0001 Amendment 28): every box in a game other than
   /// [liveGame] (0: none) that it joined before [timeS] leaves it, three
-  /// times on the channel the radio is on (the field's, or the live game's).
-  /// False without a radio that carries field frames.
-  bool release(int liveGame, int timeS) {
+  /// times on the channel the radio is on (the field's, or the live game's),
+  /// which the frame names (its addendum of 2026-11-06). Whether it was sent
+  /// (false without a radio that carries field frames) and that channel.
+  (bool, int) release(int liveGame, int timeS) {
+    // Where the radio is once the order's tune(null) is done (_tune).
+    final g = engine.liveGame;
+    final channel = g != null
+        ? (g['channel_hz'] as int?) ?? engine.fieldChannel
+        : engine.fieldChannel;
     final m = engine.modem;
-    if (m == null || !m.isUp || !m.hasFieldFrames) return false;
+    if (m == null || !m.isUp || !m.hasFieldFrames) return (false, channel);
     inviter
-      ..release(liveGame, timeS, engine.nowMs())
+      ..release(liveGame, timeS, engine.nowMs(), channel)
       ..tick(engine.nowMs()); // the first one at once
     _flush();
-    return true;
+    return (true, channel);
   }
 
   /// The field's channel changed: says so on the old one (MOVE, three times,
