@@ -59,7 +59,8 @@ static bool same_msg(const atalaia_ff_msg_t *a, const atalaia_ff_msg_t *b)
     }
     if (a->kind == ATALAIA_FF_MOVE) return a->channel_hz == b->channel_hz && a->rev == b->rev;
     if (a->kind == ATALAIA_FF_RELEASE)
-        return a->live_game == b->live_game && a->time_s == b->time_s;
+        return a->live_game == b->live_game && a->time_s == b->time_s &&
+               a->channel_hz == b->channel_hz;
     if (memcmp(a->device_id, b->device_id, 8) != 0 || memcmp(a->token, b->token, 8) != 0) {
         return false;
     }
@@ -130,16 +131,41 @@ static void test_bodies(void)
     bad = ff_valid_vectors[9].fields;
     bad.rev = 0;
     CHECK(atalaia_ff_body_encode(&bad, buf, sizeof(buf)) == 0);
-    /* RELEASE (RFC 0001 Amendment 28): a live game of 0-65534 and a time that is not 0. */
+    /* RELEASE (RFC 0001 Amendment 28): a live game of 0-65534, a time and a channel (addendum of
+     * 2026-11-06) that are not 0. */
     bad = ff_valid_vectors[11].fields;
-    CHECK(bad.kind == ATALAIA_FF_RELEASE && bad.live_game == 4242 && bad.time_s == 1793000000u);
+    CHECK(bad.kind == ATALAIA_FF_RELEASE && bad.live_game == 4242 && bad.time_s == 1793000000u &&
+          bad.channel_hz == 869525000u);
     bad.time_s = 0;
+    CHECK(atalaia_ff_body_encode(&bad, buf, sizeof(buf)) == 0);
+    bad = ff_valid_vectors[11].fields;
+    bad.channel_hz = 0;
     CHECK(atalaia_ff_body_encode(&bad, buf, sizeof(buf)) == 0);
     bad = ff_valid_vectors[11].fields;
     bad.live_game = 0xFFFF;
     CHECK(atalaia_ff_body_encode(&bad, buf, sizeof(buf)) == 0);
     bad.live_game = 0; /* no game live: still a RELEASE */
     CHECK(atalaia_ff_body_encode(&bad, buf, sizeof(buf)) > 0);
+}
+
+/* What a box in a game does with a RELEASE (the addendum of 2026-11-06 to Amendment 28). */
+static void test_release_rules(void)
+{
+    CHECK(FF_RELEASE_AHEAD_S == ATALAIA_FF_RELEASE_AHEAD_S);
+    CHECK(FF_RELEASE_HEARD_S == ATALAIA_FF_RELEASE_HEARD_S);
+    CHECK(FF_RELEASE_RULE_COUNT >= 24);
+    for (size_t i = 0; i < FF_RELEASE_RULE_COUNT; i++) {
+        const ff_release_rule_t *v = &ff_release_rules[i];
+        atalaia_ff_release_verdict_t got = atalaia_ff_release_verdict(&v->box, &v->release);
+        if (got != v->verdict) {
+            fprintf(stderr, "  %s: %s, expected %s\n", v->name,
+                    atalaia_ff_release_verdict_name(got),
+                    atalaia_ff_release_verdict_name(v->verdict));
+            fail("release rule", v->name);
+        }
+    }
+    CHECK(strcmp(atalaia_ff_release_verdict_name(ATALAIA_FF_RELEASE_AHEAD), "ahead") == 0);
+    CHECK(strcmp(atalaia_ff_release_verdict_name((atalaia_ff_release_verdict_t)99), "?") == 0);
 }
 
 static void test_frame_shape(void)
@@ -318,6 +344,7 @@ void run_field_frame_tests(void)
 {
     test_hkdf_rfc5869();
     test_bodies();
+    test_release_rules();
     test_frame_shape();
 #ifdef ATALAIA_HAVE_MBEDTLS
     test_frames();

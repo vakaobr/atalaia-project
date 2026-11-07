@@ -42,6 +42,10 @@ BIG_JUMP_S = 86400              # a forward jump this big holds the retention pu
 PURGE_HOLD_S = 3600             # for this long, so a GM sees the banner before anything is deleted
 SET_MAX_AHEAD_FLOOR_S = 5 * 365 * 86400   # a set from a wrong clock: at most this far above the floor ...
 SET_MAX_AHEAD_NOW_S = 14 * 86400          # ... and from a plausible clock, at most this far above it
+# A field-wide RELEASE (RFC 0001 Amendment 28, its addendum of 2026-11-06) is stamped with now(): never more
+# than this past a clock the controller can vouch for. Boxes refuse one that is RELEASE_AHEAD_S (the same
+# 300 s) past their game's clock, so a frame stamped ahead never stays valid for long.
+RELEASE_SLACK_S = 300
 
 _lock = threading.Lock()
 _offset = 0.0
@@ -172,6 +176,32 @@ class ClockGuard:
         with self._lock:
             held = self._hold_until is not None and self._mono() < self._hold_until
         return self.plausible() and not held
+
+    # --- RELEASE's time (RFC 0001 Amendment 28, addendum of 2026-11-06; decision RLB-4) ----------
+
+    def release_check(self, device_time: Any = None) -> None:
+        """Raises ClockError unless now() may stamp a field-wide RELEASE. Its bound is a clock the
+        controller can vouch for, plus RELEASE_SLACK_S: the GM's device clock when the request carries it
+        (``device_time``, the console sends it), else the system clock without the GM's correction. So a
+        correction moved too far forward (a typo, which cannot be undone) is refused until a GM's
+        device confirms the time, and a device that disagrees refuses it too."""
+        if not self.plausible():
+            raise ClockError("not_set", "the controller's clock is not set: set it first, so that the boxes "
+                                        "can tell this RELEASE from an older one")
+        now_s = self._wall()
+        if device_time is not None:
+            if isinstance(device_time, bool) or not isinstance(device_time, (int, float)) or device_time != device_time:
+                raise ClockError("invalid", "device_time: seconds since 1970 as a number", 400)
+            if now_s > device_time + RELEASE_SLACK_S:
+                raise ClockError("ahead_of_device",
+                                 f"the controller's clock ({_iso(now_s)}) is ahead of this device's "
+                                 f"({_iso(device_time)}): a RELEASE stamped with it would stay valid too long. "
+                                 "Restart the controller to drop the correction, or set this device's clock")
+            return
+        if offset() > RELEASE_SLACK_S:
+            raise ClockError("unconfirmed",
+                             f"the controller's clock was moved {offset():.0f} s forward and no device confirmed "
+                             "it: send the RELEASE from the console (it sends its device's clock)")
 
     # --- the GM's correction ------------------------------------------------------------------
 

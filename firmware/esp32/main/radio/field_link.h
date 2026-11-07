@@ -161,6 +161,12 @@ typedef struct {
     /* The wall clock (Unix seconds) of the first TIME taken in this join, 0 until one: a RELEASE
      * older than it is refused (RFC 0001 Amendment 28, box_lobby.c). */
     uint32_t first_wall_s;
+    /* The newest non-zero TIME wall clock taken in this join (this run), 0 until one, and l->now_ms
+     * when it came: the box's estimate of its game's clock, which bounds a RELEASE's time from
+     * above (the addendum of 2026-11-06 to Amendment 28). A box whose game still talks (have_time,
+     * last_time_ms) ignores a RELEASE. */
+    uint32_t last_wall_s;
+    uint32_t last_wall_ms;
     /* Freshness of what changes the game's state (RFC 0001 Amendment 23, SR-21): the nonce
      * counter of the last game-state CMD applied and of the last TIME applied, per source (a new
      * leader starts its own). One that is not above is refused: a recording of a CMD or TIME that

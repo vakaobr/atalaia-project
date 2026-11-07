@@ -10,7 +10,7 @@ part of 'controller_api.dart';
 //     GET  /api/v1/boxes                     GM: the free boxes heard, the previous game
 //     POST /api/v1/boxes/discover            GM: "who is free?" (at most every 10 s)
 //     POST /api/v1/boxes/stuck/{game}/release GM: an ended game's GAME_OVER now, for a box still in it
-//     POST /api/v1/boxes/release             GM: RELEASE, every box not in the live game leaves its game
+//     POST /api/v1/boxes/release             GM: RELEASE, every box not in the live game leaves its game ({"device_time"})
 //     GET|POST /api/v1/games/{id}/invites    GM: the live game's invites / invite boxes
 //     GET  /api/v1/adopt                     GM: the fingerprint, the field's name, the records
 //     POST /api/v1/adopt/card                GM: the NFC field card's bytes (never cached)
@@ -94,7 +94,8 @@ extension _BoxesRoutes on ControllerApi {
             'release_frame': 'no_join_key',
           });
         }
-        return ApiResponse(200, stuck.releaseField());
+        // The GM's device clock, when the console sends it (RLB-4).
+        return ApiResponse(200, stuck.releaseField(r.body['device_time']));
       }),
     ),
     ControllerApi._route(

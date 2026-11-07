@@ -2683,16 +2683,24 @@ static void test_outputs_disabled_in_a_field_game(void)
     CHECK(events_named("node.modules") == 0 && events_named("node.outputs_disabled") == 0);
 }
 
-/* A RELEASE field frame (RFC 0001 Amendment 28): game `live` is live (0: none), it is now `time_s`.
- */
-static void release_frame(uint16_t live, uint32_t time_s, uint8_t *keep, size_t *keep_len)
+/* A RELEASE field frame (RFC 0001 Amendment 28): game `live` is live (0: none), it is now `time_s`,
+ * on channel `channel_hz` (its addendum of 2026-11-06). */
+static void release_frame_on(uint16_t live, uint32_t time_s, uint32_t channel_hz, uint8_t *keep,
+                             size_t *keep_len)
 {
     atalaia_ff_msg_t m;
     memset(&m, 0, sizeof(m));
     m.kind = ATALAIA_FF_RELEASE;
     m.live_game = live;
     m.time_s = time_s;
+    m.channel_hz = channel_hz;
     to_box(ff_key, &m, keep, keep_len);
+}
+
+/* The same on the channel of the box's game. */
+static void release_frame(uint16_t live, uint32_t time_s, uint8_t *keep, size_t *keep_len)
+{
+    release_frame_on(live, time_s, game.join.channel_hz, keep, keep_len);
 }
 
 /* A TIME of the box's current game ("running"), its controller's wall clock at wall_s. */
@@ -2789,14 +2797,88 @@ static void test_release(void)
     time_wall(1793009500u);
     run_ms(&now, 100);
     CHECK(game.phase == BOX_PLAYING && game.join_wall_s == 1793009500u);
-    /* The recorded RELEASE played back now: older than this join, nothing changes. */
+    /* The recorded RELEASE played back now: its game talks (and the RELEASE is older than this
+     * join), nothing changes. */
     box_game_on_packet(&game, rec, rec_len, -60);
     CHECK(game.phase == BOX_PLAYING && game.lobby.releases_refused == 1);
+    /* Its controller goes quiet: still older than the join. */
+    run_ms(&now, (ATALAIA_FF_RELEASE_HEARD_S + 1) * 1000u);
+    box_game_on_packet(&game, rec, rec_len, -60);
+    CHECK(game.phase == BOX_PLAYING && game.lobby.releases_refused == 2);
+    CHECK(strstr(log_lines, "release refused (old)") != NULL);
     /* A newer one frees it too; one naming its game does not. */
-    release_frame(GAME_ID + 1, 1793010000u, NULL, NULL);
+    release_frame(GAME_ID + 1, 1793009700u, NULL, NULL);
     CHECK(game.phase == BOX_PLAYING);
-    release_frame(0, 1793010000u, NULL, NULL);
+    release_frame(0, 1793009700u, NULL, NULL);
     CHECK(game.phase == BOX_ENDED && game.lobby.releases_taken == 2);
+    state_persist_clear();
+}
+
+/* The addendum of 2026-11-06 to Amendment 28 (decisions RLB-1 to RLB-3), the security review's
+ * regressions: a box playing game G (its first TIME at 1793000100) is not freed by a RELEASE while
+ * its game's controller still sends TIME, whatever the RELEASE's time (100 s after the join, 14
+ * days after, the last second of the clock); once that controller is quiet, a RELEASE sent on
+ * another channel, one far ahead of the game's clock, and one in the format of before (no channel)
+ * are refused too, and only a RELEASE on its channel, within the bound, frees it. */
+static void test_release_bound(void)
+{
+    lobby_fixture();
+    game.shell.log = sh_log;
+    log_lines[0] = '\0';
+    static char text[ATALAIA_JOIN_MAX * 2];
+    join_text_for(GAME_ID, text, sizeof(text));
+    CHECK(box_game_join_text(&game, text) == BOX_JOIN_OK);
+    uint32_t now = 10;
+    cmd_now(FIELD_CMD_START);
+    time_wall(1793000100u);
+    run_ms(&now, 100);
+    CHECK(game.phase == BOX_PLAYING && game.join_wall_s == 1793000100u);
+    uint32_t ch = game.join.channel_hz;
+    /* Its game talks: a RELEASE is not for it. */
+    release_frame(0x0D00, 1793000200u, NULL, NULL);
+    release_frame(0x0D00, 1793000100u + 14u * 86400u, NULL, NULL);
+    release_frame(0x0D00, 0xFFFFFFFFu, NULL, NULL);
+    release_frame(0, 1793000200u, NULL, NULL);
+    CHECK(game.phase == BOX_PLAYING && game.lobby.releases_refused == 4);
+    CHECK(game.lobby.releases_taken == 0 && strstr(log_lines, "release refused (hearing)") != NULL);
+    /* Its controller goes quiet (the game's clock is now about 1793000191). */
+    run_ms(&now, (ATALAIA_FF_RELEASE_HEARD_S + 1) * 1000u);
+    release_frame_on(0x0D00, 1793000200u, ch + 200000u, NULL, NULL); /* another channel's */
+    CHECK(game.phase == BOX_PLAYING && game.lobby.releases_refused == 5);
+    CHECK(strstr(log_lines, "release refused (other_channel)") != NULL);
+    release_frame(0x0D00, 1793000100u + 14u * 86400u, NULL, NULL);
+    release_frame(0x0D00, 0xFFFFFFFFu, NULL, NULL);
+    release_frame(0x0D00, 1793000191u + ATALAIA_FF_RELEASE_AHEAD_S + 2u, NULL, NULL);
+    CHECK(game.phase == BOX_PLAYING && game.lobby.releases_refused == 8);
+    CHECK(strstr(log_lines, "release refused (ahead)") != NULL);
+    /* The format of before the addendum (no channel, a v0.9.0 controller's): not even read. */
+    uint8_t body[ATALAIA_FF_BODY_MAX];
+    size_t n = 0;
+    body[n++] = 0xA3; /* {1: 6, 4: 3328, 5: 1793000200} */
+    body[n++] = 0x01;
+    body[n++] = 0x06;
+    body[n++] = 0x04;
+    body[n++] = 0x19;
+    body[n++] = 0x0D;
+    body[n++] = 0x00;
+    body[n++] = 0x05;
+    body[n++] = 0x1A;
+    body[n++] = 0x6A;
+    body[n++] = 0xDF;
+    body[n++] = 0x03;
+    body[n++] = 0x08;
+    atalaia_ff_msg_t m;
+    CHECK(!atalaia_ff_body_decode(body, n, &m));
+    uint8_t nonce[ATALAIA_FF_NONCE_SIZE] = {0xC1, 0x01};
+    uint8_t frame[ATALAIA_FF_MAX];
+    size_t len =
+        atalaia_ff_seal(ff_key, nonce, body, n, frame, sizeof(frame), &atalaia_crypto_test_stub);
+    uint32_t ignored = game.lobby.frames_ignored;
+    box_game_on_packet(&game, frame, len, -60);
+    CHECK(game.phase == BOX_PLAYING && game.lobby.frames_ignored == ignored + 1);
+    /* On its channel, within the bound: over as on GAME_OVER. */
+    release_frame(0x0D00, 1793000200u, NULL, NULL);
+    CHECK(game.phase == BOX_ENDED && game.lobby.releases_taken == 1);
     state_persist_clear();
 }
 
@@ -2863,6 +2945,7 @@ void run_box_game_tests(void)
     test_lobby_game_over();
     test_leave_by_hand();
     test_release();
+    test_release_bound();
     test_lobby_discover_and_ready_screen();
     test_lobby_move();
     test_lobby_device_id();

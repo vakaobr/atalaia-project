@@ -60,6 +60,8 @@ A box that came back at a random epoch is found again: receivers search the rest
 
 Limits: the window lives in RAM, so a box that has just rebooted accepts the first packet of each source (a freshness value in HELLO is not built, SR-114); the change is not on the wire, so a box that has not been updated stays exposed to replay; and the radio is encrypted but not hidden (anyone can record it).
 
+A field-wide **RELEASE** (a field frame, RFC 0001 Amendment 28) is bound by other rules, since it comes from a controller that has lost its state and that no box has heard before. It names the channel it is sent on, and a box takes it only on its own game's channel. A box that heard a TIME of its game in the last 90 s ignores it. Its time may be at most 300 s past the box's game clock. The controllers stamp it only with a clock they can vouch for: within 300 s of the GM's device clock or, without one, of their clock before a GM correction. A box restarted into its game has no game clock until its first TIME, so there only the channel, the join time and the controllers' bound apply (addendum of 2026-11-06, decisions RLB-1 to RLB-8).
+
 ## The site server and accounts
 
 - **Changing how an account logs in needs a second factor.** Adding, renaming or removing a passkey, starting or turning off TOTP, setting, changing or removing the password, linking or unlinking a social login and confirming an account merge are refused (403 `mfa_required`) unless the session passed a TOTP or passkey step-up. A social login alone is not one. A merge never carries passkeys into an account with a staff role (SRV-1).

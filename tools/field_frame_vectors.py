@@ -139,8 +139,10 @@ def build() -> dict:
         ("move", {"kind": "move", "channel_hz": 869925000, "rev": 3}),
         ("move_largest", {"kind": "move", "channel_hz": 4294967295, "rev": 4294967295}),
         # RFC 0001 Amendment 28 (proposed): every box in a game other than the live one leaves it.
-        ("release", {"kind": "release", "live_game": 4242, "time": 1793000000}),
-        ("release_no_live_game", {"kind": "release", "live_game": 0, "time": 4294967295}),
+        # Its addendum of 2026-11-06: key 6, the channel it is sent on, required.
+        ("release", {"kind": "release", "live_game": 4242, "time": 1793000000, "channel_hz": 869525000}),
+        ("release_no_live_game", {"kind": "release", "live_game": 0, "time": 4294967295,
+                                  "channel_hz": 4294967295}),
     ]
     valid = []
     for i, (name, msg) in enumerate(valid_msgs):
@@ -190,10 +192,10 @@ def build() -> dict:
     inv = {1: 3, 2: DEVICE, 3: TOKEN, 4: 9, 5: 0, 6: 1, 7: b"\x01\x02"}
     over = {1: 4, 4: 7, 5: tag}
     mv = {1: 5, 4: 869925000, 5: 3}
-    rel = {1: 6, 4: 4242, 5: 1793000000}
+    rel = {1: 6, 4: 4242, 5: 1793000000, 6: 869525000}
     bodies_invalid = [
         ("unknown_kind", m({1: 7})),
-        ("unknown_kind_7_with_release_keys", m({1: 7, 4: 4242, 5: 1793000000})),
+        ("unknown_kind_7_with_release_keys", m({1: 7, 4: 4242, 5: 1793000000, 6: 869525000})),
         ("kind_not_first", m({2: DEVICE, 1: 1, 3: TOKEN, 4: "box", 5: 0})),
         ("not_a_map", m([1, 2])),
         ("announce_without_name", m({1: 1, 2: DEVICE, 3: TOKEN, 5: 0})),
@@ -238,8 +240,13 @@ def build() -> dict:
         ("move_with_a_token", m({**mv, 3: TOKEN})),
         ("move_with_an_announce_key", m({**mv, 8: 50})),
         ("move_with_an_invite_key", m({**mv, 7: b"\x01"})),
-        ("release_without_time", m({1: 6, 4: 4242})),
-        ("release_without_live_game", m({1: 6, 5: 1793000000})),
+        ("release_without_time", m({1: 6, 4: 4242, 6: 869525000})),
+        ("release_without_live_game", m({1: 6, 5: 1793000000, 6: 869525000})),
+        # The format of before the addendum of 2026-11-06 (a v0.9.0 controller's): no channel.
+        ("release_without_channel", m({1: 6, 4: 4242, 5: 1793000000})),
+        ("release_channel_0", m({**rel, 6: 0})),
+        ("release_channel_too_big", m({**rel, 6: 4294967296})),
+        ("release_channel_as_text", m({**rel, 6: "869525000"})),
         ("release_time_0", m({**rel, 5: 0})),
         ("release_time_too_big", m({**rel, 5: 4294967296})),
         ("release_live_game_65535", m({**rel, 4: 65535})),
@@ -247,6 +254,7 @@ def build() -> dict:
         ("release_with_a_device", m({**rel, 2: DEVICE})),
         ("release_with_a_token", m({**rel, 3: TOKEN})),
         ("release_with_an_invite_key", m({**rel, 7: b"\x01"})),
+        ("release_with_an_announce_key", m({**rel, 8: 50})),
         ("key_32", m({**ann, 32: 1})),
         ("trailing_byte", m(ann) + "00"),
         ("duplicate_key", "a6" + m(ann)[2:] + "0500"),
@@ -267,7 +275,7 @@ def build() -> dict:
                         "hop_limit_ignored opens to valid[1]'s body. invalid_frames do not open (reason: header, "
                         "length or mac). invalid_bodies are refused by the body decoder. optional_key_skipped decodes "
                         "like an announce without key 20. split: a join payload's invite chunks (153 bytes, the last "
-                        "shorter). game_over's key_tag is epoch_tag.json's tag of its game key (counting_key, all_ones). move (RFC 0001 Amendment 19): keys 4 channel_hz and 5 rev, both 1-4294967295. release (RFC 0001 Amendment 28, proposed): keys 4 live_game (0-65534, 0: no game live) and 5 time (1-4294967295, the sender's wall clock in Unix seconds). nonces: nonce_key is HKDF-SHA256 of the join key with the info 'atalaia field nonce v1', "
+                        "shorter). game_over's key_tag is epoch_tag.json's tag of its game key (counting_key, all_ones). move (RFC 0001 Amendment 19): keys 4 channel_hz and 5 rev, both 1-4294967295. release (RFC 0001 Amendment 28 and its addendum of 2026-11-06): keys 4 live_game (0-65534, 0: no game live), 5 time (1-4294967295, the sender's wall clock in Unix seconds) and 6 channel_hz (1-4294967295, the channel it is sent on), all required. release_rules: what a box in a game does with a RELEASE, given its game, its channel, its join time (0: unknown), whether it heard a TIME of its game since it started and how many seconds ago, and the newest such TIME's non-zero wall_s (0: none) with the seconds since; verdicts in this order: live (it names the box's game), other_channel, hearing (a TIME heard less than heard_s ago), no_join_time, old (time not after the join), ahead (time > newest wall_s + since + ahead_s), else taken. nonces: nonce_key is HKDF-SHA256 of the join key with the info 'atalaia field nonce v1', "
                         "32 bytes; a nonce is HMAC-SHA256(nonce_key, sender)[0..7] | boot (3 bytes) | ctr (2 bytes), "
                         "big-endian; source: a sender's run after a stored boot count of 41 (its first two nonces, then "
                         "the last of boot 42 and the first of boot 43), which leaves 43 stored. Generated by "
@@ -282,7 +290,59 @@ def build() -> dict:
         "optional_key_skipped": skipped,
         "split": split,
         "nonces": nonces_section(join_key),
+        "release_rules": release_rules(),
     }
+
+
+def release_rules() -> dict:
+    """What a box in a game does with a RELEASE (RFC 0001 Amendment 28, addendum of 2026-11-06):
+    atalaia_ff_release_verdict in C, field_frame.release_verdict in Python."""
+    # A box whose controller went quiet 10 minutes ago (its last TIME), in a game joined an hour before.
+    box = {"game_id": 513, "channel_hz": 869525000, "join_wall_s": 1793000100, "heard_time": True,
+           "since_heard_s": 600, "time_wall_s": 1793003600, "since_time_s": 600}
+    now = box["time_wall_s"] + box["since_time_s"]  # the box's estimate of its game's wall clock
+    rel = {"live_game": 3328, "time": now, "channel_hz": box["channel_hz"]}
+    rebooted = {**box, "heard_time": False, "since_heard_s": 0, "time_wall_s": 0, "since_time_s": 0}
+    playing = {**box, "time_wall_s": 1793000100, "since_time_s": 10, "since_heard_s": 10}
+    heard = ff.RELEASE_HEARD_S
+    cases = [
+        ("taken", box, rel, "taken"),
+        ("taken_no_live_game", box, {**rel, "live_game": 0}, "taken"),
+        ("live_game_is_the_box_s", box, {**rel, "live_game": 513}, "live"),
+        ("another_channel", box, {**rel, "channel_hz": 868100000}, "other_channel"),
+        ("another_channel_live_game_0", box, {**rel, "live_game": 0, "channel_hz": 869525001}, "other_channel"),
+        # The active phase's case: a box playing a game it still hears, a RELEASE 100 s after its join.
+        ("playing_a_game_it_hears", playing, {**rel, "time": 1793000200}, "hearing"),
+        ("playing_a_game_it_hears_14_days_ahead", playing, {**rel, "time": 1793000100 + 14 * 86400}, "hearing"),
+        ("playing_a_game_it_hears_time_max", playing, {**rel, "time": 0xFFFFFFFF}, "hearing"),
+        ("heard_just_under_the_limit", {**box, "since_heard_s": heard - 1}, rel, "hearing"),
+        ("heard_at_the_limit", {**box, "since_heard_s": heard}, rel, "taken"),
+        ("time_without_a_wall_clock_heard", {**box, "since_heard_s": 5, "time_wall_s": 0}, rel, "hearing"),
+        ("no_time_ever_heard", {**rebooted, "join_wall_s": 0}, rel, "no_join_time"),
+        ("at_the_join", box, {**rel, "time": box["join_wall_s"]}, "old"),
+        ("before_the_join", box, {**rel, "time": box["join_wall_s"] - 3600}, "old"),
+        ("ahead_by_the_margin", box, {**rel, "time": now + ff.RELEASE_AHEAD_S}, "taken"),
+        ("ahead_past_the_margin", box, {**rel, "time": now + ff.RELEASE_AHEAD_S + 1}, "ahead"),
+        ("ahead_14_days", box, {**rel, "time": now + 14 * 86400}, "ahead"),
+        ("ahead_time_max", box, {**rel, "time": 0xFFFFFFFF}, "ahead"),
+        ("quiet_for_hours", {**box, "since_heard_s": 6 * 3600, "since_time_s": 6 * 3600},
+         {**rel, "time": box["time_wall_s"] + 6 * 3600 - 60}, "taken"),
+        ("time_near_the_end_of_the_clock", {**box, "time_wall_s": 0xFFFFFF00, "since_time_s": 0xFFFF},
+         {**rel, "time": 0xFFFFFFFF}, "taken"),
+        # Restarted into a game nobody runs any more (the bench recovery of 2026-11-06): freed at once.
+        ("rebooted_into_a_lost_game", rebooted, {**rel, "time": now + 30 * 86400}, "taken"),
+        ("rebooted_another_channel", rebooted, {**rel, "channel_hz": 868100000}, "other_channel"),
+        ("rebooted_before_the_join", rebooted, {**rel, "time": box["join_wall_s"] - 1}, "old"),
+        ("rebooted_then_heard_its_game", {**rebooted, "heard_time": True, "since_heard_s": 3}, rel, "hearing"),
+    ]
+    out = []
+    for name, b, r, verdict in cases:
+        msg = {"kind": "release", **r}
+        ff.validate(msg)
+        got = ff.release_verdict(b, msg)
+        assert got == verdict, (name, got, verdict)
+        out.append({"name": name, "box": b, "release": r, "verdict": verdict})
+    return {"ahead_s": ff.RELEASE_AHEAD_S, "heard_s": ff.RELEASE_HEARD_S, "cases": out}
 
 
 def main() -> int:
