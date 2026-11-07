@@ -42,6 +42,8 @@ python3 tools/check_wiring.py
 python3 tools/bench_lbt_gate.py --selftest
 # The projected score's bench report, on a made-up log (decision BSC-2).
 python3 tools/bench_projected_score.py --selftest
+# The hardened release's checks (sdkconfig.release against a build, the sizes), on made-up files.
+python3 tools/secure_boot_sign.py --selftest
 if command -v clang-format > /dev/null 2>&1 && command -v stylua > /dev/null 2>&1; then
     sh tools/format.sh --check
 else

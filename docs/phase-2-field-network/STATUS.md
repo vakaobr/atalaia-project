@@ -321,6 +321,10 @@ Findings from two real Heltec V4.3 boards and the Pi controller; the fixes are b
 - **The Field Box's lost epoch draw (EPW-2b to EPW-4b)** takes the lower half above a margin of 1024, as the controllers do; host tests and shared vectors.
 - **A bench update over the air with the bench release key (MAC-2).** Board 3, 0.6.0-dev.157 to 0.6.1-bench.1 from the console, about 22 s to confirmed after the self-test (BRING_UP step 10c).
 
+## 2026-11-06: the leader alone is its liveness (FLC-1 to FLC-6; software and host tests only)
+
+- **Failover hardened against same-term beacons from another source.** A follower measured the leader's cadence across every TIME at the term, so TIMEs from another keyed node reset it (liveness 10 s to 30 s, takeover 30 s to 90 s) and, after the leader stopped, kept a standby from taking over. The election (`election.py`, `controller_failover.dart`) now binds liveness and cadence to the recognised leader's authenticated `source`, keeps the shortest steady cadence per leader and term, and ignores same-term CLAIMs as liveness. Regression tests on both controllers. No wire change. Not tried on a field.
+
 ## 2026-11-06: a standby on automatic failover behind a main controller on manual (FAIL-1 to FAIL-6; software and host tests only)
 
 - **No false takeover from mixed failover modes.** A standby counted missed beacons at its own mode's interval, so one on `auto` behind a main controller on `manual` claimed after one late or lost 30 s beacon. The election (`election.py`, `controller_failover.dart`) now counts the interval it hears the leader beacon at: 10 s only after three steady gaps of about 10 s, else 30 s (about 90 s of silence); a state change's TIME repeats are no evidence. No wire change. Both controllers report the leader's cadence and the takeover silence, warn once per leader and term (log, stream, console), and the shared contract case changed with them. Not tried on a field.
@@ -332,3 +336,10 @@ Findings from two real Heltec V4.3 boards and the Pi controller; the fixes are b
 ## 2026-11-06: the game master manual task-first, and a site server manual (DOCS-GM)
 
 - **The game master manual is rewritten task-first** ([en](../manuals/en/game-master.md), [pt](../manuals/pt/game-master.md)): A. set up a field (a phone-vs-Pi table, day codes, choosing and changing the channel, standby and failover), B. a game day (the Medic Kit, the check-in desk with printed tickets), C. recover from problems (a box stuck in an ended game, the controller clock, a lost or reinstalled controller), D. updates (the v0.8.0 release-key change, the modem's USB reflash), E. community modes, and a data and privacy appendix. Stuck-box recovery is marked as from v0.9.0, not released yet. The site server section moved to a new manual, [Site server administration](../manuals/en/site-admin.md) ([pt](../manuals/pt/site-admin.md)). Documentation only.
+
+## 2026-11-06: v0.9.0 released, with the stuck-box recovery
+
+- **[v0.9.0](https://github.com/vakaobr/atalaia-project/releases/tag/v0.9.0) is out** (GitHub pre-release, 2026-11-06; CHANGELOG.md 0.9.0): the controller (Raspberry Pi or phone) frees a box left in a game that ended while it was off (STUCK-1 to STUCK-73), the GM console's **Stuck in an ended game** list with **Release**, RELEASE for a controller that lost its game (RFC 0001 Amendment 28), **Leave the game** at the box and `@leave`, `@wifi` with quoted names and passwords and the setup page's Wi-Fi rules (WIFI-1 to WIFI-10). The manuals, README and project page no longer call these "not released".
+- **One bench test passed** (2026-11-06, a Heltec V4.3 box on 0.9.0-bench.1): switched off mid-game, the game ended, powered back on, freed by the controller within seconds (0.4 s after it booted). The list kept the game afterwards; fixed in v0.9.0 (STUCK-71 to STUCK-73).
+- **The modem needs a USB reflash**: the recovery works only with the v0.9.0 modem image (`"games": true` in its identity); the modem has no update over the air ([modem guide](../manuals/en/modem.md)).
+- **Not done:** the recovery and the Wi-Fi rules on more boards and a field; five boxes on a field (the phase 2 gate).

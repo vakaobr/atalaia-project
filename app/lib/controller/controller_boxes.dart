@@ -266,6 +266,9 @@ class FieldInviter {
   /// [gameId]'s GAME_OVERs are still being said.
   bool gameOverPending(int gameId) => _gamesOver.any((g) => g.gameId == gameId);
 
+  /// Any game's GAME_OVERs are still being said.
+  bool get gamesOverPending => _gamesOver.isNotEmpty;
+
   /// A RELEASE is still being said.
   bool get releasing => _releases.isNotEmpty;
 
@@ -1053,7 +1056,8 @@ class ControllerBoxes {
   }
 
   /// `stuck`: per ended game a box was heard still in, {game, name,
-  /// last_heard_s, nodes, rssi, game_over_resent}; `stuck_reports`: the
+  /// last_heard_s, nodes (the 32 heard last), nodes_count, rssi,
+  /// game_over_resent}; `stuck_reports`: the
   /// radio's reports of other games' packets; `stuck_watch`: whether the
   /// radio can report them (a USB modem whose IDENT says "games"; never an
   /// I/O pod), reinvite.py `stuck_view`; `radio_kind`: "pod", "modem" or

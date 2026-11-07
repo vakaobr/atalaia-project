@@ -800,7 +800,8 @@ Decisions APX-1 to APX-3 (`app/`; not tried on a real phone): a marshal's phone 
 
 - **The app is attached to each release from v0.9.0, signed with the project's Android key** (alias `atalaia`, RSA 4096, in the `release` environment's secrets; certificate SHA-256 in `docs/community/keys.md`). `release.yml`'s job `apk` builds it unsigned with `app/tool/check.sh apk-release` (no key in that networked build; Gradle dependency verification since APS-5), signs it with `app/tool/sign_apk.sh` in a container with no network, and fails unless `apksigner` reports that certificate (APS-1 to APS-6); updates then install over each other and keep the phone controller's data. APP-2's "the maintainer has not yet made the release keystore" is done.
 - **Once only**, phones with a debug-signed app uninstall it before the first release APK (the manuals' update sections say what each role loses).
-- **Not done:** the first tag with this job has not run yet; a real phone has not installed the release APK over another release APK; the maintainer's offline backup of the keystore is not confirmed here.
+- **Released:** [v0.9.0](https://github.com/vakaobr/atalaia-project/releases/tag/v0.9.0) (2026-11-06) is the first release with the job: it carries `atalaia-app-0.9.0.apk` and its `.apk.sha256`, signer certificate SHA-256 `9C:35:0D:17:37:D6:C5:35:CD:3E:D1:04:28:8E:65:AD:7D:B4:FA:CE:8E:4E:6F:27:75:3B:7B:7C:38:40:A1:99` (the one in `docs/community/keys.md`).
+- **Not done:** a real phone has not installed a release APK over another release APK (the next release is the first chance); the maintainer's offline backup of the keystore is not confirmed here.
 
 ## The phone controller's security parity, kept results, the player's event list (2026-10-30, software only)
 

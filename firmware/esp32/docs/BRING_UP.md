@@ -506,7 +506,11 @@ and two boards at least 1 m apart, both antennas fitted.
    Ready after 30 s; a new game's `@join` is taken at once and the old game's text is refused
    (`a game this box has played already`). The join key, the adoption and the Wi-Fi stay
    (`@lobby` shows the same device id). On a box with a keypad, the same from the admin
-   menu: hold `*` 3 s during the game, the admin PIN and `#`, *Leave the game*, `#`, `#`.
+   menu: 5 min after the restart with the controller silent, hold `*` 3 s, the admin PIN and
+   `#`, *Leave the game*, `#`, `#`. Decisions AMG-1 to AMG-5: in a running game with the
+   controller beaconing, the hold opens nothing (log `admin menu: not while the game runs`);
+   pause the game and it opens; resume and it closes. Five wrong PINs there lock only that
+   menu: `@leave <admin PIN>` and the picker still take the PIN.
    A release build counts a wrong PIN in `@leave <wrong>` (`refused: admin PIN (wrong)`).
 8. A box stuck in a lost game (RFC 0001 Amendment 28, decisions STUCK-50 to STUCK-59): join
    the box, start the game and wait for a TIME (`@lobby` shows `joined at` with the Unix time),

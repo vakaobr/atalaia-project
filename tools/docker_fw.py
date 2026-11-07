@@ -11,6 +11,11 @@
                                                also the "@lbt" listen-before-talk bench test, SL-25,
                                                docs/runbooks/lbt-bench-gate.md)
                                                -> firmware/esp32/build-bench/
+    python tools/docker_fw.py release-hardened the hardened Field Box release (sdkconfig.release: secure
+                                               boot v2, flash encryption, NVS encryption, anti-rollback;
+                                               firmware/esp32/docs/RELEASE_HARDENING.md), signed for
+                                               secure boot -> firmware/esp32/build-hardened/. Never
+                                               flash it to a board you are not ready to burn.
     python tools/docker_fw.py test             host tests and screen reference images (as CI)
     python tools/docker_fw.py test --update-screens
                                                accept new screen renders as the references
@@ -49,6 +54,18 @@ a shallow clone, which cannot count, the core's version and the commit: 0.3.0-de
                                                its patch's I2S off). Off when left out.
 All five apply to that build folder only, and are reset when left out.
 
+`release-hardened` takes the same options as `build`, and:
+    --secure-boot-key=PATH (or --secure-boot-key PATH), up to 3 times
+                                               the RSA-3072 secure boot v2 private key(s) (PEM, outside
+                                               the repository, under your home folder so Docker sees
+                                               it) the bootloader and the app are signed with:
+                                               *.signed.bin. Left out: a throw-away key made inside
+                                               the container for this one build and deleted with it,
+                                               *.test-signed.bin, TEST ONLY (no box trusts it).
+It then checks every option of sdkconfig.release made it into the build, the internal RAM
+(tools/check_fw_ram.py) and that the signed bootloader fits below the partition table and the
+signed app in its slot (tools/secure_boot_sign.py). Nothing is flashed and no eFuse is touched.
+
 `pod` (the I/O pod) also takes --buzzer= and --simple-out= (draft RFC "The expansion port",
 increment 9, EXP-26): --simple-out=on puts the pod's simple output on GPIO 33, on2 a second one on
 GPIO 1 (with or without the buzzer), a number that GPIO. Their uses and longest on times are the
@@ -79,7 +96,7 @@ CONFIG_ATALAIA_POD_MODULE_MAX_ON_S, 30 s).
                                                Applies to that build folder.
 
 Works from any folder and any shell (cmd, PowerShell, bash). Docker must be
-running. `build`, `wokwi`, `modem`, `pod` and `bench` use the espressif/idf:v5.3.2 image (pinned by digest), the same as
+running. `build`, `wokwi`, `modem`, `pod`, `bench` and `release-hardened` use the espressif/idf:v5.3.2 image (pinned by digest), the same as
 CI's esp32-build job, and write into firmware/esp32/ so that flashing tools
 and the Wokwi extension find the files. `test` runs CI's firmware-test
 commands in the atalaia-dev image (built on first use, like docker_sim.py)
@@ -125,6 +142,8 @@ POD_BUILD = "build-pod"
 POD_DEFAULTS = ("sdkconfig.defaults", "sdkconfig.pod")
 BENCH_BUILD = "build-bench"
 BENCH_DEFAULTS = ("sdkconfig.defaults", "sdkconfig.bench")
+HARDENED_BUILD = "build-hardened"
+HARDENED_DEFAULTS = ("sdkconfig.defaults", "sdkconfig.release")
 
 
 def fail(message: str) -> int:
@@ -243,10 +262,10 @@ def drop_broken_components() -> None:
             shutil.rmtree(component)
 
 
-def run_idf(script: str) -> int:
-    """Runs a shell script in the ESP-IDF image, in firmware/esp32/."""
+def run_idf(script: str, mounts: tuple[str, ...] = ()) -> int:
+    """Runs a shell script in the ESP-IDF image, in firmware/esp32/ (mounts: more -v arguments)."""
     drop_broken_components()
-    return docker("run", "--rm", *interactive(), "-v", f"{REPO}:/project",
+    return docker("run", "--rm", *interactive(), "-v", f"{REPO}:/project", *mounts,
                   "-w", "/project/firmware/esp32", IDF_IMAGE, "bash", "-c", script)
 
 
@@ -263,7 +282,9 @@ def build() -> int:
 
 # Field Box options (main sets them): the firmware's version, its release keys and its mode keys.
 FW_OPTIONS: dict[str, str] = {}
-FIELD_BOX_BUILDS = ("build", WOKWI_BUILD, BENCH_BUILD)
+FIELD_BOX_BUILDS = ("build", WOKWI_BUILD, BENCH_BUILD, HARDENED_BUILD)
+# release-hardened: the secure boot keys (--secure-boot-key, up to 3), host paths.
+SECURE_BOOT_KEYS: list[Path] = []
 
 
 def release_keys_hex(text: str) -> str | None:
@@ -438,6 +459,46 @@ def bench() -> int:
     return code
 
 
+def release_hardened() -> int:
+    """The hardened Field Box release (RELEASE_HARDENING.md, section 4 step 2): build, check the
+    configuration and the RAM, sign the bootloader and the app for secure boot v2, check the sizes."""
+    for key in SECURE_BOOT_KEYS:
+        if not key.is_file():
+            return fail(f"--secure-boot-key: {key}: no such file")
+        try:
+            key.resolve().relative_to(REPO)
+            return fail(f"--secure-boot-key: {key} is inside the repository: a private key never goes there")
+        except ValueError:
+            pass
+    code = variant(HARDENED_BUILD, HARDENED_DEFAULTS)
+    if code != 0:
+        return code
+    mounts: list[str] = []
+    for i, key in enumerate(SECURE_BOOT_KEYS):
+        mounts += ["-v", f"{key.resolve()}:/sb-keys/key{i}.pem:ro"]
+        print(f"docker_fw: secure boot key {i + 1}: {key} (/sb-keys/key{i}.pem in the container, read-only)")
+    keys = (" ".join(f"--key /sb-keys/key{i}.pem" for i in range(len(SECURE_BOOT_KEYS)))
+            or "--throwaway-test-key")
+    tool = "python3 ../../tools/secure_boot_sign.py"
+    b = HARDENED_BUILD
+    script = (
+        "set -e; . $IDF_PATH/export.sh > /dev/null; "
+        f"{tool} check-config {b}/sdkconfig; "
+        f"python3 ../../tools/check_fw_ram.py {b}/atalaia_esp32.map; "
+        f"rm -f {b}/bootloader/bootloader*signed.bin {b}/atalaia_esp32*signed.bin*; "
+        f"{tool} sign {b}/bootloader/bootloader.bin {b}/atalaia_esp32.bin {keys}; "
+        f"{tool} check-sizes {b}"
+    )
+    code = run_idf(script, tuple(mounts))
+    if code == 0:
+        kind = "signed" if SECURE_BOOT_KEYS else "test-signed"
+        print(f"\nHardened release: firmware/esp32/{b}/atalaia_esp32.{kind}.bin and "
+              f"bootloader/bootloader.{kind}.bin. NOT for a board that is not to be burned "
+              "(RELEASE_HARDENING.md, section 4); no eFuse was touched."
+              + ("" if SECURE_BOOT_KEYS else " Signed with a THROW-AWAY TEST KEY: no box trusts it."))
+    return code
+
+
 def ensure_dev_image() -> bool:
     dockerfile = (REPO / "tools" / "dev" / "Dockerfile").read_bytes().replace(b"\r\n", b"\n")
     wanted = hashlib.sha256(dockerfile).hexdigest()[:16]
@@ -477,7 +538,7 @@ def test(update_screens: bool) -> int:
 
 
 def clean() -> int:
-    for name in ("build", WOKWI_BUILD, MODEM_BUILD, POD_BUILD, BENCH_BUILD, "build-test"):
+    for name in ("build", WOKWI_BUILD, MODEM_BUILD, POD_BUILD, BENCH_BUILD, HARDENED_BUILD, "build-test"):
         path = FW / name
         if path.exists():
             shutil.rmtree(path)
@@ -497,11 +558,21 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0 if argv else 1
     command, options = argv[0], argv[1:]
+    # --secure-boot-key PATH as well as --secure-boot-key=PATH.
+    joined: list[str] = []
+    for option in options:
+        if joined and joined[-1] == "--secure-boot-key":
+            joined[-1] = f"--secure-boot-key={option}"
+        else:
+            joined.append(option)
+    if joined and joined[-1] == "--secure-boot-key":
+        return fail("--secure-boot-key needs a path")
+    options = joined
     box = ["--fw-version=", "--release-keys=", "--mode-keys=", "--region=", "--lbt=", "--antenna-dbi=",
            "--buzzer=", "--simple-out="]
     radio = ["--region=", "--lbt=", "--antenna-dbi="]
     known = {"build": box, "wokwi": box, "modem": radio, "pod": radio + ["--buzzer=", "--simple-out=", "--module-outputs="],
-             "bench": box,
+             "bench": box, "release-hardened": box + ["--secure-boot-key="],
              "test": ["--update-screens"], "clean": [], "version": []}
     if command not in known:
         return fail(f"unknown command {command!r}; run with --help")
@@ -549,6 +620,10 @@ def main(argv: list[str]) -> int:
             if value not in ("on", "off"):
                 return fail("--module-outputs: on or off")
             FW_OPTIONS["module_outputs"] = value
+        elif name == "--secure-boot-key=":
+            if len(SECURE_BOOT_KEYS) == 3:
+                return fail("--secure-boot-key: at most 3 keys (the chip's three digest slots)")
+            SECURE_BOOT_KEYS.append(Path(option.split("=", 1)[1]).expanduser())
         elif name == "--mode-keys=":
             keys = release_keys_hex(option.split("=", 1)[1])
             if keys is None:
@@ -577,6 +652,8 @@ def main(argv: list[str]) -> int:
             return pod()
         if command == "bench":
             return bench()
+        if command == "release-hardened":
+            return release_hardened()
         return test("--update-screens" in options)
     except KeyboardInterrupt:
         return 130

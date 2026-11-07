@@ -166,11 +166,16 @@ static uint8_t nfc_last_uid_len;
 static uint32_t nfc_last_poll_ms;
 /* The admin PIN (admin_pin.h): one check for the picker and adoption, its failure count in NVS. */
 static admin_pin_t admin_guard;
-/* The admin menu over a field game (decisions STUCK-20 to STUCK-33): '*' held down
- * GAME_MENU_HOLD_MS while the box is in a game opens the admin PIN, then one entry, "Leave the
- * game" (preset_ui_enable_leave). The game goes on underneath: its screens are kept, not drawn,
- * and the last one comes back when the menu closes ('*' with no digit typed, the game over, or
- * GAME_MENU_IDLE_MS without a key). */
+/* The admin menu over a field game (decisions STUCK-20 to STUCK-33, AMG-1 to AMG-5): '*' held
+ * down GAME_MENU_HOLD_MS while the box is in a game whose mode takes no keys from players
+ * (box_game_admin_menu_ok: waiting for the start, paused, or its controller silent for
+ * BOX_ADMIN_MENU_SILENT_MS) opens the admin PIN, then one entry, "Leave the game"
+ * (preset_ui_enable_leave). The game goes on underneath: its screens are kept, not drawn, and the
+ * last one comes back when the menu closes ('*' with no digit typed, the game over or running
+ * again, or GAME_MENU_IDLE_MS without a key). Its PIN tries have their own count in NVS
+ * (game_guard, "pin_fails_g"), so they never start the waits of the picker, adoption and the
+ * USB console. */
+static admin_pin_t game_guard;
 #define GAME_MENU_HOLD_MS 3000u
 #define GAME_MENU_IDLE_MS 30000u
 static preset_ui_t game_menu;
@@ -338,10 +343,11 @@ static void show_game_menu(void)
 static void open_game_menu(uint32_t now)
 {
     preset_ui_init(&game_menu, NULL, 0);
-    preset_ui_set_guard(&game_menu, &admin_guard);
+    admin_pin_follow(&game_guard, &admin_guard); /* the PIN in force, this menu's own count */
+    preset_ui_set_guard(&game_menu, &game_guard);
     preset_ui_enable_leave(&game_menu, true);
-    game_menu.locked_min = admin_pin_wait_min(&admin_guard);
-    game_menu.no_pin = !admin_pin_is_set(&admin_guard);
+    game_menu.locked_min = admin_pin_wait_min(&game_guard);
+    game_menu.no_pin = !admin_pin_is_set(&game_guard);
     memset(&game_menu_screen, 0, sizeof(game_menu_screen));
     game_menu_active = true;
     game_menu_key_ms = now;
@@ -900,18 +906,18 @@ static bool portal_join_key(const char *hex)
 #define ADMIN_PIN_BENCH_BUILD false
 #endif
 
+/* user: the NVS key of the count ("pin_fails"; "pin_fails_g" for the menu over a game). */
 static bool pin_load_failures(void *user, uint32_t *failures)
 {
-    (void)user;
-    *failures = config_store_get_u32("pin_fails", 0);
+    *failures = config_store_get_u32((const char *)user, 0);
     return true;
 }
 
 static bool pin_store_failures(void *user, uint32_t failures)
 {
-    (void)user;
-    config_store_set_u32("pin_fails", failures);
-    return config_store_get_u32("pin_fails", failures + 1u) == failures;
+    const char *key = (const char *)user;
+    config_store_set_u32(key, failures);
+    return config_store_get_u32(key, failures + 1u) == failures;
 }
 
 static bool pin_store(void *user, const char *pin)
@@ -946,8 +952,13 @@ static void admin_guard_init(void)
                            .store_failures = pin_store_failures,
                            .store_pin = pin_store,
                            .now_ms = pin_now,
-                           .ctx = NULL};
+                           .ctx = (void *)"pin_fails"};
     admin_pin_init(&admin_guard, &ops, pin);
+    /* The menu over a field game: the same PIN (admin_pin_follow when it opens), its own count. */
+    admin_pin_ops_t game_ops = ops;
+    game_ops.store_pin = NULL;
+    game_ops.ctx = (void *)"pin_fails_g";
+    admin_pin_init(&game_guard, &game_ops, pin);
     memset(stored, 0, sizeof(stored));
     memset(pin, 0, sizeof(pin));
     if (admin_pin_wait_ms(&admin_guard) > 0) {
@@ -1244,12 +1255,18 @@ static void task_game(void *arg)
 
         /* ---- Poll keypad: one press per key stroke ---- */
         char key = key_filter_update(&key_filter, hal.keypad->scan());
-        /* '*' held down in a game: the admin menu over it (its press went to the mode). */
+        /* '*' held down in a game: the admin menu over it (its press went to the mode). Not
+         * while the mode takes players' keys with its controller in reach (AMG-1). */
         if (key_filter.state == '*' && box_game_can_leave(&box) && !game_menu_active) {
             star_held_ms += delta_ms;
             if (star_held_ms >= GAME_MENU_HOLD_MS && !star_hold_used) {
                 star_hold_used = true;
-                open_game_menu(now);
+                if (box_game_admin_menu_ok(&box)) {
+                    open_game_menu(now);
+                } else {
+                    ESP_LOGI(TAG, "admin menu: not while the game runs (pause it, or "
+                                  "\"@leave <admin PIN>\" on the USB console)");
+                }
             }
         } else if (key_filter.state != '*') {
             star_held_ms = 0;
@@ -1292,8 +1309,8 @@ static void task_game(void *arg)
             key = HAL_KEY_NONE;
         }
         if (game_menu_active &&
-            (!box_game_can_leave(&box) || now - game_menu_key_ms >= GAME_MENU_IDLE_MS)) {
-            close_game_menu(); /* the game is over, or nobody is at the keypad */
+            (!box_game_admin_menu_ok(&box) || now - game_menu_key_ms >= GAME_MENU_IDLE_MS)) {
+            close_game_menu(); /* the game is over or running again, or nobody is at the keypad */
         }
         if (key != HAL_KEY_NONE && picker_active && outputs_admin_active(&outs_admin)) {
             /* The outputs screen (the picker's "Outputs" entry): '#' or '*' back to the list. */

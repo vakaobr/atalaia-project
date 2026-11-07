@@ -86,7 +86,7 @@ hero:
     Pre-alfa · fazy 1 i 2 gotowe w oprogramowaniu; prawdziwe płytki rozgrywają całe gry z
     kontrolerem terenu na stole warsztatowym, łącznie z klawiaturą; faza 3 gotowa w oprogramowaniu,
     aplikacja iOS sprawdzona na iPhonie; serwer strony z fazy 4 działa na serwerze testowym; faza 5
-    zbudowana w oprogramowaniu · najnowsze wydanie v0.8.0 · jeszcze nie gotowe do gry w terenie
+    zbudowana w oprogramowaniu · najnowsze wydanie v0.9.0 · jeszcze nie gotowe do gry w terenie
   title: Otwarta platforma <span class="nowrap">force-on-force</span>
   lead: >-
     Atalaia to otwarta platforma dla elektronicznych urządzeń do gry w airsoft, paintball i milsim:
@@ -718,12 +718,16 @@ try:
   app:
     title: Na telefonie z Androidem
     text: >-
-      Od v0.9.0 każde <a href="https://github.com/vakaobr/atalaia-project/releases">wydanie na GitHubie</a> zawiera APK aplikacji, podpisany
-      kluczem projektu, więc każde wydanie instaluje się na poprzednie (aplikację zainstalowaną ze
-      starszej wersji debugowej trzeba najpierw raz odinstalować: instrukcje mówią, co się wtedy
-      traci). Możesz też sam zbudować debugowy APK za pomocą Dockera i zainstalować go na telefonie z Androidem 8.0 lub nowszym albo
-      w emulatorze Androida, jak wyjaśnia
-      <a href="https://github.com/vakaobr/atalaia-project/blob/main/app/README.md#install-it-on-an-android-phone-from-windows">poradnik
+      <a href="https://github.com/vakaobr/atalaia-project/releases/tag/v0.9.0">v0.9.0</a> (6
+      listopada 2026) to pierwsze wydanie na GitHubie z aplikacją: atalaia-app-0.9.0.apk, podpisany
+      kluczem projektu, więc każde wydanie instaluje się na poprzednie. Odcisk SHA-256 certyfikatu
+      to <code
+      class="fingerprint">9C:35:0D:17:37:D6:C5:35:CD:3E:D1:04:28:8E:65:AD:7D:B4:FA:CE:8E:4E:6F:27:75:3B:7B:7C:38:40:A1:99</code>;
+      Android odrzuca aktualizację podpisaną innym kluczem. Aplikację zainstalowaną ze starszej
+      wersji debugowej trzeba najpierw raz odinstalować (instrukcje mówią, co się wtedy traci).
+      Możesz też sam zbudować debugowy APK za pomocą Dockera i zainstalować go na telefonie z
+      Androidem 8.0 lub nowszym albo w emulatorze Androida, jak wyjaśnia <a
+      href="https://github.com/vakaobr/atalaia-project/blob/main/app/README.md#install-it-on-an-android-phone-from-windows">poradnik
       aplikacji</a>. Działała na emulatorach, jeszcze nie na prawdziwym telefonie.
   manuals:
     title: Gra i prowadzenie gry
@@ -741,10 +745,9 @@ roadmap:
     sprzęt: fazy od 1 do 3 są gotowe w oprogramowaniu (prawdziwe płytki rozgrywają całe gry na stole
     warsztatowym, a aplikacja na iOS przeszła swoją listę kontrolną na iPhonie); fazy 4 i 5 są
     zbudowane w oprogramowaniu. Bramki czekają na zbudowane skrzynki, testy w terenie, prawdziwy
-    serwer i klucz rejestru projektu. Najnowsze wydanie to v0.8.0 (4 listopada 2026), pierwsze
-    podpisane nowym kluczem wydań projektu. Następne będzie v0.9.0: uwalnianie skrzynek, które
-    utknęły w zakończonej grze, i zasady Wi-Fi skrzynki są zrobione w oprogramowaniu, jeszcze
-    niewydane i niewypróbowane na sprzęcie.
+    serwer i klucz rejestru projektu. Najnowsze wydanie to v0.9.0 (6 listopada 2026): kontroler
+    uwalnia skrzynki, które utknęły w zakończonej grze (na razie jeden test na stole warsztatowym),
+    do tego zasady Wi-Fi skrzynki i pierwsza aplikacja na Androida podpisana kluczem projektu.
   more: Pełna roadmapa, z zawartością każdej fazy i jej bramką →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
   # hardware), in progress, designed (research, architecture and plan written; no code).
@@ -773,8 +776,8 @@ roadmap:
     short: >-
       Firmware Field Boxa i instrukcja budowy; prawdziwa płytka rozgrywa całe gry na stole
       warsztatowym, teraz z ekranem, klawiaturą i przyciskami podłączonymi luźnymi przewodami
-      (zdjęcie i klip na stronie budowy). Opuszczenie zakończonej gry na samej skrzynce jest
-      zrobione w oprogramowaniu dla v0.9.0. Wciąż czeka na zmontowaną skrzynkę.
+      (zdjęcie i klip na stronie budowy). Opuszczenie zakończonej gry na samej skrzynce weszło do
+      v0.9.0, jeszcze niewypróbowane na prawdziwej skrzynce. Wciąż czeka na zmontowaną skrzynkę.
     done:
       - Firmware ESP32 dla Field Boxa, z presetami na urządzeniu, działający w emulatorze.
       - Mały ekran skrzynki pokazuje pasek przejmowania, punkty i czas utrzymania, w czterech językach.
@@ -796,7 +799,7 @@ roadmap:
       - "Zawodna magistrala I2C nie restartuje już skrzynki: klawiatura, mały ekran, czytnik NFC i wskaźnik baterii używają nowszego sterownika ESP-IDF z limitami czasu, resetem magistrali i wycofaniem, które odstawia na bok wadliwą część, więc zepsuta klawiatura odczytuje się jako brak klawisza, a gra toczy się dalej. Restart zgłasza teraz swój prawdziwy powód (zasilanie, spadek napięcia, oprogramowanie, awaria, watchdog) zamiast zawsze „zasilanie”, a konsola GM mówi „Skrzynka uległa awarii i zrestartowała się”. Znalezione na stole warsztatowym: klawiatura ze złymi lutami zrestartowała płytkę sześć razy w trzy minuty. Tylko testy na komputerze; test poprawki na stole jest jeszcze do zrobienia."
       - "Tekst ekranowy, który się nie mieści, jest odrzucany przy sprawdzaniu trybu, a tekst, którego nie da się narysować, pokazuje „?” zamiast pustego miejsca (długi tekst w czterech językach znikał po cichu na skrzynce). Testy na komputerze."
       - "Liczba jeden przyjmuje liczbę pojedynczą („1 ponto”, nie „1 pontos”) na ekranach skrzynki, w aplikacji, konsoli GM i stronach obsługi. Testy w oprogramowaniu."
-      - "Skrzynka, która utknęła w grze zakończonej, gdy była wyłączona, może ją opuścić na samej skrzynce: przytrzymaj * przez 3 sekundy, wpisz PIN administratora i wybierz Leave the game (albo @leave na jej konsoli USB). Zachowuje teren, Wi-Fi i tryby. W oprogramowaniu, od v0.9.0: jeszcze niewydane i niewypróbowane na sprzęcie."
+      - "Skrzynka, która utknęła w grze zakończonej, gdy była wyłączona, może ją opuścić na samej skrzynce: przytrzymaj * przez 3 sekundy, wpisz PIN administratora i wybierz Leave the game (albo @leave na jej konsoli USB). Zachowuje teren, Wi-Fi i tryby. W v0.9.0 (6 listopada 2026); jeszcze niewypróbowane na prawdziwej skrzynce."
     next:
       - Zbudowana skrzynka, która przechodzi 2-godzinną grę klubową bez restartów.
       - "Zobaczenie paska czasu na prawdziwym panelu."
@@ -805,7 +808,7 @@ roadmap:
       - "Wgranie nowej tablicy partycji na prawdziwą płytkę (jedno wgranie przez USB, bez kasowania, dla skrzynki ze starą)."
       - "Utwardzony obraz wydania (szyfrowanie flash, secure boot): spisany tylko jako plan, nic nie zbudowano ani nie wypróbowano na płytce."
       - "Wypróbowanie obsługi błędów I2C na płytce ze złym połączeniem klawiatury oraz ekranu startowego i nowych ekranów na innych płytkach niż pierwsza warsztatowa."
-      - "Wydanie v0.9.0 i wypróbowanie opuszczania gry na prawdziwej skrzynce."
+      - "Wypróbowanie opuszczania gry na prawdziwej skrzynce."
     gate: >-
       Bramka: jedna skrzynka przechodzi 2-godzinną grę klubową bez restartów. <strong>Otwarta</strong>, dopóki
       nie zrobi tego zbudowana skrzynka.
@@ -815,8 +818,8 @@ roadmap:
       Skirmesh-RF przez LoRa, kontroler terenu, API, konsola GM i pakiet trybów, przetestowane w
       oprogramowaniu; na stole warsztatowym prawdziwe płytki rozgrywają całe gry z kontrolerem przez
       radio, a to, co wykazał stół, jest poprawione w oprogramowaniu. Uwalnianie skrzynek, które
-      utknęły w zakończonej grze, jest zrobione w oprogramowaniu dla v0.9.0. Czeka na 5 zbudowanych
-      skrzynek na terenie.
+      utknęły w zakończonej grze, weszło do v0.9.0 i przeszło pierwszy test na stole warsztatowym.
+      Czeka na 5 zbudowanych skrzynek na terenie.
     done:
       - Szyfrowany protokół radiowy Skirmesh-RF i modem radiowy USB.
       - Kontroler terenu z jego API.
@@ -860,8 +863,8 @@ roadmap:
       - "Kontroler terenu znosi zły zegar (Raspberry Pi 4 nie ma własnego zegara i może wystartować z rokiem 1970): czasy gry i limity czasu już od niego nie zależą, konsola ostrzega GM-a, który ustawia czas z konsoli (tylko do przodu), jego certyfikaty pozostają ważne dla telefonów z właściwym czasem, a czyszczenie danych czeka. Testy na komputerze, jeszcze nie na prawdziwym Pi."
       - "Krótkotrwałe tokeny dostępu: GM może dać telefonowi sędziego, przebiegowi testowemu lub ekranowi dla widzów token, który tylko czyta, prowadzi grę lub zarządza sędziami, dla jednej gry lub wszystkich, domyślnie na 8 godzin (najwyżej 7 dni), i natychmiast go odwołać. Testy na komputerze."
       - "Aktualizacje przez radio dla własnych buildów stołu warsztatowego: warsztatowy klucz wydań, zaufany na stole obok kluczy projektu, podpisuje codzienne buildy; 2 listopada 2026 skrzynka przeszła z jednego buildu na następny z konsoli w około 22 sekundy, potwierdzone po jej autoteście."
-      - "Kontroler uwalnia skrzynkę, która utknęła w grze zakończonej, gdy była wyłączona: modem USB ją zgłasza, kontroler ponownie wysyła koniec tej gry, a konsola GM pokazuje takie skrzynki na liście skrzynek w zakończonej grze, z przyciskiem do ich uwolnienia. Kontroler, który stracił swoją grę (przeinstalowany albo z utraconymi danymi), może uwolnić każdą skrzynkę spoza trwającej gry. W oprogramowaniu, od v0.9.0: jeszcze niewydane i niewypróbowane na sprzęcie. Modem potrzebuje nowego firmware'u, wgranego przez USB."
-      - "Konfiguracja Wi-Fi skrzynki: @wifi przyjmuje nazwę i hasło Wi-Fi ze spacjami, w cudzysłowie, a strona konfiguracji odrzuca to, czego skrzynka nie może użyć: nazwę dłuższą niż 32 bajty albo hasło, które nie jest puste, nie ma 8–63 znaków i nie jest 64 cyframi szesnastkowymi. W oprogramowaniu, od v0.9.0: jeszcze niewydane i niewypróbowane na sprzęcie."
+      - "Kontroler uwalnia skrzynkę, która utknęła w grze zakończonej, gdy była wyłączona: modem USB ją zgłasza, kontroler ponownie wysyła koniec tej gry, a konsola GM pokazuje takie skrzynki na liście skrzynek w zakończonej grze, z przyciskiem do ich uwolnienia. Kontroler, który stracił swoją grę (przeinstalowany albo z utraconymi danymi), może uwolnić każdą skrzynkę spoza trwającej gry. W v0.9.0 (6 listopada 2026). Jeden test na stole warsztatowym zaliczony 6 listopada 2026: skrzynkę Heltec V4.3 wyłączono w trakcie gry, gra się skończyła, a po ponownym włączeniu kontroler uwolnił ją w kilka sekund. Modem potrzebuje firmware'u z v0.9.0, wgranego przez USB."
+      - "Konfiguracja Wi-Fi skrzynki: @wifi przyjmuje nazwę i hasło Wi-Fi ze spacjami, w cudzysłowie, a strona konfiguracji odrzuca to, czego skrzynka nie może użyć: nazwę dłuższą niż 32 bajty albo hasło, które nie jest puste, nie ma 8–63 znaków i nie jest 64 cyframi szesnastkowymi. W v0.9.0 (6 listopada 2026)."
     next:
       - Płytki radiowe i 5 zbudowanych skrzynek do testu w terenie.
       - Test w terenie z 20 skrzynkami, z włączonym i wyłączonym nasłuchem przed nadawaniem.
@@ -870,7 +873,7 @@ roadmap:
       - "Wypróbowanie okna powtórzeń i utwardzonych kontrolerów na prawdziwych płytkach i prawdziwym Pi (nagrane polecenie odtworzone na stole warsztatowym)."
       - "Wyczyszczenie zapisu epok skrzynki na dwóch płytkach warsztatowych, by zobaczyć, że zostaje znaleziona ponownie, dwa razy z rzędu i z dawnym liderem, który ponownie dołączył (procedura jest spisana)."
       - "Ustawianie zegara i używanie tokenów dostępu na prawdziwym Raspberry Pi na terenie bez internetu."
-      - "Wydanie v0.9.0, a potem wypróbowanie uwalniania skrzynek i zasad Wi-Fi na prawdziwych płytkach i prawdziwym modemie."
+      - "Wypróbowanie uwalniania skrzynek i zasad Wi-Fi na kolejnych płytkach (uwalnianie przeszło jeden test na stole warsztatowym 6 listopada 2026)."
     gate: >-
       Bramka: 5 skrzynek na obiekcie <a href="{{ page.to.glossary }}#slownik-cqb">CQB</a> i na terenie
       otwartym, zero utraconych przejęć. <strong>Otwarta.</strong>
@@ -981,7 +984,7 @@ roadmap:
         - "Własny ekran kontrolera na telefonie importuje listę rejestracji (plik CSV lub JSON wybrany selektorem plików Androida), bez potrzeby konsoli GM."
         - "Kontroler zapasowy przejmuje wybory dotyczące beaconów skrzynek (przełącznik terenu, wyłączone skrzynki, pomieszczenia) i miejsca skrzynek od momentu dołączenia, więc po failoverze telefony dostają ten sam rejestr beaconów; konsola już otwarta na zapasowym od razu przesuwa znaczniki skrzynek, bez przeładowania. W oprogramowaniu, w obu kontrolerach; przesuwanie znaczników przetestowane w przeglądarce headless."
         - "Kontroler na telefonie dogania przegląd bezpieczeństwa Pi: odwoływanie podpisanych trybów, które w razie błędu blokuje (z minimalną wersją dla każdego trybu i limitem wieku dla telefonu offline, oba na ekranie Pakiety trybów), oraz kanał ATAK obsługi przez TLS z przypiętym urzędem certyfikacji. Przetestowane w oprogramowaniu; nie na telefonie na terenie."
-        - "Kontroler na Androidzie uwalnia skrzynki, które utknęły w zakończonej grze, tak jak Raspberry Pi, z modemem radiowym USB (moduł I/O nie potrafi zgłaszać takich skrzynek), i ma tę samą ochronę zegara co Pi. W oprogramowaniu, od v0.9.0: jeszcze niewydane i niewypróbowane na prawdziwym telefonie."
+        - "Kontroler na Androidzie uwalnia skrzynki, które utknęły w zakończonej grze, tak jak Raspberry Pi, z modemem radiowym USB (moduł I/O nie potrafi zgłaszać takich skrzynek), i ma tę samą ochronę zegara co Pi. W v0.9.0 (6 listopada 2026); jeszcze niewypróbowane na prawdziwym telefonie."
     g_ios:
       title: iOS
       items:
@@ -1215,8 +1218,8 @@ roadmap:
     short: >-
       Wizualny edytor trybów, podpisane pakiety trybów, rejestr trybów jako szablon, niemiecki i
       chiński tradycyjny, instrukcje budowy, moduły tarczy i wyjść na porcie rozszerzeń. Każdy krok
-      w oprogramowaniu jest zbudowany. Najnowsze wydanie, v0.8.0, jest podpisane nowym kluczem wydań
-      projektu.
+      w oprogramowaniu jest zbudowany. Najnowsze wydanie, v0.9.0, jest podpisane kluczem wydań
+      projektu i zawiera aplikację na Androida podpisaną kluczem Androida projektu.
     done:
       - "<strong>Wizualny edytor trybów</strong>: strona symulatora, na której tryb składa się
         z bloków (co się dzieje, gdy drużyna trzyma przycisk, timery, punkty, ekrany
@@ -2220,7 +2223,7 @@ glossary:
     text: >-
       Skrzynka, która była wyłączona lub poza zasięgiem, gdy jej gra się skończyła, więc wciąż
       uważa, że jest w tej grze: pokazuje starą grę i odrzuca nowe zaproszenia („w innej grze”). Od
-      v0.9.0 (w oprogramowaniu, jeszcze niewydane i niewypróbowane na sprzęcie) kontroler, gdy
+      v0.9.0 (wydane 6 listopada 2026; na razie jeden test na stole warsztatowym) kontroler, gdy
       usłyszy taką skrzynkę, ponownie wysyła koniec tej gry, konsola GM pokazuje ją z przyciskiem do
       jej uwolnienia, a menu administratora skrzynki ma opcję opuszczenia gry.
   microcontroller:

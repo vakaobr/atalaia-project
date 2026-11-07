@@ -129,6 +129,8 @@ section .intro { color: var(--muted); margin: 12px 0 32px; font-size: 1.05rem; }
 .band { background: var(--band); }
 
 code { font-family: var(--mono); font-size: 0.88em; }
+/* A certificate fingerprint (95 characters, no spaces) wraps anywhere instead of widening a phone screen. */
+code.fingerprint { overflow-wrap: anywhere; }
 .nowrap { white-space: nowrap; }
 
 /* ---- header: always slate, like the tower ---- */

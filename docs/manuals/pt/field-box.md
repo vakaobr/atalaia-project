@@ -11,7 +11,7 @@ Para quem cuida das caixas num campo: ligá-las, pô-las num jogo e mantê-las v
 
 > **Ainda não está pronta para o campo.** A Atalaia está em pré-alfa. Placas Heltec V4.3 a sério já jogaram jogos inteiros numa bancada com o controlador de campo. Nenhuma caixa montada foi usada num campo. Cada passo abaixo corresponde ao que o firmware mostra hoje. Os passos que dependem de hardware dizem **Ainda não testado num campo**. As palavras em *itálico* estão no [glossário](https://atalaia-project.link/glossario/).
 
-> **Que firmware.** A versão publicada mais recente é a **v0.8.0** (2026-11-04). Algumas coisas abaixo chegam com a **v0.9.0**, que **ainda não foi publicada**: até lá, precisam de firmware compilado a partir do ramo `main` do projeto. Cada uma di-lo onde aparece: tirar uma caixa do jogo na própria caixa, o controlador libertar sozinho uma caixa nessa situação, nomes de Wi-Fi com espaços na consola USB e as regras de Wi-Fi da página de configuração.
+> **Que firmware.** A versão publicada mais recente é a **v0.9.0** (2026-11-06). Algumas coisas abaixo precisam da **v0.9.0** ou seguinte, e di-lo onde aparecem: tirar uma caixa do jogo na própria caixa, o controlador libertar sozinho uma caixa nessa situação, nomes de Wi-Fi com espaços na consola USB e as regras de Wi-Fi da página de configuração.
 
 ## Índice
 
@@ -89,7 +89,7 @@ Uma caixa nova mostra **PRIMEIRA CONFIGURAÇÃO** com o nome de uma rede Wi-Fi c
 
 A caixa reinicia. Uma caixa ainda sem campo mostra **Emparelhar caixa** e um código de 6 algarismos ([secção 5](#5-adota-a-caixa-no-campo)).
 
-**As regras do Wi-Fi do campo.** A partir da v0.9.0 (ainda não publicada), a página de configuração recusa o que a caixa não conseguiria usar, e diz porquê:
+**As regras do Wi-Fi do campo.** A partir da v0.9.0, a página de configuração recusa o que a caixa não conseguiria usar, e diz porquê:
 
 - o **nome** tem 1 a 32 bytes. Uma letra acentuada ocupa 2 bytes e um carácter chinês 3, por isso um nome com elas pode ser recusado com menos de 32 caracteres;
 - a **palavra-passe** fica vazia (uma rede aberta), tem 8 a 63 caracteres, ou exatamente 64 algarismos hexadecimais.
@@ -309,7 +309,7 @@ Quando o kit fica vazio, mostra **Sem ligaduras** e **A organização pode repor
 
 ## 10. Tirar uma caixa do jogo
 
-Uma caixa que estava desligada quando o jogo terminou nunca ouve o fim. Ao voltar a ser ligada, continua nesse jogo: mostra o ecrã do jogo e recusa todos os convites e cartões de entrada (a consola diz **recusou: noutro jogo**). Uma caixa nunca sai sozinha de um jogo quando o controlador se cala. **Não a apagues.** Há três maneiras de sair. As três precisam de firmware a partir da **v0.9.0 (ainda não publicada; até lá, compila a partir do `main`)**, na peça indicada.
+Uma caixa que estava desligada quando o jogo terminou nunca ouve o fim. Ao voltar a ser ligada, continua nesse jogo: mostra o ecrã do jogo e recusa todos os convites e cartões de entrada (a consola diz **recusou: noutro jogo**). Uma caixa nunca sai sozinha de um jogo quando o controlador se cala. **Não a apagues.** Há três maneiras de sair. As três precisam de firmware a partir da **v0.9.0**, na peça indicada.
 
 | Maneira | Quem faz | Precisa da v0.9.0 em |
 | --- | --- | --- |
@@ -321,16 +321,16 @@ O lado da organização está no [manual da organização, Recuperar de problema
 
 **Sair do jogo na caixa** (o menu de administração da caixa; não o **Sair do jogo** da app de quem joga, que só apaga o nome da pessoa):
 
-1. Mantém `*` premido durante 3 segundos. O toque em si continua a ir para o jogo, como um `*`.
+1. Mantém `*` premido durante 3 segundos. O toque em si continua a ir para o jogo, como um `*`. O menu só abre quando o jogo não pode receber teclas de quem joga: a caixa está à espera do início, o jogo está em pausa, ou a caixa não ouve nada do controlador há 5 minutos (uma caixa presa: espera 5 minutos depois de a ligar). Com o jogo a decorrer e o controlador ao alcance, manter `*` premido não faz mais nada.
 2. **Marca o PIN de administração.** `#` confirma. `*` apaga; sem nada escrito, `*` volta ao jogo.
 3. **ADMINISTRAÇÃO** mostra uma entrada, **Sair do jogo**. Carrega em `#`.
 4. **SAIR DO JOGO?**: `#` sai, `*` volta.
 
 A caixa termina o jogo como se a organização o tivesse terminado: o último ecrã do jogo e, 30 segundos depois, **PRONTA**. Nunca mais entra nesse jogo. Mantém o campo, a chave de entrada, o Wi-Fi, o PIN de administração e os jogos. Pode ser convidada, ou receber um cartão de entrada, logo a seguir.
 
-- Também funciona num jogo que ainda decorre, para a organização poder tirar uma caixa: a consola passa a ver essa caixa como terminada e o jogo continua para as outras caixas.
-- O menu só aparece enquanto a caixa está num jogo do controlador ou de um cartão de entrada. Fecha sozinho ao fim de 30 segundos sem tecla, ou quando o jogo termina.
-- Cinco PIN errados obrigam a esperar, como em todo o lado.
+- Para tirar uma caixa de um jogo que ainda decorre (um botão avariado, uma caixa no sítio errado), **põe o jogo em pausa** na consola primeiro e depois mantém `*` premido. Ou usa `@leave <PIN de administração>` na consola USB, que funciona a qualquer momento. A consola da organização passa a ver essa caixa como terminada e o jogo continua para as outras caixas quando for retomado.
+- O menu só aparece enquanto a caixa está num jogo do controlador ou de um cartão de entrada. Fecha sozinho ao fim de 30 segundos sem tecla, quando o jogo termina ou quando o jogo volta a decorrer (retomado, ou o controlador ouvido de novo).
+- Cinco PIN errados neste menu obrigam a esperar antes da tentativa seguinte neste menu (1, 2, 4 ... minutos, como em todo o lado). Estas tentativas têm a sua própria contagem: nunca bloqueiam o seletor de jogos, a adoção nem o `@leave` da consola USB, por isso quem joga e marca PIN errados não consegue impedir o GM de usar a caixa.
 - Uma caixa sem teclado (um Satélite) faz o mesmo na consola USB: `@leave <PIN de administração>`. A caixa responde `leave: game N is over on this box; it is free for the next game` ([guia do firmware, secção 5](firmware.md#5-primeiro-arranque-e-configuração)).
 
 Testado só num computador; ainda não experimentado em hardware.

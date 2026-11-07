@@ -357,8 +357,63 @@ static void test_serial_gate(void)
     CHECK(!admin_pin_gate_serial(&a, true, line, 2, reply, sizeof(reply)));
 }
 
+/* The menu over a field game's own count (decision AMG-3): ctx is its "NVS" word. */
+static bool g_load(void *ctx, uint32_t *failures)
+{
+    *failures = *(uint32_t *)ctx;
+    return true;
+}
+
+static bool g_store(void *ctx, uint32_t failures)
+{
+    *(uint32_t *)ctx = failures;
+    return true;
+}
+
+/* The admin menu over a field game checks the same PIN with a count of its own: wrong PINs there
+ * lock that menu only, never the picker, adoption or the USB console, and the PIN in force is the
+ * main check's, changed or not. */
+static void test_game_menu_own_count(void)
+{
+    admin_pin_t main_pin, game_pin;
+    static uint32_t game_fails;
+    memset(&nvs, 0, sizeof(nvs));
+    game_fails = 0;
+    boot(&main_pin, "4711");
+    admin_pin_ops_t gops = {g_load, g_store, NULL, f_now, &game_fails};
+    admin_pin_init(&game_pin, &gops, "4711");
+    admin_pin_follow(&game_pin, &main_pin);
+    for (int i = 0; i < ADMIN_PIN_FREE_TRIES; i++) {
+        CHECK(admin_pin_check(&game_pin, "0000") == ADMIN_PIN_WRONG);
+    }
+    CHECK(game_fails == ADMIN_PIN_FREE_TRIES && admin_pin_wait_ms(&game_pin) == MIN_MS);
+    CHECK(admin_pin_check(&game_pin, "4711") == ADMIN_PIN_LOCKED);
+    /* The main check is untouched: nothing counted, no wait, the PIN taken. */
+    CHECK(nvs.failures == 0 && admin_pin_wait_ms(&main_pin) == 0);
+    CHECK(admin_pin_check(&main_pin, "4711") == ADMIN_PIN_OK);
+    /* Its count survives a restart, as the main one does. */
+    clock_ms = 1000;
+    admin_pin_init(&game_pin, &gops, "4711");
+    CHECK(game_pin.failures == ADMIN_PIN_FREE_TRIES && admin_pin_wait_ms(&game_pin) == MIN_MS);
+    clock_ms += MIN_MS;
+    /* A PIN changed on the main check is the one asked over a game from the next opening. */
+    char reply[96];
+    CHECK(admin_pin_command(&main_pin, "admin-pin 4711 5927", reply, sizeof(reply)));
+    CHECK(strcmp(main_pin.pin, "5927") == 0);
+    admin_pin_follow(&game_pin, &main_pin);
+    CHECK(admin_pin_check(&game_pin, "4711") == ADMIN_PIN_WRONG && nvs.failures == 0);
+    clock_ms += 2 * MIN_MS;
+    CHECK(admin_pin_check(&game_pin, "5927") == ADMIN_PIN_OK && game_fails == 0);
+    /* No PIN in force: none over a game either. */
+    admin_pin_t none;
+    admin_pin_init(&none, &OPS, "");
+    admin_pin_follow(&game_pin, &none);
+    CHECK(!admin_pin_is_set(&game_pin) && admin_pin_check(&game_pin, "") == ADMIN_PIN_NOT_SET);
+}
+
 void run_admin_pin_tests(void)
 {
+    test_game_menu_own_count();
     test_serial_gate();
     test_setup_command();
     test_weak_pins();
