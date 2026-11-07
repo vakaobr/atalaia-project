@@ -10,7 +10,12 @@
 /// the ticket its newest, and whether the player is in at once or waits for
 /// the card check under the field's APD rule (the ticket is not the card).
 /// This screen only checks that the text is a ticket before it leaves the
-/// phone, and says what the answer means.
+/// phone, and says what the answer means. When the controller asks the
+/// marshal to decide (TKS-1 to TKS-5) the screen shows what it needs to:
+/// a pending app check-in's name and time next to the ticket's name on the
+/// list (confirm it, or discard it and check in the ticket holder), or a
+/// membership that does not pass (check in anyway, or not). Nothing is
+/// confirmed without the marshal's tap.
 library;
 
 import 'package:flutter/material.dart';
@@ -35,12 +40,20 @@ final class TicketOutcome {
   final Map<String, Object?> args;
 
   /// From an answer of 200: checked in, a pending self check-in confirmed
-  /// (TKT-7), waiting for the card check, or already there (the scan
-  /// changed nothing).
+  /// (TKT-7), an app check-in discarded for the ticket holder (TKS-3),
+  /// waiting for the card check, or already there (the scan changed
+  /// nothing). An answer with a `decision` is a [TicketDecision] instead.
   factory TicketOutcome.fromRow(Map<String, Object?> row) {
     final name = row['display_name'] ?? row['player_id'] ?? '';
     final pending = row['status'] == 'pending';
     final args = {'name': name};
+    if (row['discarded'] == true) {
+      return TicketOutcome(
+        pending ? 'ticket.discarded_pending' : 'ticket.discarded',
+        pending ? NoticeKind.warning : NoticeKind.ok,
+        args,
+      );
+    }
     if (row['confirmed'] == true) {
       return TicketOutcome('ticket.confirmed', NoticeKind.ok, args);
     }
@@ -70,6 +83,62 @@ final class TicketOutcome {
       'error': e.message,
     }),
   };
+}
+
+/// What the controller asks the marshal to decide about a scanned ticket
+/// (TKS-1 to TKS-5): [kind] `app_checkin` (a pending check-in made in an app,
+/// with the app's [appName], when it checked in, [at], and the ticket's
+/// [rosterName]) or `membership` (the stored [verdict] does not pass).
+final class TicketDecision {
+  const TicketDecision({
+    required this.ticket,
+    required this.kind,
+    this.appName,
+    this.at,
+    this.rosterName,
+    this.verdict,
+    this.appCheckin,
+  });
+
+  /// The ticket's text, sent again with the marshal's choice.
+  final String ticket;
+  final String kind;
+  final String? appName;
+  final DateTime? at;
+  final String? rosterName;
+  final String? verdict;
+
+  /// The choice already made about the app check-in, kept when a
+  /// membership decision follows it.
+  final String? appCheckin;
+
+  /// The decision in an answer, or null when there is none.
+  static TicketDecision? fromRow(
+    Map<String, Object?> row,
+    String ticket, {
+    String? appCheckin,
+  }) {
+    final d = row['decision'];
+    if (d is! Map) return null;
+    final at = d['at'];
+    return TicketDecision(
+      ticket: ticket,
+      kind: '${d['kind']}',
+      appName: d['name'] as String?,
+      at: at is num
+          ? DateTime.fromMillisecondsSinceEpoch((at * 1000).round())
+          : null,
+      rosterName: d['roster_name'] as String?,
+      verdict: d['verdict'] as String?,
+      appCheckin: appCheckin,
+    );
+  }
+}
+
+/// A local time of day as the screen shows it (HH:MM).
+String ticketClock(DateTime t) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(t.hour)}:${two(t.minute)}';
 }
 
 /// A typed ticket as the controller takes it: the spaces and line breaks
@@ -103,6 +172,7 @@ class _TicketCheckinScreenState extends State<TicketCheckinScreen> {
   final _text = TextEditingController();
   bool _sending = false;
   TicketOutcome? _outcome;
+  TicketDecision? _decision;
   final _taken = <TicketOutcome>[];
 
   FieldCheckin get c => widget.checkin;
@@ -140,6 +210,7 @@ class _TicketCheckinScreenState extends State<TicketCheckinScreen> {
   /// Checks [text] is a ticket, then asks the controller.
   Future<void> _send(String text, {required bool typed}) async {
     if (_sending) return;
+    setState(() => _decision = null);
     final wrong = wrongCodeMessage(text, CodeKind.ticket);
     if (wrong != null) {
       setState(() => _outcome = TicketOutcome(wrong, NoticeKind.error));
@@ -153,15 +224,39 @@ class _TicketCheckinScreenState extends State<TicketCheckinScreen> {
       );
       return;
     }
+    await _ask(text);
+    final o = _outcome;
+    if (typed &&
+        mounted &&
+        (_decision != null || o?.kind != NoticeKind.error)) {
+      _text.clear();
+    }
+  }
+
+  /// Sends [ticket] with the marshal's choices so far and shows the answer:
+  /// an outcome, or a decision to make.
+  Future<void> _ask(
+    String ticket, {
+    String? appCheckin,
+    bool override = false,
+  }) async {
     setState(() {
       _sending = true;
       _outcome = null;
+      _decision = null;
     });
-    TicketOutcome outcome;
+    TicketOutcome? outcome;
+    TicketDecision? decision;
     try {
-      final row = await _client.ticketCheckin(c.token, c.gameId, text);
-      outcome = TicketOutcome.fromRow(row);
-      if (typed) _text.clear();
+      final row = await _client.ticketCheckin(
+        c.token,
+        c.gameId,
+        ticket,
+        appCheckin: appCheckin,
+        override: override,
+      );
+      decision = TicketDecision.fromRow(row, ticket, appCheckin: appCheckin);
+      if (decision == null) outcome = TicketOutcome.fromRow(row);
     } on CheckinException catch (e) {
       outcome = TicketOutcome.fromError(e);
     }
@@ -169,8 +264,79 @@ class _TicketCheckinScreenState extends State<TicketCheckinScreen> {
     setState(() {
       _sending = false;
       _outcome = outcome;
-      if (outcome.kind != NoticeKind.error) _taken.insert(0, outcome);
+      _decision = decision;
+      if (outcome != null && outcome.kind != NoticeKind.error) {
+        _taken.insert(0, outcome);
+      }
     });
+  }
+
+  /// The marshal's choice on a decision: sent with the same ticket.
+  void _decide(TicketDecision d, {String? appCheckin, bool override = false}) {
+    _ask(d.ticket, appCheckin: appCheckin ?? d.appCheckin, override: override);
+  }
+
+  void _cancelDecision() => setState(() {
+    _decision = null;
+    _outcome = const TicketOutcome(
+      'ticket.decision_cancelled',
+      NoticeKind.info,
+    );
+  });
+
+  Widget _decisionCard(Strings s, TicketDecision d) {
+    final app = d.kind == 'app_checkin';
+    final unknown = s.t('ticket.unknown_name');
+    final text = app
+        ? s.t('ticket.app_checkin_body', {
+            'app_name': d.appName ?? unknown,
+            'time': d.at == null ? '?' : ticketClock(d.at!),
+            'roster_name': d.rosterName ?? unknown,
+          })
+        : s.t('ticket.membership_body', {
+            'verdict': s.t('apd.status.${d.verdict}'),
+          });
+    return Card(
+      key: Key(app ? 'ticket-decision-app' : 'ticket-decision-membership'),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              s.t(app ? 'ticket.app_checkin_title' : 'ticket.membership_title'),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(text),
+            const SizedBox(height: 12),
+            if (app) ...[
+              FilledButton(
+                key: const Key('ticket-confirm-app'),
+                onPressed: () => _decide(d, appCheckin: 'confirm'),
+                child: Text(s.t('ticket.app_checkin_confirm')),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                key: const Key('ticket-discard-app'),
+                onPressed: () => _decide(d, appCheckin: 'discard'),
+                child: Text(s.t('ticket.app_checkin_discard')),
+              ),
+            ] else
+              FilledButton(
+                key: const Key('ticket-override'),
+                onPressed: () => _decide(d, override: true),
+                child: Text(s.t('ticket.membership_override')),
+              ),
+            TextButton(
+              key: const Key('ticket-decision-cancel'),
+              onPressed: _cancelDecision,
+              child: Text(s.t('common.cancel')),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -188,6 +354,8 @@ class _TicketCheckinScreenState extends State<TicketCheckinScreen> {
           const SizedBox(height: 12),
           if (_sending)
             Notice(s.t('ticket.sending'), key: const Key('ticket-sending'))
+          else if (_decision != null)
+            _decisionCard(s, _decision!)
           else if (o != null)
             Notice(
               s.t(o.key, o.args),

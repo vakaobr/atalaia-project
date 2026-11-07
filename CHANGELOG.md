@@ -14,6 +14,12 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+- **Check-in tickets (TKS-1 to TKS-6):** a staff ticket scan no longer confirms a pending check-in made in the
+  player's app on its own. The marshal app and the GM console show the app's name and check-in time next to the
+  ticket's name on the list, and the marshal confirms it or discards it for the ticket holder (the discarded app's
+  tokens stop working). A scan no longer sets `apd_override` over a failing membership verdict: the marshal
+  decides with an explicit override. Both controllers, Pi schema 22, console service worker v28, four languages.
+
 - **Failover: only the leader's own beacons keep it alive** (decisions FLC-1 to FLC-6; `simulator/atalaia_sim/election.py`, `simulator/tests/test_election.py`; `app/lib/controller/controller_failover.dart`, `app/test/controller/controller_failover_test.dart`; `controller/README.md`, `docs/manuals/{en,pt}/controller-setup.md`, notes in RFC 0001 section 7, ADR-P2-8 and `docs/design-spec.md`): a standby measured the leader's TIME cadence across every TIME at the current term, so same-term TIMEs from another node holding the game key reset the measurement (the leader's 10 s cadence read as 30 s, the takeover delay 30 s as 90 s) and, after the leader stopped, could keep a standby from taking over. A follower now recognises the leader by the packet's authenticated `source` and counts only its TIMEs as liveness and cadence; a same-term TIME from another source is ignored, except a lower id once the recognised leader has missed a beacon (two leaders elected at one term), and a same-term CLAIM no longer refreshes the leader's liveness. The cadence is kept per leader and term and is the shortest steady one heard: an extra TIME is skipped without moving the measuring point, a long silence keeps a 10 s cadence already measured, and only two steady 30 s gaps in a row turn it back to 30 s, so a standby on auto still never takes over a working manual main controller (FAIL-1 to FAIL-6). Nothing changes on the wire. A node holding the game key can still forge the leader's own source or outbid it with a higher term; the RFC note says so. In software and host tests only.
 
 * **server:** pyasn1 0.6.5 and opentelemetry-api 1.45.1 in the site server's lock (the controller already had

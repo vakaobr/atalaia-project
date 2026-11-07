@@ -668,6 +668,9 @@ class ControllerCheckin {
       'card_checked_at': null,
       'ticket_scanned_by': null,
       'ticket_scanned_at': null,
+      'roster_name': null,
+      'app_checkin_at': null,
+      'token_gen': 0,
       'position_share': false,
       'position_share_at': null,
       'position_share_notice': null,
@@ -1222,12 +1225,18 @@ class ControllerCheckin {
     'card_checked_at': null,
   };
 
-  /// Who took a registered player's printed ticket, and when (TKT-3):
-  /// erased with the card check's columns when the row's data goes.
+  /// Who took a registered player's printed ticket, and when (TKT-3), the
+  /// roster's name and when the app checked in (TKS-1): erased with the card
+  /// check's columns when the row's data goes.
   static const _erasedScan = <String, Object?>{
     'ticket_scanned_by': null,
     'ticket_scanned_at': null,
+    'roster_name': null,
+    'app_checkin_at': null,
   };
+
+  /// What staff decided about a pending app check-in (TKS-2, TKS-3).
+  static const _ticketChoices = {'confirm', 'discard'};
 
   static const _ticketNotNewest =
       "ticket_not_newest: this ticket is not this registration's "
@@ -1660,12 +1669,28 @@ class ControllerCheckin {
     return max(exp, now + _tokenMinS).floor();
   }
 
+  /// The key a check-in's player tokens are signed with: the game's token
+  /// key, or for a row whose app check-in staff discarded (`token_gen` above
+  /// 0, TKS-4) a key derived from it, so the tokens issued before stop
+  /// working. Only the controller checks player tokens: the format stays.
+  static Uint8List _genKey(Uint8List key, Map<String, Object?> row) {
+    final gen = (row['token_gen'] as int?) ?? 0;
+    if (gen == 0) return key;
+    return Uint8List.fromList(
+      Hmac(sha256, key)
+          .convert(
+            utf8.encode('atalaia token generation $gen ${row['player_id']}'),
+          )
+          .bytes,
+    );
+  }
+
   (String, int) issueToken(
     Map<String, Object?> game,
     Map<String, Object?> row,
   ) {
     final id = game['id']! as int;
-    final key = tokenKey(id, create: true)!;
+    final key = _genKey(tokenKey(id, create: true)!, row);
     final exp = tokenExp(game, _wall());
     final claims = PlayerClaims(
       playerId: row['player_id']! as String,
@@ -1682,6 +1707,7 @@ class ControllerCheckin {
   /// throws [ControllerError] (401).
   ApiViewer resolve(String token) {
     int gameId;
+    Object? claimed;
     try {
       final parts = token.split('.');
       if (parts.length != 3) throw const FormatException();
@@ -1690,12 +1716,17 @@ class ControllerCheckin {
       final gid = payload is Map ? payload['game_id'] : null;
       if (gid is! int) throw const FormatException();
       gameId = gid;
+      claimed = payload['player_id'];
     } on FormatException {
       throw _unauthorized('not a valid token');
     }
-    final key = tokenKey(gameId);
+    var key = tokenKey(gameId);
     final game = engine.store.game(gameId);
     if (key == null || game == null) throw _unauthorized('not a valid token');
+    // The claimed row picks the key (its token generation); the MAC then
+    // proves the claim.
+    final claimedRow = claimed is String ? _row(gameId, claimed) : null;
+    if (claimedRow != null) key = _genKey(key, claimedRow);
     final PlayerClaims claims;
     try {
       claims = PlayerToken.verify(
@@ -1879,6 +1910,7 @@ class ControllerCheckin {
         'team_preference': pref,
         'notice_version': notice,
         'checked_in_at': status == 'checked_in' ? now : null,
+        'app_checkin_at': now,
         ..._shareFields(share, notice, now),
       };
       if (row == null) {
@@ -1894,11 +1926,22 @@ class ControllerCheckin {
       emit = status == 'checked_in';
     } else {
       var status = row['status']! as String;
-      if (status == 'left') {
+      final rejoin = status == 'left';
+      if (rejoin) {
         status = st['confirm'] == 'auto' && !apdPending
             ? 'checked_in'
             : 'pending';
         emit = status == 'checked_in';
+      }
+      if (known == null) {
+        // The first phone to check in on a row a ticket scan made: its
+        // secret binds (TKS-6).
+        _fieldPlayers[pid] = {
+          'player_id': pid,
+          'secret_sha256': digest,
+          'created_at': now,
+          'last_seen_at': now,
+        };
       }
       final fields = <String, Object?>{
         'status': status,
@@ -1906,6 +1949,7 @@ class ControllerCheckin {
         'team_preference': pref,
         'notice_version': notice,
         'updated_at': now,
+        if (rejoin || known == null) 'app_checkin_at': now,
       };
       // Once a marshal checked the card the number is gone and the stored
       // verdict stands: the app cannot put the number back.
@@ -2128,6 +2172,11 @@ class ControllerCheckin {
     }
     return out;
   }
+
+  /// For tests only: a check-in row's columns set as a flow the test cannot
+  /// reach through the API would leave them (TKS-5's stored verdict).
+  void debugUpdateCheckin(int gameId, String pid, Map<String, Object?> f) =>
+      _update(gameId, pid, f);
 
   /// For tests only: the field's own readings replaced by these signed
   /// records, as if marshals had uploaded them (the shared vectors' "already
@@ -2833,16 +2882,23 @@ class ControllerCheckin {
 
   /// POST /api/v1/games/{id}/checkins/ticket: staff (the GM token or a
   /// marshal's own token for this game, TKT-1) scan a registered player's
-  /// printed ticket. The registration must be in this
-  /// game's roster and the ticket its own (403 `ticket_not_newest`); an
-  /// expected player arrives at once, or waits for "card seen, matches"
-  /// under the APD rule. A player who checked in with the app and waits as
-  /// `pending` is confirmed by the scan, the staff confirmation (TKT-7),
-  /// unless the APD rule's card check is still to do: then they stay pending
-  /// for it. The answer is the row with `already`: true when the scan
-  /// changed nothing, and `confirmed`: true when it confirmed a pending
-  /// check-in. Who scanned and when are kept with the arrival and logged
-  /// (TKT-3); at most [ticketRate] scans a minute per staff id
+  /// printed ticket. The registration must be in this game's roster and the
+  /// ticket its own (403 `ticket_not_newest`); an expected player arrives at
+  /// once, or waits for "card seen, matches" under the APD rule.
+  ///
+  /// A scan never confirms on its own what it cannot see (TKS-1 to TKS-3): a
+  /// pending check-in made in the player's app that no ticket matched yet
+  /// answers a `decision` of kind `app_checkin` (the app's name, when it
+  /// checked in, the roster's name) and changes nothing, until staff send the
+  /// ticket again with `app_checkin`: `confirm` (the scan confirms, as TKT-7
+  /// had it) or `discard` (the app check-in is undone, its phone's tokens and
+  /// field identity dropped, and the ticket holder arrives as an expected
+  /// player would). A confirmation over a stored verdict other than valid is
+  /// a `decision` of kind `membership` until staff add `override`: true
+  /// (TKS-5). The answer is the row with `already` (nothing changed and
+  /// nothing to decide), `confirmed`, `discarded` and, when staff must
+  /// choose, `decision`. Who scanned and when are kept with the arrival and
+  /// logged (TKT-3); at most [ticketRate] scans a minute per staff id
   /// (TKT-2). Without a roster no registration is on the list: 404, as on a
   /// Pi without one.
   Map<String, Object?> ticketCheckin(
@@ -2861,8 +2917,15 @@ class ControllerCheckin {
     if (game['state'] == 'ended') {
       throw ControllerError.conflict('the game has ended');
     }
-    final unknown = body.keys.where((k) => k != 'ticket').toList()..sort();
+    const known = {'ticket', 'app_checkin', 'override'};
+    final unknown = body.keys.where((k) => !known.contains(k)).toList()..sort();
     if (unknown.isNotEmpty) throw ControllerError('unknown fields $unknown');
+    final choice = body['app_checkin'];
+    if (choice != null && !_ticketChoices.contains(choice)) {
+      throw ControllerError('app_checkin: "confirm" or "discard"');
+    }
+    final override = body['override'] ?? false;
+    if (override is! bool) throw ControllerError('override: true or false');
     final CheckinTicket ticket;
     try {
       final text = body['ticket'];
@@ -2892,22 +2955,20 @@ class ControllerCheckin {
       throw _forbidden('staff removed this check-in');
     }
     final pid = row['player_id']! as String;
-    final arriving = row['status'] == 'expected';
     var emit = false;
     var changed = false;
     var confirmed = false;
+    var discarded = false;
+    Map<String, Object?>? decision;
+    final cardRule = apdRule().checkin;
     final scan = {
       'ticket_scanned_by': staff,
       'ticket_scanned_at': now,
       'updated_at': now,
     };
-    if (arriving) {
-      final st = settings();
-      if (_count(gameId) >= (st['max_players']! as int)) {
-        throw _forbidden('game $gameId is full (${st['max_players']} players)');
-      }
+    void arrive() {
       changed = true;
-      if (apdRule().checkin) {
+      if (cardRule) {
         // The ticket is not the card: pending until "card seen, matches".
         _update(gameId, pid, {'status': 'pending', ...scan});
       } else {
@@ -2918,15 +2979,67 @@ class ControllerCheckin {
           ...scan,
         });
       }
+    }
+
+    final unmatchedApp =
+        row['status'] == 'pending' &&
+        row['app_checkin_at'] != null &&
+        row['ticket_scanned_at'] == null;
+    if (unmatchedApp && choice == null) {
+      decision = {
+        'kind': 'app_checkin',
+        'name': row['display_name'],
+        'at': row['app_checkin_at'],
+        'roster_name': row['roster_name'],
+      };
+    } else if (unmatchedApp && choice == 'discard') {
+      // The app check-in is undone (TKS-3, TKS-4): what the app sent goes,
+      // its phone's tokens and field identity with it; the ticket holder then
+      // arrives as an expected player does.
+      _update(gameId, pid, {
+        'display_name': row['roster_name'],
+        'team_preference': null,
+        'notice_version': null,
+        'federation_number': null,
+        'apd_id': null,
+        'membership_expires': null,
+        'apd_override': false,
+        'federation_seen': false,
+        ..._erasedCard,
+        'position_share': false,
+        'position_share_at': now,
+        'app_checkin_at': null,
+        'token_gen': ((row['token_gen'] as int?) ?? 0) + 1,
+        'updated_at': now,
+      });
+      engine.positions?.erasePlayerIn(gameId, pid);
+      _fieldPlayers.remove(pid);
+      discarded = true;
+      arrive();
+      _save();
+    } else if (row['status'] == 'expected') {
+      final st = settings();
+      if (_count(gameId) >= (st['max_players']! as int)) {
+        throw _forbidden('game $gameId is full (${st['max_players']} players)');
+      }
+      arrive();
       _save();
     } else if (row['status'] == 'pending') {
-      // A pending self check-in: the scan is the staff confirmation (TKT-7).
-      // The card check, when the rule asks for it and nobody ticked it yet,
-      // still waits; the scan is recorded once.
-      final fields = <String, Object?>{
+      // A pending check-in staff matched with the ticket: the scan is the
+      // staff confirmation (TKT-7). The card check, when the rule asks for it
+      // and nobody ticked it yet, still waits; the scan is recorded once. A
+      // stored verdict other than valid needs the marshal's explicit
+      // override (TKS-5).
+      var fields = <String, Object?>{
         if (row['ticket_scanned_at'] == null) ...scan,
       };
-      if (!apdRule().checkin || row['card_checked_at'] != null) {
+      final confirming = !cardRule || row['card_checked_at'] != null;
+      final verdict = cardRule ? row['apd_verdict'] as String? : null;
+      final failing = verdict != null && verdict != 'valid';
+      if (confirming && failing && !override) {
+        decision = {'kind': 'membership', 'verdict': verdict};
+        fields = {};
+      } else if (confirming) {
         fields.addAll({
           'status': 'checked_in',
           'checked_in_at': now,
@@ -2947,12 +3060,27 @@ class ControllerCheckin {
     if (changed) {
       audit(
         'ticket check-in: game $gameId, $pid by $staff, ${row['status']}'
-        '${confirmed ? ' (confirmed)' : ''}',
+        '${confirmed
+            ? ' (confirmed)'
+            : discarded
+            ? ' (app check-in discarded)'
+            : ''}',
+      );
+    } else if (decision != null) {
+      audit(
+        'ticket check-in: game $gameId, $pid by $staff, staff to decide '
+        '(${decision['kind']})',
       );
     }
     if (emit) _emitCheckinEvent(game, row);
     _notify(gameId, pid);
-    return {...rowView(game, row), 'already': !changed, 'confirmed': confirmed};
+    return {
+      ...rowView(game, row),
+      'already': !changed && decision == null,
+      'confirmed': confirmed,
+      'discarded': discarded,
+      'decision': ?decision,
+    };
   }
 
   /// GET /api/v1/games/{id}/checkins.csv (the GM token): one line per
@@ -4361,6 +4489,7 @@ class ControllerCheckin {
       );
       final fields = <String, Object?>{
         'display_name': name,
+        'roster_name': name,
         'federation_number': fed,
         'apd_id': apdId,
         'membership_expires': expires,
@@ -4383,9 +4512,13 @@ class ControllerCheckin {
           _update(gameId, pid, {
             'registration_id': rid,
             'from_roster': true,
+            'roster_name': name,
             'ticket_sha256': reg['ticket_sha256'],
             'updated_at': now,
           });
+        } else if (row['roster_name'] != name && row['erased_at'] == null) {
+          // What a ticket scan shows staff (TKS-1).
+          _update(gameId, pid, {'roster_name': name});
         }
         inc('kept');
       }
@@ -4492,6 +4625,8 @@ class ControllerCheckin {
             ..['card_checked_at'] = null
             ..['ticket_scanned_by'] = null
             ..['ticket_scanned_at'] = null
+            ..['roster_name'] = null
+            ..['app_checkin_at'] = null
             ..['team_preference'] = null
             ..['erased_at'] = now;
           erased++;

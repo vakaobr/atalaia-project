@@ -472,6 +472,17 @@ const Map<String, String> zhTwStrings = {
   'ticket.session': '你的報到已過期：請重新報到。',
   'ticket.refused': '場地控制器拒絕了票券：{error}',
   'ticket.recent': '剛剛收取',
+  'ticket.app_checkin_title': '有一筆 App 報到在等這張票券',
+  'ticket.app_checkin_body': '有人在 {time} 用 App 以「{app_name}」報到，正在等待工作人員確認。這張票券屬於遊戲名單上的「{roster_name}」。只有在你面前的人就是用那支手機報到的人時才確認。',
+  'ticket.app_checkin_confirm': '是同一個人：確認 App 報到',
+  'ticket.app_checkin_discard': '不是：取消 App 報到，為持票人報到',
+  'ticket.membership_title': '會員資格不符合',
+  'ticket.membership_body': '{verdict}。只有在場地允許時才仍然報到：這個例外會被記錄。',
+  'ticket.membership_override': '仍然報到（例外）',
+  'ticket.decision_cancelled': '沒有任何變更。',
+  'ticket.unknown_name': '（沒有名字）',
+  'ticket.discarded': 'App 報到已取消：持票人 {name} 已報到。持票人自己的 App 可以用票券報到。',
+  'ticket.discarded_pending': 'App 報到已取消：持票人 {name} 正在等待查驗會員卡：請看「待測速的槍」。',
 
   // Tags
   'tags.title': '玩家標籤',
