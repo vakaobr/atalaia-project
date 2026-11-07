@@ -11,7 +11,7 @@ For the person who looks after the boxes on a field: switching them on, getting 
 
 > **Not field-ready yet.** Atalaia is pre-alpha. Real Heltec V4.3 boards have played whole games on a bench with the field controller. No built box has been used on a field. Every step below matches what the firmware shows today. Steps that depend on hardware say **Not yet tested on a field**. Words in *italics* are in the [glossary](https://atalaia-project.link/en/glossary/).
 
-> **Which firmware.** The newest release is **v0.10.0** (2026-11-07). A few things below need **v0.9.0** or later, and say so where they appear: taking a box out of its game at the box, the controller freeing such a box by itself, Wi-Fi names with spaces on the USB console, and the setup page's Wi-Fi rules. **For v0.10.0, update the boxes and the controller together**, and reflash the controller's USB radio modem over USB: a v0.9.0 box and a v0.10.0 controller, or the reverse, do not accept each other's **Release every box not in this game** ([12.2](#122-update)).
+> **Which firmware.** The newest release is **v0.11.0** (2026-11-07). A few things below need **v0.9.0** or later, and say so where they appear: taking a box out of its game at the box, the controller freeing such a box by itself, Wi-Fi names with spaces on the USB console, and the setup page's Wi-Fi rules. **Coming from v0.9.0 or earlier, update the boxes and the controller together to v0.10.0 or later**, and reflash the controller's USB radio modem over USB: a v0.9.0 box and a v0.10.0 controller, or the reverse, do not accept each other's **Release every box not in this game** ([12.2](#122-update)). From v0.10.0 to v0.11.0 nothing has to go together, and updating the boxes is optional.
 
 ## Contents
 
@@ -366,6 +366,8 @@ The organisers update a box's firmware over the field's Wi-Fi, between games. No
 5. The box downloads the image, checks the signature again with the keys built into its own firmware, installs it and restarts. If the new version fails its self-test, the box goes back to the old one by itself.
 
 Do not switch the box off during an update. A box that is not in the game, or a game that has started, gets no update.
+
+**v0.11.0: nothing has to be updated together.** Coming from v0.10.0, update the controllers, the boxes, the site server and the players' app when it suits you: older apps, rosters and controllers keep working with newer ones. The Field Box firmware changed only in code that the hardened image uses, and no box runs that image, so updating the boxes over the air is optional; the USB radio modem needs no new image. For an app check-in to show the marshal that it came from the **registering phone**, update the site server, the controller and the players' app; until then app check-ins show **phone not proved** and still go through ([marshal manual](marshal.md#printed-tickets-and-registered-players)). Coming from v0.9.0 or earlier, the v0.10.0 rule below still applies.
 
 **v0.10.0: update the controllers and the boxes together.** From v0.10.0, **Release every box not in this game** names its channel: a v0.9.0 box refuses a v0.10.0 controller's, and a v0.10.0 box refuses a v0.9.0 controller's. Update the controller (Raspberry Pi or phone) and every Field Box to v0.10.0 on the same day, and reflash the USB radio modem with the v0.10.0 image over USB (it has no update over the air). Until both are updated, a stuck box still leaves its game with **Leave the game** at the box, `@leave` on its USB console, or the controller's automatic resend.
 

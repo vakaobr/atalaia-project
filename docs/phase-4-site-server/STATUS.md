@@ -1170,3 +1170,7 @@ What S16-9 left for later, now that social login and passkeys exist (LG-*): `/f/
 ## 2026-11-07: v0.10.0 released, with the server's dependency updates
 
 [v0.10.0](https://github.com/vakaobr/atalaia-project/releases/tag/v0.10.0) (2026-11-07; CHANGELOG.md 0.10.0) carries the site server's dependency updates (pyasn1 0.6.5 and opentelemetry-api 1.45.1 in its lock) and accepts a passkey registration only with the attestation formats the server asks for (`none`, or `packed` self-attestation). Update the site server to v0.10.0. Not yet on a real field's server.
+
+## 2026-11-07: v0.11.0 released, with the registering phone's key
+
+[v0.11.0](https://github.com/vakaobr/atalaia-project/releases/tag/v0.11.0) (2026-11-07; CHANGELOG.md 0.11.0) lets the app give a registration an Ed25519 key of the registering phone (`PUT /api/v1/me/registrations/{id}/binding`, migration `0032_registration_binding`), and the roster carries the public key to a controller that asks (`&binding=1`), so the controllers can show staff a bound or unbound check-in (TKB-1 to TKB-8, phase 3). Update the site server to v0.11.0 for bound check-ins; older apps and controllers keep working with it. Not yet on a real field's server.

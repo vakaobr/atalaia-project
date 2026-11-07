@@ -88,7 +88,7 @@ hero:
     Pré-alfa · software das fases 1 e 2 pronto; placas a sério já jogam jogos inteiros com o
     controlador de campo na bancada, com teclado; fase 3 pronta em software, a app iOS verificada
     num iPhone; o servidor do site da fase 4 a correr num servidor de testes; fase 5 feita em
-    software · versão mais recente v0.10.0 · ainda não pronta para o campo
+    software · versão mais recente v0.11.0 · ainda não pronta para o campo
   title: A plataforma aberta de <span class="nowrap">combate simulado</span>
   lead: >-
     A Atalaia é uma plataforma aberta para os dispositivos eletrónicos de jogo (os props) de
@@ -739,7 +739,7 @@ try:
       novembro de 2026) é a primeira versão no GitHub que traz a app: o atalaia-app-0.9.0.apk,
       assinado com a chave do projeto, para cada versão se instalar por cima da anterior. A mais
       recente, a <a
-      href="https://github.com/vakaobr/atalaia-project/releases/tag/v0.10.0">v0.10.0</a> (7 de
+      href="https://github.com/vakaobr/atalaia-project/releases/tag/v0.11.0">v0.11.0</a> (7 de
       novembro de 2026), instala-se por cima dela e mantém os dados da app; a partir da v0.10.0 o
       APK é compilado sem a chave de assinatura e assinado num passo à parte, sem rede. A impressão
       digital SHA-256 do certificado é <code
@@ -767,13 +767,15 @@ roadmap:
     do hardware: as fases 1 a 3 estão prontas em software (placas a sério já jogam jogos inteiros na
     bancada e a app para iOS já passou a sua lista de verificação num iPhone); as fases 4 e 5 estão
     feitas em software. As provas esperam por caixas montadas, testes no campo, um servidor a sério
-    e a chave do registo do projeto. A versão mais recente é a v0.10.0 (7 de novembro de 2026):
+    e a chave do registo do projeto. A versão mais recente é a v0.11.0 (7 de novembro de 2026):
+    no check-in, a app de quem joga prova que é o telemóvel da inscrição, e a equipa vê se um
+    check-in está ligado ao telemóvel ou não; o procedimento de gravação da imagem endurecida da
+    Field Box está preparado e, por decisão do responsável do projeto, nenhuma placa a recebe por
+    agora. Nada tem de ser atualizado ao mesmo tempo. A v0.10.0 (7 de novembro de 2026) trouxe
     correções de uma revisão que reforçam a recuperação das caixas presas, a substituição do
-    controlador e o check-in com bilhete, um APK assinado sem rede e uma imagem endurecida da Field
-    Box que já se compila (ainda não gravada em nenhuma placa). As caixas e os controladores
-    atualizam-se para ela ao mesmo tempo. A v0.9.0 (6 de novembro de 2026) trouxe a recuperação das
-    caixas presas (por agora, um teste na bancada), as regras do Wi-Fi da caixa e a primeira app
-    Android assinada com a chave do projeto.
+    controlador e o check-in com bilhete, e um APK assinado sem rede; a v0.9.0 (6 de novembro de
+    2026), a recuperação das caixas presas (por agora, um teste na bancada) e a primeira app Android
+    assinada com a chave do projeto.
   more: O roadmap completo, com o que cada fase inclui e a sua prova →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
   # hardware), in progress, designed (research, architecture and plan written; no code):
@@ -806,7 +808,8 @@ roadmap:
       montagem). Sair de um jogo terminado na própria caixa chegou com a v0.9.0, ainda não
       experimentado numa caixa a sério. A partir da v0.10.0, o menu de administração da caixa só
       abre durante um jogo quando o jogo está em pausa ou à espera, e a imagem de lançamento
-      endurecida já se compila (ainda não gravada em nenhuma placa). Falta ainda uma caixa montada.
+      endurecida já se compila; a v0.11.0 prepara o procedimento de gravação, e nenhuma placa a
+      recebe por agora. Falta ainda uma caixa montada.
     done:
       - Firmware ESP32 da Field Box, com predefinições na própria caixa, a correr num emulador.
       - O pequeno ecrã da caixa mostra a barra de progresso, os pontos e o tempo de posse, em quatro línguas.
@@ -831,13 +834,14 @@ roadmap:
       - "Uma caixa que ficou num jogo terminado enquanto estava desligada sai dele na própria caixa: mantém * premido 3 segundos, escreve o PIN de administração e escolhe Sair do jogo (ou @leave na consola USB). Mantém o campo, o Wi-Fi e os modos. Na v0.9.0 (6 de novembro de 2026); ainda não experimentado numa caixa a sério."
       - "O menu de administração da caixa só abre durante um jogo de campo quando o jogo não recebe teclas de quem joga: antes do início, em pausa, ou 5 minutos depois de o controlador do jogo se calar (uma caixa presa num jogo terminado). Para tirar uma caixa de um jogo a decorrer, põe primeiro o jogo em pausa. Na v0.10.0 (7 de novembro de 2026); só testes no computador."
       - "A imagem de lançamento endurecida (arranque seguro v2, cifra da memória flash, cifra da NVS, anti-reversão) já se compila, e a CI assina-a com uma chave descartável. Nada foi gravado de forma permanente numa placa, e as imagens publicadas não mudam. Na v0.10.0 (7 de novembro de 2026)."
+      - "A gravação da imagem endurecida está escrita num script que só mostra o plano, a não ser que receba a porta da placa e uma confirmação explícita para essa placa; só a compilação endurecida consegue revogar o resumo de uma chave do arranque seguro, com uma instrução assinada pela chave raiz de versões do projeto; e um teste num emulador faz a gravação com chaves descartáveis. Por decisão do responsável do projeto, de 7 de novembro de 2026, nenhuma placa, de bancada ou de campo, recebe por agora a imagem endurecida nem qualquer gravação de eFuses; as imagens normal e de bancada não mudam. Na v0.11.0 (7 de novembro de 2026)."
     next:
       - Uma caixa montada que aguente um jogo de clube de 2 horas sem reiniciar.
       - "Ver a barra do tempo num painel a sério."
       - "Experimentar o reenvio da configuração e o Mudar de campo numa placa a sério."
       - "Ouvir a baliza de uma Field Box com um telemóvel a sério, e arrancar o Wi-Fi à entrada num jogo com o novo orçamento de memória."
       - "Gravar a nova tabela de partições numa placa a sério (uma gravação por USB, sem apagar, para uma caixa com a antiga)."
-      - "Gravar a imagem de lançamento endurecida numa placa: compila-se a partir da v0.10.0, ainda não gravada em nenhuma placa."
+      - "A imagem de lançamento endurecida numa placa: compila-se a partir da v0.10.0 e o procedimento de gravação está pronto a partir da v0.11.0, mas, por decisão do responsável do projeto de 7 de novembro de 2026, nenhuma placa a recebe por agora."
       - "Experimentar o tratamento de falhas do I2C numa placa com o teclado mal ligado, e o ecrã de arranque e os novos ecrãs em mais do que a primeira placa de bancada."
       - "Experimentar o Sair do jogo numa caixa a sério."
     gate: >-
@@ -978,6 +982,7 @@ roadmap:
         - "A revisão de segurança da app: a CA do campo fixada é exatamente um certificado, nada de HTTP simples em todo o Android (só o loopback, o anfitrião do emulador, 192.168.4.1 e atalaia.local), uma APK de lançamento que nunca é assinada com a chave de depuração por engano e um bilhete de início de sessão social ligado à instância da app. Não experimentado num telemóvel real; a chave de assinatura de lançamento ainda tem de ser criada pelo responsável do projeto."
         - "A lista de eventos e o histórico de jogos de quem joga deixam de fora os eventos de rotina que não têm texto para jogadores (uma caixa a confirmar a configuração, nós a ligar ou desligar, leituras de etiquetas, acertos em alvos), em vez de mostrar nomes de tipo em bruto."
         - "A leitura de um bilhete impresso por um marshal ou pela organização já não confirma sozinha um check-in feito na app de quem joga: aparecem os dois nomes, e o marshal confirma-o ou descarta-o. Na v0.10.0 (7 de novembro de 2026); não experimentado num telemóvel a sério."
+        - "O telemóvel da inscrição prova-se no check-in: quando a app faz a inscrição num jogo (ou pede um bilhete novo), dá à inscrição uma chave que fica nesse telemóvel, e assina o desafio do controlador do campo quando faz o check-in. Os marshals e a organização veem se um check-in na app vem do telemóvel da inscrição ou não (uma cópia do bilhete, uma app mais antiga, uma inscrição feita na web) na app de marshal, na lista de check-in da consola e no cartão do bilhete impresso. Nada é recusado por isso, e as apps, as listas e os controladores mais antigos continuam a funcionar. Na v0.11.0 (7 de novembro de 2026); testado num computador, ainda não num telemóvel a sério."
     g_props:
       title: Dispositivos Android e módulo de E/S
       items:
@@ -1273,7 +1278,7 @@ roadmap:
     short: >-
       Editor visual de modos, pacotes de modos assinados, o registo de modos como modelo, alemão e
       chinês tradicional, guias de montagem, os módulos de alvo e de saídas da porta de expansão.
-      Todos os passos de software estão feitos. A versão mais recente, a v0.10.0, vem assinada com a
+      Todos os passos de software estão feitos. A versão mais recente, a v0.11.0, vem assinada com a
       chave de versões do projeto e traz a app Android, compilada sem a chave e assinada com a chave
       Android do projeto num passo à parte, sem rede.
     done:

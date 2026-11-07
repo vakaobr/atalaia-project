@@ -54,7 +54,7 @@ Esta é a maneira suportada, do [guia do controlador](../../../controller/README
    sudo git clone https://github.com/vakaobr/atalaia-project /opt/atalaia
    ```
 
-   Isto traz o código mais recente (o ramo `main`). Para instalar antes uma versão publicada, corre `sudo git -C /opt/atalaia checkout v0.10.0` (a mais recente a 2026-11-07; a [página das versões](https://github.com/vakaobr/atalaia-project/releases) lista-as).
+   Isto traz o código mais recente (o ramo `main`). Para instalar antes uma versão publicada, corre `sudo git -C /opt/atalaia checkout v0.11.0` (a mais recente a 2026-11-07; a [página das versões](https://github.com/vakaobr/atalaia-project/releases) lista-as).
 2. Compila a pequena biblioteca de programas de que o controlador precisa para os scripts dos jogos:
 
    ```
@@ -291,6 +291,8 @@ Com um servidor do site, `[sync] push_walkins` (desligado por omissão) envia-lh
 
 Atualiza entre jogos, nunca com um jogo a decorrer. Uma versão nova pode mudar a base de dados da primeira vez que arranca, por isso faz antes uma cópia de segurança: é o caminho de volta.
 
+**v0.11.0: nada tem de ser atualizado ao mesmo tempo.** Vindo da v0.10.0, atualiza os controladores, as caixas, o servidor do site e a app de quem joga quando te der jeito: as apps, as listas e os controladores mais antigos continuam a funcionar com os mais recentes. O firmware da Field Box só mudou em código que a imagem endurecida usa, e nenhuma caixa usa essa imagem, por isso atualizar as caixas pelo ar é opcional; o modem de rádio USB não precisa de imagem nova. Para um check-in na app mostrar ao marshal que veio do **telemóvel da inscrição**, atualiza o servidor do site, o controlador e a app de quem joga; até lá, os check-ins na app aparecem como **telemóvel por provar** e continuam a entrar ([manual de marshal](marshal.md#bilhetes-impressos-e-inscrições)). Vindo da v0.9.0 ou anterior, continua a valer a regra da v0.10.0 abaixo.
+
 **v0.10.0: atualiza os controladores e as caixas ao mesmo tempo.** A partir da v0.10.0, **Libertar todas as caixas que não estão neste jogo** indica o canal: uma caixa v0.9.0 recusa a de um controlador v0.10.0, e uma caixa v0.10.0 recusa a de um controlador v0.9.0. Atualiza o controlador (Raspberry Pi ou telemóvel) e todas as caixas para a v0.10.0 no mesmo dia, e grava de novo o modem de rádio USB com a imagem da v0.10.0, por USB (não tem atualização pelo ar). Enquanto não estiverem os dois atualizados, uma caixa presa continua a sair do jogo com **Sair do jogo** na própria caixa, `@leave` na consola USB dela, ou o reenvio automático do controlador. A atualização das caixas está no [manual da Field Box](field-box.md#update-the-boxes).
 
 ### Atualizar o controlador
@@ -300,10 +302,10 @@ Atualiza entre jogos, nunca com um jogo a decorrer. Uma versão nova pode mudar 
 
    ```
    sudo git -C /opt/atalaia fetch --tags
-   sudo git -C /opt/atalaia checkout v0.10.0
+   sudo git -C /opt/atalaia checkout v0.11.0
    ```
 
-   Põe a versão que queres no lugar de `v0.10.0`. Para seguir antes o código mais recente, `sudo git -C /opt/atalaia checkout main` e depois `sudo git -C /opt/atalaia pull`.
+   Põe a versão que queres no lugar de `v0.11.0`. Para seguir antes o código mais recente, `sudo git -C /opt/atalaia checkout main` e depois `sudo git -C /opt/atalaia pull`.
 3. Instala pacotes novos, se os houver: corre outra vez a linha `sudo apt install ...` da [secção 4](#4-instalar-o-controlador) (não faz nada aos pacotes que já tens).
 4. Compila outra vez a biblioteca de programas:
 
@@ -345,7 +347,7 @@ Uma lista vazia (`release_keys = []`) recusa todas as versões. Atualizar as pr�
 
 O modem não tem atualização pelo ar: escreve a imagem nova por USB. Quando e como fazê-lo está em [Montar o modem de rádio, Atualizar o modem](modem.md#update-the-modem). Em resumo: pára o controlador, escreve a imagem nova do modem e volta a arrancar o controlador.
 
-Atualiza também o modem quando o registo disser `the radio modem's firmware cannot report boxes still in an ended game`, ou o separador **Caixas** da consola disser que o modem de rádio não consegue dizer que caixas ficaram num jogo terminado. Isso precisa de uma imagem do modem da v0.9.0. Para a v0.10.0, grava de novo o modem com a imagem da v0.10.0 quando atualizares o controlador e as caixas.
+Atualiza também o modem quando o registo disser `the radio modem's firmware cannot report boxes still in an ended game`, ou o separador **Caixas** da consola disser que o modem de rádio não consegue dizer que caixas ficaram num jogo terminado. Isso precisa de uma imagem do modem da v0.9.0. Para a v0.10.0, grava de novo o modem com a imagem da v0.10.0 quando atualizares o controlador e as caixas. A v0.11.0 não muda o modem: um modem com a imagem da v0.10.0 fica como está.
 
 ## 12. Resolução de problemas
 
