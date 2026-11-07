@@ -308,10 +308,26 @@ EOV
         printf '#!/bin/sh\nexec "$(dirname "$0")/gradlew.real" --write-verification-metadata sha256 "$@"\n' \
             > android/gradlew
         chmod +x android/gradlew
-        # From clean build folders, so every task runs and resolves what it uses.
-        rm -rf build android/.gradle android/app/.cxx
+        # From clean build folders, so every task runs and resolves what it uses. That includes
+        # the Flutter SDK's own Gradle plugin (packages/flutter_tools/gradle, the included build
+        # `:gradle`): the first build compiled it into the SDK, and an up-to-date
+        # :gradle:compileKotlin never resolves its kotlinBuildToolsApiClasspath. And from an
+        # empty Gradle home: with a warm cache Gradle records some POMs, BOMs and parent POMs
+        # (or the .pom where a fresh download reads the .module) differently from what a fresh
+        # CI machine downloads, and CI fails on the ones missing.
+        sdk_gradle="$(dirname "$(dirname "$(command -v flutter)")")/packages/flutter_tools/gradle"
+        rm -rf build android/.gradle android/app/.cxx android/.kotlin \
+            "$sdk_gradle/build" "$sdk_gradle/.gradle" "$sdk_gradle/.kotlin"
+        saved_gradle_home="${GRADLE_USER_HOME:-}"
+        GRADLE_USER_HOME=$(mktemp -d /tmp/gradle-home.XXXXXX)
+        export GRADLE_USER_HOME
         flutter build apk --debug
         flutter build apk --release --android-project-arg atalaia.release.unsigned=true
+        # The Gradle and Kotlin daemons may still write into it as they stop; a leftover temp
+        # folder is harmless.
+        (cd android && ./gradlew.real --stop) > /dev/null 2>&1 || true
+        rm -rf "$GRADLE_USER_HOME" 2> /dev/null || true
+        if [ -n "$saved_gradle_home" ]; then export GRADLE_USER_HOME="$saved_gradle_home"; else unset GRADLE_USER_HOME; fi
         mv android/gradlew.real android/gradlew
         [ -s "$meta" ] || { echo "check.sh: Gradle wrote no $meta" >&2; exit 1; }
         # Keep the file's own header (the licence and what it is for).
