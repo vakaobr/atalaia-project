@@ -12,6 +12,29 @@ CONTRIBUTING.md, "Pull request titles and commit messages"); optional hand-writt
 `## [Unreleased]` and move into the next release's section as "Details". The sections up to 0.5.0
 were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.10.0](https://github.com/vakaobr/atalaia-project/compare/v0.9.0...v0.10.0) (2026-11-07)
+
+
+### Features
+
+* **firmware:** build the hardened Field Box image, signed for secure boot v2 (nothing burned) ([#126](https://github.com/vakaobr/atalaia-project/issues/126)) ([a40b337](https://github.com/vakaobr/atalaia-project/commit/a40b337ef057e4a10f2452e91d7a1df65906e42f))
+
+
+### Bug Fixes
+
+* **controller:** a ticket scan asks staff before confirming an app check-in (TKS-1 to TKS-7) ([#132](https://github.com/vakaobr/atalaia-project/issues/132)) ([aee9eb2](https://github.com/vakaobr/atalaia-project/commit/aee9eb26267a824578bfa1c77d94679841c634f1))
+* **controller:** bind failover liveness and cadence to the recognised leader ([#131](https://github.com/vakaobr/atalaia-project/issues/131)) ([6e2073b](https://github.com/vakaobr/atalaia-project/commit/6e2073b9515d797f8d70fbeb07dd315c7da6c0b1))
+* **controller:** bound the stuck-box GAME_OVER resends' air time ([#128](https://github.com/vakaobr/atalaia-project/issues/128)) ([61533a1](https://github.com/vakaobr/atalaia-project/commit/61533a1b2bec07f85d8289dab8989ad210d2cc49))
+* **firmware:** open the Field Box admin menu over a game only while the mode takes no player keys ([#127](https://github.com/vakaobr/atalaia-project/issues/127)) ([3dc94a8](https://github.com/vakaobr/atalaia-project/commit/3dc94a8474e8cab0f1df55d36078e23b63b59e15))
+* **protocol:** bind RELEASE to its channel, a silent game and a trusted clock ([#134](https://github.com/vakaobr/atalaia-project/issues/134)) ([63ba451](https://github.com/vakaobr/atalaia-project/commit/63ba4510eb32403cbc99af098ad0bbd8bc4aee92))
+* **release:** build the release APK without the signing key and sign it offline ([#133](https://github.com/vakaobr/atalaia-project/issues/133)) ([b977b78](https://github.com/vakaobr/atalaia-project/commit/b977b78709cf3d9424a3c01c5dd6a6cffcfad10d))
+* **server:** bump pyasn1 and opentelemetry-api, accept only none/packed passkey attestation ([#130](https://github.com/vakaobr/atalaia-project/issues/130)) ([1a66703](https://github.com/vakaobr/atalaia-project/commit/1a66703868889c94562ced2919db2c71a1cada94))
+
+
+### Documentation
+
+* v0.9.0 is released: README, manuals, STATUS and the project page ([#125](https://github.com/vakaobr/atalaia-project/issues/125)) ([8c4427f](https://github.com/vakaobr/atalaia-project/commit/8c4427fb89c8d31527890e33b9f04a64782e4548))
+
 ## [Unreleased]
 
 ### Security
