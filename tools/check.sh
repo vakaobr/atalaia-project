@@ -44,6 +44,8 @@ python3 tools/bench_lbt_gate.py --selftest
 python3 tools/bench_projected_score.py --selftest
 # The hardened release's checks (sdkconfig.release against a build, the sizes), on made-up files.
 python3 tools/secure_boot_sign.py --selftest
+# The hardened burn procedure's planning and guards, with a fake device (it opens no port).
+python3 tools/hardened_burn.py --selftest
 if command -v clang-format > /dev/null 2>&1 && command -v stylua > /dev/null 2>&1; then
     sh tools/format.sh --check
 else

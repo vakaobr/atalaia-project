@@ -203,6 +203,10 @@ else()
     if(CONFIG_ATALAIA_LBT_BENCH)
         list(APPEND ATALAIA_SRCS "radio/lbt_bench.c")
     endif()
+    # Secure boot digest revocation (sb_revoke.h): the hardened release only (secure boot v2 on).
+    if(CONFIG_ATALAIA_SB_REVOKE)
+        list(APPEND ATALAIA_SRCS "sb_revoke.c" "sb_revoke_esp.c")
+    endif()
 endif()
 
 set(ATALAIA_REQUIRES
@@ -226,6 +230,9 @@ set(ATALAIA_REQUIRES
     app_update
     esp_http_client
     monocypher
+    # esp_efuse.h for the hardened release's secure boot digest revocation (sb_revoke_esp.c, only
+    # compiled with CONFIG_ATALAIA_SB_REVOKE); listed always, as bt below.
+    efuse
     # NimBLE (part of ESP-IDF) for the I/O pod's Bluetooth link. Always listed:
     # requirements are expanded before the sdkconfig is read. Without
     # CONFIG_BT_ENABLED (the Field Box, the modem) it builds and links nothing.

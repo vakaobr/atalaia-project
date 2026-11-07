@@ -58,6 +58,7 @@ int main(void)
     run_pod_settings_tests();
     run_pod_pair_tests();
     run_fw_update_tests();
+    run_sb_revoke_tests();
     run_mode_package_tests();
     run_mode_fetch_tests();
     run_box_beacon_tests();

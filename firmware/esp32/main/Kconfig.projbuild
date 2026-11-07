@@ -945,6 +945,45 @@ menu "Atalaia Field Box Configuration"
             int "Seconds to wait for the field Wi-Fi"
             default 20
             range 5 120
+
+        config ATALAIA_SB_REVOKE
+            bool "Secure boot digest revocation (the hardened release only)"
+            depends on SECURE_BOOT_V2_ENABLED && !ATALAIA_SERIAL_KEYS
+            default y
+            help
+                On a box burned for secure boot v2 (sdkconfig.release,
+                firmware/esp32/docs/RELEASE_HARDENING.md): revokes one of its
+                secure boot public-key digests when an instruction signed with
+                a key of ATALAIA_SB_REVOKE_KEYS (Ed25519) says so, over the USB
+                console ("@sbrevoke <digest> <signature> <admin PIN>") or built
+                into the image (ATALAIA_SB_REVOKE_BUILTIN). The way out of a
+                leaked secure boot CI key: a burned box's ROM downloader no
+                longer runs espefuse. Refuses the key the running image is
+                signed with and the last trusted digest (main/sb_revoke.h).
+                Only selectable with secure boot v2 on, so the plain, bench,
+                Wokwi, modem and I/O pod builds do not contain it.
+
+        config ATALAIA_SB_REVOKE_KEYS
+            string "Keys that sign secure boot revocations (64 hex digits each)"
+            depends on ATALAIA_SB_REVOKE
+            default "e6dccf90dd002529fe837e023f9f658a70917ff7dc69615cec600083bab360d7"
+            help
+                The Ed25519 public keys a revocation instruction must be signed
+                with (up to 4). Default: the project's root release key
+                424d053af5cdbc35 alone, kept offline (docs/community/keys.md):
+                the CI release key, which a leak would concern, cannot revoke.
+                `python3 tools/firmware_release.py revoke-sb-digest` signs one.
+
+        config ATALAIA_SB_REVOKE_BUILTIN
+            string "Revocations built into this image (digest and signature, comma-separated)"
+            depends on ATALAIA_SB_REVOKE
+            default ""
+            help
+                "<digest hex> <signature base64>" instructions, separated by
+                commas, that the image carries out at boot once it is confirmed
+                (after an update's self-test): the release that revokes a
+                leaked key on every box that installs it. Each one is checked
+                as the console's. Empty: none.
     endmenu
 
     # ---- USB radio modem (ADR-P2-4) -----------------------------------------

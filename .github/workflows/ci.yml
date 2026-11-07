@@ -42,6 +42,7 @@ jobs:
       registry: ${{ steps.filter.outputs.registry }}
       firmware_test: ${{ steps.filter.outputs.firmware_test }}
       esp32: ${{ steps.filter.outputs.esp32 }}
+      hardened: ${{ steps.filter.outputs.hardened }}
       module_core: ${{ steps.filter.outputs.module_core }}
       target_module: ${{ steps.filter.outputs.target_module }}
       output_module: ${{ steps.filter.outputs.output_module }}
@@ -229,7 +230,17 @@ jobs:
               - 'tools/docker_fw.py'
               - 'tools/firmware_release.py'
               - 'tools/gen_box_fonts.py'
+              - 'tools/hardened_burn.py'
+              - 'tools/hardened_qemu.py'
               - 'tools/oled_logo.py'
+              - 'tools/secure_boot_sign.py'
+            hardened: # the emulator test of the hardened burn (a step of esp32-hardened-build)
+              - 'firmware/esp32/partitions.csv'
+              - 'firmware/esp32/sdkconfig.defaults'
+              - 'firmware/esp32/sdkconfig.release'
+              - 'firmware/esp32/main/sb_revoke*'
+              - 'tools/hardened_burn.py'
+              - 'tools/hardened_qemu.py'
               - 'tools/secure_boot_sign.py'
             module_core:
               - *shared
@@ -1079,6 +1090,10 @@ jobs:
         run: |
           . "$IDF_PATH/export.sh"
           python3 ../../tools/secure_boot_sign.py --selftest
+          # The burn procedure (planning and guards, a fake device) and the digest revocation's
+          # signature format (RFC 8032's public test key): nothing here opens a port.
+          python3 ../../tools/hardened_burn.py --selftest
+          python3 ../../tools/firmware_release.py --selftest
           idf.py -B build-hardened -D SDKCONFIG=build-hardened/sdkconfig \
             -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.release" -D "ATALAIA_FW_VERSION=$FW_VERSION" \
             build 2>&1 | tee build-hardened.log
@@ -1093,6 +1108,16 @@ jobs:
           python3 ../../tools/secure_boot_sign.py sign build-hardened/bootloader/bootloader.bin \
             build-hardened/atalaia_esp32.bin --throwaway-test-key
           python3 ../../tools/secure_boot_sign.py check-sizes build-hardened
+      - name: The burn and secure boot in Espressif's QEMU, throw-away keys (tools/hardened_qemu.py)
+        # About 10 minutes, almost all the emulated flash write, so only when the burn procedure,
+        # the overlay or the layout changes (and on main). No board, no serial port: esptool and
+        # espefuse reach the emulated ESP32-S3 over a TCP socket (RELEASE_HARDENING.md, section 8).
+        if: needs.changes.outputs.all == 'true' || needs.changes.outputs.hardened == 'true'
+        working-directory: firmware/esp32
+        timeout-minutes: 30
+        run: |
+          . "$IDF_PATH/export.sh"
+          python3 -u ../../tools/hardened_qemu.py build-hardened
 
   firmware-test:
     name: Firmware HAL stub tests

@@ -47,6 +47,10 @@ OVERLAY = REPO / "firmware" / "esp32" / "sdkconfig.release"
 MAX_KEYS = 3  # the ESP32-S3's secure boot digest slots
 BENCH_OPTIONS = ("CONFIG_ATALAIA_SERIAL_KEYS", "CONFIG_ATALAIA_SKIP_SETUP", "CONFIG_ATALAIA_RADIO_LOG_PACKETS",
                  "CONFIG_ATALAIA_LBT_BENCH")
+# Options the hardened build must end up with that the overlay does not set itself (they follow
+# from it): the secure boot digest revocation (firmware/esp32/main/sb_revoke.h), on by default with
+# secure boot v2 and off in every other build.
+DERIVED = {"CONFIG_ATALAIA_SB_REVOKE": "y"}
 SET = re.compile(r"^(CONFIG_[A-Z0-9_]+)=(.*)$")
 UNSET = re.compile(r"^# (CONFIG_[A-Z0-9_]+) is not set$")
 
@@ -90,6 +94,9 @@ def config_problems(overlay: str, sdkconfig: str) -> list[str]:
                             + ("no such option (renamed, misspelt, or its dependencies are off?)"
                                if name not in built else f"{name}={got}" if got is not None else "it unset"))
     problems += [f"{name} (a bench option) is on" for name in BENCH_OPTIONS if built.get(name) == "y"]
+    if wanted.get("CONFIG_SECURE_BOOT") == "y":
+        problems += [f"{name}={value} wanted (it follows from the overlay), the build has {built.get(name)}"
+                     for name, value in DERIVED.items() if built.get(name) != value]
     return problems
 
 
@@ -100,7 +107,8 @@ def cmd_check_config(args: argparse.Namespace) -> int:
         print(f"FAIL {p}")
     if problems:
         return fail(f"{args.sdkconfig} is not the configuration of {args.overlay}")
-    print(f"OK: every option of {Path(args.overlay).name} is in {args.sdkconfig}, no bench option on")
+    print(f"OK: every option of {Path(args.overlay).name} is in {args.sdkconfig} (and "
+          f"{', '.join(DERIVED)}), no bench option on")
     return 0
 
 
@@ -241,6 +249,9 @@ def selftest() -> int:
     assert config_problems(overlay, good + "CONFIG_B=y\n") == ["CONFIG_B should be unset, the build has y"]
     assert config_problems("", "CONFIG_ATALAIA_SKIP_SETUP=y\n") == [
         "CONFIG_ATALAIA_SKIP_SETUP (a bench option) is on"]
+    sb = "CONFIG_SECURE_BOOT=y\n"
+    assert config_problems(sb, sb) == ["CONFIG_ATALAIA_SB_REVOKE=y wanted (it follows from the overlay), the build has None"]
+    assert config_problems(sb, sb + "CONFIG_ATALAIA_SB_REVOKE=y\n") == []
     real = read_options(OVERLAY.read_text(encoding="utf-8"))
     assert real.get("CONFIG_SECURE_BOOT") == "y" and real.get("CONFIG_SECURE_BOOT_BUILD_SIGNED_BINARIES", 0) is None
     assert real.get("CONFIG_BOOTLOADER_APP_SECURE_VERSION") == "1"

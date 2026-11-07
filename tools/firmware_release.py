@@ -15,6 +15,15 @@
         atalaia_esp32.bin.release.json next to it: what the GM uploads with the image
     python3 tools/firmware_release.py verify IMAGE IMAGE.release.json --keys <base64 or hex>[,...]
         checks a release as a box would (signature, size, hash, descriptors)
+    python3 tools/firmware_release.py revoke-sb-digest <digest hex> --key ~/atalaia-keys/root.pem
+        signs the instruction that revokes a secure boot v2 public-key digest on a hardened Field
+        Box (firmware/esp32/main/sb_revoke.h; RELEASE_SIGNING.md, "Secure boot signature"): the
+        root release key only (the boxes' CONFIG_ATALAIA_SB_REVOKE_KEYS). Prints the line for the
+        box's console ("@sbrevoke ... <admin PIN>") and for CONFIG_ATALAIA_SB_REVOKE_BUILTIN
+    python3 tools/firmware_release.py verify-sb-revocation "<digest hex> <signature>" --keys <hex>[,...]
+        checks such an instruction as a box would
+    python3 tools/firmware_release.py --selftest
+        the revocation's message and a fixed signature (RFC 8032's public test key)
 
 The manifest is exactly the one the site server's catalogue, the field controller and
 the box check: the shared ``controller/atalaia_controller/firmware_release.py``. The
@@ -212,7 +221,94 @@ def cmd_verify(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---- secure boot digest revocation (firmware/esp32/main/sb_revoke.h) -------------------------
+
+SB_REVOKE_HEADER = "atalaia-secure-boot-revoke-v1"
+
+
+def sb_revoke_message(digest_hex: str, platform: str = "esp32s3") -> bytes:
+    """The bytes a revocation's Ed25519 signature covers, exactly as sb_revoke.c builds them."""
+    return f"{SB_REVOKE_HEADER}\nplatform={platform}\ndigest={digest_hex.lower()}\n".encode("ascii")
+
+
+def sb_digest(text: str) -> str | None:
+    """A secure boot v2 public-key digest: 64 hex digits (espsecure.py digest_sbv2_public_key)."""
+    text = text.strip().lower()
+    return text if len(text) == 64 and all(c in "0123456789abcdef" for c in text) else None
+
+
+def sb_revocation_signer(line: str, keys: list[str]) -> str | None:
+    """The id of the key (of keys, base64) that signed '<digest hex> <signature base64>', or None."""
+    parts = line.strip().split(" ")
+    if len(parts) != 2 or sb_digest(parts[0]) is None or len(parts[1]) != 88:
+        return None
+    try:
+        signature = base64.b64decode(parts[1], validate=True)
+    except ValueError:
+        return None
+    message = sb_revoke_message(parts[0])
+    for key in keys:
+        if fr.verify_signature(base64.b64decode(key), message, signature):
+            return fr.key_id(key)
+    return None
+
+
+def cmd_revoke_sb_digest(args: argparse.Namespace) -> int:
+    digest = sb_digest(args.digest)
+    if digest is None:
+        return fail("the digest: 64 hex digits (secure_boot_sign.py sign prints each key's)")
+    key_path = Path(args.key).expanduser()
+    if not outside_repo(key_path):
+        return fail(f"{key_path} is inside the repository: move the private key out of it")
+    key = load_private(key_path)
+    signature = base64.b64encode(key.sign(sb_revoke_message(digest))).decode("ascii")
+    line = f"{digest} {signature}"
+    print(f"revocation of the secure boot digest {digest}, signed by key {public_forms(raw_public(key))['key_id']}")
+    print("A box's USB console (with its admin PIN as the last word):")
+    print(f"  @sbrevoke {line} <admin PIN>")
+    print("Built into a release (sdkconfig; several separated by commas):")
+    print(f'  CONFIG_ATALAIA_SB_REVOKE_BUILTIN="{line}"')
+    print("A box refuses it unless this key is in its CONFIG_ATALAIA_SB_REVOKE_KEYS (the root release key), "
+          "the digest is in a slot, its running image is not signed with that key and another slot stays trusted.")
+    return 0
+
+
+def cmd_verify_sb_revocation(args: argparse.Namespace) -> int:
+    signer = sb_revocation_signer(args.line, parse_keys(args.keys))
+    if signer is None:
+        print("FAIL no given key signed this revocation (or it is not '<digest hex> <signature base64>')")
+        return 1
+    print(f"OK: revokes the secure boot digest {args.line.split()[0].lower()}, signed by key {signer}")
+    return 0
+
+
+def selftest() -> int:
+    # SHA-256("atalaia test secure boot key: ci") signed with RFC 8032 TEST 1's public test key: the
+    # same vector as firmware/esp32/test/test_sb_revoke.c.
+    digest = "59bfba86f71e817ab31f06f1d8ba59e715abdd5a365742da0070683c42d26ee9"
+    signature = "ImH55+uGCOigpTucIneiZnE9+H6Wv/+AtZpdWfho2IzwjTzjLfKnPaXAVPAB7cWPbgmAImliI8cqqmprAuWqBA=="
+    t1_public = base64.b64encode(bytes.fromhex(
+        "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a")).decode("ascii")
+    message = sb_revoke_message(digest)
+    assert len(message) == 119 and message.startswith(b"atalaia-secure-boot-revoke-v1\nplatform=esp32s3\n")
+    assert sb_revocation_signer(f"{digest} {signature}", [t1_public]) == fr.key_id(t1_public)
+    assert sb_revocation_signer(f"{digest.upper()} {signature}", [t1_public]) == fr.key_id(t1_public)
+    assert sb_revocation_signer(f"{digest[:-1]}0 {signature}", [t1_public]) is None
+    assert sb_revocation_signer(f"{digest}  {signature}", [t1_public]) is None
+    assert sb_revocation_signer(f"{digest} {signature}", []) is None
+    assert sb_digest("xyz") is None and sb_digest(digest.upper()) == digest
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey  # noqa: PLC0415
+    key = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(
+        "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"))  # RFC 8032 TEST 1, public
+    assert base64.b64encode(key.sign(message)).decode("ascii") == signature
+    print("firmware_release: self-test passed")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv == ["--selftest"]:
+        return selftest()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     k = sub.add_parser("keygen", help="make a new release key")
@@ -231,8 +327,16 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("image")
     v.add_argument("release")
     v.add_argument("--keys", required=True, help="trusted public keys, base64 or hex, separated by commas")
+    r = sub.add_parser("revoke-sb-digest", help="sign a secure boot digest revocation (root key)")
+    r.add_argument("digest", help="the secure boot v2 public-key digest, 64 hex digits")
+    r.add_argument("--key", required=True, help="the root release key (PEM, outside the repository)")
+    c = sub.add_parser("verify-sb-revocation", help="check a secure boot digest revocation as a box would")
+    c.add_argument("line", help="'<digest hex> <signature base64>'")
+    c.add_argument("--keys", required=True, help="trusted public keys, base64 or hex, separated by commas")
     args = parser.parse_args(argv)
-    return {"keygen": cmd_keygen, "pubkey": cmd_pubkey, "sign": cmd_sign, "verify": cmd_verify}[args.command](args)
+    return {"keygen": cmd_keygen, "pubkey": cmd_pubkey, "sign": cmd_sign, "verify": cmd_verify,
+            "revoke-sb-digest": cmd_revoke_sb_digest,
+            "verify-sb-revocation": cmd_verify_sb_revocation}[args.command](args)
 
 
 if __name__ == "__main__":
