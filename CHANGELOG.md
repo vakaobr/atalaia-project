@@ -12,8 +12,9 @@ CONTRIBUTING.md, "Pull request titles and commit messages"); optional hand-writt
 `## [Unreleased]` and move into the next release's section as "Details". The sections up to 0.5.0
 were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.11.0](https://github.com/vakaobr/atalaia-project/compare/v0.10.0...v0.11.0) (2026-11-07)
+## [Unreleased]
 
+## [0.11.0](https://github.com/vakaobr/atalaia-project/compare/v0.10.0...v0.11.0) (2026-11-07)
 
 ### Features
 
@@ -26,7 +27,7 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 * **release:** record the release environment's reviewer and the v* tag ruleset ([#139](https://github.com/vakaobr/atalaia-project/issues/139)) ([8c7b5b9](https://github.com/vakaobr/atalaia-project/commit/8c7b5b95223712fe7bd4e1c36de9d99e6e0dd08c))
 * v0.10.0 is released: README, manuals, STATUS and the project page ([#137](https://github.com/vakaobr/atalaia-project/issues/137)) ([3619b6e](https://github.com/vakaobr/atalaia-project/commit/3619b6e2a9bcbb6137260c72c2eac0402d8bcb03))
 
-## [Unreleased]
+### Details
 
 - **The hardened Field Box image, prepared and still burned nowhere (HPR-1 to HPR-12).** The maintainer decided on
   2026-11-07 that no board, bench or field, gets the hardened image or any eFuse burn for now
