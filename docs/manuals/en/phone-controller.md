@@ -148,6 +148,8 @@ The phone controller keeps its games, codes, the field's certificate authority a
 
 After that, every update installs in place. Never uninstall to update again: if Android ever refuses a release APK, stop and ask on the project's issues first.
 
+**v0.10.0: the app, the boxes and the modem together.** From v0.10.0, **Release every box not in this game** names its channel, and a v0.9.0 box and a v0.10.0 controller, or the reverse, do not accept each other's. Install the v0.10.0 APK (it installs over v0.9.0 and keeps the app's data), update every Field Box to v0.10.0 the same day, and reflash the USB radio modem with the v0.10.0 image.
+
 **The radio.** A USB radio modem is updated over USB from a computer: [Set up the radio modem, Update the modem](modem.md#update-the-modem). An I/O pod: [Phone prop guide](phone-prop.md).
 
 **The boxes.** Under **Firmware updates**, **Firmware release keys** lists the keys whose releases the phone accepts (one per line, 44 characters each), as the Pi's `[firmware] release_keys`. A phone that kept the project's earlier default switches to the new keys by itself; a list you typed by hand stays as it is. Since v0.8.0 the project's keys are:

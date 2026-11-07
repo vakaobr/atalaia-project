@@ -343,3 +343,13 @@ Findings from two real Heltec V4.3 boards and the Pi controller; the fixes are b
 - **One bench test passed** (2026-11-06, a Heltec V4.3 box on 0.9.0-bench.1): switched off mid-game, the game ended, powered back on, freed by the controller within seconds (0.4 s after it booted). The list kept the game afterwards; fixed in v0.9.0 (STUCK-71 to STUCK-73).
 - **The modem needs a USB reflash**: the recovery works only with the v0.9.0 modem image (`"games": true` in its identity); the modem has no update over the air ([modem guide](../manuals/en/modem.md)).
 - **Not done:** the recovery and the Wi-Fi rules on more boards and a field; five boxes on a field (the phase 2 gate).
+
+## 2026-11-07: v0.10.0 released, with the review fixes
+
+- **[v0.10.0](https://github.com/vakaobr/atalaia-project/releases/tag/v0.10.0) is out** (GitHub pre-release, 2026-11-07; CHANGELOG.md 0.10.0), hardening what v0.9.0 brought:
+  - **RELEASE names its channel** (RFC 0001 Amendment 28, addendum of 2026-11-06; RLB-1 to RLB-8): a box ignores a field-wide RELEASE while it has heard a TIME of its game in the last 90 s, refuses one for another channel or whose time is more than 300 s past its game clock, so a RELEASE heard again can no longer free a box that is still in a live game. Both controllers stamp it only with a clock they can vouch for.
+  - **One air budget for the automatic stuck-box resends** (SRB-1 to SRB-6, both controllers): none while a game is started (running or paused; the GM's **Release** still works), and between games one burst a minute for all ended games together.
+  - **Failover bound to the recognised leader** (FLC-1 to FLC-6, above): a standby counts only the leader's own TIMEs for liveness and cadence.
+  - **The box's admin menu during a game** opens only while the game takes no keys from players (AMG-1 to AMG-5, phase 1).
+- **Update controllers and boxes together**: a v0.9.0 box refuses a v0.10.0 controller's RELEASE, and a v0.10.0 box refuses a v0.9.0 controller's. Until both are updated, **Leave the game** at the box, `@leave` and the GAME_OVER resend still free a stuck box. **The modem is reflashed over USB** with the v0.10.0 image ([modem guide](../manuals/en/modem.md)). The manuals, README and project page say so.
+- **Not done:** none of the v0.10.0 changes has been tried on the bench or a field yet; five boxes on a field (the phase 2 gate).

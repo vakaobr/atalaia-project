@@ -84,7 +84,7 @@ hero:
     Pre-alpha · phases 1 and 2 done in software; real boards play whole games with the field
     controller on the bench, keypad included; phase 3 done in software, the iOS app checked on an
     iPhone; phase 4's site server running on a test server; phase 5 built in software · newest
-    release v0.9.0 · not field-ready yet
+    release v0.10.0 · not field-ready yet
   title: The open <span class="nowrap">force-on-force</span> platform
   lead: >-
     Atalaia is an open platform for the electronic props of airsoft, paintball and milsim: the
@@ -720,8 +720,11 @@ try:
     text: >-
       <a href="https://github.com/vakaobr/atalaia-project/releases/tag/v0.9.0">v0.9.0</a> (6
       November 2026) is the first GitHub release that carries the app: atalaia-app-0.9.0.apk, signed
-      with the project's key so that each release installs over the one before. Its certificate's
-      SHA-256 fingerprint is <code
+      with the project's key so that each release installs over the one before. The newest, <a
+      href="https://github.com/vakaobr/atalaia-project/releases/tag/v0.10.0">v0.10.0</a> (7 November
+      2026), installs over it and keeps the app's data; from v0.10.0 the APK is built without the
+      signing key and signed in a separate offline step. Its certificate's SHA-256 fingerprint is
+      <code
       class="fingerprint">9C:35:0D:17:37:D6:C5:35:CD:3E:D1:04:28:8E:65:AD:7D:B4:FA:CE:8E:4E:6F:27:75:3B:7B:7C:38:40:A1:99</code>;
       Android refuses an update signed with another key. An app installed from an older debug build
       must be uninstalled once first (the manuals say what it loses). Or build the debug APK
@@ -745,8 +748,11 @@ roadmap:
     phases 1 to 3 are done in software (real boards play whole games on the bench, and the iOS app
     has passed its checklist on an iPhone); phases 4 and 5 are built in software. The gates wait for
     built boxes, field tests, a real server and the project's registry key. The newest release is
-    v0.9.0 (6 November 2026): the controller frees boxes left in an ended game (one bench test so
-    far), the box's Wi-Fi rules, and the first Android app signed with the project's key.
+    v0.10.0 (7 November 2026): review fixes that harden the stuck-box recovery, failover and the
+    ticket check-in, a release APK signed offline, and a hardened Field Box image that now builds
+    (nothing burned into a board yet). Boxes and controllers are updated to it together. v0.9.0 (6
+    November 2026) brought the stuck-box recovery (one bench test so far), the box's Wi-Fi rules and
+    the first Android app signed with the project's key.
   more: The full roadmap, with what each phase holds and its gate →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
   # hardware), in progress, designed (research, architecture and plan written; no code).
@@ -775,8 +781,10 @@ roadmap:
     short: >-
       Field Box firmware and a build manual; a real board plays whole games on the bench, now with
       its screen, keypad and buttons wired up on loose wires (photo and clip on the build page).
-      Leaving an ended game at the box came with v0.9.0, not yet tried on a real box. Still waiting
-      for an assembled box.
+      Leaving an ended game at the box came with v0.9.0, not yet tried on a real box. From v0.10.0
+      the box's admin menu opens during a game only while the game is paused or waiting, and the
+      hardened release image builds (nothing burned into a board yet). Still waiting for an
+      assembled box.
     done:
       - ESP32 firmware for the Field Box, with presets on the device, running in an emulator.
       - The box's small screen shows the hold bar, points and held time, in four languages.
@@ -799,13 +807,15 @@ roadmap:
       - "A screen text that does not fit is refused when a mode is checked, and a text that fails to draw shows a \"?\" instead of a blank (a long text in four languages used to go silently empty on a box). Tests on a computer."
       - "A count of one takes the singular (\"1 ponto\", not \"1 pontos\") on the box's screens, in the app, the GM console and the staff pages. Tests in software."
       - "A box left in a game that ended while it was off can leave it at the box: hold * for 3 seconds, type the admin PIN, then Leave the game (or @leave on its USB console). It keeps its field, Wi-Fi and modes. In v0.9.0 (6 November 2026); not yet tried at a real box."
+      - "The box's admin menu opens during a field game only while the game takes no keys from players: before the start, while it is paused, or 5 minutes after the game's controller went silent (a box stuck in an ended game). To take a box out of a running game, pause the game first. In v0.10.0 (7 November 2026); host tests only."
+      - "The hardened release image (secure boot v2, flash encryption, NVS encryption, anti-rollback) builds, and CI signs it with a throw-away key. Nothing has been burned into a board, and the released images do not change. In v0.10.0 (7 November 2026)."
     next:
       - A built box that runs a 2-hour club game with no restarts.
       - "Seeing the timer bar on a real panel."
       - "Trying the setup re-send and Change field on a real board."
       - "Hearing a Field Box's beacon with a real phone, and starting the Wi-Fi at a game's join with the new memory budget."
       - "Flashing the new partition table on a real board (one USB flash, no erase, for a box on the old one)."
-      - "A hardened release image (flash encryption, secure boot): written down as a plan only, nothing built or tried on a board."
+      - "Flashing the hardened release image on a board: it builds from v0.10.0, nothing burned into a board yet."
       - "Trying the I2C fault handling on a board with a bad keypad connection, and the boot splash and the new screens on more than the first bench board."
       - "Trying Leave the game on a real box."
     gate: >-
@@ -817,7 +827,9 @@ roadmap:
       Skirmesh-RF over LoRa, field controller, API, GM console and a mode pack, tested in software;
       on the bench, real boards play whole games with the controller over the radio, and what the
       bench found is fixed in software. Freeing boxes left in an ended game came with v0.9.0 and
-      passed its first bench test. Waiting for 5 built boxes on a field.
+      passed its first bench test. v0.10.0 hardens it: a box ignores a field-wide release on another
+      channel or while it still hears its game, and the automatic resends keep to one air budget.
+      Waiting for 5 built boxes on a field.
     done:
       - The encrypted Skirmesh-RF radio protocol, and the USB radio modem.
       - The field controller with its API.
@@ -863,6 +875,7 @@ roadmap:
       - "Updates over the air for the bench's own builds: a bench release key, trusted on the bench beside the project's keys, signs daily builds; on 2 November 2026 a box went from one build to the next from the console in about 22 seconds, confirmed after its self-test."
       - "The controller frees a box left in a game that ended while it was off: the USB modem reports it, the controller sends that game's end again, and the GM console lists such boxes under Stuck in an ended game, with a Release button. A controller that lost its game (reinstalled, or its data lost) can release every box not in the live game. In v0.9.0 (6 November 2026). One bench test passed on 6 November 2026: a Heltec V4.3 box switched off mid-game, the game ended, powered back on: freed by the controller within seconds. The modem needs the v0.9.0 firmware, flashed over USB."
       - "The box's Wi-Fi setup: @wifi takes a Wi-Fi name and password with spaces, in double quotes, and the setup page refuses what the box cannot use: a name over 32 bytes, or a password that is not empty, 8–63 characters or 64 hex digits. In v0.9.0 (6 November 2026)."
+      - "The review fixes of v0.10.0 (7 November 2026): Release every box not in this game names its channel, and a box that still hears its game's controller ignores it, so a release heard again cannot free a box in a live game; the controller's automatic resends to stuck boxes wait while a game is started and keep to one burst a minute; a standby controller counts only the recognised leader's beacons for failover. Controllers and boxes are updated together, and the modem is reflashed over USB. In software and host tests, not yet on the bench."
     next:
       - The radio boards, and 5 built boxes for the field test.
       - A 20-box field test with listen-before-talk on and off.
@@ -872,6 +885,7 @@ roadmap:
       - "Wiping a box's epoch store on two bench boards to see it found again, twice in a row and with a former leader rejoined (the runbook is written)."
       - "Setting the clock and using access tokens on a real Raspberry Pi on a field with no internet."
       - "Trying the stuck-box recovery and the Wi-Fi rules on more boards (the stuck-box recovery passed one bench test on 6 November 2026)."
+      - "Trying the v0.10.0 release and resend rules on the bench boards."
     gate: >-
       Gate: 5 boxes on a <a href="{{ page.to.glossary }}#glossary-cqb">CQB</a> site and an outdoor
       field, zero lost captures. <strong>Open.</strong>
@@ -936,6 +950,7 @@ roadmap:
         - "Sharing the position is a separate, unticked choice at check-in (in the app and at the console's hand check-in), with who sees it; declining blocks neither the check-in nor the game, and a player can switch it on or off at any time. Without it the controller refuses the positions. Software only."
         - "The app's security review: a pinned field CA is exactly one certificate, no app-wide cleartext HTTP on Android (only the loopback, the emulator's host, 192.168.4.1 and atalaia.local), a release APK that is never signed with the debug key by accident, and a social login ticket bound to the app instance. Not tried on a real phone; the release signing key is still for the maintainer to make."
         - "The player's event list and game history leave out housekeeping events that have no text for players (a box confirming its setup, nodes online or offline, tag scans, target hits) instead of showing raw type names."
+        - "A marshal's or the GM's scan of a printed ticket no longer confirms a check-in made in the player's app on its own: both names show, and the marshal confirms it or discards it. In v0.10.0 (7 November 2026); not tried on a real phone."
     g_props:
       title: Props and the I/O pod
       items:
@@ -1216,8 +1231,9 @@ roadmap:
     short: >-
       Visual mode editor, signed mode packages, the mode registry as a template, German and
       Traditional Chinese, build guides, the expansion port's target and output modules. Every
-      software step is built. The newest release, v0.9.0, is signed with the project's release key
-      and carries the Android app, signed with the project's Android key.
+      software step is built. The newest release, v0.10.0, is signed with the project's release key
+      and carries the Android app, built without its key and signed with the project's Android key
+      in a separate offline step.
     done:
       - "<strong>The visual mode editor</strong>: a page of the simulator where a mode is put
         together from blocks (what happens when a team holds the button, timers, points, screens

@@ -164,6 +164,8 @@ O telemóvel controlador guarda os jogos, os códigos, a autoridade de certifica
 
 A partir daí, todas as atualizações se instalam por cima. Nunca desinstales para atualizar outra vez: se o Android alguma vez recusar o APK de uma versão, para e pergunta primeiro nas issues do projeto.
 
+**v0.10.0: a app, as caixas e o modem ao mesmo tempo.** A partir da v0.10.0, **Libertar todas as caixas que não estão neste jogo** indica o canal, e uma caixa v0.9.0 e um controlador v0.10.0, ou o contrário, não aceitam o dela um do outro. Instala o APK da v0.10.0 (instala-se por cima da v0.9.0 e mantém os dados da app), atualiza todas as caixas para a v0.10.0 no mesmo dia e grava de novo o modem de rádio USB com a imagem da v0.10.0.
+
 **O rádio.** Um modem de rádio USB atualiza-se por USB a partir de um computador: [Montar o modem de rádio, Atualizar o modem](modem.md#update-the-modem). Um módulo de E/S: [Guia do telemóvel como dispositivo de jogo](phone-prop.md).
 
 **As caixas.** Em **Atualizações de firmware**, **Chaves das versões de firmware** lista as chaves cujas versões o telemóvel aceita (uma por linha, 44 caracteres cada), como o `[firmware] release_keys` do Pi. Um telemóvel que tinha o valor por omissão anterior do projeto passa sozinho para as chaves novas; uma lista que escreveste à mão fica como está. Desde a v0.8.0, as chaves do projeto são:

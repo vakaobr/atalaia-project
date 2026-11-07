@@ -9,7 +9,7 @@ Para quem dirige um campo: prepará-lo uma vez, dirigir um dia de jogo a partir 
 
 > **Ainda não está pronta para o campo.** A Atalaia está em pré-alfa. O controlador já jogou jogos inteiros com placas a sério numa bancada, mas nenhum controlador, caixa, telemóvel ou servidor foi usado num campo a sério. Cada passo abaixo corresponde ao que o software mostra hoje. Os passos que dependem de hardware dizem **Ainda não testado num campo**. As palavras em *itálico* estão no [glossário](https://atalaia-project.link/glossario/).
 
-> **Versões.** A versão mais recente é a **v0.9.0** (6 de novembro de 2026). Uma funcionalidade marcada **A partir da v0.9.0** precisa dessa versão ou de uma seguinte no controlador, no modem ou na caixa, como o texto indica.
+> **Versões.** A versão mais recente é a **v0.10.0** (7 de novembro de 2026). Uma funcionalidade marcada **A partir da v0.9.0** precisa dessa versão ou de uma seguinte no controlador, no modem ou na caixa, como o texto indica. **Para a v0.10.0, atualiza o controlador e as caixas ao mesmo tempo**, e grava de novo por USB o modem de rádio USB: vê [Atualizar as caixas](#update-the-boxes).
 
 ## Índice
 
@@ -611,6 +611,8 @@ Mais ajuda: o [guia do controlador](../../../controller/README.md) (em inglês),
 ### Atualizar as caixas
 
 Atualizas o firmware das caixas pelo Wi-Fi do campo, entre jogos. Feito numa bancada com uma placa a sério; ainda não testado num campo.
+
+**v0.10.0: atualiza os controladores e as caixas ao mesmo tempo.** A partir da v0.10.0, **Libertar todas as caixas que não estão neste jogo** indica o canal: uma caixa v0.9.0 recusa a de um controlador v0.10.0, e uma caixa v0.10.0 recusa a de um controlador v0.9.0. Atualiza o controlador (Raspberry Pi ou telemóvel) e todas as caixas para a v0.10.0 no mesmo dia, e grava de novo o modem de rádio USB com a imagem da v0.10.0, por USB (não tem atualização pelo ar). Enquanto não estiverem os dois atualizados, uma caixa presa continua a sair do jogo com **Sair do jogo** na própria caixa, `@leave` na consola USB dela, ou o reenvio automático do controlador.
 
 **Antes da primeira atualização depois da v0.8.0: as chaves das versões**
 

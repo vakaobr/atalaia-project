@@ -271,6 +271,7 @@ The modem has **no over-the-air update**: a new image is always written over USB
 ### When to update it
 
 - A new release's notes say the modem changed. Look at the [Releases page](https://github.com/vakaobr/atalaia-project/releases) and the CHANGELOG.
+- You update the controller and the boxes to **v0.10.0**: they go together, and the modem gets the v0.10.0 image at the same time ([Field Box manual](field-box.md#update-the-boxes)).
 - The controller's log says `the radio modem's firmware cannot report boxes still in an ended game`, or the console's **Boxes** tab, or a phone controller's screen under **Radio**, says the radio modem cannot report them. That needs a modem image from **v0.9.0**.
 - It was flashed with v0.4.0 or earlier (the old partition table, section 4.3).
 
