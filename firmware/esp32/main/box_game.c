@@ -239,6 +239,13 @@ bool box_game_can_leave(const box_game_t *g)
     return g->phase == BOX_JOINED || g->phase == BOX_PLAYING || g->phase == BOX_FETCHING;
 }
 
+bool box_game_admin_menu_ok(const box_game_t *g)
+{
+    if (!box_game_can_leave(g)) return false;
+    if (g->phase != BOX_PLAYING || g->paused) return true; /* the mode takes no keys from players */
+    return g->now_ms - g->link.last_time_ms >= BOX_ADMIN_MENU_SILENT_MS;
+}
+
 bool box_game_leave(box_game_t *g, const char *how)
 {
     if (!box_game_can_leave(g)) return false;

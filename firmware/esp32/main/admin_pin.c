@@ -96,6 +96,11 @@ bool admin_pin_is_set(const admin_pin_t *a)
     return a->pin[0] != '\0';
 }
 
+void admin_pin_follow(admin_pin_t *a, const admin_pin_t *main)
+{
+    snprintf(a->pin, sizeof(a->pin), "%s", main->pin);
+}
+
 uint32_t admin_pin_wait_ms(const admin_pin_t *a)
 {
     if (a->wait_ms == 0) return 0;

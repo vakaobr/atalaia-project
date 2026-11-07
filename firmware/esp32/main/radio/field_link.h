@@ -155,6 +155,9 @@ typedef struct {
     uint8_t game_state; /* FIELD_GAME_*, from TIME and CMD */
     bool have_time;
     uint32_t controller_time_ms; /* game time of the last TIME, plus its airtime */
+    /* When the last TIME was taken (the box's clock), or the link's start until one: how long the
+     * controller has been silent (box_game_admin_menu_ok, decision AMG-2). */
+    uint32_t last_time_ms;
     /* The wall clock (Unix seconds) of the first TIME taken in this join, 0 until one: a RELEASE
      * older than it is refused (RFC 0001 Amendment 28, box_lobby.c). */
     uint32_t first_wall_s;

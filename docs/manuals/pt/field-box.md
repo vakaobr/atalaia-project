@@ -321,16 +321,16 @@ O lado da organização está no [manual da organização, Recuperar de problema
 
 **Sair do jogo na caixa** (o menu de administração da caixa; não o **Sair do jogo** da app de quem joga, que só apaga o nome da pessoa):
 
-1. Mantém `*` premido durante 3 segundos. O toque em si continua a ir para o jogo, como um `*`.
+1. Mantém `*` premido durante 3 segundos. O toque em si continua a ir para o jogo, como um `*`. O menu só abre quando o jogo não pode receber teclas de quem joga: a caixa está à espera do início, o jogo está em pausa, ou a caixa não ouve nada do controlador há 5 minutos (uma caixa presa: espera 5 minutos depois de a ligar). Com o jogo a decorrer e o controlador ao alcance, manter `*` premido não faz mais nada.
 2. **Marca o PIN de administração.** `#` confirma. `*` apaga; sem nada escrito, `*` volta ao jogo.
 3. **ADMINISTRAÇÃO** mostra uma entrada, **Sair do jogo**. Carrega em `#`.
 4. **SAIR DO JOGO?**: `#` sai, `*` volta.
 
 A caixa termina o jogo como se a organização o tivesse terminado: o último ecrã do jogo e, 30 segundos depois, **PRONTA**. Nunca mais entra nesse jogo. Mantém o campo, a chave de entrada, o Wi-Fi, o PIN de administração e os jogos. Pode ser convidada, ou receber um cartão de entrada, logo a seguir.
 
-- Também funciona num jogo que ainda decorre, para a organização poder tirar uma caixa: a consola passa a ver essa caixa como terminada e o jogo continua para as outras caixas.
-- O menu só aparece enquanto a caixa está num jogo do controlador ou de um cartão de entrada. Fecha sozinho ao fim de 30 segundos sem tecla, ou quando o jogo termina.
-- Cinco PIN errados obrigam a esperar, como em todo o lado.
+- Para tirar uma caixa de um jogo que ainda decorre (um botão avariado, uma caixa no sítio errado), **põe o jogo em pausa** na consola primeiro e depois mantém `*` premido. Ou usa `@leave <PIN de administração>` na consola USB, que funciona a qualquer momento. A consola da organização passa a ver essa caixa como terminada e o jogo continua para as outras caixas quando for retomado.
+- O menu só aparece enquanto a caixa está num jogo do controlador ou de um cartão de entrada. Fecha sozinho ao fim de 30 segundos sem tecla, quando o jogo termina ou quando o jogo volta a decorrer (retomado, ou o controlador ouvido de novo).
+- Cinco PIN errados neste menu obrigam a esperar antes da tentativa seguinte neste menu (1, 2, 4 ... minutos, como em todo o lado). Estas tentativas têm a sua própria contagem: nunca bloqueiam o seletor de jogos, a adoção nem o `@leave` da consola USB, por isso quem joga e marca PIN errados não consegue impedir o GM de usar a caixa.
 - Uma caixa sem teclado (um Satélite) faz o mesmo na consola USB: `@leave <PIN de administração>`. A caixa responde `leave: game N is over on this box; it is free for the next game` ([guia do firmware, secção 5](firmware.md#5-primeiro-arranque-e-configuração)).
 
 Testado só num computador; ainda não experimentado em hardware.
