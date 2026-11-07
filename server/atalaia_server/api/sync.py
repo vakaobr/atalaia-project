@@ -17,7 +17,8 @@
     POST /api/v1/sync/erasures the players whose data the controller erased on request: their chrono records
                                and account links here go too (S14-10, decision RET-4)
     GET  /api/v1/sync/schedule?days=14         the field's published games of the coming days
-    GET  /api/v1/sync/roster?scheduled_game_id= one scheduled game's live registrations
+    GET  /api/v1/sync/roster?scheduled_game_id= one scheduled game's live registrations (&binding=1: with the
+                                                registering phones' public keys, TKB-2)
     GET  /api/v1/sync/chrono?scheduled_game_id= other fields' chrono records of that roster's players, only
                                with the person's consent for both fields (S14-5)
     GET  /api/v1/sync/claims                   accounts' claims of player ids, waiting for this field's verdict
@@ -186,7 +187,9 @@ async def roster(request: Request) -> JSONResponse:
                             status_code=400, headers=NO_STORE)
 
     async def build(db: Any, caller: sync.Caller) -> Any:
-        answer = await registration.roster(db, caller.field_id, wanted)
+        # ``binding=1`` (TKB-2): a controller that knows the registering phones' keys; others never get them.
+        answer = await registration.roster(db, caller.field_id, wanted,
+                                           binding=request.query_params.get("binding") == "1")
         if answer is None:
             raise sync.SyncProblem(404, "scheduled_game_not_found")
         # FU7-6: when this key's controller last pulled the game's roster (the staff roster page shows it).

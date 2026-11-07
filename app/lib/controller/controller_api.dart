@@ -1039,9 +1039,26 @@ class ControllerApi {
       }
       return ApiResponse(200, svc.info(), _noStore);
     }),
+    _route('GET', r'/api/v1/checkin/challenge', (r) {
+      final svc = _svc();
+      if (!svc.infoRate.allow(r.client)) {
+        throw _HttpError(
+          429,
+          'too many requests from this address; wait a minute',
+        );
+      }
+      return ApiResponse(200, svc.challenge(), _noStore);
+    }),
     _route('POST', r'/api/v1/checkin', (r) {
-      final (out, created) = _svc().checkIn(r.body, r.client);
-      return ApiResponse(created ? 201 : 200, out, _noStore);
+      ApiResponse answer((Map<String, Object?>, bool) result) =>
+          ApiResponse(result.$2 ? 201 : 200, result.$1, _noStore);
+      final body = r.body;
+      // Without the registering phone's proof the check-in answers at once;
+      // with one, after its Ed25519 signature is verified (TKB-3).
+      if (body['binding'] == null) {
+        return answer(_svc().checkIn(body, r.client));
+      }
+      return _svc().checkInWithProof(body, r.client).then(answer);
     }),
     _route(
       'POST',

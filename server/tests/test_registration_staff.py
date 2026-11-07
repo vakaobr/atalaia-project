@@ -514,6 +514,7 @@ class StaffPageCodesTests(StaffRegistrationCase):
         raised = set(re.findall(r'RegistrationError\("([a-z_]+)"', source.read_text(encoding="utf-8")))
         raised -= {"player_id_unavailable", "player_secret_invalid", "player_id_invalid", "player_id_exists",
                    "player_id_taken", "registration_closed", "already_registered", "display_name_invalid",
-                   "team_preference_invalid", "federation_number_invalid", "make_model_invalid"}
+                   "team_preference_invalid", "federation_number_invalid", "make_model_invalid",
+                   "binding_key_invalid"}  # the app's own call (TKB-1), never from a staff page
         for code in sorted(raised):
             self.assertIn(f"e_{code}", STRINGS["en"], code)

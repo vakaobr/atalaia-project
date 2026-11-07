@@ -498,6 +498,19 @@ class SiteApi {
     await session.call('POST', '/me/registrations/$regId/ticket'),
   );
 
+  /// Gives the registration this phone's public key (decisions TKB-1,
+  /// TKB-2), so a check-in can prove it comes from this phone. False when
+  /// the site server refused it or does not know the call (an older one:
+  /// the check-in is then unbound, as before).
+  Future<bool> bind(String regId, String publicKey) async {
+    final r = await session.callRaw(
+      'PUT',
+      '/me/registrations/$regId/binding',
+      body: {'binding_key': publicKey},
+    );
+    return r.ok;
+  }
+
   /// The games the account played, oldest first, from the player's own
   /// data (`GET /me/data`, its `game_history`): the site server has no
   /// smaller answer for a player, and its other history views
@@ -586,6 +599,7 @@ final class KeptTicket {
     required this.gameTitle,
     required this.fieldName,
     this.startsAt,
+    this.bindingSeed,
   });
 
   final String site;
@@ -597,6 +611,23 @@ final class KeptTicket {
   final String fieldName;
   final DateTime? startsAt;
 
+  /// The private key of the Ed25519 pair whose public key the site server
+  /// has for this registration (base64url, sealed at rest: TKB-1); null when
+  /// the site server did not take one (the check-in is then unbound).
+  final String? bindingSeed;
+
+  KeptTicket withBinding(String? seed) => KeptTicket(
+    site: site,
+    registrationId: registrationId,
+    playerId: playerId,
+    ticket: ticket,
+    ticketText: ticketText,
+    gameTitle: gameTitle,
+    fieldName: fieldName,
+    startsAt: startsAt,
+    bindingSeed: seed,
+  );
+
   Map<String, Object?> toJson() => {
     'site': site,
     'registration_id': registrationId,
@@ -606,6 +637,7 @@ final class KeptTicket {
     'game_title': gameTitle,
     'field_name': fieldName,
     'starts_at': startsAt?.toUtc().toIso8601String(),
+    'binding_seed': ?bindingSeed,
   };
 
   static KeptTicket? fromJson(Map<String, Object?> j) {
@@ -625,6 +657,7 @@ final class KeptTicket {
       gameTitle: _str(j['game_title']) ?? '',
       fieldName: _str(j['field_name']) ?? '',
       startsAt: _time(j['starts_at']),
+      bindingSeed: _str(j['binding_seed']),
     );
   }
 

@@ -24,6 +24,7 @@ import '../checkin/declare_replicas_screen.dart' show NewReplicaDialog;
 import '../checkin/field_identity.dart';
 import '../checkin/my_replicas.dart';
 import '../l10n/strings.dart';
+import '../protocol/checkin_binding.dart';
 import '../ui/code_kind.dart';
 import '../ui/qr_painter.dart';
 import '../ui/widgets.dart';
@@ -1101,11 +1102,24 @@ class _SiteGameScreenState extends State<SiteGameScreen> {
     }
   }
 
-  /// Keeps the ticket an answer carries, before anything else.
-  Future<KeptTicket?> _keep(Registration r) async {
+  /// Keeps the ticket an answer carries, before anything else; then gives
+  /// the registration a new key of this phone's (TKB-1), kept with the
+  /// ticket once the site server took it. A site server that does not take
+  /// it (an older one, no network) leaves the ticket as it was: unbound.
+  Future<KeptTicket?> _keep(SiteApi api, Registration r) async {
+    final tickets = context.services.tickets;
     final t = KeptTicket.of(_site, r, fieldName: f.name);
-    if (t != null) await context.services.tickets.keep(t);
-    return t;
+    if (t == null) return null;
+    await tickets.keep(t);
+    try {
+      final key = await BindingKey.generate();
+      if (!await api.bind(r.id, key.publicKeyText)) return t;
+      final bound = t.withBinding(key.seedText);
+      await tickets.keep(bound);
+      return bound;
+    } on Exception {
+      return t;
+    }
   }
 
   Future<void> _register() async {
@@ -1114,7 +1128,7 @@ class _SiteGameScreenState extends State<SiteGameScreen> {
     final app = AppScope.read(context);
     await _run((api) async {
       final r = await api.register(f.id, g.id, form);
-      final t = await _keep(r);
+      final t = await _keep(api, r);
       await app.update((x) => x.displayName = form.displayName);
       if (!mounted) return;
       setState(() => (_reg = r, _ticket = t));
@@ -1153,7 +1167,7 @@ class _SiteGameScreenState extends State<SiteGameScreen> {
   Future<void> _newTicket() async {
     await _run((api) async {
       final r = await api.newTicket(_reg!.id);
-      final t = await _keep(r);
+      final t = await _keep(api, r);
       if (!mounted) return;
       setState(() => _ticket = t);
       if (t != null) await _showTicket(t);

@@ -30,6 +30,7 @@ import 'package:atalaia_app/controller/controller_sync.dart';
 import 'package:atalaia_app/controller/controller_sync_format.dart';
 import 'package:atalaia_app/ffi/bindings.dart';
 import 'package:atalaia_app/protocol/apd.dart';
+import 'package:atalaia_app/protocol/checkin_binding.dart';
 import 'package:atalaia_app/protocol/checkin_ticket.dart' as tkt;
 import 'package:atalaia_app/radio/rf_codec.dart';
 import 'package:crypto/crypto.dart';
@@ -1534,6 +1535,7 @@ void main() {
         'name': 'X',
         'at': appAt,
         'roster_name': 'Falcão',
+        'app_binding': 'unbound',
       });
       expect(row['ticket_scanned_by'], isNull);
       expect(logged.single, contains('staff to decide (app_checkin)'));
@@ -1651,6 +1653,208 @@ void main() {
       expect(
         (row['status'], row['confirmed'], row['apd_override']),
         ('checked_in', true, true),
+      );
+    });
+
+    test('the registering phone proves its key: bound or unbound for '
+        'staff, never a refusal; a challenge this controller did not give is '
+        '409 (TKB-1 to TKB-8)', () async {
+      site.gets['/api/v1/sync/schedule'] = scheduled();
+      site.gets['/api/v1/sync/claims'] = {
+        'sync_version': 1,
+        'claims': <Object?>[],
+      };
+      final c = client();
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      final made = api.handle(
+        'POST',
+        Uri.parse('/api/v1/schedule/$scheduledId/game'),
+        authorization: 'Bearer g',
+        body: '{}',
+      );
+      final gid = (made.body! as Map)['id']! as int;
+      final phone = await BindingKey.fromSeed(List.filled(32, 0x31));
+      final r = roster();
+      final falcaoEntry = (r['registrations']! as List).first as Map;
+      falcaoEntry['binding_key'] = phone.publicKeyText;
+      site.gets['/api/v1/sync/roster'] = r;
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(site.queries['/api/v1/sync/roster']!.last, contains('binding=1'));
+      final logged = <String>[];
+      checkin.audit = logged.add;
+      Future<ApiResponse> call(
+        String method,
+        String path,
+        String? token, [
+        Object? b,
+      ]) => api.handleAsync(
+        method,
+        Uri.parse(path),
+        authorization: token == null ? null : 'Bearer $token',
+        body: b == null ? '' : jsonEncode(b),
+      );
+      String b64(int seed) =>
+          base64Url.encode(List.filled(32, seed)).replaceAll('=', '');
+      const falcaoReg = '7a000000-0000-4000-8000-000000000001';
+      const pid = 'p-aaaaaaaaaaaa';
+      Future<String> challenge() async {
+        final a = await call('GET', '/api/v1/checkin/challenge', null);
+        expect(a.status, 200);
+        expect((a.body! as Map)['expires_in'], 300);
+        return (a.body! as Map)['challenge']! as String;
+      }
+
+      Future<ApiResponse> selfCheckin(int secret, Object? binding) =>
+          call('POST', '/api/v1/checkin', null, {
+            'game_id': gid,
+            'player_id': pid,
+            'player_secret': b64(secret),
+            'display_name': 'X',
+            'notice_version': 2,
+            'registration_id': falcaoReg,
+            'ticket': b64(9),
+            'binding': ?binding,
+          });
+      Future<Map<String, String>> prove(BindingKey key, int secret) async =>
+          key.prove(
+            challenge: await challenge(),
+            gameId: gid,
+            registrationId: falcaoReg,
+            playerId: pid,
+            playerSecret: List.filled(32, secret),
+          );
+      expect(
+        (await call('POST', '/api/v1/games/$gid/checkin/open', 'g', {})).status,
+        200,
+      );
+      // A copy of the ticket on another phone, with its own key: unbound.
+      final thief = await BindingKey.fromSeed(List.filled(32, 0x32));
+      var a = await selfCheckin(4, await prove(thief, 4));
+      expect((a.status, (a.body! as Map)['app_binding']), (201, 'unbound'));
+      expect(logged.single, contains('did not verify'));
+      // The phone that holds the identity proves the registering key: bound
+      // from then on.
+      a = await selfCheckin(4, await prove(phone, 4));
+      expect((a.status, (a.body! as Map)['app_binding']), (200, 'bound'));
+      final list = await call('GET', '/api/v1/games/$gid/checkins', 'g');
+      final rows = ((list.body! as Map)['checkins']! as List)
+          .cast<Map<String, Object?>>();
+      expect(
+        rows.firstWhere((x) => x['player_id'] == pid)['app_binding'],
+        'bound',
+      );
+      // A proof for another phone's secret does not bind; an older app (no
+      // proof) is unbound; a challenge from elsewhere is 409; a proof
+      // without a registration or of another shape is 400.
+      expect((await selfCheckin(4, await prove(phone, 5))).status, 200);
+      final other = Challenges(key: List.filled(32, 1)).issue();
+      a = await selfCheckin(4, {
+        'challenge': other,
+        'signature': (await prove(phone, 4))['signature'],
+      });
+      expect(a.status, 409);
+      expect('${(a.body! as Map)['detail']}', startsWith('binding_challenge'));
+      expect((await selfCheckin(4, {'challenge': other})).status, 400);
+      a = await call('POST', '/api/v1/checkin', null, {
+        'game_id': gid,
+        'player_id': 'p-zzzzzzzzzzzz',
+        'player_secret': b64(12),
+        'display_name': 'Y',
+        'notice_version': 2,
+        'binding': await prove(phone, 12),
+      });
+      expect(a.status, 400);
+    });
+
+    test('a decision shows whether the pending app check-in is bound, and a '
+        'discard forgets it (TKB-5)', () async {
+      site.gets['/api/v1/sync/schedule'] = scheduled();
+      site.gets['/api/v1/sync/claims'] = {
+        'sync_version': 1,
+        'claims': <Object?>[],
+      };
+      final c = client();
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      final made = api.handle(
+        'POST',
+        Uri.parse('/api/v1/schedule/$scheduledId/game'),
+        authorization: 'Bearer g',
+        body: '{}',
+      );
+      final gid = (made.body! as Map)['id']! as int;
+      final phone = await BindingKey.fromSeed(List.filled(32, 0x31));
+      final r = roster();
+      ((r['registrations']! as List).first as Map)['binding_key'] =
+          phone.publicKeyText;
+      site.gets['/api/v1/sync/roster'] = r;
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      Future<ApiResponse> call(
+        String method,
+        String path,
+        String? token, [
+        Object? b,
+      ]) => api.handleAsync(
+        method,
+        Uri.parse(path),
+        authorization: token == null ? null : 'Bearer $token',
+        body: b == null ? '' : jsonEncode(b),
+      );
+      String b64(int seed) =>
+          base64Url.encode(List.filled(32, seed)).replaceAll('=', '');
+      const falcaoReg = '7a000000-0000-4000-8000-000000000001';
+      expect(
+        (await call('POST', '/api/v1/games/$gid/checkin/open', 'g', {})).status,
+        200,
+      );
+      expect(
+        (await call('PUT', '/api/v1/checkin/settings', 'g', {
+          'confirm': 'staff',
+        })).status,
+        200,
+      );
+      final ch =
+          ((await call('GET', '/api/v1/checkin/challenge', null)).body!
+                  as Map)['challenge']!
+              as String;
+      var a = await call('POST', '/api/v1/checkin', null, {
+        'game_id': gid,
+        'player_id': 'p-aaaaaaaaaaaa',
+        'player_secret': b64(4),
+        'display_name': 'X',
+        'notice_version': 2,
+        'registration_id': falcaoReg,
+        'ticket': b64(9),
+        'binding': await phone.prove(
+          challenge: ch,
+          gameId: gid,
+          registrationId: falcaoReg,
+          playerId: 'p-aaaaaaaaaaaa',
+          playerSecret: List.filled(32, 4),
+        ),
+      });
+      expect(
+        ((a.body! as Map)['status'], (a.body! as Map)['app_binding']),
+        ('pending', 'bound'),
+      );
+      final falcao = tkt.ticketToText(
+        tkt.encodeTicket(
+          tkt.CheckinTicket(
+            registrationId: falcaoReg,
+            playerId: 'p-aaaaaaaaaaaa',
+            secret: Uint8List.fromList(List.filled(32, 9)),
+          ),
+        ),
+      );
+      final path = '/api/v1/games/$gid/checkins/ticket';
+      a = await call('POST', path, 'g', {'ticket': falcao});
+      expect(((a.body! as Map)['decision']! as Map)['app_binding'], 'bound');
+      a = await call('POST', path, 'g', {
+        'ticket': falcao,
+        'app_checkin': 'discard',
+      });
+      expect(
+        ((a.body! as Map)['discarded'], (a.body! as Map)['app_binding']),
+        (true, null),
       );
     });
 

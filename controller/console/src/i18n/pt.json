@@ -1004,6 +1004,12 @@
     "squad_n": "squad {n}",
     "no_squad": "sem squad",
     "registered_counts": "Inscrições: {expected} por chegar, {arrived} já chegaram · sem inscrição: {walkins}",
+    "app_binding": {
+      "bound": "telemóvel da inscrição",
+      "unbound": "telemóvel por provar",
+      "bound_long": "A app provou que é o telemóvel com que foi feita a inscrição neste jogo.",
+      "unbound_long": "A app não provou que é o telemóvel da inscrição: pode ser uma cópia do bilhete (ou uma app mais antiga, ou uma inscrição feita na web)."
+    },
     "registered_badge": "com inscrição",
     "arrived": "Chegou",
     "ticket_title": "Bilhete impresso",

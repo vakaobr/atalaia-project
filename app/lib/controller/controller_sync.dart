@@ -1097,8 +1097,11 @@ class ControllerSync {
       final gid = game['id']! as int, seed = game['game_seed']! as int;
       final Map<String, Object?>? roster;
       try {
+        // `binding=1` (TKB-2): the registering phones' keys; an older site
+        // server ignores it.
         roster = await _get(
-          '/api/v1/sync/roster?scheduled_game_id=${link['scheduled_game_id']}',
+          '/api/v1/sync/roster?scheduled_game_id=${link['scheduled_game_id']}'
+              '&binding=1',
           'roster',
         );
       } on SyncError catch (e) {

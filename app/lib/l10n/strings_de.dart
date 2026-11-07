@@ -588,6 +588,13 @@ const Map<String, String> deStrings = {
       'wartet auf eine Bestätigung der Orga. Das Ticket gehört zu '
       '"{roster_name}" auf der Liste des Spiels. Bestätige nur, wenn die '
       'Person vor dir die ist, die sich mit diesem Handy eingecheckt hat.',
+  'ticket.app_bound':
+      'Die App hat nachgewiesen, dass es das Handy ist, mit dem die Anmeldung '
+      'für dieses Spiel gemacht wurde.',
+  'ticket.app_unbound':
+      'Die App hat nicht nachgewiesen, dass es das Handy der Anmeldung ist: '
+      'es kann eine Kopie des Tickets sein (oder eine ältere App oder eine '
+      'Anmeldung im Web).',
   'ticket.app_checkin_confirm': 'Das ist die Person: App-Check-in bestätigen',
   'ticket.app_checkin_discard':
       'Nicht die Person: App-Check-in verwerfen und die Person mit dem Ticket '

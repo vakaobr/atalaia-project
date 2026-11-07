@@ -150,6 +150,9 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const Key('ticket-result')), findsNothing);
+    // An older controller says nothing about the registering phone.
+    expect(find.byKey(const Key('ticket-app-bound')), findsNothing);
+    expect(find.byKey(const Key('ticket-app-unbound')), findsNothing);
     await tester.tap(find.byKey(const Key('ticket-confirm-app')));
     await tester.pumpAndSettle();
     expect(field.ticketBodies.last['app_checkin'], 'confirm');
@@ -168,6 +171,25 @@ void main() {
       result(tester).text,
       s.t('ticket.already', {'name': 'Falcão do telemóvel'}),
     );
+  });
+
+  testWidgets('the decision says whether the app proved it is the '
+      'registering phone (TKB-5)', (tester) async {
+    final text = field.registerExpected('p-falcaofalcao', 'Falcão', _reg1);
+    appCheckin('p-falcaofalcao', 'Falcão do telemóvel', 'Falcão');
+    field.rows['p-falcaofalcao']!['app_binding'] = 'unbound';
+    final (_, s) = await open(tester, marshal);
+    await type(tester, text);
+    expect(find.byKey(const Key('ticket-app-unbound')), findsOneWidget);
+    expect(find.text(s.t('ticket.app_unbound')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('ticket-decision-cancel')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ticket-decision-cancel')));
+    await tester.pumpAndSettle();
+    field.rows['p-falcaofalcao']!['app_binding'] = 'bound';
+    await type(tester, text);
+    expect(find.byKey(const Key('ticket-app-bound')), findsOneWidget);
+    expect(find.text(s.t('ticket.app_bound')), findsOneWidget);
   });
 
   testWidgets('the marshal discards an app check-in for the ticket holder, '

@@ -5163,18 +5163,22 @@ class ConsoleBrowserTests(unittest.TestCase):
         ctrl.checkin.apply_roster(gid, {"registrations": regs})
         expect(page.get_by_test_id("checkin-row-p-gaiogaiogaio")).to_contain_text("por chegar")
         self.field.bundle.store.update_checkin(gid, "p-gaiogaiogaio", status="pending", display_name="Gaio do telemóvel",
-                                               app_checkin_at=now)
+                                               app_checkin_at=now, app_bound=0)
         page.get_by_test_id("ticket-input").fill(checkin_ticket.make(
             {"registration_id": regs[2]["registration_id"], "player_id": "p-gaiogaiogaio", "secret": raw2}))
         page.get_by_test_id("ticket-submit").click()
         decision = page.get_by_test_id("ticket-decision-app")
         expect(decision).to_contain_text("Gaio do telemóvel")
+        expect(decision.get_by_test_id("ticket-app-unbound")).to_contain_text("pode ser uma cópia do bilhete")
         expect(decision).to_contain_text('"Gaio"')
         self.assertEqual(self.field.bundle.store.checkin(gid, "p-gaiogaiogaio")["status"], "pending")
         decision.get_by_test_id("ticket-confirm-app").click()
         expect(page.get_by_test_id("toast")).to_contain_text("Gaio do telemóvel esperava por uma confirmação da organização")
         expect(page.get_by_test_id("checkin-row-p-gaiogaiogaio")).to_contain_text("com check-in")
         expect(page.get_by_test_id("ticket-decision-app")).to_have_count(0)
+        # The app did not prove the registering phone's key (TKB-5): the list says so too.
+        badge = page.get_by_test_id("checkin-row-p-gaiogaiogaio").get_by_test_id("checkin-app-binding")
+        expect(badge).to_contain_text("telemóvel por provar")
         self.check_in(gid, "Zé")
         expect(page.get_by_test_id("checkin-registered")).to_contain_text("3 já chegaram · sem inscrição: 1")
 

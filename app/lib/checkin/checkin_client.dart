@@ -18,6 +18,7 @@ import 'dart:typed_data';
 
 import '../chrono/replica.dart' show Replica;
 import '../protocol/apd.dart';
+import '../protocol/checkin_binding.dart' show challengeRe;
 import 'apd_fields.dart' show apdCountryOf;
 import 'field_route.dart';
 import 'field_trust.dart';
@@ -217,6 +218,11 @@ class CheckinException implements Exception {
   /// The controller's privacy notice is not the version the app showed (409
   /// `notice_version_changed`; an older controller's text said "privacy
   /// notice changed"): read the notice again, do not show a raw error.
+  /// The challenge of the registering phone's proof was too old or not this
+  /// controller's (a restart): fetch a new one and send again (TKB-3).
+  bool get challengeExpired =>
+      status == 409 && message.startsWith('binding_challenge_expired');
+
   bool get noticeChanged =>
       status == 409 &&
       (message.startsWith('notice_version_changed') ||
@@ -428,6 +434,17 @@ class CheckinClient {
 
   Future<FieldInfo> info() async => FieldInfo(await _call('GET', '/checkin'));
 
+  /// The controller's challenge for the registering phone's proof (TKB-3),
+  /// or null from a controller that has none (an older one: the check-in
+  /// then goes without a proof, unbound).
+  Future<String?> challenge() async {
+    final r = await http.send('GET', '/checkin/challenge');
+    if (r.status == 404 || r.status == 405) return null;
+    if (!r.ok) throw CheckinException(r.status, r.detail, const []);
+    final c = r.json['challenge'];
+    return c is String && challengeRe.hasMatch(c) ? c : null;
+  }
+
   Future<CheckinTicket> checkIn({
     required int gameId,
     required String playerId,
@@ -442,6 +459,7 @@ class CheckinClient {
     String? registrationId,
     String? registrationTicket,
     bool? sharePosition,
+    Map<String, String>? binding,
   }) async => CheckinTicket(
     await _call(
       'POST',
@@ -452,6 +470,8 @@ class CheckinClient {
         if (registrationId != null && registrationTicket != null) ...{
           'registration_id': registrationId,
           'ticket': registrationTicket,
+          // The registering phone's proof (TKB-3): only with a registration.
+          'binding': ?binding,
         },
         'game_id': gameId,
         'player_id': playerId,

@@ -1405,5 +1405,43 @@
         "expected": null
       }
     ]
+  },
+  "binding": {
+    "description": "The registering phone's proof (decisions TKB-1 to TKB-8; protocol/checkin.md, \"The registering phone\"). challenge_key and clock make the challenge: 8 bytes big-endian of the clock's seconds, 8 nonce bytes, then the first 16 bytes of HMAC-SHA256(challenge_key, \"atalaia checkin challenge v1\" | those 16 bytes), in base64url without padding. message is the UTF-8 text the seed's Ed25519 key signs (lines joined by a line feed); signature is that signature in base64url without padding. Both controllers must verify valid with public_key and refuse every case of invalid; the challenge is valid at clock + 0 and clock + ttl, not at clock + ttl + 1, and never under another key.",
+    "challenge_key": "1111111111111111111111111111111111111111111111111111111111111111",
+    "clock": 1000,
+    "nonce": "2222222222222222",
+    "ttl": 300,
+    "challenge": "AAAAAAAAA-giIiIiIiIiIrJdmn6NLzgp0TPZnwBd7JY",
+    "seed": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+    "public_key": "Kay64UG8yvCyLhqU000LxzYeUm0L/hLIl5S8kyKWbdc=",
+    "game_id": 4242,
+    "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+    "player_id": "p-abcdefgh2345",
+    "player_secret": "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU",
+    "message": "atalaia-checkin-binding-v1\nAAAAAAAAA-giIiIiIiIiIrJdmn6NLzgp0TPZnwBd7JY\n4242\n0192f3a4-0000-7000-8000-00000000b001\np-abcdefgh2345\nf849d67325facf04177bc663b2dc544051831c589ef581d412f2eba44834e77c",
+    "signature": "m5XT0g4PR0vR50NZ3n9mGe-yfmIxUJkd04w1YSVQSdOG3bfTHAJjKtxnZX8ebtKtw9Begv6-osuPsfsBj4LUCQ",
+    "invalid": [
+      {
+        "name": "another_key",
+        "public_key": "My6+jSfLcyOzpAHBwTtd1kvMwOEOzaHCtdEaA3eaheU="
+      },
+      {
+        "name": "another_game",
+        "game_id": 4243
+      },
+      {
+        "name": "another_player_secret",
+        "player_secret": "BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY"
+      },
+      {
+        "name": "another_challenge",
+        "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      },
+      {
+        "name": "flipped_signature",
+        "signature": "mpXT0g4PR0vR50NZ3n9mGe-yfmIxUJkd04w1YSVQSdOG3bfTHAJjKtxnZX8ebtKtw9Begv6-osuPsfsBj4LUCQ"
+      }
+    ]
   }
 }

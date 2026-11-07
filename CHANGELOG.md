@@ -14,6 +14,16 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+- **Check-in tickets: the registering phone (TKB-1 to TKB-8, follow-up to TKS-7).** When the app registers for a game
+  (or gets a new ticket) it gives the registration an Ed25519 key of that phone (`PUT /api/v1/me/registrations/{id}/binding`,
+  site server migration `0032_registration_binding`). The roster carries the public key to a controller that asks
+  (`&binding=1`), and at check-in the app signs the controller's challenge (`GET /api/v1/checkin/challenge`). Both
+  controllers verify it and show staff whether a self check-in is **bound** (the registering phone) or **unbound** (a copy
+  of the ticket, an older app, a registration made on the web): the marshal app's decision card, the console's list and
+  Printed ticket card (service worker v29), four languages. The staff confirmation is unchanged, and unbound check-ins
+  still go through: older apps, rosters and controllers keep working. Pi schema 23; shared vectors in
+  `protocol/vectors/checkin.json` (`binding`), `sync.json` and the controller contract.
+
 - **Check-in tickets (TKS-1 to TKS-6):** a staff ticket scan no longer confirms a pending check-in made in the
   player's app on its own. The marshal app and the GM console show the app's name and check-in time next to the
   ticket's name on the list, and the marshal confirms it or discards it for the ticket holder (the discarded app's

@@ -104,6 +104,11 @@ personal data erased with ``display_name``), ``app_checkin_at`` (when a player's
 ticket scan can tell staff about an app check-in they have not matched with a ticket yet) and ``token_gen`` (the
 player-token generation: tokens issued before staff discarded an app check-in stop working). A schema 21 file gets
 the columns empty (generation 0).
+
+Schema 23 (decisions TKB-1 to TKB-8) adds on ``checkins``: ``binding_key`` (the registering phone's Ed25519 public
+key the roster gave the registration, standard base64; no personal data) and ``app_bound`` (whether the app check-in
+on the row proved it: 1, 0, or NULL with no app check-in; erased with ``app_checkin_at``). A schema 22 file gets the
+columns empty: its app check-ins show as unbound.
 """
 
 from __future__ import annotations
@@ -123,7 +128,7 @@ from . import wallclock
 
 log = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 22
+SCHEMA_VERSION = 23
 TOKEN_AUDIT_DAYS = 365  # the access tokens' audit log (access_tokens.py)
 GAME_RESULTS_DAYS = 365  # team results (no player ids) outlive the game's own data by this long, from its end
 REMOTE_LOG_DAYS = 365  # the remote GM's log on the controller (decision S19-9)
@@ -540,6 +545,13 @@ CHECKIN_COLUMNS_V22 = (
     ("token_gen", "INTEGER NOT NULL DEFAULT 0"),  # player tokens of an older generation are refused
 )
 
+# Columns added to checkins in schema 23 (decisions TKB-1 to TKB-8): the registering phone's key from the roster, and
+# whether the app check-in proved it.
+CHECKIN_COLUMNS_V23 = (
+    ("binding_key", "TEXT"),                      # Ed25519 public key, standard base64 (NULL: the roster had none)
+    ("app_bound", "INTEGER"),                     # 1 the app check-in proved it, 0 it did not, NULL no app check-in
+)
+
 # Column added to chrono_readings in schema 16 (PKD-3): the class limit (J) the series was judged against, sent to the
 # site server so it can work out how far over a violation went.
 CHRONO_COLUMNS_V16 = (("limit_j", "REAL"),)
@@ -612,6 +624,10 @@ class Store:
                     self._db.execute(f"ALTER TABLE checkins ADD COLUMN {name} {decl}")
             have = {r["name"] for r in self._db.execute("PRAGMA table_info(checkins)").fetchall()}
             for name, decl in CHECKIN_COLUMNS_V22:
+                if name not in have:
+                    self._db.execute(f"ALTER TABLE checkins ADD COLUMN {name} {decl}")
+            have = {r["name"] for r in self._db.execute("PRAGMA table_info(checkins)").fetchall()}
+            for name, decl in CHECKIN_COLUMNS_V23:
                 if name not in have:
                     self._db.execute(f"ALTER TABLE checkins ADD COLUMN {name} {decl}")
             have = {r["name"] for r in self._db.execute("PRAGMA table_info(chrono_readings)").fetchall()}
@@ -1468,7 +1484,7 @@ class Store:
                       "erased_at", "registration_id", "ticket_sha256", "from_roster", "apd_id", "membership_expires",
                       "apd_override", "apd_verdict", "apd_verdict_on", "card_checked_by", "card_checked_at",
                       "position_share", "position_share_at", "position_share_notice", "ticket_scanned_by",
-                      "ticket_scanned_at", "roster_name", "app_checkin_at", "token_gen")
+                      "ticket_scanned_at", "roster_name", "app_checkin_at", "token_gen", "binding_key", "app_bound")
 
     @staticmethod
     def _checkin(row: sqlite3.Row) -> dict[str, Any]:
@@ -1811,7 +1827,7 @@ class Store:
                     "UPDATE checkins SET display_name = NULL, federation_number = NULL, "
                     "apd_id = NULL, membership_expires = NULL, apd_verdict = NULL, apd_verdict_on = NULL, "
                     "card_checked_by = NULL, card_checked_at = NULL, ticket_scanned_by = NULL, ticket_scanned_at = NULL, "
-                    "roster_name = NULL, app_checkin_at = NULL, team_preference = NULL, erased_at = ? WHERE game_id = ? AND erased_at IS NULL",
+                    "roster_name = NULL, app_checkin_at = NULL, app_bound = NULL, team_preference = NULL, erased_at = ? WHERE game_id = ? AND erased_at IS NULL",
                     (now, gid)).rowcount
                 declarations += self._exec("DELETE FROM declarations WHERE game_id = ?", (gid,)).rowcount
             idle = [r["player_id"] for r in self._exec(

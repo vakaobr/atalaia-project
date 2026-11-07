@@ -662,7 +662,7 @@ def check_roster(body: Any) -> dict[str, Any]:
     """GET /api/v1/sync/roster's answer: a scheduled game's live registrations, with what the check-in
     list needs and nothing more (ADR-P4-11): the player's id at the field, the display name, the team
     preference, the federation number only when the game asks for one, the ticket's SHA-256 and the
-    pre-declared replicas."""
+    pre-declared replicas; for a controller that asked (``?binding=1``, TKB-2) the registering phone's public key."""
     body = _answer_envelope(body, ("scheduled_game_id", "status", "federation", "registrations"), ("apd",))
     _uuid(body["scheduled_game_id"], "scheduled_game_id")
     rule = check_apd_rule(body.get("apd"), "apd")
@@ -678,7 +678,8 @@ def check_roster(body: Any) -> dict[str, Any]:
         path = f"registrations[{i}]"
         r = _obj(r, path)
         _keys(r, path, ("registration_id", "player_id", "display_name", "replicas"),
-              ("team_preference", "federation_number", "ticket_sha256", "apd_id", "membership_expires"))
+              ("team_preference", "federation_number", "ticket_sha256", "apd_id", "membership_expires",
+               "binding_key"))
         _uuid(r["registration_id"], f"{path}.registration_id")
         _text(r["player_id"], f"{path}.player_id", 14, pattern=PLAYER_ID)
         if r["registration_id"] in regs or r["player_id"] in players:
@@ -699,6 +700,9 @@ def check_roster(body: Any) -> dict[str, Any]:
         if (r.get("apd_id") is not None or r.get("membership_expires") is not None) and not asked:
             _fail("not_asked", f"{path}.apd_id")
         _text(r.setdefault("ticket_sha256", None), f"{path}.ticket_sha256", 64, null=True, pattern=SHA256_HEX)
+        # The registering phone's Ed25519 key (TKB-2), only for a controller that asked (``?binding=1``).
+        if r.setdefault("binding_key", None) is not None:
+            public_key_bytes(r["binding_key"], f"{path}.binding_key")
         for j, d in enumerate(_list(r["replicas"], f"{path}.replicas", MAX_DECLARATIONS)):
             check_declaration(d, f"{path}.replicas[{j}]")
             if d["declaration_id"] in decls:

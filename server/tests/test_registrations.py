@@ -355,6 +355,53 @@ class GameDaySyncTests(RegistrationCase):
         answer = await self.pull(f"/api/v1/sync/roster?scheduled_game_id={asked.id}")
         self.assertEqual(answer["registrations"][0]["federation_number"], "FPA-9")
 
+    async def test_the_registering_phone_s_key(self) -> None:
+        """TKB-1, TKB-2: the app gives a registration its phone's Ed25519 public key; the roster carries it only to a
+        controller that asks (``binding=1``: an older controller refuses unknown keys); cancelling clears it."""
+        from cryptography.hazmat.primitives import serialization  # noqa: PLC0415
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey  # noqa: PLC0415
+
+        def key() -> str:
+            raw = Ed25519PrivateKey.generate().public_key().public_bytes(serialization.Encoding.Raw,
+                                                                          serialization.PublicFormat.Raw)
+            return base64.b64encode(raw).decode("ascii")
+
+        game = await self.game(federation="off")
+        reg = await self.register(game, display_name="Falcão")
+        self.assertFalse(reg["has_binding"])
+        path = f"/api/v1/me/registrations/{reg['id']}/binding"
+        for bad in ("x" * 44, base64.b64encode(b"\x01" * 31).decode(), base64.urlsafe_b64encode(os.urandom(32)).decode()
+                    .replace("=", "")):
+            r = await self.client.put(path, json={"binding_key": bad}, headers=self.player)
+            self.assertEqual((r.status_code, r.json()["detail"]), (400, "binding_key_invalid"), bad)
+        r = await self.client.put(path, json={"binding_key": key(), "extra": 1}, headers=self.player)
+        self.assertEqual(r.status_code, 422)
+        first = key()
+        r = await self.client.put(path, json={"binding_key": first}, headers=self.player)
+        self.assertEqual((r.status_code, r.json()["has_binding"]), (200, True), r.text)
+        self.assertNotIn(first, r.text)  # the answer says it is set, it does not echo it
+        _, _, _ = await self.make_user("rui", password=PASSWORD)
+        rui = await self.auth("rui")
+        r = await self.client.put(path, json={"binding_key": key()}, headers=rui)
+        self.assertEqual(r.status_code, 404)  # another account's registration
+        plain = await self.pull(f"/api/v1/sync/roster?scheduled_game_id={game.id}")
+        self.assertNotIn("binding_key", plain["registrations"][0])
+        asked = await self.pull(f"/api/v1/sync/roster?scheduled_game_id={game.id}&binding=1")
+        sync_format.check_roster(json.loads(json.dumps(asked)))
+        self.assertEqual(asked["registrations"][0]["binding_key"], first)
+        # A new key replaces it (a new ticket on another phone of the same account); the audit names no key.
+        second = key()
+        await self.client.put(path, json={"binding_key": second}, headers=self.player)
+        asked = await self.pull(f"/api/v1/sync/roster?scheduled_game_id={game.id}&binding=1")
+        self.assertEqual(asked["registrations"][0]["binding_key"], second)
+        audit = await self.fetch("SELECT details FROM audit_log WHERE action = 'registration_binding'")
+        self.assertEqual(len(audit), 2)
+        self.assertNotIn(second, json.dumps([a["details"] for a in audit], default=str))
+        await self.client.delete(f"/api/v1/me/registrations/{reg['id']}", headers=self.player)
+        self.assertEqual((await self.fetch("SELECT binding_key FROM game_registrations"))[0]["binding_key"], None)
+        r = await self.client.put(path, json={"binding_key": key()}, headers=self.player)
+        self.assertEqual((r.status_code, r.json()["detail"]), (409, "not_registered"))
+
     async def test_a_game_made_from_the_schedule_and_its_outcomes(self) -> None:
         game = await self.game(starts=1, registration_closes_at=hour(0.5))
         first = await self.register(game, replicas=[{"type": "aeg", "class": "rifle"}])

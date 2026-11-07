@@ -869,6 +869,10 @@ class GameRegistration(Base):
     membership_expires: Mapped[Optional[date]] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="registered")
     ticket_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    # The registering phone's Ed25519 public key (migration 0032, decisions TKB-1 to TKB-8): standard base64, set by
+    # the player's app (``PUT /me/registrations/{id}/binding``) and sent in the roster to a controller that asks, so
+    # a self check-in can prove it comes from that phone. Not a secret; cleared with the ticket.
+    binding_key: Mapped[Optional[str]] = mapped_column(String(44))
     source: Mapped[str] = mapped_column(String(32), nullable=False, server_default="site")
     external_ref: Mapped[Optional[str]] = mapped_column(String(128))
     cancelled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

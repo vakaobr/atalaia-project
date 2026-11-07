@@ -1004,6 +1004,12 @@
     "squad_n": "squad {n}",
     "no_squad": "no squad",
     "registered_counts": "Registered: {expected} expected, {arrived} arrived · walk-ins: {walkins}",
+    "app_binding": {
+      "bound": "registering phone",
+      "unbound": "phone not proved",
+      "bound_long": "The app proved it is the phone that registered for this game.",
+      "unbound_long": "The app did not prove it is the phone that registered: it may be a copy of the ticket (or an older app, or a registration made on the web)."
+    },
     "registered_badge": "registered",
     "arrived": "Arrived",
     "ticket_title": "Printed ticket",

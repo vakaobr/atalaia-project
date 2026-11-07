@@ -474,6 +474,8 @@ const Map<String, String> zhTwStrings = {
   'ticket.recent': '剛剛收取',
   'ticket.app_checkin_title': '有一筆 App 報到在等這張票券',
   'ticket.app_checkin_body': '有人在 {time} 用 App 以「{app_name}」報到，正在等待工作人員確認。這張票券屬於遊戲名單上的「{roster_name}」。只有在你面前的人就是用那支手機報到的人時才確認。',
+  'ticket.app_bound': '這個 App 已證明它就是報名這場遊戲的手機。',
+  'ticket.app_unbound': '這個 App 沒有證明它是報名用的手機：可能是票券的副本（或是較舊的 App，或是在網站上報名）。',
   'ticket.app_checkin_confirm': '是同一個人：確認 App 報到',
   'ticket.app_checkin_discard': '不是：取消 App 報到，為持票人報到',
   'ticket.membership_title': '會員資格不符合',

@@ -995,6 +995,12 @@
     "squad_n": "第 {n} 小隊",
     "no_squad": "無小隊",
     "registered_counts": "已報名：預計 {expected} 人，已到 {arrived} 人 · 現場報名：{walkins} 人",
+    "app_binding": {
+      "bound": "報名用的手機",
+      "unbound": "手機未證明",
+      "bound_long": "這個 App 已證明它就是報名這場遊戲的手機。",
+      "unbound_long": "這個 App 沒有證明它是報名用的手機：可能是票券的副本（或是較舊的 App，或是在網站上報名）。"
+    },
     "registered_badge": "已報名",
     "arrived": "已到場",
     "ticket_title": "紙本票券",

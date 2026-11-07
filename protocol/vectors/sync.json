@@ -11403,6 +11403,47 @@
     }
    },
    {
+    "name": "roster_with_binding_keys",
+    "kind": "roster",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "status": "published",
+     "federation": "required",
+     "registrations": [
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+       "player_id": "p-abcdefgh2345",
+       "display_name": "Falcão",
+       "team_preference": "red",
+       "federation_number": "FPA-1234",
+       "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "replicas": [
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+         "type": "aeg",
+         "class": "rifle",
+         "make_model": "Tokyo Marui M4"
+        },
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+         "replica_id": "0192f3a4-0000-7000-8000-00000000d001",
+         "type": "sniper",
+         "class": "sniper"
+        }
+       ],
+       "binding_key": "Kay64UG8yvCyLhqU000LxzYeUm0L/hLIl5S8kyKWbdc="
+      },
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+       "player_id": "p-zzzzzzzzzzzz",
+       "display_name": "Coruja",
+       "replicas": []
+      }
+     ]
+    }
+   },
+   {
     "name": "claims",
     "kind": "claims",
     "body": {
@@ -16983,6 +17024,49 @@
     },
     "error": "bad_value",
     "path": "registrations[0].membership_expires"
+   },
+   {
+    "name": "roster_binding_key_not_a_key",
+    "kind": "roster",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "status": "published",
+     "federation": "required",
+     "registrations": [
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+       "player_id": "p-abcdefgh2345",
+       "display_name": "Falcão",
+       "team_preference": "red",
+       "federation_number": "FPA-1234",
+       "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "replicas": [
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+         "type": "aeg",
+         "class": "rifle",
+         "make_model": "Tokyo Marui M4"
+        },
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+         "replica_id": "0192f3a4-0000-7000-8000-00000000d001",
+         "type": "sniper",
+         "class": "sniper"
+        }
+       ],
+       "binding_key": "Kay64UG8yvCyLhqU000LxzYeUm0L_hLIl5S8kyKWbdc"
+      },
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+       "player_id": "p-zzzzzzzzzzzz",
+       "display_name": "Coruja",
+       "replicas": []
+      }
+     ]
+    },
+    "error": "bad_public_key",
+    "path": "registrations[0].binding_key"
    },
    {
     "name": "field_settings_country_lowercase",
