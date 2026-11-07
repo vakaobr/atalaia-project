@@ -90,7 +90,7 @@ hero:
     Pre-Alpha · Software der Phasen 1 und 2 fertig; echte Boards spielen auf dem Labortisch ganze
     Spiele mit dem Feld-Controller, mit Tastenfeld; Phase 3 in Software fertig, die iOS-App auf
     einem iPhone geprüft; der Site-Server aus Phase 4 läuft auf einem Testserver; Phase 5 in
-    Software gebaut · neueste Version v0.10.0 · noch nicht feldtauglich
+    Software gebaut · neueste Version v0.11.0 · noch nicht feldtauglich
   title: Die offene Plattform für <span class="nowrap">Force-on-Force</span>
   lead: >-
     Atalaia ist eine offene Plattform für die elektronischen Props von Airsoft, Paintball und
@@ -761,7 +761,7 @@ try:
       <a href="https://github.com/vakaobr/atalaia-project/releases/tag/v0.9.0">v0.9.0</a> (6.
       November 2026) ist das erste GitHub-Release mit der App: atalaia-app-0.9.0.apk, signiert mit
       dem Schlüssel des Projekts, sodass sich jedes Release über das vorherige installiert. Die
-      neueste, <a href="https://github.com/vakaobr/atalaia-project/releases/tag/v0.10.0">v0.10.0</a>
+      neueste, <a href="https://github.com/vakaobr/atalaia-project/releases/tag/v0.11.0">v0.11.0</a>
       (7. November 2026), installiert sich darüber und behält die Daten der App; ab v0.10.0 wird die
       APK ohne den Signaturschlüssel gebaut und in einem eigenen Schritt ohne Netzwerk signiert. Der
       SHA-256-Fingerabdruck des Zertifikats ist <code
@@ -790,13 +790,15 @@ roadmap:
     Hardware voraus: Die Phasen 1 bis 3 sind in Software fertig (echte Boards spielen auf dem
     Labortisch ganze Spiele, und die iOS-App hat ihre Checkliste auf einem iPhone bestanden); die
     Phasen 4 und 5 sind in Software gebaut. Die Gates warten auf gebaute Boxen, Feldtests, einen
-    echten Server und den Registry-Schlüssel des Projekts. Die neueste Version ist v0.10.0 (7.
-    November 2026): Korrekturen aus einem Review, die das Freigeben hängengebliebener Boxen, das
-    Failover und den Check-in mit Ticket härten, eine Release-APK, die ohne Netzwerk signiert wird,
-    und ein gehärtetes Field-Box-Image, das sich jetzt bauen lässt (noch auf keinem Board
-    eingebrannt). Boxen und Controller werden gemeinsam darauf aktualisiert. v0.9.0 (6. November
-    2026) brachte das Freigeben hängengebliebener Boxen (bisher ein Test auf dem Labortisch), die
-    WLAN-Regeln der Box und die erste Android-App, die mit dem Schlüssel des Projekts signiert ist.
+    echten Server und den Registry-Schlüssel des Projekts. Die neueste Version ist v0.11.0 (7.
+    November 2026): Beim Check-in beweist die App der Spielenden, dass sie das Handy ist, mit dem
+    angemeldet wurde, und das Team sieht, ob ein Check-in gebunden ist oder nicht; das Einbrennen des
+    gehärteten Field-Box-Images ist vorbereitet, und nach Entscheidung des Maintainers bekommt es
+    vorerst kein Board. Nichts muss gemeinsam aktualisiert werden. v0.10.0 (7. November 2026)
+    brachte Korrekturen aus einem Review, die das Freigeben hängengebliebener Boxen, das Failover und
+    den Check-in mit Ticket härten, und eine ohne Netzwerk signierte Release-APK; v0.9.0 (6. November
+    2026) das Freigeben hängengebliebener Boxen (bisher ein Test auf dem Labortisch) und die erste
+    Android-App, die mit dem Schlüssel des Projekts signiert ist.
   more: Die ganze Roadmap, mit dem Inhalt jeder Phase und ihrem Gate →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
   # hardware), in progress, designed (research, architecture and plan written; no code).
@@ -827,8 +829,8 @@ roadmap:
       Spiele, inzwischen mit Display, Tastenfeld und Tastern an losen Kabeln (Foto und Clip auf der
       Bauseite). Ein beendetes Spiel an der Box verlassen kam mit v0.9.0, noch nicht an einer echten
       Box ausprobiert. Ab v0.10.0 öffnet sich das Admin-Menü der Box während eines Spiels nur, wenn
-      das Spiel pausiert ist oder noch wartet, und das gehärtete Release-Image lässt sich bauen
-      (noch auf keinem Board eingebrannt). Es fehlt noch eine zusammengebaute Box.
+      das Spiel pausiert ist oder noch wartet, und das gehärtete Release-Image lässt sich bauen;
+      v0.11.0 bereitet sein Einbrennen vor, und vorerst bekommt es kein Board. Es fehlt noch eine zusammengebaute Box.
     done:
       - ESP32-Firmware der Field Box mit Presets auf dem Gerät, lauffähig in einem Emulator.
       - Der kleine Bildschirm der Box zeigt Haltebalken, Punkte und Haltezeit, in vier Sprachen.
@@ -853,13 +855,14 @@ roadmap:
       - "Eine Box, die in einem Spiel hängt, das endete, während sie aus war, verlässt es an der Box: * 3 Sekunden halten, die Admin-PIN eingeben, dann Spiel verlassen (oder @leave auf ihrer USB-Konsole). Sie behält Feld, WLAN und Modi. In v0.9.0 (6. November 2026); noch nicht an einer echten Box ausprobiert."
       - "Das Admin-Menü der Box öffnet sich während eines Feldspiels nur, wenn das Spiel keine Tasten von Spielenden annimmt: vor dem Start, während einer Pause oder 5 Minuten, nachdem der Controller des Spiels verstummt ist (eine Box, die in einem beendeten Spiel hängt). Um eine Box aus einem laufenden Spiel zu nehmen, das Spiel zuerst pausieren. In v0.10.0 (7. November 2026); nur Host-Tests."
       - "Das gehärtete Release-Image (Secure Boot v2, Flash-Verschlüsselung, NVS-Verschlüsselung, Anti-Rollback) lässt sich bauen, und die CI signiert es mit einem Wegwerf-Schlüssel. Auf kein Board ist etwas eingebrannt, und die veröffentlichten Images ändern sich nicht. In v0.10.0 (7. November 2026)."
+      - "Das Einbrennen des gehärteten Images ist als Skript festgehalten, das nur seinen Plan ausgibt, solange es nicht den Port des Boards und eine ausdrückliche Bestätigung für genau dieses Board bekommt; nur der gehärtete Build kann einen Secure-Boot-Schlüssel-Digest widerrufen, mit einer Anweisung, die mit dem Root-Release-Schlüssel des Projekts signiert ist; und ein Emulatortest spielt das Einbrennen mit Wegwerf-Schlüsseln durch. Nach Entscheidung des Maintainers vom 7. November 2026 bekommt vorerst kein Board, weder auf dem Labortisch noch im Feld, das gehärtete Image oder irgendein Einbrennen von eFuses; das normale und das Labortisch-Image bleiben unverändert. In v0.11.0 (7. November 2026)."
     next:
       - Eine gebaute Box, die ein zweistündiges Club-Spiel ohne Neustart durchhält.
       - "Die Zeitleiste an einem echten Display sehen."
       - "Das erneute Senden des Setups und Feld wechseln auf einem echten Board ausprobieren."
       - "Das Beacon einer Field Box mit einem echten Handy hören und das WLAN beim Spielbeitritt mit dem neuen Speicherbudget starten."
       - "Die neue Partitionstabelle auf einem echten Board flashen (einmal per USB, ohne Löschen, bei einer Box mit der alten)."
-      - "Das gehärtete Release-Image auf ein Board flashen: Es lässt sich ab v0.10.0 bauen, noch auf keinem Board eingebrannt."
+      - "Das gehärtete Release-Image auf einem Board: Es lässt sich ab v0.10.0 bauen, und sein Einbrennen ist ab v0.11.0 vorbereitet, aber nach Entscheidung des Maintainers vom 7. November 2026 bekommt es vorerst kein Board."
       - "Die I2C-Fehlerbehandlung auf einem Board mit schlecht angeschlossenem Tastenfeld ausprobieren, dazu den Startbildschirm und die neuen Bildschirme auf mehr als dem ersten Labortisch-Board."
       - "Spiel verlassen an einer echten Box ausprobieren."
     gate: >-
@@ -1003,6 +1006,7 @@ roadmap:
         - "Das Sicherheits-Review der App: Eine angeheftete Feld-CA ist genau ein Zertifikat, kein App-weites unverschlüsseltes HTTP auf Android (nur Loopback, der Host des Emulators, 192.168.4.1 und atalaia.local), eine Release-APK, die nie aus Versehen mit dem Debug-Schlüssel signiert wird, und ein Ticket der Social-Anmeldung, das an die App-Instanz gebunden ist. Auf einem echten Handy nicht ausprobiert; den Signaturschlüssel für Releases muss der Maintainer noch erzeugen."
         - "Die Ereignisliste und der Spielverlauf der Spielenden lassen Routine-Ereignisse ohne Text für Spielende weg (eine Box, die ihr Setup bestätigt, Nodes online oder offline, Tag-Scans, Treffer auf Ziele), statt rohe Typnamen zu zeigen."
         - "Der Scan eines gedruckten Tickets durch einen Marshal oder den GM bestätigt einen Check-in aus der App nicht mehr von selbst: Beide Namen werden angezeigt, und der Marshal bestätigt ihn oder verwirft ihn. In v0.10.0 (7. November 2026); noch nicht auf einem echten Handy ausprobiert."
+        - "Das Handy der Anmeldung weist sich beim Check-in aus: Wenn die App sich für ein Spiel anmeldet (oder ein neues Ticket anfordert), gibt sie der Anmeldung einen Schlüssel, der auf diesem Handy bleibt, und signiert beim Check-in die Challenge des Feld-Controllers. Marshals und GM sehen in der Marshal-App, in der Check-in-Liste der Konsole und auf ihrer Karte für gedruckte Tickets, ob ein Check-in aus der App gebunden ist (das Handy der Anmeldung) oder nicht (eine Kopie des Tickets, eine ältere App, eine Anmeldung im Web). Deswegen wird nichts abgelehnt, und ältere Apps, Listen und Controller funktionieren weiter. In v0.11.0 (7. November 2026); auf einem Computer getestet, noch nicht auf einem echten Handy."
     g_props:
       title: Android-Props und I/O-Pod
       items:
@@ -1302,7 +1306,7 @@ roadmap:
     short: >-
       Visueller Modus-Editor, signierte Modus-Pakete, die Modus-Registry als Vorlage, Deutsch und
       traditionelles Chinesisch, Bauanleitungen, das Ziel- und das Ausgangsmodul des
-      Erweiterungsanschlusses. Alle Software-Schritte sind gebaut. Die neueste Version, v0.10.0, ist
+      Erweiterungsanschlusses. Alle Software-Schritte sind gebaut. Die neueste Version, v0.11.0, ist
       mit dem Release-Schlüssel des Projekts signiert und enthält die Android-App, ohne ihren
       Schlüssel gebaut und in einem eigenen Schritt ohne Netzwerk mit dem Android-Schlüssel des
       Projekts signiert.

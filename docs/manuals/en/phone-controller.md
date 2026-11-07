@@ -148,6 +148,8 @@ The phone controller keeps its games, codes, the field's certificate authority a
 
 After that, every update installs in place. Never uninstall to update again: if Android ever refuses a release APK, stop and ask on the project's issues first.
 
+**v0.11.0: the app on its own.** Coming from v0.10.0, install the v0.11.0 APK when it suits you (it installs over v0.9.0 or later and keeps the app's data); the boxes and the modem do not have to change with it. From v0.11.0 the phone controller shows staff whether an app check-in came from the **registering phone** or the **phone not proved**, once the site server and the players' app are on v0.11.0 too ([marshal manual](marshal.md#printed-tickets-and-registered-players)). Coming from v0.9.0 or earlier, the v0.10.0 rule below still applies.
+
 **v0.10.0: the app, the boxes and the modem together.** From v0.10.0, **Release every box not in this game** names its channel, and a v0.9.0 box and a v0.10.0 controller, or the reverse, do not accept each other's. Install the v0.10.0 APK (it installs over v0.9.0 and keeps the app's data), update every Field Box to v0.10.0 the same day, and reflash the USB radio modem with the v0.10.0 image.
 
 **The radio.** A USB radio modem is updated over USB from a computer: [Set up the radio modem, Update the modem](modem.md#update-the-modem). An I/O pod: [Phone prop guide](phone-prop.md).

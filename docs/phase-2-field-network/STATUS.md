@@ -353,3 +353,9 @@ Findings from two real Heltec V4.3 boards and the Pi controller; the fixes are b
   - **The box's admin menu during a game** opens only while the game takes no keys from players (AMG-1 to AMG-5, phase 1).
 - **Update controllers and boxes together**: a v0.9.0 box refuses a v0.10.0 controller's RELEASE, and a v0.10.0 box refuses a v0.9.0 controller's. Until both are updated, **Leave the game** at the box, `@leave` and the GAME_OVER resend still free a stuck box. **The modem is reflashed over USB** with the v0.10.0 image ([modem guide](../manuals/en/modem.md)). The manuals, README and project page say so.
 - **Not done:** none of the v0.10.0 changes has been tried on the bench or a field yet; five boxes on a field (the phase 2 gate).
+
+## 2026-11-07: v0.11.0 released, with bound check-ins on the controllers
+
+- **[v0.11.0](https://github.com/vakaobr/atalaia-project/releases/tag/v0.11.0) is out** (GitHub pre-release, 2026-11-07; CHANGELOG.md 0.11.0). For the controllers: both verify the registering phone's signature at check-in and show staff whether a self check-in is **bound** or **unbound** (TKB-1 to TKB-8, phase 3): the GM console's check-in list and *Printed ticket* card (service worker v29), Pi schema 23. No radio change: the modem and the Field Box firmware are unchanged apart from the version.
+- **Nothing has to be updated together** from v0.10.0: older apps, rosters and controllers keep working, and their check-ins show as unbound. Coming from v0.9.0 or earlier, controllers and boxes still go to v0.10.0 or later together, with the modem reflashed over USB.
+- **Not done:** bound check-ins on a real Pi or phone controller; five boxes on a field (the phase 2 gate).

@@ -7,7 +7,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 These are the manuals for the people who **use** Atalaia on a field: players, organisers, marshals and the people who look after the boxes. They are not for developers. For the design, the protocol and the code, start at the [documentation index](../README.md).
 
-> **Pre-alpha.** The software for every role is built, but no real phone, box or controller has been used on a field yet. The manuals describe the screens and steps as the software shows them today. A step that depends on hardware says **Not yet tested on a field**. A feature names the release it comes in, for example **from v0.10.0** (the newest release, 2026-11-07); one that is not in a release yet says **not released yet**. When the software changes, the manuals change with it.
+> **Pre-alpha.** The software for every role is built, but no real phone, box or controller has been used on a field yet. The manuals describe the screens and steps as the software shows them today. A step that depends on hardware says **Not yet tested on a field**. A feature names the release it comes in, for example **from v0.11.0** (the newest release, 2026-11-07); one that is not in a release yet says **not released yet**. When the software changes, the manuals change with it.
 
 ## The manuals
 
