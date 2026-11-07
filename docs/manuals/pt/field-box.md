@@ -11,7 +11,7 @@ Para quem cuida das caixas num campo: ligá-las, pô-las num jogo e mantê-las v
 
 > **Ainda não está pronta para o campo.** A Atalaia está em pré-alfa. Placas Heltec V4.3 a sério já jogaram jogos inteiros numa bancada com o controlador de campo. Nenhuma caixa montada foi usada num campo. Cada passo abaixo corresponde ao que o firmware mostra hoje. Os passos que dependem de hardware dizem **Ainda não testado num campo**. As palavras em *itálico* estão no [glossário](https://atalaia-project.link/glossario/).
 
-> **Que firmware.** A versão publicada mais recente é a **v0.9.0** (2026-11-06). Algumas coisas abaixo precisam da **v0.9.0** ou seguinte, e di-lo onde aparecem: tirar uma caixa do jogo na própria caixa, o controlador libertar sozinho uma caixa nessa situação, nomes de Wi-Fi com espaços na consola USB e as regras de Wi-Fi da página de configuração.
+> **Que firmware.** A versão publicada mais recente é a **v0.10.0** (2026-11-07). Algumas coisas abaixo precisam da **v0.9.0** ou seguinte, e di-lo onde aparecem: tirar uma caixa do jogo na própria caixa, o controlador libertar sozinho uma caixa nessa situação, nomes de Wi-Fi com espaços na consola USB e as regras de Wi-Fi da página de configuração. **Para a v0.10.0, atualiza as caixas e o controlador ao mesmo tempo**, e grava de novo por USB o modem de rádio USB do controlador: uma caixa v0.9.0 e um controlador v0.10.0, ou o contrário, não aceitam o **Libertar todas as caixas que não estão neste jogo** um do outro ([12.2](#122-atualizar)).
 
 ## Índice
 
@@ -366,6 +366,8 @@ A organização atualiza o firmware de uma caixa pelo Wi-Fi do campo, entre jogo
 5. A caixa descarrega a imagem, volta a verificar a assinatura com as chaves incluídas no seu próprio firmware, instala-a e reinicia. Se a versão nova falhar o autoteste, a caixa volta sozinha à antiga.
 
 Não desligues a caixa durante uma atualização. Uma caixa que não está no jogo, ou um jogo que já começou, não recebe atualização.
+
+**v0.10.0: atualiza os controladores e as caixas ao mesmo tempo.** A partir da v0.10.0, **Libertar todas as caixas que não estão neste jogo** indica o canal: uma caixa v0.9.0 recusa a de um controlador v0.10.0, e uma caixa v0.10.0 recusa a de um controlador v0.9.0. Atualiza o controlador (Raspberry Pi ou telemóvel) e todas as caixas para a v0.10.0 no mesmo dia, e grava de novo o modem de rádio USB com a imagem da v0.10.0, por USB (não tem atualização pelo ar). Enquanto não estiverem os dois atualizados, uma caixa presa continua a sair do jogo com **Sair do jogo** na própria caixa, `@leave` na consola USB dela, ou o reenvio automático do controlador.
 
 ### 12.3 As chaves de versões depois da v0.8.0
 

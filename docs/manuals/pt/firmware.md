@@ -45,9 +45,11 @@ Há duas maneiras. Transfere uma versão publicada se só queres pôr na placa o
 
 ### 2.1 Transferir uma versão publicada (o caminho fácil)
 
-O projeto publica o firmware no GitHub: [a página de Releases](https://github.com/vakaobr/atalaia-project/releases). Escolhe a mais recente: a **v0.9.0**, de 2026-11-06 (antes dela a v0.8.0, de 2026-11-04, a v0.7.0, de 2026-11-03, e a v0.6.1, de 2026-11-02; a primeira foi a v0.4.0; a v0.6.0 não tem ficheiros, a compilação dela falhou). Cada uma está marcada como **pré-lançamento**: pré-alfa e **não testada num campo**. Lê primeiro as notas dela.
+O projeto publica o firmware no GitHub: [a página de Releases](https://github.com/vakaobr/atalaia-project/releases). Escolhe a mais recente: a **v0.10.0**, de 2026-11-07 (antes dela a v0.9.0, de 2026-11-06, a v0.8.0, de 2026-11-04, a v0.7.0, de 2026-11-03, e a v0.6.1, de 2026-11-02; a primeira foi a v0.4.0; a v0.6.0 não tem ficheiros, a compilação dela falhou). Cada uma está marcada como **pré-lançamento**: pré-alfa e **não testada num campo**. Lê primeiro as notas dela.
 
 **A v0.8.0 mudou as chaves de versões.** Está assinada com a chave da CI nova do projeto, em que as caixas na v0.6.1 ou anteriores não confiam. Grava essa caixa por USB, ou passa-a primeiro pela v0.7.0: [secção 7.1](#71-com-as-versões-publicadas-do-projeto). Algumas coisas deste guia precisam da v0.9.0 ou seguinte; dizem-no. O modem de rádio USB não se atualiza pelo ar: para o controlador libertar caixas que ficaram num jogo terminado, grava por USB a imagem do modem da v0.9.0 ([guia do modem](modem.md)).
+
+**v0.10.0: atualiza os controladores e as caixas ao mesmo tempo.** A partir da v0.10.0, **Libertar todas as caixas que não estão neste jogo** indica o canal: uma caixa v0.9.0 recusa a de um controlador v0.10.0, e uma caixa v0.10.0 recusa a de um controlador v0.9.0. Atualiza o controlador (Raspberry Pi ou telemóvel) e todas as caixas para a v0.10.0 no mesmo dia, e grava de novo o modem de rádio USB com a imagem da v0.10.0, por USB (não tem atualização pelo ar). Enquanto não estiverem os dois atualizados, uma caixa presa continua a sair do jogo com **Sair do jogo** na própria caixa, `@leave` na consola USB dela, ou o reenvio automático do controlador.
 
 Escolhe os ficheiros da tua placa:
 
@@ -93,7 +95,7 @@ python tools/docker_fw.py build
 
 No macOS e no Linux, usa `python3` se o `python` não for encontrado. A primeira compilação transfere as ferramentas de compilação e demora vários minutos (cerca de dez da primeira vez). Acaba com uma linha que nomeia o ficheiro `firmware/esp32/build/atalaia_esp32.bin`. Os outros ficheiros de que precisas estão na mesma pasta. Não precisas de os ler.
 
-Uma compilação feita a partir de um clone mostra uma versão como `0.9.0+12.g1a2b3c4` (ou `0.10.0-dev.12+g1a2b3c4` entre versões publicadas): o número da versão publicada, o número de alterações desde então e o identificador do código. Também aparece no ecrã pequeno da placa, no arranque. Guarda uma nota dela junto da caixa. Para obteres exatamente o firmware de uma versão publicada, faz checkout da etiqueta dela (`git checkout v0.9.0`) e compila aí: um checkout limpo de uma etiqueta diz apenas `0.9.0`.
+Uma compilação feita a partir de um clone mostra uma versão como `0.10.0+12.g1a2b3c4` (ou `0.11.0-dev.12+g1a2b3c4` entre versões publicadas): o número da versão publicada, o número de alterações desde então e o identificador do código. Também aparece no ecrã pequeno da placa, no arranque. Guarda uma nota dela junto da caixa. Para obteres exatamente o firmware de uma versão publicada, faz checkout da etiqueta dela (`git checkout v0.10.0`) e compila aí: um checkout limpo de uma etiqueta diz apenas `0.10.0`.
 
 **Chaves.** Uma compilação feita por ti confia, por omissão, nas duas chaves de versões e nas duas chaves de modos do projeto, tal como os ficheiros publicados, por isso um controlador teu aceita as versões assinadas do projeto. As tuas compilações não são assinadas pelo projeto: assina-as com uma chave tua e dá às caixas a metade pública dela (`--release-keys=`, [secção 7](#7-atualizações-pelo-ar-e-o-que-mais-usa-o-wi-fi-do-campo)).
 

@@ -22,6 +22,9 @@ val releaseSigningFound =
     listOf("storeFile" to "STORE_FILE", "storePassword" to "STORE_PASSWORD", "keyAlias" to "KEY_ALIAS",
         "keyPassword" to "KEY_PASSWORD").all { (p, e) -> releaseSetting(p, e) != null }
 val releaseDebugSigned = (project.findProperty("atalaia.release.debugSigned") as String?) == "true"
+// An unsigned release APK, to be signed afterwards by app/tool/sign_apk.sh in a
+// separate, offline step (release.yml): the key never enters the networked build.
+val releaseUnsigned = (project.findProperty("atalaia.release.unsigned") as String?) == "true"
 
 android {
     namespace = "org.atalaia.app"
@@ -99,8 +102,11 @@ android {
             // name). With no release keystore the build stops in
             // checkReleaseSigning below, unless -Patalaia.release.debugSigned=true
             // asks for a debug-signed build (CI smoke builds, a trial on a desk).
+            // -Patalaia.release.unsigned=true builds it unsigned on purpose, for
+            // app/tool/sign_apk.sh to sign offline (the release workflow does).
             signingConfig =
-                if (releaseSigningFound) signingConfigs.getByName("release")
+                if (releaseUnsigned) null
+                else if (releaseSigningFound) signingConfigs.getByName("release")
                 else if (releaseDebugSigned) signingConfigs.getByName("debug")
                 else null
         }
@@ -113,14 +119,16 @@ android {
 val checkReleaseSigning by tasks.registering {
     val found = releaseSigningFound
     val debugSigned = releaseDebugSigned
+    val unsigned = releaseUnsigned
     doFirst {
-        if (!found && !debugSigned) {
+        if (!found && !debugSigned && !unsigned) {
             throw GradleException(
                 "No release keystore: set ATALAIA_RELEASE_STORE_FILE, ATALAIA_RELEASE_STORE_PASSWORD, " +
                     "ATALAIA_RELEASE_KEY_ALIAS and ATALAIA_RELEASE_KEY_PASSWORD (environment) or " +
                     "atalaia.release.storeFile, .storePassword, .keyAlias and .keyPassword (Gradle " +
                     "properties). For a build that is not for distribution, pass " +
-                    "-Patalaia.release.debugSigned=true to sign it with the debug key on purpose. " +
+                    "-Patalaia.release.debugSigned=true to sign it with the debug key on purpose, or " +
+                    "-Patalaia.release.unsigned=true for an unsigned APK to sign afterwards. " +
                     "See app/README.md, \"Signing a release\"."
             )
         }

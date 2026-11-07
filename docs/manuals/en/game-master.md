@@ -9,7 +9,7 @@ For the people who run a field: setting it up once, running a game day from the 
 
 > **Not field-ready yet.** Atalaia is pre-alpha. The controller has played whole games with real boards on a bench, but no controller, box, phone or server has been used on a real field. Every step below matches what the software shows today. Steps that depend on hardware say **Not yet tested on a field**. Words in *italics* are in the [glossary](https://atalaia-project.link/en/glossary/).
 
-> **Versions.** The newest release is **v0.9.0** (6 November 2026). A feature marked **From v0.9.0** needs that release or a later one on the controller, the modem or the box, as the text says.
+> **Versions.** The newest release is **v0.10.0** (7 November 2026). A feature marked **From v0.9.0** needs that release or a later one on the controller, the modem or the box, as the text says. **For v0.10.0, update the controller and the boxes together**, and reflash the USB radio modem over USB: see [Update the boxes](#update-the-boxes).
 
 ## Contents
 
@@ -570,6 +570,8 @@ More help: the [controller guide](../../../controller/README.md), the project's 
 ### Update the boxes
 
 You update the boxes' firmware over the field's Wi-Fi, between games. Done on a bench with a real board; not yet tested on a field.
+
+**v0.10.0: update the controllers and the boxes together.** From v0.10.0, **Release every box not in this game** names its channel: a v0.9.0 box refuses a v0.10.0 controller's, and a v0.10.0 box refuses a v0.9.0 controller's. Update the controller (Raspberry Pi or phone) and every Field Box to v0.10.0 on the same day, and reflash the USB radio modem with the v0.10.0 image over USB (it has no update over the air). Until both are updated, a stuck box still leaves its game with **Leave the game** at the box, `@leave` on its USB console, or the controller's automatic resend.
 
 **Before the first update after v0.8.0: the release keys**
 
