@@ -74,12 +74,32 @@ def default_efuse() -> bytes:
     return binascii.unhexlify("".join(re.findall(r"'([0-9a-f]+)'", block[:block.index("))")])))
 
 
+def listening(port: int) -> bool:
+    """Whether a TCP socket listens on this port (Linux's /proc/net/tcp*; elsewhere a 3 s wait)."""
+    hexport = f":{port:04X}"
+    seen = False
+    for name in ("/proc/net/tcp", "/proc/net/tcp6"):
+        try:
+            lines = Path(name).read_text().splitlines()[1:]
+        except OSError:
+            continue
+        seen = True
+        for line in lines:
+            f = line.split()
+            if len(f) > 3 and f[1].endswith(hexport) and f[3] == "0A":
+                return True
+    if not seen:
+        time.sleep(3)
+        return True
+    return False
+
+
 class Qemu:
     """One emulator run on work/flash.bin and work/efuse.bin. The ESP32-S3's eFuse device is
     nvram.esp32c3.efuse in this QEMU: ESP-IDF 5.3's `idf.py qemu` names it nvram.esp32s3.efuse,
     which QEMU ignores with a warning, so its eFuses would not be kept in the file."""
 
-    def __init__(self, work: Path, download: bool, log: Optional[Path] = None):
+    def __init__(self, work: Path, download: bool, log: Optional[Path] = None, settle: float = 3.0):
         cmd = ["qemu-system-xtensa", "-nographic", "-M", "esp32s3",
                "-drive", f"file={work / 'flash.bin'},if=mtd,format=raw",
                "-drive", f"file={work / 'efuse.bin'},if=none,format=raw,id=efuse",
@@ -93,7 +113,17 @@ class Qemu:
         cmd += ["-monitor", "none"]
         self.log = log
         self.proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        time.sleep(3)
+        if download:
+            # The emulated ROM answers only some seconds after the socket listens; a fixed 3 s from
+            # the start was sometimes too short on a GitHub runner (every start then failed within
+            # seconds). Wait until the socket listens (read from /proc, never by connecting: the ROM
+            # takes the first session as esptool's), then a settle time, longer on each new start.
+            deadline = time.time() + 30
+            while time.time() < deadline and self.proc.poll() is None and not listening(PORT):
+                time.sleep(0.25)
+            time.sleep(settle)
+        else:
+            time.sleep(3)
 
     def text(self) -> bytes:
         return self.log.read_bytes() if self.log and self.log.exists() else b""
@@ -115,15 +145,22 @@ def esptool(*args: str, timeout: float = 120) -> subprocess.CompletedProcess:
 def download_mode(work: Path) -> tuple[Optional[Qemu], str]:
     """The emulator in download mode and the chip's MAC. The emulated ROM sometimes never answers
     the first esptool session after a start (and then no later one either), so a start whose first
-    read_mac fails is stopped and made again, up to 6 times."""
-    for _ in range(6):
-        q = Qemu(work, download=True)
+    read_mac fails is stopped and made again, up to 10 times, each after a longer settle. Locally the
+    sixth start answered in two runs in a row, at 13 s and at 28 s of settling, so the cause is not the
+    wait alone; each failed start prints what esptool said."""
+    said = ""
+    for attempt in range(10):
+        q = Qemu(work, download=True, settle=min(8.0 + 2.0 * attempt, 20.0))
         out = esptool("--connect-attempts", "3", "read_mac", timeout=60)
         found = re.findall(r"MAC:\s*([0-9a-f:]{17})", out.stdout)
         if found:
             return q, found[-1]
+        gone = q.proc.poll()
+        said = f"start {attempt + 1}: qemu {'exited ' + str(gone) if gone is not None else 'running'}; " + \
+            (out.stdout + out.stderr).strip()[-600:]
+        print(said, flush=True)
         q.stop()
-    return None, ""
+    return None, said
 
 
 def flash_with(work: Path, base: bytes, offset: int, room: int, image: Path) -> bytes:

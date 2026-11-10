@@ -16,6 +16,11 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ### Details
 
+- **The hardened image's emulator test is less flaky in CI.** `tools/hardened_qemu.py` failed in
+  `esp32-hardened-build` when the emulated ROM did not answer esptool (seen on main and on the v0.12.0 release pull
+  request). A start now waits until the emulator's socket listens, then settles 8 s or more (it was a fixed 3 s), the
+  emulator is started up to 10 times instead of 6, and each failed start prints what esptool said.
+
 - **Writing join cards and the field card with a Field Box's own reader (NFCW-1 to NFCW-10).** The bench has PN532
   readers now but no Android phone, so a box writes an NTAG213, NTAG215 or NTAG216 card itself, from a computer on its USB
   cable: `tools/nfc_write.py --port <port> "<the bytes the GM console shows>"` (a file with `--file`; a player tag's bare
