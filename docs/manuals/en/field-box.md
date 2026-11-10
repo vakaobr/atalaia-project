@@ -153,6 +153,8 @@ When it joins, the box tells the console what it has (buttons, NFC, outputs, mod
 
 With no game being played, hold the **join card** to the NFC reader. The box shows **JOINED GAME** *N*. A card made for another field is refused.
 
+The organisers write join cards and the field card with an Android phone. At the bench or in the workshop, a box can write them itself on its own NFC reader, from a computer on its USB cable, when it is not in a game: see [Writing a card with a box](game-master.md#write-cards-with-a-box). A box with release firmware asks for its admin PIN for that.
+
 The same words show in Portuguese, German or Traditional Chinese when the organisers set the **Box language** for the game.
 
 ### 6.3 A game with no controller (stand-alone)

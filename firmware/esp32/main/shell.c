@@ -47,6 +47,7 @@
 #include "mem_monitor.h"
 #include "node_runner.h"
 #include "outputs.h"
+#include "nfc_card.h"
 #include "outputs_admin.h"
 #include "preset_store.h"
 #include "preset_ui.h"
@@ -167,6 +168,18 @@ static uint8_t nfc_mem[888]; /* NTAG216 user memory */
 static uint8_t nfc_last_uid[10];
 static uint8_t nfc_last_uid_len;
 static uint32_t nfc_last_poll_ms;
+static bool nfc_on; /* the reader answered at boot */
+#if CONFIG_ATALAIA_SERIAL_JOIN
+/* The USB console's card writer (nfc_card.h): "@nfcappend" and "@nfcwrite" collect the bytes
+ * here, then the main loop waits up to NFC_CARD_WAIT_MS for a card (nfc_job_step). */
+typedef enum { NFC_JOB_NONE, NFC_JOB_WRITE, NFC_JOB_READ, NFC_JOB_READ_ALL } nfc_job_t;
+static uint8_t nfc_out[NFC_CARD_MAX];
+static size_t nfc_out_len;
+static nfc_job_t nfc_job;
+static uint32_t nfc_job_until;
+static uint32_t nfc_out_at; /* the last "@nfcappend": pieces older than 30 s are dropped */
+static bool nfc_command(const char *cmd);
+#endif
 /* The admin PIN (admin_pin.h): one check for the picker and adoption, its failure count in NVS. */
 static admin_pin_t admin_guard;
 /* The admin menu over a field game (decisions STUCK-20 to STUCK-33, AMG-1 to AMG-5): '*' held
@@ -403,6 +416,8 @@ static void serial_input_init(void)
                   "\"@setup <PIN>\", \"@leave <admin PIN>\", "
                   "\"@update <version> <release id> <admin PIN>\", \"@modes\", \"@forgetmodes\" "
                   "or \"@lobby\" on the console");
+    ESP_LOGI(TAG, "NFC card writer on: \"@nfcwrite <hex from page 4> <admin PIN>\" "
+                  "(\"@nfcappend <hex>\" first for a long one), \"@nfcread [all]\"");
 #endif
 #if CONFIG_ATALAIA_SB_REVOKE
     ESP_LOGI(TAG, "hardened build: \"@sbdigests\", \"@sbrevoke <digest> <signature> <admin PIN>\"");
@@ -539,6 +554,11 @@ static void serial_command(const char *cmd)
         ESP_LOGW(TAG, "hang: the game task stops now (bench test); restart the box afterwards");
         for (;;) vTaskDelay(portMAX_DELAY);
     }
+#endif
+#if CONFIG_ATALAIA_SERIAL_JOIN
+    /* "@nfcappend <hex>", "@nfcwrite <hex> [<admin PIN>]" and "@nfcread [all]": an NTAG card
+     * written or read with the box's own PN532 (nfc_card.h, tools/nfc_write.py). */
+    if (nfc_command(cmd)) return;
 #endif
     /* "@joinkey <hex>" and "@update <version> <id>" change what the box trusts or runs: a release
      * build wants the admin PIN as their last word, a bench build (serial keys) does not
@@ -1020,6 +1040,197 @@ static void adopt_log(void *user, const char *line)
     ESP_LOGI(TAG, "%s", line);
 }
 
+#if CONFIG_ATALAIA_SERIAL_JOIN
+/* The "ATALAIA-NFC {json}" line tools/nfc_write.py waits for: the end of one "@nfc..." command. */
+static void nfc_result_line(const char *op, const char *result, const nfc_card_info_t *info,
+                            const hal_nfc_tag_t *tag, const uint8_t *data, size_t len)
+{
+    printf("ATALAIA-NFC {\"op\":\"%s\",\"result\":\"%s\"", op, result);
+    if (info != NULL && info->kind != NFC_T2_UNKNOWN) {
+        printf(",\"tag\":\"%s\",\"user_pages\":%u", nfc_t2_kind_name(info->kind),
+               (unsigned)(info->last_user_page - NFC_CARD_FIRST_PAGE + 1));
+    }
+    if (tag != NULL) {
+        printf(",\"uid\":\"");
+        for (unsigned i = 0; i < tag->uid_len; i++) printf("%02x", tag->uid[i]);
+        printf("\"");
+    }
+    if (info != NULL && strcmp(op, "write") == 0) {
+        printf(",\"pages\":%u", info->pages_written);
+        if (info->failed_page != 0) printf(",\"page\":%u", info->failed_page);
+    }
+    if (data != NULL) {
+        printf(",\"bytes\":%u,\"hex\":\"", (unsigned)len);
+        for (size_t i = 0; i < len; i++) printf("%02x", data[i]);
+        printf("\"");
+    }
+    printf("}\n");
+    fflush(stdout);
+}
+
+static void nfc_job_clear(void)
+{
+    nfc_job = NFC_JOB_NONE;
+    memset(nfc_out, 0, sizeof(nfc_out)); /* a field card's bytes are the field's master secret */
+    nfc_out_len = 0;
+}
+
+static bool nfc_busy(void)
+{
+    return box_game_active(&box) || runner.running;
+}
+
+static bool nfc_command(const char *cmd)
+{
+    bool append = strncmp(cmd, "nfcappend ", 10) == 0 || strcmp(cmd, "nfcappend") == 0;
+    bool write = strncmp(cmd, "nfcwrite ", 9) == 0 || strcmp(cmd, "nfcwrite") == 0;
+    bool read = strcmp(cmd, "nfcread") == 0 || strcmp(cmd, "nfcread all") == 0;
+    if (!append && !write && !read) return false;
+    const char *op = read ? "read" : write ? "write" : "append";
+    if (nfc_job == NFC_JOB_NONE && nfc_out_len > 0 && now_ms() - nfc_out_at > 30000u) {
+        nfc_job_clear(); /* an earlier run's pieces, never written: not the start of this card */
+    }
+    if (nfc_job != NFC_JOB_NONE) {
+        ESP_LOGW(TAG, "nfc%s: refused, already waiting for a card", op);
+        nfc_result_line(op, "busy", NULL, NULL, NULL, 0);
+        return true;
+    }
+    /* A write changes a card: a release build wants the admin PIN as its last word, as
+     * "@joinkey" (decision SR-40); a bench build takes it without. */
+    static char line[SERIAL_CONSOLE_LINE_MAX];
+    snprintf(line, sizeof(line), "%s", cmd);
+    if (write) {
+        static char reply[120];
+        if (!admin_pin_gate_serial(&admin_guard, SERIAL_KEYS_ON, line, 1, reply, sizeof(reply))) {
+            ESP_LOGW(TAG, "nfcwrite: %s", reply);
+            nfc_job_clear();
+            nfc_result_line(op, "refused", NULL, NULL, NULL, 0);
+            return true;
+        }
+    }
+    if (nfc_busy()) {
+        ESP_LOGW(TAG, "nfc%s: refused, not in a game", op);
+        nfc_job_clear();
+        nfc_result_line(op, "refused", NULL, NULL, NULL, 0);
+        return true;
+    }
+    if (!nfc_on || hal.nfc->t2_write == NULL) {
+        ESP_LOGW(TAG, "nfc%s: no NFC reader (the PN532 did not answer at boot)", op);
+        nfc_job_clear();
+        nfc_result_line(op, "no_reader", NULL, NULL, NULL, 0);
+        return true;
+    }
+    if (read) {
+        nfc_job = line[7] != '\0' ? NFC_JOB_READ_ALL : NFC_JOB_READ;
+    } else {
+        const char *hex = line[write ? 8 : 9] != '\0' ? line + (write ? 9 : 10) : "";
+        if (hex[0] == '\0' || !nfc_card_hex_append(hex, nfc_out, &nfc_out_len, sizeof(nfc_out))) {
+            ESP_LOGW(TAG, "nfc%s: \"<hex digits, no spaces>\", %u bytes at most in all", op,
+                     (unsigned)sizeof(nfc_out));
+            nfc_job_clear();
+            nfc_result_line(op, "refused", NULL, NULL, NULL, 0);
+            return true;
+        }
+        nfc_out_at = now_ms();
+        if (append) {
+            ESP_LOGI(TAG, "nfcappend: %u bytes so far; \"@nfcwrite <the last ones>\" writes them",
+                     (unsigned)nfc_out_len);
+            nfc_result_line(op, "ok", NULL, NULL, NULL, 0);
+            return true;
+        }
+        nfc_job = NFC_JOB_WRITE;
+    }
+    nfc_job_until = now_ms() + NFC_CARD_WAIT_MS;
+    if (nfc_job == NFC_JOB_WRITE) {
+        ESP_LOGI(TAG,
+                 "nfcwrite: %u bytes (%u pages from page 4); hold an NTAG213/215/216 card on the "
+                 "box's reader (%u s)",
+                 (unsigned)nfc_out_len, (unsigned)((nfc_out_len + 3) / 4),
+                 (unsigned)(NFC_CARD_WAIT_MS / 1000));
+    } else {
+        ESP_LOGI(TAG, "nfcread: hold an NTAG213/215/216 card on the box's reader (%u s)",
+                 (unsigned)(NFC_CARD_WAIT_MS / 1000));
+    }
+    return true;
+}
+
+/* A card job of the USB console: true while one is waiting (poll_nfc then does nothing else, so a
+ * card held to be written is not taken as a join card first). */
+static bool nfc_job_step(uint32_t now)
+{
+    if (nfc_job == NFC_JOB_NONE) return false;
+    const char *op = nfc_job == NFC_JOB_WRITE ? "write" : "read";
+    if (nfc_busy()) {
+        ESP_LOGW(TAG, "nfc%s: cancelled, a game started", op);
+        nfc_job_clear();
+        nfc_result_line(op, "refused", NULL, NULL, NULL, 0);
+        return true;
+    }
+    if ((int32_t)(now - nfc_job_until) >= 0) {
+        ESP_LOGW(TAG, "nfc%s: no card within %u s", op, (unsigned)(NFC_CARD_WAIT_MS / 1000));
+        nfc_job_clear();
+        nfc_result_line(op, "timeout", NULL, NULL, NULL, 0);
+        return true;
+    }
+    if (now - nfc_last_poll_ms < 200u) return true;
+    nfc_last_poll_ms = now;
+    hal_nfc_tag_t tag;
+    if (!hal.nfc->poll(&tag)) return true;
+    /* The card stays on the reader afterwards: not a tap to read until it is taken away. */
+    memcpy(nfc_last_uid, tag.uid, sizeof(nfc_last_uid));
+    nfc_last_uid_len = tag.uid_len;
+    nfc_card_info_t info;
+    if (nfc_job == NFC_JOB_WRITE) {
+        nfc_card_result_t r = nfc_card_write(hal.nfc, nfc_out, nfc_out_len, &info);
+        if (r == NFC_CARD_OK) {
+            ESP_LOGI(TAG, "nfcwrite: %s, wrote %u pages (4 to %u) and read them back: ok",
+                     nfc_t2_kind_name(info.kind), info.pages_written, 3 + info.pages_written);
+        } else if (info.kind != NFC_T2_UNKNOWN) {
+            ESP_LOGW(TAG, "nfcwrite: %s: %s (%u bytes; %u user pages; %u pages written%s)",
+                     nfc_t2_kind_name(info.kind), nfc_card_result_name(r), (unsigned)nfc_out_len,
+                     (unsigned)(info.last_user_page - NFC_CARD_FIRST_PAGE + 1), info.pages_written,
+                     r == NFC_CARD_WRITE_FAILED || r == NFC_CARD_VERIFY_FAILED
+                         ? "; the card is not usable as it is: write it again"
+                         : "");
+        } else {
+            ESP_LOGW(TAG, "nfcwrite: %s", nfc_card_result_name(r));
+        }
+        nfc_result_line("write", nfc_card_result_code(r), &info, &tag, NULL, 0);
+    } else {
+        size_t got = 0;
+        nfc_card_result_t r = nfc_card_read(hal.nfc, nfc_mem, sizeof(nfc_mem),
+                                            nfc_job == NFC_JOB_READ_ALL, &got, &info);
+        if (r == NFC_CARD_OK) {
+            ESP_LOGI(TAG, "nfcread: %s, %u bytes from page 4", nfc_t2_kind_name(info.kind),
+                     (unsigned)got);
+            for (size_t off = 0; off < got; off += 16) {
+                char hex[16 * 3 + 1];
+                size_t n = got - off < 16 ? got - off : 16;
+                for (size_t i = 0; i < n; i++) {
+                    snprintf(hex + i * 3, 4, "%02x ", nfc_mem[off + i]);
+                }
+                hex[n * 3 - 1] = '\0';
+                ESP_LOGI(TAG, "nfcread: page %3u: %s", (unsigned)(NFC_CARD_FIRST_PAGE + off / 4),
+                         hex);
+            }
+        } else {
+            ESP_LOGW(TAG, "nfcread: %s", nfc_card_result_name(r));
+        }
+        nfc_result_line("read", nfc_card_result_code(r), &info, &tag,
+                        r == NFC_CARD_OK ? nfc_mem : NULL, got);
+        memset(nfc_mem, 0, sizeof(nfc_mem));
+    }
+    nfc_job_clear();
+    return true;
+}
+#else
+static bool nfc_job_step(uint32_t now)
+{
+    (void)now;
+    return false;
+}
+#endif
+
 /*
  * NFC, at most every 300 ms while a game runs (player tags, protocol/nfc-tag.md)
  * and every 500 ms otherwise (join cards). A card is read once per tap.
@@ -1029,6 +1240,7 @@ static void adopt_log(void *user, const char *line)
  */
 static void poll_nfc(uint32_t now)
 {
+    if (nfc_job_step(now)) return;
     bool playing = runner.running;
     if (now - nfc_last_poll_ms < (playing ? 300u : 500u)) return;
     if (!playing && box.phase == BOX_PLAYING) return;
@@ -1683,6 +1895,7 @@ static void hal_start(void)
     if (leds && CONFIG_ATALAIA_LED_PIN >= 0) hal_cap(ATALAIA_CAP_LED);
     if (speaker_fitted || hal.buzzer != NULL) hal_cap(ATALAIA_CAP_AUDIO);
     if (nfc) hal_cap(ATALAIA_CAP_NFC);
+    nfc_on = nfc;
     if (gauge) hal_cap(ATALAIA_CAP_BATTERY);
     if (hal.radio->init() != 0) {
         ESP_LOGW(TAG, "radio: not available (no SX1262)");

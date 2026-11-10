@@ -161,7 +161,8 @@ static void volume(void *ctx, uint8_t v)
 
 static const hal_button_ops_t button_ops = {ok_init, poll_buttons, no_deinit};
 static const hal_keypad_ops_t keypad_ops = {ok_init, scan_key, no_deinit};
-static const hal_nfc_ops_t nfc_ops = {ok_init, poll_nfc, read_mem, no_deinit};
+static const hal_nfc_ops_t nfc_ops = {
+    .init = ok_init, .poll = poll_nfc, .read_user_memory = read_mem, .deinit = no_deinit};
 static const hal_led_ops_t led_ops = {ok_init,  led_fill,           led_set,
                                       led_show, led_set_brightness, no_deinit};
 static hal_t hal;

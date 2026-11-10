@@ -159,7 +159,7 @@ On a channel with little airtime the sweeps of the earlier channels are rationed
 Each new box needs the field's key once. Open **Adopt**. Three ways:
 
 - **USB cable**: plug the box into the controller's USB with a data cable. Tap **Look for boxes**, check the box's name and MAC, tap **Adopt** and confirm.
-- **Field card**: tap **Make the field card**. Write the bytes on an NTAG215 or NTAG216 card. Tap the card once on each new box. **The card is the field's master secret.** Keep it locked away. If it is lost or copied, rotate the key (on a Pi: `join-key --rotate`), restart the controller, adopt every box again and destroy the old cards.
+- **Field card**: tap **Make the field card**. Write the bytes on an NTAG215 or NTAG216 card (with the app on an Android phone, or [with a box's own reader](#write-cards-with-a-box)). Tap the card once on each new box. **The card is the field's master secret.** Keep it locked away. If it is lost or copied, rotate the key (on a Pi: `join-key --rotate`), restart the controller, adopt every box again and destroy the old cards.
 - **Pair by code (radio)**: an unadopted box shows a 6-digit code. Tap **Look for boxes on the radio**, pick the box by its name (check the **id** on its screen if two share a name), type the code and tap **Pair**.
 
 A box that belongs to another field asks for its **admin PIN** first. See the [Field Box manual](field-box.md).
@@ -342,6 +342,16 @@ A box can answer **refused: in another game** ([A box is stuck in an ended game]
 2. Tap **Generate**. The console shows a **QR code**, a **Join text** (`atalaia:join:…`) and the bytes for an **NFC card (NTAG215/216)**.
 3. The box reads the card on its NFC reader; a phone prop scans the QR code under **Game prop › Join a game**. **This code and the card carry the game key**: show them only to the people setting up.
 
+<a id="write-cards-with-a-box"></a>
+**Writing a card with a box instead of a phone** (the bench or the workshop): an Android phone with the Atalaia app (or an NFC app that writes raw NDEF memory) is the normal way to write join cards, the field card and player tags. Without one, a Field Box with an NFC reader writes them itself, from a computer on its USB cable (firmware from v0.12.0):
+
+1. Connect the box by USB. It must not be in a game.
+2. Copy the card's bytes from the console (the **NFC card** bytes, the field card's bytes, or a player tag's **NDEF record (hex)**).
+3. Run `python3 tools/nfc_write.py --port <the box's port> "<the bytes>"` from the Atalaia repository (`--pin <admin PIN>` for a box with release firmware; the tool needs pyserial).
+4. Within 10 seconds, hold a blank NTAG213, NTAG215 or NTAG216 card on the box's reader. The tool says **write: ok** and how many pages it wrote. The box writes only the card's user memory, reads it all back, and refuses a card too small for the bytes or a locked card.
+
+`--read` reads a card back to check it. Take the card away afterwards: the box does not join with the card it just wrote.
+
 ### The check-in desk
 
 Check-in is open from the moment a game is created. **Close check-in** stops it and **Open check-in** reopens it. The desk works in the console's **Check-in** tab, with the GM code or a **Full GM** [day code](#access-codes-and-day-codes). Marshals can also check players in by hand, do the card check and take printed tickets in their app, with their own marshal check-in: no GM code or day code needed ([marshal manual](marshal.md#printed-tickets-and-registered-players)).
@@ -376,7 +386,7 @@ Check-in is open from the moment a game is created. **Close check-in** stops it 
 
 Kill Confirmed, Respawn and Lives, Player Check-in, Medic Kit and Money Factory need an NFC tag for each player. The controller signs every tag with the game's key, so a tag works only in the game it was made for: every new game needs new tags. Use blank NTAG213, NTAG215 or NTAG216 tags. Create the game first: an ended game has no key.
 
-- **In the console**: under **Check-in**, the **Players' tags** card. Pick the **Player's id** and the **Team** (or **No team**) and tap **Make the tag**. With Chrome on an Android phone (console over HTTPS), tap **Write it with this device's NFC** and hold a blank tag to the phone. Otherwise the console shows the **NDEF record (hex)** and **Download the NDEF file**, to write with the Atalaia app or an NFC app.
+- **In the console**: under **Check-in**, the **Players' tags** card. Pick the **Player's id** and the **Team** (or **No team**) and tap **Make the tag**. With Chrome on an Android phone (console over HTTPS), tap **Write it with this device's NFC** and hold a blank tag to the phone. Otherwise the console shows the **NDEF record (hex)** and **Download the NDEF file**, to write with the Atalaia app or an NFC app (or [with a box's own reader](#write-cards-with-a-box), at the bench).
 - **On a phone controller**: under **Players' tags**, tap **Write players' tags** while a game runs.
 - **A marshal** writes them in the marshal's app, on the field's Wi-Fi ([marshal manual](marshal.md)).
 

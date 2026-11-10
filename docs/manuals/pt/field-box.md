@@ -153,6 +153,8 @@ Quando entra, a caixa diz à consola o que tem (botões, NFC, saídas, módulos)
 
 Sem nenhum jogo a decorrer, encosta o **cartão de entrada** ao leitor NFC. A caixa mostra **Entrou:** *função*. Um cartão feito para outro campo é recusado.
 
+A organização escreve os cartões de entrada e o cartão de campo com um telemóvel Android. Na bancada ou na oficina, uma caixa pode escrevê-los ela própria no seu leitor NFC, a partir de um computador ligado pelo cabo USB, quando não está num jogo: vê [Escrever um cartão com uma caixa](game-master.md#write-cards-with-a-box). Uma caixa com firmware de lançamento pede para isso o PIN de administração.
+
 As mesmas palavras aparecem em inglês, alemão ou chinês tradicional quando a organização define a **Língua das caixas** para o jogo.
 
 ### 6.3 Um jogo sem controlador (autónomo)

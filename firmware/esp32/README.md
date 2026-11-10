@@ -624,7 +624,7 @@ Radio-specific Kconfig options (under "Atalaia Field Box Configuration > Radio")
 Field game options (under "Field network games"):
 - `ATALAIA_STATE_INTERVAL_S` -- seconds between STATE packets in a joined game (default 15)
 - `ATALAIA_BATTERY_LOW_PCT` -- send `battery.low` below this battery level (default 20; 0 = never; only with a MAX17048 gauge)
-- `ATALAIA_SERIAL_JOIN` -- accept `@join`, `@joinkey`, `@tag`, `@wifi`, `@update`, `@modes`, `@forgetmodes` and `@lobby` lines on the serial console (default on). `@joinkey` and `@update` take the admin PIN as their last word unless `ATALAIA_SERIAL_KEYS` is on (the bench and Wokwi builds). `@wifi <ssid> [<password>]` takes a name or password with spaces in double quotes, `\"` and `\\` inside (`@wifi "My Field" "pass word"`; decisions WIFI-1 to WIFI-9, `main/wifi_args.c`): the SSID 1-32 bytes, the password none, 8-63 characters or 64 hex digits
+- `ATALAIA_SERIAL_JOIN` -- accept `@join`, `@joinkey`, `@tag`, `@wifi`, `@update`, `@modes`, `@forgetmodes`, `@lobby`, `@nfcappend`, `@nfcwrite` and `@nfcread` lines on the serial console (default on). `@joinkey`, `@update` and `@nfcwrite` take the admin PIN as their last word unless `ATALAIA_SERIAL_KEYS` is on (the bench and Wokwi builds). `@wifi <ssid> [<password>]` takes a name or password with spaces in double quotes, `\"` and `\\` inside (`@wifi "My Field" "pass word"`; decisions WIFI-1 to WIFI-9, `main/wifi_args.c`): the SSID 1-32 bytes, the password none, 8-63 characters or 64 hex digits
 - `ATALAIA_SERIAL_ADOPT` -- accept `@adopt-info` and `@adopt` on the serial console: USB adoption by the field controller (default on; protocol/adoption.md)
 - `ATALAIA_CONSOLE_USB_INPUT` -- read the console input from the USB-C port (USB-Serial-JTAG, the Heltec V4's only USB) as well as UART0 (default on; off in the Wokwi build)
 - `ATALAIA_LED_BRIGHTNESS_PCT` -- LED ring brightness at boot (default 40%; under "LEDs")
@@ -1208,6 +1208,35 @@ without a reader (bring-up, Wokwi; `CONFIG_ATALAIA_SERIAL_JOIN`). Team
 buttons now also send `team_input.press` when they go down (Kill Confirmed
 and Respawn count presses).
 
+## Writing cards from the USB console
+
+A box writes an NTAG213/215/216 card with its own PN532: the bench's and the
+workshop's way to make a join card or the field card from the bytes the GM
+console shows, with no phone (`main/nfc_card.c`; an Android phone with the
+app stays the normal way). `tools/nfc_write.py --port <port> "<hex>"` sends
+them and waits for the answer; by hand, `@nfcwrite <hex from page 4, no spaces>
+[<admin PIN>]` (the PIN last in a release build, as `@joinkey`; a longer card
+first in `@nfcappend <hex>` pieces, since a console line holds 768
+characters; pieces left more than 30 s without a write are dropped) and `@nfcread [all]` (to the end of the NDEF message, or the whole
+user memory, as `nfcread: page N: ...` lines). Refused while a game is joined or
+played. The box then waits 10 s for a card (`NFC_CARD_WAIT_MS`; the main loop
+goes on, and a card held meanwhile is not taken as a join card), reads its size
+from the capability container (page 3 byte 2: `12h`, `3Eh`, `6Dh`) and
+GET_VERSION (byte 6: `0Fh`, `11h`, `13h`; the smaller when they disagree; a card
+neither names is refused), refuses bytes past the last user page (39, 129 or
+225: never the dynamic lock or configuration pages, never pages 0-3) and pages
+a static or dynamic lock bit covers, writes one page per WRITE (`A2h`, through
+InDataExchange), reads every page back and logs how many pages it wrote. Each
+command ends with one `ATALAIA-NFC {"op":"write","result":"ok","tag":"NTAG215",
+"user_pages":126,"uid":"04...","pages":24}` line (`result`: `ok`, `timeout`,
+`refused`, `busy`, `no_reader`, `no_card`, `unknown_tag`, `too_big`, `locked`,
+`write_failed`, `verify_failed`; a read adds `bytes` and `hex`), which the tool
+reads. The PN532's frames and commands are platform-free in `main/hal/pn532.c`
+(the ESP32's I2C in `hal_esp_nfc.c`), checked byte by byte against the PN532
+User Manual (UM0701-02) with a fake PN532 holding a fake NTAG in
+`test/test_pn532.c`; not yet run on a real reader ([BRING_UP.md](docs/BRING_UP.md)
+step 7).
+
 ## Phase 2: the radio and field games
 
 Implemented in plan phase C:
@@ -1236,7 +1265,7 @@ controller's game.
 
 - **Joining** -- `main/box_game.c`. A join payload
   ([protocol/join.md](../../protocol/join.md)) arrives on an NFC card (the
-  PN532 reads the NTAG215/216 user memory: `hal_esp_nfc.c`) or as a line on
+  PN532 reads the NTAG215/216 user memory: `hal/pn532.c`, `hal_esp_nfc.c`) or as a line on
   the serial console, `@join atalaia:join:...`. Its tag is checked with the
   **field join key**, which the box gets once, when the field adopts it (next
   item). The verified payload (game key included)
