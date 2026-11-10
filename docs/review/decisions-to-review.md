@@ -4603,3 +4603,14 @@ The bench has PN532 readers but no way to write a join card or the field card wi
 | SBT-2 | How to show the exact topic is used? | **A decoy retained score for another game, and a run without `--once` until `--timeout` that must print only this game's line.** | `--once` stops at whichever score the broker sends first; only a run that waits for everything catches an example that ignores `--game`. | open |
 | SBT-3 | How to check the retain flag, which the example does not print? | **A second subscriber, started after a first one saw the score, must get exactly this game's score and the decoy, each retained** (the MQF-1 pattern). | The example's subscription works the same way, so this checks what it receives. | open |
 | SBT-4 | How strict is the output check? | **The whole of stdout must equal the one line, and stderr must be empty.** | Extra lines, duplicates or noise now fail the test (confirmed with mutation runs). | open |
+
+## The hardened emulator test's first start answers (QDL-1 to QDL-4, 2026-11-10)
+
+Most of `tools/hardened_qemu.py`'s emulator starts never answered esptool (#146 retried around it). The cause is a race in the ESP32-S3 ROM's download-mode port polling that this QEMU turns into a livelock; the script now sends the first SYNC only while the emulated ROM is in UART0's turn, and the first start answers (15 of 15).
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| QDL-1 | Why did most emulator starts never answer? | **A race in the ROM's download-mode polling:** bytes that reach UART0 during another port's turn livelock its interrupt handler on UART0's next turn (`uart_buff_switch` enables the interrupt before storing `buff_uart_no`; QEMU retakes it before the store). | Shown with gdb on the ROM ELF, the UART0 registers and monitor reads; file hashes, the settle time and `server,wait` made no difference; `-icount` failed every time. | open |
+| QDL-2 | How is the first start made to answer? | **The script sends the first SYNC while QEMU is paused (`stop`/`cont` on a monitor socket) in UART0's turn** (`buff_uart_no` 0, UART0's interrupt enabled, another port had a turn first); then esptool connects as before. | Removes the race instead of retrying around it. | open |
+| QDL-3 | The serial socket's mode? | **`tcp::5555,server,wait`**: the script connects first and waits for the ROM's banner. | With `nowait` the banner went out before anyone connected, so readiness was a guess; esptool's later reconnects still work. | open |
+| QDL-4 | Keep the retries? | **At most 3 starts** (was 10 with growing settles), each failure printing why and QEMU's stderr. | A safety net only; no settle time is needed. | open |
