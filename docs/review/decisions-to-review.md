@@ -4592,3 +4592,14 @@ The bench has PN532 readers but no way to write a join card or the field card wi
 | NFCW-8 | Locks? | **Refused if the CC's write access is not 0 or a static or dynamic lock bit covers a page to write; every page read back.** | Fails before half-writing a card; the read-back catches what the lock map misses. | open |
 | NFCW-9 | The result format for the tool? | **One `ATALAIA-NFC {json}` line per command**, plus the human log lines. | Same pattern as `ATALAIA-ADOPT`. | open |
 | NFCW-10 | How do the docs present it? | **The bench and workshop way; an Android phone stays the normal way.** | No claims about what iPhones can write. | open |
+
+## The scoreboard example's retained score, tested for what it claims (SBT-1 to SBT-4, 2026-11-10)
+
+`controller/tests/test_scoreboard_example.py::test_prints_the_retained_score` compared only the last printed line and never checked the retain flag or the `--game` filter. It now does; the example and the controller are unchanged (no bug found), and five broken copies of the example each fail it.
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| SBT-1 | How to prove the example printed the *retained* score, not a live one? | **Stop the controller's MQTT bridge before running the example.** | With the publisher gone, the broker's retained message is the only way the score can arrive: deterministic, no timing guess. | open |
+| SBT-2 | How to show the exact topic is used? | **A decoy retained score for another game, and a run without `--once` until `--timeout` that must print only this game's line.** | `--once` stops at whichever score the broker sends first; only a run that waits for everything catches an example that ignores `--game`. | open |
+| SBT-3 | How to check the retain flag, which the example does not print? | **A second subscriber, started after a first one saw the score, must get exactly this game's score and the decoy, each retained** (the MQF-1 pattern). | The example's subscription works the same way, so this checks what it receives. | open |
+| SBT-4 | How strict is the output check? | **The whole of stdout must equal the one line, and stderr must be empty.** | Extra lines, duplicates or noise now fail the test (confirmed with mutation runs). | open |
