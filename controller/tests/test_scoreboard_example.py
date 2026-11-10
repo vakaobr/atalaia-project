@@ -12,16 +12,18 @@ it, and must print them.
 from __future__ import annotations
 
 import importlib.util
+import json
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 
 from support import MOSQUITTO, FakeModem, Listener, Mosquitto, config, wait_for
 from atalaia_controller.engine import Controller
-from atalaia_controller.mqtt import MqttBridge
+from atalaia_controller.mqtt import MqttBridge, _client
 from atalaia_controller.store import Store
 from atalaia_sim import codec
 
@@ -79,19 +81,47 @@ class ExampleAgainstBrokerTests(unittest.TestCase):
 
     def test_prints_the_retained_score(self):
         self.ctrl.adjust_score(self.gid, "red", 10, "bonus")
-        # bridge.published counts every publish queued in paho (the game start's events too), not what
-        # the broker holds. A subscriber seeing red 10 at all (live or retained, MQTT 3.1.1 section
-        # 3.3.1.3) proves the broker holds it; the example, started after that, gets it retained.
         topic = f"field/v1/{self.gid}/score"
+        # A decoy: another game's retained score on the same broker. The example asked for this game
+        # alone must print this game's score and never the other one (its topic filter, decision SBT-2).
+        other = f"field/v1/{self.gid + 1}/score"
+        pub = _client("decoy-test")
+        pub.connect("127.0.0.1", self.broker.port)
+        pub.loop_start()
+        try:
+            pub.publish(other, json.dumps({"teams": {"green": 99}}), qos=1, retain=True).wait_for_publish(5)
+        finally:
+            pub.loop_stop()
+            pub.disconnect()
+        # wait_for on the bridge's publish counter proves nothing about the broker (decision MQF-1). A first
+        # subscriber seeing red 10 at all (live or retained, MQTT 3.1.1 section 3.3.1.3) proves the broker
+        # holds it; a second one, subscribing after that, must get exactly it, on this topic, retained.
         first = Listener(self.broker.port, topic)
         try:
             self.assertTrue(wait_for(lambda: {"red": 10, "blue": 0} in [m["teams"] for m in first.topic(topic)], 5),
                             first.messages)
         finally:
             first.close()
+        held = Listener(self.broker.port, "field/v1/+/score")
+        try:
+            self.assertTrue(wait_for(lambda: len(held.messages) >= 2, 5), held.messages)
+            time.sleep(0.2)  # nothing else may follow
+            self.assertCountEqual([(t, m["teams"], r) for t, m, r in held.messages],
+                                  [(topic, {"red": 10, "blue": 0}, True), (other, {"green": 99}, True)])
+        finally:
+            held.close()
+        # The bridge goes away: the broker's retained message is now the only way the score can reach the
+        # example, so the line it prints is the retained score and nothing published live (SBT-1).
+        self.bridge.stop()
         out = self.run_example("--once", "--timeout", "10", "--game", str(self.gid))
         self.assertEqual(out.returncode, 0, out.stderr)
-        self.assertEqual(out.stdout.strip().splitlines()[-1], f"game {self.gid}: red 10 · blue 0")
+        self.assertEqual(out.stderr, "")
+        self.assertEqual(out.stdout, f"game {self.gid}: red 10 · blue 0\n")
+        # Without --once it follows the game until --timeout: still that line alone, never the other game's
+        # retained score (--once alone stops at the first score, whichever game the broker sends first).
+        out = self.run_example("--timeout", "3", "--game", str(self.gid))
+        self.assertEqual(out.stdout, f"game {self.gid}: red 10 · blue 0\n")
+        self.assertEqual((out.returncode, out.stderr), (1, "scoreboard: no score arrived in time\n"))
 
     def test_follows_events_and_score_changes(self):
         proc = subprocess.Popen([sys.executable, str(EXAMPLE), "--host", "127.0.0.1", "--port",
