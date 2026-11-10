@@ -12,8 +12,9 @@ CONTRIBUTING.md, "Pull request titles and commit messages"); optional hand-writt
 `## [Unreleased]` and move into the next release's section as "Details". The sections up to 0.5.0
 were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.12.0](https://github.com/vakaobr/atalaia-project/compare/v0.11.0...v0.12.0) (2026-11-10)
+## [Unreleased]
 
+## [0.12.0](https://github.com/vakaobr/atalaia-project/compare/v0.11.0...v0.12.0) (2026-11-10)
 
 ### Features
 
@@ -29,9 +30,9 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 * v0.11.0 is released: README, manuals, STATUS and the project page ([#142](https://github.com/vakaobr/atalaia-project/issues/142)) ([f327b81](https://github.com/vakaobr/atalaia-project/commit/f327b81910a810387d62e83b94c4f0ab2f525298))
 
-## [Unreleased]
-
 ### Details
+
+#### Details
 
 - **The hardened image's emulator test is less flaky in CI.** `tools/hardened_qemu.py` failed in
   `esp32-hardened-build` when the emulated ROM did not answer esptool (seen on main and on the v0.12.0 release pull
