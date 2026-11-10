@@ -14,7 +14,25 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/vakaobr/atalaia-project/compare/v0.11.0...v0.12.0) (2026-11-10)
+
+### Features
+
+* **firmware:** write NTAG cards from a box's own PN532 over the USB console; host-test the PN532 framing ([#145](https://github.com/vakaobr/atalaia-project/issues/145)) ([d873e42](https://github.com/vakaobr/atalaia-project/commit/d873e42149b5344c3a059218161187c354bb1c08))
+
+
+### Bug Fixes
+
+* **firmware:** the hardened emulator test waits for the emulator's socket and retries longer ([#146](https://github.com/vakaobr/atalaia-project/issues/146)) ([6ddb123](https://github.com/vakaobr/atalaia-project/commit/6ddb123ea00aea26e2d54234c321ce4b9bb0f19e))
+
+
+### Documentation
+
+* v0.11.0 is released: README, manuals, STATUS and the project page ([#142](https://github.com/vakaobr/atalaia-project/issues/142)) ([f327b81](https://github.com/vakaobr/atalaia-project/commit/f327b81910a810387d62e83b94c4f0ab2f525298))
+
 ### Details
+
+#### Details
 
 - **The hardened image's emulator test is less flaky in CI.** `tools/hardened_qemu.py` failed in
   `esp32-hardened-build` when the emulated ROM did not answer esptool (seen on main and on the v0.12.0 release pull
