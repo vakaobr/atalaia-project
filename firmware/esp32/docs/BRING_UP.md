@@ -244,10 +244,33 @@ firmware no longer reads a button there.
 
 1. Verify the PN532 is in I2C mode (DIP switches); the log shows
    `PN532 NFC reader at 0x24`, not `not found`.
-2. Write a join card: in the GM console's *Join* tab, make a payload for
-   this box and write its NFC bytes to an NTAG215 or NTAG216 card (any NFC
-   writer that can write raw NDEF memory; the console shows the bytes for
-   page 4 onwards). The box needs the field join key first: adopt it (step
+2. Write a join card with this box's own reader (no phone needed; an
+   Android phone with the app, or any NFC writer that can write raw NDEF
+   memory, stays the normal way). In the GM console's *Join* tab, make a
+   payload for this box and copy its NFC bytes (the console shows the bytes
+   for page 4 onwards), then, with the board on USB and no game joined:
+
+   ```sh
+   python3 tools/nfc_write.py --port /dev/ttyACM0 "<the bytes the console shows>"
+   ```
+
+   (`--file card.txt` takes the bytes from a file; a release build wants
+   `--pin <admin PIN>`; `--dry-run` prints the console lines without a
+   port.) Hold an NTAG213, NTAG215 or NTAG216 card on the reader within
+   10 s: the log shows `nfcwrite: NTAG215, wrote N pages (4 to M) and read
+   them back: ok` and the tool `write: ok`. The box writes user memory only
+   (from page 4 to page 39, 129 or 225 by the card's size, read from its
+   capability container and GET_VERSION), never the lock, CC or
+   configuration pages; bytes too long for the card are refused before any
+   page is written (`too_big`), and a locked card is refused (`locked`).
+   `python3 tools/nfc_write.py --port ... --read` (`--all` for the whole
+   user memory) dumps the card back, page by page. The same way writes the
+   field card from the console's *Adopt* tab, "Make the field card". Typed
+   by hand, the console lines are `@nfcwrite <hex, no spaces> [<admin
+   PIN>]` (a line holds 768 characters: a longer card goes first in
+   `@nfcappend <hex>` pieces) and `@nfcread [all]`. The card stays on the
+   reader afterwards without being read as a join card; take it away
+   before step 3. The box needs the field join key first: adopt it (step
    10a), by cable or with a field card, which this reader takes too.
 3. With no game being played, hold the card on the reader: the log shows
    `join card: joined` and the screen `JOINED GAME <id>`. A card made with
@@ -257,13 +280,19 @@ firmware no longer reads a button there.
 5. Player tags (phase 3, [protocol/nfc-tag.md](../../../protocol/nfc-tag.md)):
    during a game the box polls the reader every 300 ms. Check that a
    game's buttons still respond at once while no card is near (the PN532
-   is set to one activation attempt per poll; if the log warned
+   is set to two activation attempts per poll; if the log warned
    `configuration not acknowledged`, polls block for 100 ms each), and that
    any card held during a Kill Confirmed game logs `field: tag {"uid":...}`.
 6. If no response, check the reader's 3V3 supply and I2C address (0x24). The PN532 code
    (command, ACK, response; SAMConfiguration and RFConfiguration at init;
-   NTAG READ through InDataExchange) has not run on a real reader before
-   this step.
+   NTAG READ, WRITE and GET_VERSION through InDataExchange and
+   InCommunicateThru) has not run on a real reader before this step; its
+   frames are checked byte by byte against the PN532 User Manual by the
+   host tests (`test/test_pn532.c`, a fake PN532 holding a fake NTAG), so
+   a failure here points at the wiring, the DIP switches, the timing or a
+   chip that does not behave as the manual says. If GET_VERSION is not
+   answered (`InCommunicateThru`), the writer polls the card again and
+   goes by its capability container alone.
 
 ## Step 8: Audio
 

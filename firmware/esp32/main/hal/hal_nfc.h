@@ -25,6 +25,15 @@ typedef struct {
      * read, or -1 if no tag answers. Used for join cards (protocol/join.md).
      */
     int (*read_user_memory)(uint8_t *buf, size_t cap);
+    /*
+     * The NFC Forum Type 2 tag commands on the tag the last successful poll found, for the USB
+     * console's card writer (nfc_card.h): READ (16 bytes: 4 pages from page), WRITE (one 4-byte
+     * page) and GET_VERSION (8 bytes). 0 on success, -1 or less otherwise. NULL without a reader
+     * that can (the host stub).
+     */
+    int (*t2_read)(uint8_t page, uint8_t out[16]);
+    int (*t2_write)(uint8_t page, const uint8_t data[4]);
+    int (*t2_get_version)(uint8_t out[8]);
     void (*deinit)(void);
 } hal_nfc_ops_t;
 

@@ -14,6 +14,24 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Details
+
+- **Writing join cards and the field card with a Field Box's own reader (NFCW-1 to NFCW-10).** The bench has PN532
+  readers now but no Android phone, so a box writes an NTAG213, NTAG215 or NTAG216 card itself, from a computer on its USB
+  cable: `tools/nfc_write.py --port <port> "<the bytes the GM console shows>"` (a file with `--file`; a player tag's bare
+  NDEF record is put in its TLV; `--read [--all]` dumps a card; `--selftest` opens no port) types `@nfcwrite <hex>`
+  (`@nfcappend <hex>` pieces first for a long card; the admin PIN last in a release build, as `@joinkey`) and waits for
+  the box's `ATALAIA-NFC {json}` answer. Refused while a game is joined or played; the box waits 10 s for a card, reads
+  its size from the capability container and GET_VERSION, writes user memory only (pages 4-39, 4-129 or 4-225, never
+  the lock, CC or configuration pages, nothing on a locked page), reads every page back and logs how many pages it
+  wrote; `@nfcread [all]` dumps a card. An Android phone stays the normal way (manuals: game master, Field Box). The
+  PN532's frames and commands moved from `hal_esp_nfc.c` into the platform-free `main/hal/pn532.c` and are checked byte
+  by byte against the PN532 User Manual (UM0701-02) with a fake PN532 holding a fake NTAG (`test/test_pn532.c`). The
+  test found no framing error; the driver now also refuses a response whose code is not the command's + 1 and a poll
+  answer whose UID is cut short (before, such a card read as a tag with an empty UID), and the comment that called
+  RFConfiguration's `MxRtyPassiveActivation 1` "one attempt" was wrong: it is one retry, two attempts (the byte is
+  unchanged). Still not run on a real PN532 (BRING_UP.md step 7).
+
 - **The scoreboard example's retained-score test checks what it claims** (decisions SBT-1 to SBT-4;
   `controller/tests/test_scoreboard_example.py` `test_prints_the_retained_score`): it checked only the last line the
   example printed, after a subscriber had seen the score at all. It now checks, with a second subscriber, that the

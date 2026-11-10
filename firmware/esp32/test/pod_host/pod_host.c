@@ -261,7 +261,8 @@ static void hw_volume(void *ctx, uint8_t pct)
 
 static const hal_button_ops_t button_ops = {ok_init, hw_buttons, no_deinit};
 static const hal_keypad_ops_t keypad_ops = {ok_init, hw_key, no_deinit};
-static const hal_nfc_ops_t nfc_ops = {ok_init, hw_nfc, hw_mem, no_deinit};
+static const hal_nfc_ops_t nfc_ops = {
+    .init = ok_init, .poll = hw_nfc, .read_user_memory = hw_mem, .deinit = no_deinit};
 static const hal_led_ops_t led_ops = {ok_init, hw_fill, hw_set, hw_show, hw_brightness, no_deinit};
 
 /* ---- The pod -------------------------------------------------------------------------- */

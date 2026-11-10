@@ -164,6 +164,8 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/builtin_presets.c
     ${SHELL_DIR}/key_filter.c
     ${SHELL_DIR}/i2c_health.c
+    ${SHELL_DIR}/hal/pn532.c
+    ${SHELL_DIR}/nfc_card.c
     ${SHELL_DIR}/reset_reason.c
     ${SHELL_DIR}/radio/radio_task.c
     ${SHELL_DIR}/radio/radio_lbt.c
@@ -241,6 +243,7 @@ set(TEST_SOURCES
     test_builtin_presets.c
     test_key_filter.c
     test_i2c_health.c
+    test_pn532.c
     test_reset_reason.c
     test_display.c
     test_event_log.c

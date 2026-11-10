@@ -73,6 +73,7 @@ elseif(CONFIG_ATALAIA_POD_MODE)
         "hal/esp/hal_esp_keypad_gpio.c"
         "hal/esp/hal_esp_leds.c"
         "hal/esp/hal_esp_nfc.c"
+        "hal/pn532.c"
         "hal/esp/hal_esp_audio.c"
         "hal/esp/hal_esp_battery.c"
         "hal/esp/hal_esp_radio.c"
@@ -108,6 +109,7 @@ elseif(CONFIG_ATALAIA_POD_MODE)
 else()
     set(ATALAIA_SRCS
         "shell.c"
+        "nfc_card.c"
         "game_timer.c"
         "command_dispatch.c"
         "preset_store.c"
@@ -143,6 +145,7 @@ else()
         "hal/esp/hal_esp_display.c"
         "hal/esp/hal_esp_oled.c"
         "hal/esp/hal_esp_nfc.c"
+        "hal/pn532.c"
         "hal/esp/hal_esp_audio.c"
         "hal/esp/hal_esp_battery.c"
         "hal/esp/hal_esp_radio.c"

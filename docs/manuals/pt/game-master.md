@@ -168,7 +168,7 @@ Num canal com pouco tempo de emissão, as procuras nos canais anteriores são ra
 Cada caixa nova precisa da chave do campo uma vez. Abre **Adotar**. Três maneiras:
 
 - **Cabo USB**: liga a caixa ao USB do controlador com um cabo de dados. Toca em **Procurar caixas**, confirma o nome e o MAC da caixa, toca em **Adotar** e confirma.
-- **Cartão de campo**: toca em **Gerar o cartão de campo**. Escreve os bytes num cartão NTAG215 ou NTAG216. Encosta o cartão uma vez a cada caixa nova. **O cartão é o segredo-mestre do campo.** Guarda-o fechado à chave. Se se perder ou for copiado, muda a chave (num Pi: `join-key --rotate`), reinicia o controlador, adota de novo todas as caixas e destrói os cartões antigos.
+- **Cartão de campo**: toca em **Gerar o cartão de campo**. Escreve os bytes num cartão NTAG215 ou NTAG216 (com a app num telemóvel Android, ou [com o leitor de uma caixa](#write-cards-with-a-box)). Encosta o cartão uma vez a cada caixa nova. **O cartão é o segredo-mestre do campo.** Guarda-o fechado à chave. Se se perder ou for copiado, muda a chave (num Pi: `join-key --rotate`), reinicia o controlador, adota de novo todas as caixas e destrói os cartões antigos.
 - **Emparelhar por código (rádio)**: uma caixa não adotada mostra um código de 6 algarismos. Toca em **Procurar caixas pelo rádio**, escolhe a caixa pelo nome (confere o **id** no ecrã se duas tiverem o mesmo nome), escreve o código e toca em **Emparelhar**.
 
 Uma caixa que pertence a outro campo pede primeiro o seu **PIN de administração**. Vê o [manual da Field Box](field-box.md).
@@ -363,6 +363,16 @@ Uma caixa pode responder **recusou: noutro jogo** ([Uma caixa presa num jogo ter
 2. Toca em **Gerar**. A consola mostra um **código QR**, um **Texto de entrada** (`atalaia:join:…`) e os bytes de um **Cartão NFC (NTAG215/216)**.
 3. A caixa lê o cartão no leitor NFC; um telemóvel lê o código QR em **Dispositivo de jogo › Entrar num jogo**. **Este código e o cartão levam a chave do jogo**: mostra-os só a quem está a montar o campo.
 
+<a id="write-cards-with-a-box"></a>
+**Escrever um cartão com uma caixa em vez de um telemóvel** (na bancada ou na oficina): um telemóvel Android com a app Atalaia (ou uma app NFC que escreva memória NDEF em bruto) é a forma normal de escrever cartões de entrada, o cartão de campo e etiquetas de quem joga. Sem ele, uma Field Box com leitor NFC escreve-os ela própria, a partir de um computador ligado pelo cabo USB (firmware a partir da v0.12.0):
+
+1. Liga a caixa por USB. Não pode estar num jogo.
+2. Copia os bytes do cartão na consola (os bytes do **Cartão NFC**, os do cartão de campo, ou o **Registo NDEF (hex)** de uma etiqueta de quem joga).
+3. Corre `python3 tools/nfc_write.py --port <a porta da caixa> "<os bytes>"` a partir do repositório Atalaia (`--pin <PIN de administração>` numa caixa com firmware de lançamento; a ferramenta precisa do pyserial).
+4. Nos 10 segundos seguintes, encosta um cartão NTAG213, NTAG215 ou NTAG216 virgem ao leitor da caixa. A ferramenta diz **write: ok** e quantas páginas escreveu. A caixa escreve só a memória de utilizador do cartão, lê-a toda de volta e recusa um cartão pequeno demais para os bytes ou um cartão bloqueado.
+
+`--read` lê um cartão de volta para o verificar. Retira o cartão no fim: a caixa não entra num jogo com o cartão que acabou de escrever.
+
 <a id="the-check-in-desk"></a>
 ### A mesa do check-in
 
@@ -399,7 +409,7 @@ O check-in está aberto desde o momento em que o jogo é criado. **Fechar o chec
 
 Baixa Confirmada, Reentradas e Vidas, Registo de Presença, Ligaduras e Fábrica de Dinheiro precisam de uma etiqueta NFC por pessoa. O controlador assina cada etiqueta com a chave do jogo, por isso uma etiqueta só funciona no jogo para que foi feita: cada jogo novo precisa de etiquetas novas. Usa etiquetas NTAG213, NTAG215 ou NTAG216 virgens. Cria primeiro o jogo: um jogo terminado não tem chave.
 
-- **Na consola**: em **Check-in**, o cartão **Etiquetas de quem joga**. Escolhe o **Identificador de quem joga** e a **Equipa** (ou **Sem equipa**) e toca em **Fazer a etiqueta**. Com o Chrome num telemóvel Android (consola por HTTPS), toca em **Escrever com o NFC deste aparelho** e encosta uma etiqueta virgem ao telemóvel. Caso contrário a consola mostra o **Registo NDEF (hex)** e **Descarregar o ficheiro NDEF**, para gravar com a app Atalaia ou uma app NFC.
+- **Na consola**: em **Check-in**, o cartão **Etiquetas de quem joga**. Escolhe o **Identificador de quem joga** e a **Equipa** (ou **Sem equipa**) e toca em **Fazer a etiqueta**. Com o Chrome num telemóvel Android (consola por HTTPS), toca em **Escrever com o NFC deste aparelho** e encosta uma etiqueta virgem ao telemóvel. Caso contrário a consola mostra o **Registo NDEF (hex)** e **Descarregar o ficheiro NDEF**, para gravar com a app Atalaia ou uma app NFC (ou [com o leitor de uma caixa](#write-cards-with-a-box), na bancada).
 - **Num telemóvel controlador**: em **Etiquetas de quem joga**, toca em **Escrever etiquetas de quem joga** enquanto um jogo decorre.
 - **Um marshal** grava-as na app de marshal, no Wi-Fi do campo ([manual de marshal](marshal.md)).
 
