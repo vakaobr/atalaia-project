@@ -14,6 +14,17 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+- **The scoreboard example's retained-score test checks what it claims** (decisions SBT-1 to SBT-4;
+  `controller/tests/test_scoreboard_example.py` `test_prints_the_retained_score`): it checked only the last line the
+  example printed, after a subscriber had seen the score at all. It now checks, with a second subscriber, that the
+  broker holds exactly this game's score on `field/v1/<game>/score` with the retain flag set (next to a decoy retained
+  score for another game); stops the controller's MQTT bridge, so the retained message is the only way the score can
+  reach the example; and wants the example's whole output to be that one line, with `--once` and when following the game
+  until `--timeout` (the decoy game never printed). An example that ignores `--game`, drops retained messages,
+  subscribes to the wrong topic, prints another format or prints the score twice now fails the test (each tried). No
+  controller or example change: the stronger test found no bug. No other controller test has a `published > 0`-style
+  check.
+
 ## [0.11.0](https://github.com/vakaobr/atalaia-project/compare/v0.10.0...v0.11.0) (2026-11-07)
 
 ### Features
