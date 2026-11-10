@@ -32,7 +32,13 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ### Details
 
-#### Details
+- **The hardened image's emulator test answers on its first start (QDL-1 to QDL-4).** The emulated ROM ignored
+  esptool on about one start in two, whatever the wait: its joint download mode polls UART0, UART1 and the two USB
+  ports in turn, and bytes that reach UART0 during another port's turn livelock its interrupt handler when UART0's turn
+  comes (RELEASE_HARDENING.md, section 8). `tools/hardened_qemu.py` now has QEMU wait for the serial socket, reads the
+  ROM's banner, and sends the first SYNC while the emulator is stopped (QEMU's monitor) in UART0's turn; esptool then
+  connects as before. The settle times and the 10 starts of the previous fix are gone (3 starts at most remain, each
+  saying why it failed).
 
 - **The hardened image's emulator test is less flaky in CI.** `tools/hardened_qemu.py` failed in
   `esp32-hardened-build` when the emulated ROM did not answer esptool (seen on main and on the v0.12.0 release pull
