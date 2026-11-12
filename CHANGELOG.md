@@ -12,8 +12,9 @@ CONTRIBUTING.md, "Pull request titles and commit messages"); optional hand-writt
 `## [Unreleased]` and move into the next release's section as "Details". The sections up to 0.5.0
 were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.12.1](https://github.com/vakaobr/atalaia-project/compare/v0.12.0...v0.12.1) (2026-11-12)
+## [Unreleased]
 
+## [0.12.1](https://github.com/vakaobr/atalaia-project/compare/v0.12.0...v0.12.1) (2026-11-12)
 
 ### Bug Fixes
 
@@ -23,8 +24,6 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 ### Documentation
 
 * **site:** the test server and the live demo are offline until about 3 December 2026 ([#150](https://github.com/vakaobr/atalaia-project/issues/150)) ([eb0bec1](https://github.com/vakaobr/atalaia-project/commit/eb0bec14eabc441cf3df9d101bcf7a994cd2d6c1))
-
-## [Unreleased]
 
 ## [0.12.0](https://github.com/vakaobr/atalaia-project/compare/v0.11.0...v0.12.0) (2026-11-10)
 
