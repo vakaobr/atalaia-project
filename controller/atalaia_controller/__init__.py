@@ -13,7 +13,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-__version__ = "0.12.0"  # x-release-please-version
+__version__ = "0.12.1"  # x-release-please-version
 
 try:
     import atalaia_sim  # noqa: F401

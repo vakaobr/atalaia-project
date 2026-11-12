@@ -14,6 +14,17 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.12.1](https://github.com/vakaobr/atalaia-project/compare/v0.12.0...v0.12.1) (2026-11-12)
+
+### Bug Fixes
+
+* **firmware:** the hardened emulator test's first start answers (QDL-1 to QDL-4) ([#148](https://github.com/vakaobr/atalaia-project/issues/148)) ([3a9a53d](https://github.com/vakaobr/atalaia-project/commit/3a9a53df3a1143f07049a09994f970a6b398fb83))
+
+
+### Documentation
+
+* **site:** the test server and the live demo are offline until about 3 December 2026 ([#150](https://github.com/vakaobr/atalaia-project/issues/150)) ([eb0bec1](https://github.com/vakaobr/atalaia-project/commit/eb0bec14eabc441cf3df9d101bcf7a994cd2d6c1))
+
 ## [0.12.0](https://github.com/vakaobr/atalaia-project/compare/v0.11.0...v0.12.0) (2026-11-10)
 
 ### Features
