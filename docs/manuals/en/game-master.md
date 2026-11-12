@@ -9,7 +9,7 @@ For the people who run a field: setting it up once, running a game day from the 
 
 > **Not field-ready yet.** Atalaia is pre-alpha. The controller has played whole games with real boards on a bench, but no controller, box, phone or server has been used on a real field. Every step below matches what the software shows today. Steps that depend on hardware say **Not yet tested on a field**. Words in *italics* are in the [glossary](https://atalaia-project.link/en/glossary/).
 
-> **Versions.** The newest release is **v0.11.0** (7 November 2026). A feature marked **From v0.9.0** needs that release or a later one on the controller, the modem or the box, as the text says. **Coming from v0.9.0 or earlier, update the controller and the boxes together to v0.10.0 or later**, and reflash the USB radio modem over USB; from v0.10.0 to v0.11.0 nothing has to go together: see [Update the boxes](#update-the-boxes).
+> **Versions.** The newest release is **v0.12.0** (12 November 2026). A feature marked **From v0.9.0** needs that release or a later one on the controller, the modem or the box, as the text says. **Coming from v0.9.0 or earlier, update the controller and the boxes together to v0.10.0 or later**, and reflash the USB radio modem over USB; from v0.10.0 on nothing has to go together: see [Update the boxes](#update-the-boxes).
 
 ## Contents
 
@@ -580,6 +580,8 @@ More help: the [controller guide](../../../controller/README.md), the project's 
 ### Update the boxes
 
 You update the boxes' firmware over the field's Wi-Fi, between games. Done on a bench with a real board; not yet tested on a field.
+
+**v0.12.0: nothing has to be updated together.** Coming from v0.11.0, update the boxes when it suits you, over the air or over USB: the new Field Box firmware lets a box write cards on its own NFC reader from a computer at the bench or in the workshop ([Writing a card with a box](#write-cards-with-a-box)), and nothing else on the field depends on it. The controllers, the players' app and the site server are unchanged apart from their version, and the USB radio modem needs no new image. The I/O pod reads cards with the same, stricter reader driver; reflashing it over USB is optional. Coming from v0.10.0, the v0.11.0 paragraph below applies too.
 
 **v0.11.0: nothing has to be updated together.** Coming from v0.10.0, update the controllers, the boxes, the site server and the players' app when it suits you: older apps, rosters and controllers keep working with newer ones. The Field Box firmware changed only in code that the hardened image uses, and no box runs that image, so updating the boxes over the air is optional; the USB radio modem needs no new image. For an app check-in to show the marshal that it came from the **registering phone**, update the site server, the controller and the players' app; until then app check-ins show **phone not proved** and still go through ([marshal manual](marshal.md#printed-tickets-and-registered-players)). Coming from v0.9.0 or earlier, the v0.10.0 rule below still applies.
 

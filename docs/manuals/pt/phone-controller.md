@@ -164,6 +164,8 @@ O telemóvel controlador guarda os jogos, os códigos, a autoridade de certifica
 
 A partir daí, todas as atualizações se instalam por cima. Nunca desinstales para atualizar outra vez: se o Android alguma vez recusar o APK de uma versão, para e pergunta primeiro nas issues do projeto.
 
+**v0.12.0: só a app.** Vindo da v0.11.0, instala o APK da v0.12.0 quando te der jeito (instala-se por cima da v0.9.0 ou seguinte e mantém os dados da app): só muda o número de versão, e as caixas e o modem não têm de mudar com ela.
+
 **v0.11.0: só a app.** Vindo da v0.10.0, instala o APK da v0.11.0 quando te der jeito (instala-se por cima da v0.9.0 ou seguinte e mantém os dados da app); as caixas e o modem não têm de mudar com ela. A partir da v0.11.0, o telemóvel controlador mostra à equipa se um check-in na app veio do **telemóvel da inscrição** ou do **telemóvel por provar**, quando o servidor do site e a app de quem joga também estiverem na v0.11.0 ([manual de marshal](marshal.md#bilhetes-impressos-e-inscrições)). Vindo da v0.9.0 ou anterior, continua a valer a regra da v0.10.0 abaixo.
 
 **v0.10.0: a app, as caixas e o modem ao mesmo tempo.** A partir da v0.10.0, **Libertar todas as caixas que não estão neste jogo** indica o canal, e uma caixa v0.9.0 e um controlador v0.10.0, ou o contrário, não aceitam o dela um do outro. Instala o APK da v0.10.0 (instala-se por cima da v0.9.0 e mantém os dados da app), atualiza todas as caixas para a v0.10.0 no mesmo dia e grava de novo o modem de rádio USB com a imagem da v0.10.0.

@@ -273,7 +273,7 @@ O modem **não tem atualização pelo ar**: uma imagem nova escreve-se sempre po
 ### Quando o atualizar
 
 - As notas de uma versão nova dizem que o modem mudou. Vê a [página das versões](https://github.com/vakaobr/atalaia-project/releases) e o CHANGELOG.
-- Atualizas o controlador e as caixas para a **v0.10.0** (vindo da v0.9.0 ou anterior): vão juntos, e o modem recebe ao mesmo tempo a imagem da v0.10.0 ([manual da Field Box](field-box.md#update-the-boxes)). A v0.11.0 não muda o modem: um modem com a imagem da v0.10.0 fica como está.
+- Atualizas o controlador e as caixas para a **v0.10.0** (vindo da v0.9.0 ou anterior): vão juntos, e o modem recebe ao mesmo tempo a imagem da v0.10.0 ([manual da Field Box](field-box.md#update-the-boxes)). A v0.11.0 e a v0.12.0 não mudam o modem: um modem com a imagem da v0.10.0 fica como está.
 - O registo do controlador diz `the radio modem's firmware cannot report boxes still in an ended game`, ou o separador **Caixas** da consola, ou o ecrã de um telemóvel controlador em **Rádio**, diz que o modem de rádio não consegue dizer que caixas ficaram num jogo terminado. Isso precisa de uma imagem do modem da **v0.9.0**.
 - Foi gravado com a v0.4.0 ou anterior (a tabela de partições antiga, secção 4.3).
 

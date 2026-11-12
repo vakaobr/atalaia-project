@@ -9,7 +9,7 @@ Para quem dirige um campo: prepará-lo uma vez, dirigir um dia de jogo a partir 
 
 > **Ainda não está pronta para o campo.** A Atalaia está em pré-alfa. O controlador já jogou jogos inteiros com placas a sério numa bancada, mas nenhum controlador, caixa, telemóvel ou servidor foi usado num campo a sério. Cada passo abaixo corresponde ao que o software mostra hoje. Os passos que dependem de hardware dizem **Ainda não testado num campo**. As palavras em *itálico* estão no [glossário](https://atalaia-project.link/glossario/).
 
-> **Versões.** A versão mais recente é a **v0.11.0** (7 de novembro de 2026). Uma funcionalidade marcada **A partir da v0.9.0** precisa dessa versão ou de uma seguinte no controlador, no modem ou na caixa, como o texto indica. **Vindo da v0.9.0 ou anterior, atualiza o controlador e as caixas ao mesmo tempo para a v0.10.0 ou seguinte**, e grava de novo por USB o modem de rádio USB; da v0.10.0 para a v0.11.0 nada tem de ir junto: vê [Atualizar as caixas](#update-the-boxes).
+> **Versões.** A versão mais recente é a **v0.12.0** (12 de novembro de 2026). Uma funcionalidade marcada **A partir da v0.9.0** precisa dessa versão ou de uma seguinte no controlador, no modem ou na caixa, como o texto indica. **Vindo da v0.9.0 ou anterior, atualiza o controlador e as caixas ao mesmo tempo para a v0.10.0 ou seguinte**, e grava de novo por USB o modem de rádio USB; a partir da v0.10.0 nada tem de ir junto: vê [Atualizar as caixas](#update-the-boxes).
 
 ## Índice
 
@@ -621,6 +621,8 @@ Mais ajuda: o [guia do controlador](../../../controller/README.md) (em inglês),
 ### Atualizar as caixas
 
 Atualizas o firmware das caixas pelo Wi-Fi do campo, entre jogos. Feito numa bancada com uma placa a sério; ainda não testado num campo.
+
+**v0.12.0: nada tem de ser atualizado ao mesmo tempo.** Vindo da v0.11.0, atualiza as caixas quando te der jeito, pelo ar ou por USB: o firmware novo da Field Box deixa uma caixa escrever cartões no seu próprio leitor NFC, a partir de um computador, na bancada ou na oficina ([Escrever um cartão com uma caixa](#write-cards-with-a-box)), e mais nada no campo depende disso. Os controladores, a app de quem joga e o servidor do site só mudam de número de versão, e o modem de rádio USB não precisa de imagem nova. O I/O pod lê cartões com o mesmo controlador do leitor, agora mais rigoroso; gravá-lo de novo por USB é opcional. Vindo da v0.10.0, vale também o parágrafo da v0.11.0 abaixo.
 
 **v0.11.0: nada tem de ser atualizado ao mesmo tempo.** Vindo da v0.10.0, atualiza os controladores, as caixas, o servidor do site e a app de quem joga quando te der jeito: as apps, as listas e os controladores mais antigos continuam a funcionar com os mais recentes. O firmware da Field Box só mudou em código que a imagem endurecida usa, e nenhuma caixa usa essa imagem, por isso atualizar as caixas pelo ar é opcional; o modem de rádio USB não precisa de imagem nova. Para um check-in na app mostrar ao marshal que veio do **telemóvel da inscrição**, atualiza o servidor do site, o controlador e a app de quem joga; até lá, os check-ins na app aparecem como **telemóvel por provar** e continuam a entrar ([manual de marshal](marshal.md#bilhetes-impressos-e-inscrições)). Vindo da v0.9.0 ou anterior, continua a valer a regra da v0.10.0 abaixo.
 
