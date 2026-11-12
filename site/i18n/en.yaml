@@ -86,7 +86,7 @@ hero:
     Pre-alpha · phases 1 and 2 done in software; real boards play whole games with the field
     controller on the bench, keypad included; phase 3 done in software, the iOS app checked on an
     iPhone; phase 4's site server running on a test server; phase 5 built in software · newest
-    release v0.11.0 · not field-ready yet
+    release v0.12.0 · not field-ready yet
   title: The open <span class="nowrap">force-on-force</span> platform
   lead: >-
     Atalaia is an open platform for the electronic props of airsoft, paintball and milsim: the
@@ -723,10 +723,10 @@ try:
       <a href="https://github.com/vakaobr/atalaia-project/releases/tag/v0.9.0">v0.9.0</a> (6
       November 2026) is the first GitHub release that carries the app: atalaia-app-0.9.0.apk, signed
       with the project's key so that each release installs over the one before. The newest, <a
-      href="https://github.com/vakaobr/atalaia-project/releases/tag/v0.11.0">v0.11.0</a> (7 November
-      2026), installs over it and keeps the app's data; from v0.10.0 the APK is built without the
-      signing key and signed in a separate offline step. Its certificate's SHA-256 fingerprint is
-      <code
+      href="https://github.com/vakaobr/atalaia-project/releases/tag/v0.12.0">v0.12.0</a> (12
+      November 2026), installs over it and keeps the app's data; from v0.10.0 the APK is built
+      without the signing key and signed in a separate offline step. Its certificate's SHA-256
+      fingerprint is <code
       class="fingerprint">9C:35:0D:17:37:D6:C5:35:CD:3E:D1:04:28:8E:65:AD:7D:B4:FA:CE:8E:4E:6F:27:75:3B:7B:7C:38:40:A1:99</code>;
       Android refuses an update signed with another key. An app installed from an older debug build
       must be uninstalled once first (the manuals say what it loses). Or build the debug APK
@@ -750,13 +750,15 @@ roadmap:
     phases 1 to 3 are done in software (real boards play whole games on the bench, and the iOS app
     has passed its checklist on an iPhone); phases 4 and 5 are built in software. The gates wait for
     built boxes, field tests, a real server and the project's registry key. The newest release is
-    v0.11.0 (7 November 2026): at check-in the player's app proves it is the phone that registered,
-    and staff see whether a check-in is bound or unbound; the hardened Field Box image's burn
-    procedure is prepared, and by the maintainer's decision no board gets it for now. Nothing has to
-    be updated together. v0.10.0 (7 November 2026) brought review fixes that harden the stuck-box
-    recovery, failover and the ticket check-in, and a release APK signed offline; v0.9.0 (6 November
-    2026) the stuck-box recovery (one bench test so far) and the first Android app signed with the
-    project's key.
+    v0.12.0 (12 November 2026): a Field Box writes join cards, the field card and players' tags on
+    its own NFC reader, from a computer at the bench, and the reader's driver is tested on a
+    computer (not yet on a real reader). Nothing has to be updated together. v0.11.0 (7 November
+    2026) brought the registering phone's proof at check-in, with staff seeing whether a check-in is
+    bound or unbound, and prepared the hardened Field Box image's burn procedure (no board gets it
+    for now); v0.10.0 (7 November 2026) review fixes that harden the stuck-box recovery, failover
+    and the ticket check-in, and a release APK signed offline; v0.9.0 (6 November 2026) the
+    stuck-box recovery (one bench test so far) and the first Android app signed with the project's
+    key.
   more: The full roadmap, with what each phase holds and its gate →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
   # hardware), in progress, designed (research, architecture and plan written; no code).
@@ -788,7 +790,8 @@ roadmap:
       Leaving an ended game at the box came with v0.9.0, not yet tried on a real box. From v0.10.0
       the box's admin menu opens during a game only while the game is paused or waiting, and the
       hardened release image builds; v0.11.0 prepares its burn procedure, and no board gets it for
-      now. Still waiting for an assembled box.
+      now. From v0.12.0 a box writes cards on its own NFC reader for the bench, not yet tried on a
+      real reader. Still waiting for an assembled box.
     done:
       - ESP32 firmware for the Field Box, with presets on the device, running in an emulator.
       - The box's small screen shows the hold bar, points and held time, in four languages.
@@ -814,6 +817,7 @@ roadmap:
       - "The box's admin menu opens during a field game only while the game takes no keys from players: before the start, while it is paused, or 5 minutes after the game's controller went silent (a box stuck in an ended game). To take a box out of a running game, pause the game first. In v0.10.0 (7 November 2026); host tests only."
       - "The hardened release image (secure boot v2, flash encryption, NVS encryption, anti-rollback) builds, and CI signs it with a throw-away key. Nothing has been burned into a board, and the released images do not change. In v0.10.0 (7 November 2026)."
       - "The hardened image's burn procedure is written as a script that only prints its plan unless it is given the board's port and an explicit, per-board confirmation; the hardened build alone can revoke a secure boot key digest with an instruction signed by the project's root release key; and an emulator test runs the burn with throw-away keys. By the maintainer's decision of 7 November 2026 no board, bench or field, gets the hardened image or any eFuse burn for now; the plain and bench images are unchanged. In v0.11.0 (7 November 2026)."
+      - "A Field Box with an NFC reader writes and reads NTAG213, NTAG215 and NTAG216 cards (join cards, the field card, players' tags) from a computer on its USB cable, at the bench or in the workshop; an Android phone stays the normal way. The box asks for its admin PIN in a release build, refuses while it is in a game, writes only the card's user memory and reads it all back. The reader's driver is tested on a computer against NXP's manual and refuses garbled answers. In v0.12.0 (12 November 2026); not yet run on a real reader."
     next:
       - A built box that runs a 2-hour club game with no restarts.
       - "Seeing the timer bar on a real panel."
@@ -823,6 +827,7 @@ roadmap:
       - "The hardened release image on a board: it builds from v0.10.0 and its burn procedure is ready from v0.11.0, but by the maintainer's decision of 7 November 2026 no board gets it for now."
       - "Trying the I2C fault handling on a board with a bad keypad connection, and the boot splash and the new screens on more than the first bench board."
       - "Trying Leave the game on a real box."
+      - "Writing and reading cards with a box's own reader on a real PN532 and real NTAG cards: in v0.12.0, tested on a computer only."
     gate: >-
       Gate: one box runs a 2-hour club game with no restarts. <strong>Open</strong> until a built
       box does.
@@ -1237,7 +1242,7 @@ roadmap:
     short: >-
       Visual mode editor, signed mode packages, the mode registry as a template, German and
       Traditional Chinese, build guides, the expansion port's target and output modules. Every
-      software step is built. The newest release, v0.11.0, is signed with the project's release key
+      software step is built. The newest release, v0.12.0, is signed with the project's release key
       and carries the Android app, built without its key and signed with the project's Android key
       in a separate offline step.
     done:
