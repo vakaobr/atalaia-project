@@ -29,6 +29,8 @@ Atalaia is an open, local-first platform for airsoft, paintball and milsim game 
 > - **Phase 4, the site server:** built; it runs on the test server and as a read-only [demo](https://demo.atalaia-project.link/), not yet at a real field.
 > - **Phase 5, community:** the mode editor, the [mode registry](https://vakaobr.github.io/atalaia-modes/), the manuals and the expansion port's modules are built in software; the hardware and the registry's signing key are left.
 >
+> **The test server and the live demo are offline until about 3 December 2026** while the maintainer is travelling; this repository and the releases stay available.
+>
 > The newest release is **v0.11.0** (2026-11-07). The [roadmap](#roadmap) below, the [roadmap page](https://atalaia-project.link/en/roadmap/) and each phase's `STATUS.md` say what is done and what is next. Ideas, reviews and early contributors are very welcome.
 
 ---

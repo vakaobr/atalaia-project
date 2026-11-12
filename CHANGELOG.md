@@ -32,6 +32,10 @@ were written by hand and follow [Keep a Changelog](https://keepachangelog.com/).
 
 ### Details
 
+- **The project page says the test server is away.** Every page, in the five languages, and the README say that the test
+  server and the live demo (tests.atalaia-project.link, demo.atalaia-project.link) are offline until about 3 December 2026
+  while the maintainer is travelling (`header.server_notice`; emptied on return, it is hidden).
+
 - **The hardened image's emulator test answers on its first start (QDL-1 to QDL-4).** The emulated ROM ignored
   esptool on about one start in two, whatever the wait: its joint download mode polls UART0, UART1 and the two USB
   ports in turn, and bytes that reach UART0 during another port's turn livelock its interrupt handler when UART0's turn
