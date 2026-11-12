@@ -66,6 +66,8 @@ meta:
 
 header:
   translation_notice: ""
+  # The test server is off while the maintainer travels (2026-11-12): empty it on return.
+  server_notice: "O servidor de testes e a demonstração ao vivo (tests.atalaia-project.link e demo.atalaia-project.link) estão desligados até cerca de 3 de dezembro de 2026, durante uma viagem de quem mantém o projeto. Esta página, o código e as versões no GitHub continuam disponíveis."
   skip: Saltar para o conteúdo
   home: Atalaia, página inicial
   sections: Secções
@@ -1151,7 +1153,7 @@ roadmap:
         - "reset-totp: quem opera o servidor repõe o código de dois fatores de uma conta que perdeu o autenticador."
         - "Os controladores de campo vão buscar os registos de cronógrafo de outros campos de quem está na sua lista de inscritos, só com o consentimento de cada pessoa. Guardam-nos à parte das suas próprias leituras e nunca os avaliam."
         - "Os controladores recebem do servidor do site as definições e a imagem do campo, e uma alteração chega logo ao Pi e ao controlador no telemóvel. Em software."
-        - "Início de sessão com Google, Microsoft ou Apple e com passkeys (chaves de acesso). As palavras-passe são opcionais; a equipa continua a precisar de um segundo fator. A Google e a Microsoft foram experimentadas com os fornecedores a sério no servidor de testes (tests.atalaia-project.link); a Apple ainda não."
+        - "Início de sessão com Google, Microsoft ou Apple e com passkeys (chaves de acesso). As palavras-passe são opcionais; a equipa continua a precisar de um segundo fator. A Google e a Microsoft foram experimentadas com os fornecedores a sério no servidor de testes (tests.atalaia-project.link e demo.atalaia-project.link); a Apple ainda não."
         - "Uma página de conta para a equipa, onde cada pessoa gere os seus inícios de sessão: passkeys, contas associadas, palavra-passe e código de dois fatores."
         - "As alterações a cenários, predefinições e calendário chegam logo aos controladores."
         - "Durante quanto tempo o campo guarda os dados é uma definição do campo: o histórico de jogos e os registos de cronografagem têm cada um o seu prazo, definido no controlador, na consola de GM ou na página de definições do servidor do site: o histórico de jogos 90 dias por omissão (os resultados das equipas, sem identificadores de jogadores, 365), os registos de cronografagem 365. A limpeza diária apaga um jogo terminado com essa idade, nunca antes de o servidor do site o ter por inteiro. O campo, sem uso, de retenção por conta desapareceu."
@@ -1259,7 +1261,7 @@ roadmap:
         - "Uma demonstração em direto, só de leitura, para o servidor de pré-visualização: o controlador de campo a sério, com três Field Box simuladas, joga jogos sem parar, alternando um campo aberto e um edifício inventado de três pisos (uma planta por piso, quinze balizas, doze jogadores simulados: seis localizados por baliza, cinco por GPS com o piso escolhido, um indeciso), e quem visita vê a consola de GM, o marcador e a vista de quem joga, sem nada para alterar e sem dados pessoais. No ar desde 29 de outubro de 2026, em demo.atalaia-project.link; a vista de quem joga é testada num navegador sem ecrã."
         - "Modo alojado: um só retorno de início de sessão social para todo o centro (opcional): quem opera regista um endereço de retorno por fornecedor; o centro assina o estado, confere o campo no seu registo e passa para o retorno do próprio campo. Testado em Docker, não com os fornecedores a sério."
         - "Uma lista de verificação de entrada em produção para quem opera: seis condições antes de um campo poder usar o modo alojado (um acordo de subcontratação assinado por campo, os termos de partilha, todos os subcontratantes no anexo e na UE, um aviso de privacidade preenchido, os papéis próprios de quem opera se for uma pessoa singular, e uma prova num servidor real)."
-        - "O servidor de pré-visualização (tests.atalaia-project.link) corre tudo isto desde 30 de outubro e tem um aviso de privacidade próprio (versão preview-2026-10-31, contas assentes no contrato, 16 anos, sem encarregado de proteção de dados)."
+        - "O servidor de pré-visualização (tests.atalaia-project.link e demo.atalaia-project.link) corre tudo isto desde 30 de outubro e tem um aviso de privacidade próprio (versão preview-2026-10-31, contas assentes no contrato, 16 anos, sem encarregado de proteção de dados)."
         - "O servidor de pré-visualização instala sozinho o seu aviso de privacidade em cada arranque e atualização (e pára se faltarem os ficheiros de uma versão), a demonstração em direto envia HSTS, e uma pilha de teste descartável (um hub alojado, um fornecedor de início de sessão falso e um controlador de campo, só em 127.0.0.1) permite correr um teste de segurança autorizado sobre o código de hoje."
     next:
       - Um servidor a sério com domínio.
