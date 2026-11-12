@@ -33,6 +33,7 @@ import binascii
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -74,24 +75,83 @@ def default_efuse() -> bytes:
     return binascii.unhexlify("".join(re.findall(r"'([0-9a-f]+)'", block[:block.index("))")])))
 
 
-def listening(port: int) -> bool:
-    """Whether a TCP socket listens on this port (Linux's /proc/net/tcp*; elsewhere a 3 s wait)."""
-    hexport = f":{port:04X}"
-    seen = False
-    for name in ("/proc/net/tcp", "/proc/net/tcp6"):
+# The ROM's joint download mode (strap 0x00) polls UART0, UART1, the USB-OTG and the USB-Serial-JTAG
+# in turn (detect_uart_usb_spi_boot_mode). Each turn starts with uart_buff_switch(n), which enables
+# that port's receive interrupt and only then stores n in UartDev.buff_uart_no, the port its
+# interrupt handler reads. Bytes that reach UART0 while another port has its turn wait in UART0's
+# FIFO; on UART0's next turn the interrupt fires between those two steps, the handler reads the
+# previous port and never clears UART0's, and this QEMU takes the interrupt again before the store,
+# for ever: the ROM never answers that start (each start's esptool session, about one in two,
+# depended on where the loop was when its first byte arrived). So the first SYNC is sent only while
+# the emulator is stopped in UART0's turn (QEMU's monitor: stop, read buff_uart_no and UART0's
+# interrupt enable, cont); once the ROM has answered one SYNC it stays in UART0's download loop and
+# every later esptool or espefuse session answers. Addresses from ESP-IDF's ROM ELF
+# (esp-rom-elfs/esp32s3_rev0_rom.elf; a chip's ROM never changes): UartDev 0x3fcef134, buff_uart_no
+# its byte 24; UART0's INT_ENA register 0x6000000c (bit 0, RXFIFO_FULL).
+ROM_BUFF_UART_NO = 0x3FCEF14C
+UART0_INT_ENA = 0x6000000C
+ROM_WAITING = b"waiting for download"
+SYNC = b"\xc0\x00\x08\x24\x00\x00\x00\x00\x07\x07\x12\x20" + b"\x55" * 32 + b"\xc0"  # SLIP, command 0x08
+SYNC_REPLY = b"\xc0\x01\x08"
+
+
+class Monitor:
+    """QEMU's human monitor on a Unix socket: one command, its output up to the next prompt."""
+
+    def __init__(self, path: Path):
+        self.sock = socket.socket(socket.AF_UNIX)
+        self.sock.settimeout(10)
+        self.sock.connect(str(path))
+        self._prompt()
+
+    def _prompt(self) -> str:
+        buf = b""
+        while not buf.endswith(b"(qemu) "):
+            chunk = self.sock.recv(4096)
+            if not chunk:
+                raise OSError("the QEMU monitor closed")
+            buf += chunk
+        return buf.decode(errors="replace")
+
+    def cmd(self, line: str) -> str:
+        self.sock.sendall(line.encode() + b"\n")
+        return self._prompt()
+
+    def read(self, address: int, size: str) -> int:
+        """A byte (b) or word (w) of the emulated chip's memory, read while it is stopped."""
+        found = re.findall(r":\s*(0x[0-9a-f]+)", self.cmd(f"xp /1{size}x {address:#x}"))
+        if not found:
+            raise OSError(f"the QEMU monitor did not read {address:#x}")
+        return int(found[-1], 16)
+
+    def close(self) -> None:
+        self.sock.close()
+
+
+def connect(port: int, seconds: float) -> socket.socket:
+    deadline = time.time() + seconds
+    while True:
         try:
-            lines = Path(name).read_text().splitlines()[1:]
+            return socket.create_connection(("localhost", port), timeout=1)
         except OSError:
-            continue
-        seen = True
-        for line in lines:
-            f = line.split()
-            if len(f) > 3 and f[1].endswith(hexport) and f[3] == "0A":
-                return True
-    if not seen:
-        time.sleep(3)
-        return True
-    return False
+            if time.time() > deadline:
+                raise
+            time.sleep(0.05)
+
+
+def read_until(sock: socket.socket, want: bytes, seconds: float) -> bytes:
+    got = b""
+    deadline = time.time() + seconds
+    while want not in got and time.time() < deadline:
+        sock.settimeout(max(0.05, deadline - time.time()))
+        try:
+            chunk = sock.recv(4096)
+        except socket.timeout:
+            break
+        if not chunk:
+            break
+        got += chunk
+    return got
 
 
 class Qemu:
@@ -99,31 +159,71 @@ class Qemu:
     nvram.esp32c3.efuse in this QEMU: ESP-IDF 5.3's `idf.py qemu` names it nvram.esp32s3.efuse,
     which QEMU ignores with a warning, so its eFuses would not be kept in the file."""
 
-    def __init__(self, work: Path, download: bool, log: Optional[Path] = None, settle: float = 3.0):
+    def __init__(self, work: Path, download: bool, log: Optional[Path] = None):
         cmd = ["qemu-system-xtensa", "-nographic", "-M", "esp32s3",
                "-drive", f"file={work / 'flash.bin'},if=mtd,format=raw",
                "-drive", f"file={work / 'efuse.bin'},if=none,format=raw,id=efuse",
                "-global", "driver=nvram.esp32c3.efuse,property=drive,value=efuse"]
+        self.monitor_path = work / "monitor.sock"
         if download:
-            # GPIO0 low: the ROM's download mode, its UART0 a TCP socket.
+            # GPIO0 low: the ROM's download mode, its UART0 a TCP socket that QEMU waits on before it
+            # starts the chip (so Qemu.sync sees the ROM's banner); the monitor for the first SYNC.
+            self.monitor_path.unlink(missing_ok=True)
             cmd += ["-global", "driver=esp32s3.gpio,property=strap_mode,value=0x00",
-                    "-serial", f"tcp::{PORT},server,nowait"]
+                    "-serial", f"tcp::{PORT},server,wait", "-monitor", f"unix:{self.monitor_path},server,nowait"]
         else:
-            cmd += ["-serial", f"file:{log}"]
-        cmd += ["-monitor", "none"]
+            cmd += ["-serial", f"file:{log}", "-monitor", "none"]
         self.log = log
-        self.proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if download:
-            # The emulated ROM answers only some seconds after the socket listens; a fixed 3 s from
-            # the start was sometimes too short on a GitHub runner (every start then failed within
-            # seconds). Wait until the socket listens (read from /proc, never by connecting: the ROM
-            # takes the first session as esptool's), then a settle time, longer on each new start.
-            deadline = time.time() + 30
-            while time.time() < deadline and self.proc.poll() is None and not listening(PORT):
-                time.sleep(0.25)
-            time.sleep(settle)
-        else:
+        self.stderr = work / "qemu.stderr"
+        with self.stderr.open("wb") as err:
+            self.proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=err)
+        if not download:
             time.sleep(3)
+
+    def sync(self) -> str:
+        """Brings the ROM into UART0's download loop (see ROM_BUFF_UART_NO); "" when it answered a
+        SYNC, else what went wrong. QEMU starts the chip when this connects, and the ROM's banner
+        says when it waits; the socket is closed at the end and esptool connects again."""
+        try:
+            serial = connect(PORT, 30)
+        except OSError as e:
+            return f"no serial socket ({e})"
+        monitor = None
+        try:
+            banner = read_until(serial, ROM_WAITING, 30)
+            if ROM_WAITING not in banner:
+                return f"no download-mode banner: {banner[-200:]!r}"
+            deadline = time.time() + 30
+            while not self.monitor_path.exists() and time.time() < deadline:
+                time.sleep(0.05)
+            monitor = Monitor(self.monitor_path)
+            other_turn, polls = False, 0
+            while time.time() < deadline:
+                polls += 1
+                monitor.cmd("stop")
+                port = monitor.read(ROM_BUFF_UART_NO, "b")
+                enabled = monitor.read(UART0_INT_ENA, "w") & 1
+                # UART0's turn, after the loop has given another port one (at boot buff_uart_no is
+                # 0 before the loop has begun, and the ROM resets UART0 when it begins).
+                other_turn = other_turn or port != 0
+                if other_turn and port == 0 and enabled:
+                    serial.sendall(SYNC)
+                    time.sleep(0.05)  # QEMU puts the bytes in UART0's FIFO while the chip is stopped
+                    monitor.cmd("cont")
+                    reply = read_until(serial, SYNC_REPLY, 5)
+                    if SYNC_REPLY in reply:
+                        read_until(serial, b"\x00" * 64, 0.3)  # the ROM's other SYNC replies
+                        return ""
+                    return f"no SYNC reply after {polls} polls ({len(reply)} bytes: {reply[-40:].hex()})"
+                monitor.cmd("cont")
+                time.sleep(0.001 * (polls % 7))
+            return f"UART0's turn not seen in {polls} polls"
+        except OSError as e:
+            return f"monitor or socket error: {e}"
+        finally:
+            serial.close()
+            if monitor:
+                monitor.close()
 
     def text(self) -> bytes:
         return self.log.read_bytes() if self.log and self.log.exists() else b""
@@ -143,21 +243,22 @@ def esptool(*args: str, timeout: float = 120) -> subprocess.CompletedProcess:
 
 
 def download_mode(work: Path) -> tuple[Optional[Qemu], str]:
-    """The emulator in download mode and the chip's MAC. The emulated ROM sometimes never answers
-    the first esptool session after a start (and then no later one either), so a start whose first
-    read_mac fails is stopped and made again, up to 10 times, each after a longer settle. Locally the
-    sixth start answered in two runs in a row, at 13 s and at 28 s of settling, so the cause is not the
-    wait alone; each failed start prints what esptool said."""
+    """The emulator in download mode and the chip's MAC. Qemu.sync makes the first start answer;
+    a start that still does not is stopped and made again, up to 3 times, saying why."""
     said = ""
-    for attempt in range(10):
-        q = Qemu(work, download=True, settle=min(8.0 + 2.0 * attempt, 20.0))
-        out = esptool("--connect-attempts", "3", "read_mac", timeout=60)
-        found = re.findall(r"MAC:\s*([0-9a-f:]{17})", out.stdout)
+    for attempt in range(3):
+        q = Qemu(work, download=True)
+        t0 = time.time()
+        why = q.sync()
+        out = esptool("--connect-attempts", "3", "read_mac", timeout=60) if not why else None
+        found = re.findall(r"MAC:\s*([0-9a-f:]{17})", out.stdout) if out else []
         if found:
+            print(f"the ROM answered on start {attempt + 1} after {time.time() - t0:.1f} s", flush=True)
             return q, found[-1]
         gone = q.proc.poll()
         said = f"start {attempt + 1}: qemu {'exited ' + str(gone) if gone is not None else 'running'}; " + \
-            (out.stdout + out.stderr).strip()[-600:]
+            (why or (out.stdout + out.stderr).strip()[-600:]) + \
+            f"; qemu stderr: {q.stderr.read_text(errors='replace').strip()[-300:]!r}"
         print(said, flush=True)
         q.stop()
     return None, said
