@@ -15,9 +15,9 @@
 #   --exclude-newer-package httpcore2=2026-10-21T08:00:00Z (requirements-test.txt)
 #   --exclude-newer-package opentelemetry-api=2026-10-06T18:00:00Z
 #   --exclude-newer-package pyasn1=2026-10-27T07:00:00Z (security fix, under two weeks old)
-alembic==1.20.0 \
-    --hash=sha256:77eb101048d95f982c0353e9233404889dcd7a6fc244c107836c0e2fc9cf7d9d \
-    --hash=sha256:db505480647bc60386c5369402f4a57a506b7539c9e9ef5e270d45cbbe4939bf
+alembic==1.20.1 \
+    --hash=sha256:83490def1f723413db5096591f7609ac52544805be93849170088ed04f5a2e0b \
+    --hash=sha256:9970712cfb81ea26c8658d378aaa5b8f6ff9146e5bb111d70497c164016cf598
     # via -r requirements.in
 annotated-doc==0.0.5 \
     --hash=sha256:117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101 \
@@ -884,7 +884,7 @@ pyyaml==6.0.3 \
     --hash=sha256:fa160448684b4e94d80416c0fa4aac48967a969efe22931448d853ada8baf926 \
     --hash=sha256:fc09d0aa354569bc501d4e787133afc08552722d3ab34836a80547331bb5d4a0
     # via -r requirements.in
-sqlalchemy==2.1.6 \
+sqlalchemy[asyncio]==2.1.6 \
     --hash=sha256:015bd7b0687b5feaecb9988bc2f36ecb39daca83bd806b094b43b19ea503b0a9 \
     --hash=sha256:048d1beb9bfd7ca1afbcfdb8da9519712827df6cccc80a225715ce387d37bb3b \
     --hash=sha256:0534d3f41295a74d9fe2e0838e06ce6329a0855b2965df5f5d1c4d3f6f1406d0 \
@@ -969,14 +969,11 @@ typing-extensions==4.16.0 \
     --hash=sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5
     # via
     #   alembic
-    #   anyio
     #   fastapi
     #   opentelemetry-api
     #   pydantic
     #   pydantic-core
-    #   pyopenssl
     #   sqlalchemy
-    #   starlette
     #   typing-inspection
 typing-inspection==0.4.4 \
     --hash=sha256:547274fa6b0a561ccf549cc9524b999a578e737d015d8709d021f9d0d13bea47 \
